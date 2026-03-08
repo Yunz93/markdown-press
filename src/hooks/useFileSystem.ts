@@ -1,9 +1,25 @@
 import { useCallback } from 'react';
-import { TauriFileSystem } from '../services/tauriFileSystem';
-import { getFileSystem, isTauriEnvironment } from '../types/filesystem';
+import { getFileSystem } from '../types/filesystem';
 import { useAppStore } from '../store/appStore';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import type { FileNode } from '../types';
+
+function getPathSeparator(path: string): '/' | '\\' {
+  return path.includes('\\') ? '\\' : '/';
+}
+
+function getPathBasename(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] || path;
+}
+
+function joinPath(basePath: string, segment: string): string {
+  const sep = getPathSeparator(basePath);
+  if (basePath.endsWith('/') || basePath.endsWith('\\')) {
+    return `${basePath}${segment}`;
+  }
+  return `${basePath}${sep}${segment}`;
+}
 
 /**
  * Hook for file system operations
@@ -40,15 +56,11 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const path = await fs.openFile();
       if (path) {
-        const { basename } = await import('@tauri-apps/api/path').catch(() => ({
-          basename: (p: string) => p.split('/').pop() || p
-        }));
-
         const content = await withErrorHandling(
           () => fs.readFile(path),
           'Failed to read file'
         );
-        const fileName = await basename(path);
+        const fileName = getPathBasename(path);
 
         const newFile: FileNode = {
           id: path,
@@ -143,16 +155,13 @@ export function useFileSystem() {
   const createFile = useCallback(async (fileName: string, content: string = '', folderPath?: string): Promise<FileNode | null> => {
     try {
       const fs = await getFileSystem();
-      const { join } = await import('@tauri-apps/api/path').catch(() => ({
-        join: (...parts: string[]) => parts.join('/')
-      }));
       const basePath = folderPath || useAppStore.getState().rootFolderPath;
       if (!basePath) {
         showNotification('No folder opened. Please open a folder first.', 'error');
         return null;
       }
 
-      const fullPath = await join(basePath, fileName);
+      const fullPath = joinPath(basePath, fileName);
       await withErrorHandling(
         () => fs.createFile(fullPath, content),
         'Failed to create file'
@@ -182,16 +191,13 @@ export function useFileSystem() {
   const createFolder = useCallback(async (folderName: string, parentPath?: string): Promise<FileNode | null> => {
     try {
       const fs = await getFileSystem();
-      const { join } = await import('@tauri-apps/api/path').catch(() => ({
-        join: (...parts: string[]) => parts.join('/')
-      }));
       const basePath = parentPath || useAppStore.getState().rootFolderPath;
       if (!basePath) {
         showNotification('No folder opened. Please open a folder first.', 'error');
         return null;
       }
 
-      const fullPath = await join(basePath, folderName);
+      const fullPath = joinPath(basePath, folderName);
       await withErrorHandling(
         () => fs.createDirectory(fullPath),
         'Failed to create folder'
@@ -302,8 +308,9 @@ export function useFileSystem() {
    */
   const watchFile = useCallback(async (path: string, callback: (event: any) => void): Promise<(() => void) | null> => {
     try {
-      if (isTauriEnvironment()) {
-        return await TauriFileSystem.getInstance().watchFile(path, callback);
+      const fs = await getFileSystem();
+      if (typeof fs.watchFile === 'function') {
+        return await fs.watchFile(path, callback);
       }
       return null;
     } catch (error) {

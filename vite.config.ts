@@ -23,6 +23,8 @@ export default defineConfig(({ mode }) => {
         target: 'esnext',
         outDir: 'dist',
         emptyOutDir: true,
+        // Shiki + Mermaid bundle many offline language assets; keep warning signal practical.
+        chunkSizeWarningLimit: 1600,
       },
       // 基础路径配置为相对路径
       base: './',

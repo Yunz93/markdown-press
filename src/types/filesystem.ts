@@ -18,6 +18,7 @@ export interface IFileSystem {
   createDirectory(path: string): Promise<void>;
   revealInExplorer?(path: string): Promise<void>;
   moveFile?(sourcePath: string, targetPath: string): Promise<string>;
+  watchFile?(path: string, callback: (event: any) => void): Promise<() => void>;
 }
 
 /**

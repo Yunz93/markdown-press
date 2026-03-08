@@ -4,11 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Markdown Press</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown.min.css" />
-    <script>
-      // Polyfill for process and tailwind config if CDN fails
-      window.process = { env: { NODE_ENV: 'production' } };
-    </script>
     <style>
       body { margin: 0; background: #f9fafb; }
       .loading-container {
@@ -28,21 +23,5 @@
       </div>
     </div>
     <script type="module" src="./index.tsx"></script>
-    <!-- Use CDN as fallback but don't let it block -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      if (window.tailwind) {
-        tailwind.config = {
-          darkMode: 'class',
-          theme: {
-            extend: {
-              colors: {
-                accent: { DEFAULT: '#007AFF', hover: '#0056b3' }
-              }
-            }
-          }
-        }
-      }
-    </script>
   </body>
 </html>

@@ -1,5 +1,6 @@
-/* KaTeX CSS - must be at top */
-@import 'katex/dist/katex.min.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* iOS-style minimalist scrollbar */
 ::-webkit-scrollbar {

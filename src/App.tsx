@@ -19,6 +19,9 @@ import { analyzeContent } from './services/geminiService';
 import { getFileSystem } from './types/filesystem';
 import { withErrorHandling } from './utils/errorHandler';
 import { parseFrontmatter } from './utils/frontmatter';
+import { exportToHtml } from './utils/export';
+import * as yaml from 'js-yaml';
+import { basename } from '@tauri-apps/api/path';
 import { ViewMode, type FileNode, type Frontmatter } from './types';
 
 // Helper function to recursively find a file in the tree
@@ -70,7 +73,8 @@ const App: React.FC = () => {
     renameFile,
     deleteFile,
     moveFile,
-    revealInExplorer
+    revealInExplorer,
+    watchFile
   } = useFileSystem();
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
@@ -165,7 +169,6 @@ const App: React.FC = () => {
       };
 
       // Generate YAML frontmatter
-      const yaml = await import('js-yaml');
       const frontmatterYaml = yaml.dump(mergedFrontmatter, { skipInvalid: true });
       const frontmatterBlock = `---\n${frontmatterYaml}---\n\n`;
 
@@ -195,6 +198,57 @@ const App: React.FC = () => {
     },
     handleAIAnalyze
   );
+
+  // Watch active file for external changes and auto-reload when safe.
+  useEffect(() => {
+    if (!activeTabId || !currentFilePath) return;
+
+    let disposed = false;
+    let unwatch: (() => void) | null = null;
+
+    const setupWatcher = async () => {
+      unwatch = await watchFile(currentFilePath, async (event) => {
+        if (disposed) return;
+        if (event?.type === 'deleted') {
+          showNotification('File was deleted on disk.', 'error');
+          return;
+        }
+        if (event?.type === 'error') {
+          showNotification('Failed to watch file changes on disk.', 'error');
+          return;
+        }
+        if (event?.type !== 'modified') return;
+
+        const state = useAppStore.getState();
+        if (state.hasUnsavedChanges(activeTabId)) {
+          showNotification('File changed on disk. Save or discard local edits before reloading.', 'error');
+          return;
+        }
+
+        const node = findFileInTree(state.files, activeTabId);
+        if (!node || node.type !== 'file') return;
+
+        try {
+          const latestContent = await readFile(node);
+          const currentCached = useAppStore.getState().fileContents[activeTabId];
+          if (currentCached === latestContent) return;
+
+          useAppStore.getState().updateTabContent(activeTabId, latestContent);
+          useAppStore.getState().setContent(latestContent);
+          showNotification('File reloaded from disk.', 'success');
+        } catch {
+          showNotification('Failed to reload file changed on disk.', 'error');
+        }
+      });
+    };
+
+    setupWatcher();
+
+    return () => {
+      disposed = true;
+      if (unwatch) unwatch();
+    };
+  }, [activeTabId, currentFilePath, readFile, showNotification, watchFile]);
 
   // Additional keyboard shortcuts for search and outline
   useEffect(() => {
@@ -276,7 +330,6 @@ const App: React.FC = () => {
 
     let initialContent = '';
     try {
-      const yaml = await import('js-yaml');
       initialContent = `---\n${yaml.dump(meta)}---\n\n# Untitled\n\n`;
     } catch (e) {
       initialContent = `# Untitled\n\n`;
@@ -343,7 +396,6 @@ const App: React.FC = () => {
     if (sourceId === targetId) return;
 
     try {
-      const { basename } = await import('@tauri-apps/api/path');
       const fileName = await basename(sourceFile.path);
       const newPath = await moveFile(sourceFile, targetFolder.path);
 
@@ -404,7 +456,6 @@ const App: React.FC = () => {
 
     try {
       // Create HTML rendered markdown
-      const { exportToHtml } = await import('./utils/export');
       const htmlContent = await exportToHtml(content, {
         title: activeFile.name.replace('.md', ''),
         theme: settings.themeMode === 'dark' ? 'dark' : 'light',

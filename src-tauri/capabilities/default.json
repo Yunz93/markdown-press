@@ -10,20 +10,9 @@
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
-    "shell:allow-open",
-    "shell:allow-spawn",
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        {
-          "name": "open",
-          "cmd": "open",
-          "args": [
-            {
-              "validator": ".+"
-            }
-          ]
-        },
         {
           "name": "osascript",
           "cmd": "osascript",
@@ -43,16 +32,8 @@
           "cmd": "explorer",
           "args": [
             {
-              "validator": "/select,.+"
-            }
-          ]
-        },
-        {
-          "name": "cmd",
-          "cmd": "cmd",
-          "args": [
-            "/c",
-            "start",
+              "validator": "^/select,$"
+            },
             {
               "validator": ".+"
             }

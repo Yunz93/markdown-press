@@ -18,6 +18,7 @@
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "dompurify": "^3.3.1",
+    "github-markdown-css": "^5.9.0",
     "js-yaml": "4.1.0",
     "katex": "^0.16.33",
     "lucide-react": "^0.563.0",
@@ -35,6 +36,9 @@
     "@types/katex": "^0.16.8",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.17",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

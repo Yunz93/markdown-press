@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './src/App';
+import 'github-markdown-css/github-markdown.css';
+import 'katex/dist/katex.min.css';
 import './index.css';
 
 // Ensure process.env exists for some libraries
