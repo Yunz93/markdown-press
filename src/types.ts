@@ -1,0 +1,77 @@
+export interface FileNode {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  content?: string;
+  children?: FileNode[];
+  path: string;
+  isPublished?: boolean;
+  isTrash?: boolean;
+}
+
+export interface Frontmatter {
+  title?: string;
+  date?: string;
+  tags?: string[];
+  description?: string;
+  layout?: string;
+  [key: string]: string | string[] | number | boolean | null | undefined;
+}
+
+export interface ParsedMarkdown {
+  frontmatter: Frontmatter | null;
+  body: string;
+}
+
+export interface MarkdownFile {
+  frontmatter: Frontmatter;
+  body: string;
+  raw: string;
+}
+
+export enum ViewMode {
+  EDITOR = 'EDITOR',
+  PREVIEW = 'PREVIEW',
+  SPLIT = 'SPLIT'
+}
+
+export interface AIAnalysisResult {
+  summary: string;
+  suggestedTags: string[];
+  seoTitle: string;
+}
+
+export interface ShortcutConfig {
+  save: string;
+  toggleView: string;
+  aiAnalyze: string;
+}
+
+export interface MetadataField {
+  key: string;
+  defaultValue: string;
+}
+
+export interface AppSettings {
+  fontSize: number;
+  wordWrap: boolean;
+  fontFamily: string;
+  githubRepo: string;
+  geminiApiKey?: string;
+  shortcuts: ShortcutConfig;
+  themeMode: 'light' | 'dark' | 'solarized-light' | 'solarized-dark' | 'custom';
+  customCss: string;
+  metadataFields: MetadataField[];
+  autoSaveInterval: number; // Auto-save interval in milliseconds
+}
+
+export interface Notification {
+  msg: string;
+  type: 'success' | 'error';
+}
+
+export interface DragDropEvent {
+  payload: {
+    paths: string[];
+  };
+}

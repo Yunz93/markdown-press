@@ -1,0 +1,5 @@
+{
+  "name": "Markdown Press",
+  "description": "A minimalist static blog editor tailored for Markdown users. Features AI-powered frontmatter generation for SEO, and GitHub Pages compatibility.",
+  "requestFramePermissions": []
+}

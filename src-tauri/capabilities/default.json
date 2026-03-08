@@ -1,0 +1,144 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "shell:allow-open",
+    "shell:allow-spawn",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "open",
+          "cmd": "open",
+          "args": [
+            {
+              "validator": ".+"
+            }
+          ]
+        },
+        {
+          "name": "osascript",
+          "cmd": "osascript",
+          "args": [
+            "-e",
+            {
+              "validator": ".+"
+            },
+            "-e",
+            {
+              "validator": ".*"
+            }
+          ]
+        },
+        {
+          "name": "explorer",
+          "cmd": "explorer",
+          "args": [
+            {
+              "validator": "/select,.+"
+            }
+          ]
+        },
+        {
+          "name": "cmd",
+          "cmd": "cmd",
+          "args": [
+            "/c",
+            "start",
+            {
+              "validator": ".+"
+            }
+          ]
+        },
+        {
+          "name": "xdg-open",
+          "cmd": "xdg-open",
+          "args": [
+            {
+              "validator": ".+"
+            }
+          ]
+        }
+      ]
+    },
+    "core:path:allow-basename",
+    "core:path:allow-dirname",
+    "core:path:allow-extname",
+    "core:path:allow-is-absolute",
+    "core:path:allow-join",
+    "core:path:allow-normalize",
+    "core:path:allow-resolve",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-rename",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME/.markdown-press/**" }
+      ]
+    }
+  ],
+  "platforms": ["macOS", "windows", "linux"]
+}

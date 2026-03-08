@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(npm run:*)",
+      "Bash(open:*)",
+      "Bash(cp:*)",
+      "Bash(cd /Users/yunz/Code/VibeCoding/markdown-press/src-tauri/target/release/bundle/macos/markdown-press.app/Contents/MacOS && ./app 2>&1)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

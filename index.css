@@ -1,0 +1,465 @@
+/* KaTeX CSS - must be at top */
+@import 'katex/dist/katex.min.css';
+
+/* iOS-style minimalist scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.dark .glass {
+  background: rgba(20, 20, 20, 0.75);
+}
+
+/* GitHub Markdown CSS Overrides */
+.markdown-body {
+  box-sizing: border-box;
+  min-width: 200px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 45px;
+  background-color: transparent !important;
+  font-family: inherit !important;
+}
+
+/* High Contrast Overrides for Light Mode */
+html:not(.dark) .markdown-body {
+  color: #000000 !important;
+  --color-fg-default: #000000 !important;
+  --color-fg-muted: #444444 !important;
+  --color-canvas-default: transparent !important;
+}
+
+.dark .markdown-body {
+  color: #c9d1d9;
+  --color-canvas-default: transparent;
+}
+
+/* Outline Panel Styles */
+.outline-panel {
+  width: 250px;
+  height: 100%;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+}
+
+.dark .outline-panel {
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.outline-panel.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+
+.outline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.dark .outline-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.outline-header .collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.outline-header .collapse-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.dark .outline-header .collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.outline-content {
+  padding: 8px 0;
+}
+
+.outline-item {
+  overflow: hidden;
+}
+
+.outline-node {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.outline-node:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .outline-node:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.outline-node.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.outline-node .expand-btn,
+.outline-node .spacer {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.outline-node .expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+}
+
+.outline-node .expand-btn .chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s;
+}
+
+.outline-node .expand-btn.expanded .chevron {
+  transform: rotate(90deg);
+}
+
+.outline-node .heading-text {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.outline-node .heading-text:hover {
+  color: #3b82f6;
+}
+
+.outline-node .heading-text.active {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.outline-node .heading-level {
+  font-size: 10px;
+  color: #999;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.outline-node .heading-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline-node .children {
+  overflow: hidden;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 20px;
+  font-size: 12px;
+  color: #999;
+}
+
+/* Search Bar Styles */
+.search-bar {
+  position: absolute;
+  top: 64px;
+  right: 20px;
+  z-index: 100;
+  background: white;
+  dark: background;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  min-width: 320px;
+  max-width: 480px;
+}
+
+.dark .search-bar {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-bar .search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.search-bar .search-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-bar .search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #f9f9f9;
+  color: #333;
+}
+
+.dark .search-bar .search-input {
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ccc;
+}
+
+.search-bar .search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.search-bar .search-options {
+  display: flex;
+  gap: 12px;
+}
+
+.search-bar .search-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+}
+
+.dark .search-bar .search-option {
+  color: #999;
+}
+
+.search-bar .search-option input {
+  cursor: pointer;
+}
+
+.search-bar .search-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.search-bar .search-count {
+  font-size: 12px;
+  color: #666;
+  margin-right: 8px;
+}
+
+.dark .search-bar .search-count {
+  color: #999;
+}
+
+.search-bar .search-btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #f0f0f0;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark .search-bar .search-btn {
+  background: #333;
+  color: #ccc;
+}
+
+.search-bar .search-btn:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.dark .search-bar .search-btn:hover:not(:disabled) {
+  background: #444;
+}
+
+.search-bar .search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-bar .search-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.search-bar .close-btn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+}
+
+.search-bar .close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.dark .search-bar .close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Writing Stats Styles */
+.writing-stats {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.dark .writing-stats {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.writing-stats .stat-item {
+  white-space: nowrap;
+}
+
+.writing-stats .stat-item svg {
+  flex-shrink: 0;
+}
+
+/* Tab Bar Styles */
+.tab-bar {
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.tab {
+  user-select: none;
+}
+
+.tab .close-tab {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tab:hover .close-tab {
+  opacity: 1;
+}
+
+/* KaTeX Styles */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+.katex-error {
+  color: #ef4444;
+  font-family: monospace;
+  padding: 0.5em;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+}
+
+/* Mermaid Styles */
+.mermaid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5em;
+  background: rgba(128, 128, 128, 0.05);
+  border-radius: 8px;
+  margin: 1em 0;
+}
+
+.dark .mermaid {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mermaid-error {
+  color: #ef4444;
+  font-family: monospace;
+  padding: 1em;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.dark .katex {
+  color: #e5e7eb;
+}
+
+.dark .katex .mord {
+  color: #e5e7eb;
+}
+
+.dark .katex .mtext {
+  color: #9ca3af;
+}
+
+.dark .katex-display {
+  color: #e5e7eb;
+}

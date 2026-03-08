@@ -1,0 +1,464 @@
+import React, { useState } from 'react';
+import type { AppSettings, MetadataField } from '../../types';
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  settings: AppSettings;
+  onUpdateSettings: (updates: Partial<AppSettings>) => void;
+}
+
+type SettingsTab = 'general' | 'editor' | 'appearance' | 'metadata' | 'shortcuts' | 'ai';
+
+interface TabConfig {
+  id: SettingsTab;
+  label: string;
+  icon: React.FC<{ size: number }>;
+}
+
+const tabs: TabConfig[] = [
+  { id: 'appearance', label: 'Appearance', icon: (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+    </svg>
+  )},
+  { id: 'editor', label: 'Editor', icon: (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="4 7 4 4 20 4 20 7" />
+      <line x1="9" y1="20" x2="15" y2="20" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+    </svg>
+  )},
+  { id: 'ai', label: 'AI Enhance', icon: (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z" />
+    </svg>
+  )},
+  { id: 'metadata', label: 'Metadata', icon: (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  )},
+  { id: 'shortcuts', label: 'Shortcuts', icon: (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <line x1="6" y1="8" x2="6" y2="8" />
+      <line x1="10" y1="8" x2="10" y2="8" />
+      <line x1="14" y1="8" x2="14" y2="8" />
+      <line x1="18" y1="8" x2="18" y2="8" />
+      <line x1="6" y1="12" x2="6" y2="12" />
+      <line x1="10" y1="12" x2="10" y2="12" />
+      <line x1="14" y1="12" x2="14" y2="12" />
+      <line x1="18" y1="12" x2="18" y2="12" />
+      <line x1="6" y1="16" x2="10" y2="16" />
+    </svg>
+  )},
+  { id: 'general', label: 'Publishing', icon: (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  )},
+];
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  settings,
+  onUpdateSettings
+}) => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  // Normalize shortcut input to standard format (e.g., "Ctrl+S")
+  const normalizeShortcut = (input: string): string => {
+    const parts = input.toLowerCase().split('+').map(p => p.trim());
+    const modifiers: string[] = [];
+    let key = '';
+
+    for (const part of parts) {
+      if (part === 'ctrl' || part === 'meta' || part === 'command') {
+        modifiers.push('Ctrl');
+      } else if (part === 'shift') {
+        modifiers.push('Shift');
+      } else if (part === 'alt' || part === 'option') {
+        modifiers.push('Alt');
+      } else if (part) {
+        // Capitalize key
+        key = part.length === 1 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+      }
+    }
+
+    if (!key) return 'Ctrl+S'; // Default fallback
+    return [...modifiers, key].join('+');
+  };
+
+  const handleShortcutChange = (key: string, value: string) => {
+    const normalized = normalizeShortcut(value);
+    onUpdateSettings({
+      shortcuts: { ...settings.shortcuts, [key]: normalized }
+    });
+  };
+
+  const isValidGithubRepo = (repo: string): boolean => {
+    if (!repo.trim()) return true; // Allow empty
+    return /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/.test(repo.trim());
+  };
+
+  if (!isOpen) return null;
+
+  const handleUpdateMetadata = (idx: number, field: Partial<MetadataField>) => {
+    if (idx < 0 || idx >= settings.metadataFields.length) return;
+    const newFields = settings.metadataFields.map((f, i) =>
+      i === idx ? { ...f, ...field } : f
+    );
+    onUpdateSettings({ metadataFields: newFields });
+  };
+
+  const handleAddMetadata = () => {
+    onUpdateSettings({
+      metadataFields: [...settings.metadataFields, { key: 'new_prop', defaultValue: '' }]
+    });
+  };
+
+  const handleRemoveMetadata = (idx: number) => {
+    if (idx < 0 || idx >= settings.metadataFields.length) return;
+    const newFields = settings.metadataFields.filter((_, i) => i !== idx);
+    onUpdateSettings({ metadataFields: newFields });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-fade-in-02s">
+      <div
+        className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-scale-in flex h-[600px] max-h-[90vh] border border-gray-200/50 dark:border-white/10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sidebar */}
+        <div className="w-56 bg-gray-50/50 dark:bg-black/20 border-r border-gray-200/50 dark:border-white/5 flex flex-col p-3 gap-1 shrink-0">
+          <div className="px-3 py-4 mb-2">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Settings</h2>
+          </div>
+
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? 'bg-white dark:bg-white/10 shadow-sm text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <tab.icon size={18} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-transparent">
+          <div className="flex-1 overflow-y-auto p-8">
+            {/* AI Tab */}
+            {activeTab === 'ai' && (
+              <div className="space-y-6 animate-fade-in-02s">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">AI Content Enhancement</h3>
+                  <p className="text-sm text-gray-500 mb-6">Use Google Gemini to automatically generate frontmatter, summaries, and SEO tags.</p>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini API Key</label>
+                      <div className="relative">
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={settings.geminiApiKey || ''}
+                          onChange={(e) => onUpdateSettings({ ...settings, geminiApiKey: e.target.value })}
+                          placeholder="Paste your API key here..."
+                          className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                        />
+                        <button
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          {showApiKey ? (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-400">Your API key is stored locally and never shared. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Appearance Tab */}
+            {activeTab === 'appearance' && (
+              <div className="space-y-8 animate-fade-in-02s">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Theme</h3>
+                  <p className="text-sm text-gray-500 mb-4">Choose a look for your workspace.</p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                    {[
+                      { mode: 'light', label: 'Light', bg: 'bg-white', border: 'border-gray-200' },
+                      { mode: 'dark', label: 'Dark', bg: 'bg-gray-900', border: 'border-gray-800' },
+                      { mode: 'solarized-light', label: 'Solarized Light', bg: 'bg-[#fdf6e3]', border: 'border-[#eee8d5]' },
+                      { mode: 'solarized-dark', label: 'Solarized Dark', bg: 'bg-[#002b36]', border: 'border-[#073642]' },
+                      { mode: 'custom', label: 'Custom CSS', bg: 'bg-gradient-to-br from-indigo-50 to-purple-50', border: 'border-indigo-100' }
+                    ].map(theme => (
+                      <button
+                        key={theme.mode}
+                        onClick={() => onUpdateSettings({ ...settings, themeMode: theme.mode as any })}
+                        className={`p-3 border rounded-xl text-center transition-all relative overflow-hidden group ${
+                          settings.themeMode === theme.mode
+                            ? 'ring-2 ring-accent-DEFAULT ring-offset-2 dark:ring-offset-black'
+                            : 'hover:border-gray-400'
+                        }`}
+                      >
+                        <div className={`w-full h-16 rounded-lg mb-2 shadow-inner ${theme.bg} ${theme.border} border`}></div>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{theme.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {settings.themeMode === 'custom' && (
+                    <div className="space-y-3 animate-fade-in-02s">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">CSS Override</label>
+                      <textarea
+                        value={settings.customCss}
+                        onChange={(e) => onUpdateSettings({ ...settings, customCss: e.target.value })}
+                        placeholder=".bg-white { background: red !important; }"
+                        className="w-full h-48 p-3 font-mono text-xs bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT resize-none"
+                        spellCheck={false}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Editor Tab */}
+            {activeTab === 'editor' && (
+              <div className="space-y-6 animate-fade-in-02s">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Typography</h3>
+
+                  <div className="space-y-5">
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Font Size</label>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.fontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="12"
+                        max="32"
+                        step="1"
+                        value={settings.fontSize}
+                        onChange={(e) => onUpdateSettings({ ...settings, fontSize: parseInt(e.target.value) })}
+                        className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Word Wrap</label>
+                      <button
+                        onClick={() => onUpdateSettings({ ...settings, wordWrap: !settings.wordWrap })}
+                        className={`w-10 h-6 rounded-full transition-colors duration-200 relative ${
+                          settings.wordWrap ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 shadow-sm ${
+                          settings.wordWrap ? 'translate-x-4' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Font Family</label>
+                      <input
+                        type="text"
+                        value={settings.fontFamily}
+                        onChange={(e) => onUpdateSettings({ ...settings, fontFamily: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Auto-Save</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-Save Interval</label>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.autoSaveInterval}ms</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="100"
+                        max="5000"
+                        step="100"
+                        value={settings.autoSaveInterval}
+                        onChange={(e) => onUpdateSettings({ ...settings, autoSaveInterval: parseInt(e.target.value) })}
+                        className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
+                      />
+                      <div className="flex justify-between mt-1 text-xs text-gray-400">
+                        <span>100ms</span>
+                        <span>5s</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Changes are automatically saved to disk after the specified delay.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Metadata Tab */}
+            {activeTab === 'metadata' && (
+              <div className="space-y-6 animate-fade-in-02s">
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Metadata Templates</h3>
+                      <p className="text-xs text-gray-500 mt-1">Properties added to frontmatter when creating new files.</p>
+                    </div>
+                    <button
+                      onClick={handleAddMetadata}
+                      className="px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                    >
+                      + Add Field
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                    {settings.metadataFields.map((field, idx) => (
+                      <div key={idx} className="flex gap-2 items-center bg-gray-50 dark:bg-white/5 p-2 rounded-xl border border-gray-100 dark:border-white/5 group">
+                        <input
+                          type="text"
+                          value={field.key}
+                          onChange={(e) => handleUpdateMetadata(idx, { key: e.target.value })}
+                          placeholder="Key (e.g., tags)"
+                          className="flex-1 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
+                        />
+                        <span className="text-gray-400">:</span>
+                        <input
+                          type="text"
+                          value={field.defaultValue}
+                          onChange={(e) => handleUpdateMetadata(idx, { defaultValue: e.target.value })}
+                          placeholder="Value (e.g., draft)"
+                          className="flex-1 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
+                          title="Use {now} for current date"
+                        />
+                        <button
+                          onClick={() => handleRemoveMetadata(idx)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-xs text-gray-400 flex items-center gap-1">
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                    </svg>
+                    <span>Tip: Use <code className="bg-gray-100 dark:bg-white/10 px-1 rounded text-gray-600 dark:text-gray-300">{'{now}'}</code> for the current date.</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* General Tab */}
+            {activeTab === 'general' && (
+              <div className="space-y-6 animate-fade-in-02s">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">GitHub Pages</h3>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Repository</label>
+                    <div className="relative">
+                      <svg className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                      </svg>
+                      <input
+                        type="text"
+                        value={settings.githubRepo}
+                        onChange={(e) => {
+                          const repo = e.target.value;
+                          if (isValidGithubRepo(repo)) {
+                            onUpdateSettings({ githubRepo: repo });
+                          }
+                        }}
+                        placeholder="username/repo"
+                        className={`w-full pl-9 pr-3 py-2 border text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl ${
+                          isValidGithubRepo(settings.githubRepo)
+                            ? 'border-gray-200 dark:border-white/10'
+                            : 'border-red-500 dark:border-red-500'
+                        }`}
+                      />
+                    </div>
+                    {settings.githubRepo && !isValidGithubRepo(settings.githubRepo) && (
+                      <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        Please use the format "username/repo"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Shortcuts Tab */}
+            {activeTab === 'shortcuts' && (
+              <div className="space-y-6 animate-fade-in-02s">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Key Bindings</h3>
+                  <div className="space-y-3">
+                    {Object.entries(settings.shortcuts).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
+                        <span className="text-sm font-medium capitalize text-gray-700 dark:text-gray-200">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </span>
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => handleShortcutChange(key, e.target.value)}
+                          className="w-24 px-2 py-1 border border-gray-200 dark:border-white/10 rounded-md text-xs font-mono text-center bg-white dark:bg-black/20 focus:border-accent-DEFAULT outline-none uppercase tracking-wide"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 border-t border-gray-200/50 dark:border-white/10 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black text-sm font-medium rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-sm"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
