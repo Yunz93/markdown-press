@@ -15,8 +15,9 @@ export const AIButton: React.FC<AIButtonProps> = ({
     <button
       onClick={onClick}
       disabled={disabled || isLoading}
+      title={isLoading ? 'AI Enhancing' : 'AI Enhance'}
       className={`
-        flex items-center gap-2 px-3 py-2 rounded-lg text-xs md:text-sm font-medium transition-all active:scale-95
+        p-2 rounded-lg transition-all active:scale-95
         ${isLoading
           ? 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-wait'
           : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20'
@@ -24,9 +25,10 @@ export const AIButton: React.FC<AIButtonProps> = ({
       `}
     >
       <svg className={`w-4 h-4 ${isLoading ? 'animate-pulse' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+        <path d="M9 18h6" />
+        <path d="M10 22h4" />
+        <path d="M8 14a6 6 0 1 1 8 0c-.8.7-1.4 1.7-1.6 2.8a1 1 0 0 1-1 .8h-2.8a1 1 0 0 1-1-.8C9.4 15.7 8.8 14.7 8 14Z" />
       </svg>
-      <span className="hidden lg:inline">{isLoading ? 'Thinking...' : 'AI Enhance'}</span>
     </button>
   );
 };

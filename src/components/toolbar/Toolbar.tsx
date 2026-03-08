@@ -16,7 +16,7 @@ interface ToolbarProps {
   onToggleOutline: () => void;
   isOutlineOpen: boolean;
   onToggleSearch: () => void;
-  onToggleExport: () => void;
+  onPublishBlog?: () => void;
   onExportPdf?: () => void;
 }
 
@@ -33,7 +33,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onToggleOutline,
   isOutlineOpen,
   onToggleSearch,
-  onToggleExport,
+  onPublishBlog,
   onExportPdf
 }) => {
   const isDark = themeMode === 'dark' || themeMode === 'solarized-dark';
@@ -78,33 +78,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        <AIButton
-          onClick={onAIAnalyze}
-          isLoading={isAnalyzing}
-          disabled={!fileName}
-        />
-
-        {/* View Mode Toggle - positioned prominently */}
-        <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
-
-        {/* PDF Export Button - right after view mode */}
-        {onExportPdf && (
-          <button
-            onClick={onExportPdf}
-            className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
-            title="Export to PDF"
-          >
-            <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-          </button>
-        )}
-
-        {/* Theme Toggle - right after view mode */}
         <button
           onClick={onToggleTheme}
           className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
@@ -122,18 +95,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </button>
 
         <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
-
-        <button
-          onClick={onToggleExport}
-          className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
-          title="Export (HTML/PDF/Txt)"
-        >
-          <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
 
         <button
           onClick={onToggleSearch}
@@ -162,6 +123,42 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <circle cx="4" cy="18" r="2" fill="currentColor" />
           </svg>
         </button>
+
+        <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+        <AIButton
+          onClick={onAIAnalyze}
+          isLoading={isAnalyzing}
+          disabled={!fileName}
+        />
+
+        <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+
+        {onPublishBlog && (
+          <button
+            onClick={onPublishBlog}
+            className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+            title="Publish Blog"
+          >
+            <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <polyline points="6 10 12 4 18 10" />
+            </svg>
+          </button>
+        )}
+
+        {onExportPdf && (
+          <button
+            onClick={onExportPdf}
+            className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+            title="Export Preview PDF"
+          >
+            <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="4" x2="12" y2="20" />
+              <polyline points="18 14 12 20 6 14" />
+            </svg>
+          </button>
+        )}
 
       </div>
     </div>

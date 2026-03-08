@@ -14,10 +14,7 @@ import { SplitView } from './components/editor/SplitView';
 import { OutlinePanel } from './components/outline/OutlinePanel';
 import { ContentSearch } from './components/search/ContentSearch';
 import { TabBar } from './components/tabs/TabBar';
-import { ExportMenu } from './components/export/ExportMenu';
 import { analyzeContent } from './services/geminiService';
-import { getFileSystem } from './types/filesystem';
-import { withErrorHandling } from './utils/errorHandler';
 import { parseFrontmatter } from './utils/frontmatter';
 import { exportToHtml } from './utils/export';
 import * as yaml from 'js-yaml';
@@ -86,7 +83,6 @@ const App: React.FC = () => {
   const [highlighter, setHighlighter] = useState<ShikiHighlighter | null>(null);
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // Load Shiki for syntax highlighting
   useEffect(() => {
@@ -484,6 +480,37 @@ const App: React.FC = () => {
     }
   }, [activeTabId, content, files, settings.themeMode, showNotification]);
 
+  // Handle blog publish (marks frontmatter and saves current file)
+  const handlePublishBlog = useCallback(async () => {
+    if (!activeTabId) {
+      showNotification('No file to publish', 'error');
+      return;
+    }
+
+    const currentContent = useAppStore.getState().fileContents[activeTabId] ?? content;
+    if (!currentContent) {
+      showNotification('No content to publish', 'error');
+      return;
+    }
+
+    try {
+      const { frontmatter, body } = parseFrontmatter(currentContent);
+      const merged: Frontmatter = {
+        ...(frontmatter || {}),
+        is_publish: true,
+      };
+      const nextContent = `---\n${yaml.dump(merged, { skipInvalid: true })}---\n\n${body}`;
+
+      setContent(nextContent);
+      updateTabContent(activeTabId, nextContent);
+      await forceSave();
+      showNotification('Marked as published and saved.', 'success');
+    } catch (error) {
+      console.error('Failed to publish blog:', error);
+      showNotification('Failed to publish blog', 'error');
+    }
+  }, [activeTabId, content, forceSave, setContent, showNotification, updateTabContent]);
+
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const notification = useAppStore(state => state.notification);
 
@@ -565,7 +592,7 @@ const App: React.FC = () => {
           onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
           isOutlineOpen={isOutlineOpen}
           onToggleSearch={() => setIsSearchBarOpen(!isSearchBarOpen)}
-          onToggleExport={() => setIsExportMenuOpen(!isExportMenuOpen)}
+          onPublishBlog={handlePublishBlog}
           onExportPdf={handleExportToPdf}
         />
 
@@ -585,11 +612,6 @@ const App: React.FC = () => {
           )}
           {isSearchBarOpen && (
             <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
-          )}
-          {isExportMenuOpen && (
-            <div className="absolute top-14 right-4 z-50">
-              <ExportMenu onClose={() => setIsExportMenuOpen(false)} />
-            </div>
           )}
         </div>
       </main>
