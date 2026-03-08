@@ -6,7 +6,6 @@ import { useSettings } from './hooks/useSettings';
 import { useGlobalKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useOutline } from './hooks/useOutline';
-import { useSearch } from './hooks/useSearch';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { Toolbar } from './components/toolbar/Toolbar';
@@ -35,10 +34,8 @@ function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
 }
 
 const App: React.FC = () => {
-  console.log('App: Rendering component');
   const {
     files,
-    openTabs,
     activeTabId,
     content,
     fileContents,
@@ -51,32 +48,23 @@ const App: React.FC = () => {
     settings,
     outlineHeadings,
     activeHeadingId,
-    setFiles,
     setContent,
     setCurrentFilePath,
     setSidebarOpen,
     setSettingsOpen,
     setAnalyzing,
-    setOutlineHeadings,
     setActiveHeadingId,
     showNotification,
-    updateFileContent,
     toggleFileTrash,
-    deleteFileForever,
-    updateFileName,
     updateSettings,
     addTab,
     closeTab,
-    setActiveTab,
     updateTabContent,
-    markAsSaved
   } = useAppStore();
 
   const {
-    openFile,
     openDirectory,
     readFile,
-    saveFile,
     createFile,
     createFolder,
     renameFile,
@@ -86,12 +74,7 @@ const App: React.FC = () => {
   } = useFileSystem();
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
-  const { headings, scrollToHeading } = useOutline();
-  const {
-    isOpen: isSearchOpen,
-    openSearch,
-    closeSearch,
-  } = useSearch();
+  useOutline();
 
   // Initialize undo/redo keyboard shortcuts
   useUndoRedo();
@@ -106,7 +89,7 @@ const App: React.FC = () => {
     const loadShiki = async () => {
       try {
         const shiki = await import('shiki');
-        const createHighlighter = shiki.createHighlighter || shiki.default?.createHighlighter;
+        const createHighlighter = shiki.createHighlighter;
         if (typeof createHighlighter !== 'function') return;
 
         const h = await createHighlighter({
@@ -255,7 +238,6 @@ const App: React.FC = () => {
         setContent(cachedContent);
       } else {
         // Read from file
-        console.log('Reading file:', file.path, 'id:', file.id);
         const text = await readFile(file);
         setContent(text);
         // Cache content in tab store
@@ -337,22 +319,28 @@ const App: React.FC = () => {
   const handleDeleteForever = useCallback(async (file: FileNode) => {
     try {
       await deleteFile(file);
-      deleteFileForever(file.id);
       showNotification('Permanently deleted.', 'success');
     } catch (e) {
       showNotification('Failed to delete file.', 'error');
     }
-  }, [deleteFile, deleteFileForever, showNotification]);
+  }, [deleteFile, showNotification]);
 
   // Handle move node (drag and drop)
   const handleMoveNode = useCallback(async (sourceId: string, targetId: string) => {
-    const sourceFile = files.find(f => f.id === sourceId);
-    const targetFolder = files.find(f => f.id === targetId);
+    const sourceFile = findFileInTree(files, sourceId);
+    const targetFolder = findFileInTree(files, targetId);
 
-    if (!sourceFile || targetFolder?.type !== 'folder') {
+    if (!sourceFile || !targetFolder || targetFolder.type !== 'folder') {
       showNotification('Can only move files to folders', 'error');
       return;
     }
+
+    if (sourceFile.type !== 'file') {
+      showNotification('Only files can be moved for now', 'error');
+      return;
+    }
+
+    if (sourceId === targetId) return;
 
     try {
       const { basename } = await import('@tauri-apps/api/path');
@@ -371,8 +359,7 @@ const App: React.FC = () => {
   }, [files, moveFile, showNotification]);
 
   // Handle create folder
-  const handleNewFolder = useCallback(async (parentFolder?: FileNode) => {
-    const name = prompt("Folder name:");
+  const handleNewFolder = useCallback(async (parentFolder?: FileNode, name?: string) => {
     if (!name || !name.trim()) return;
 
     const newNode = await createFolder(name, parentFolder?.path);
@@ -446,19 +433,24 @@ const App: React.FC = () => {
     }
   }, [activeTabId, content, files, settings.themeMode, showNotification]);
 
-  const activeFile = findFileInTree(files, activeTabId || '');
+  const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const notification = useAppStore(state => state.notification);
 
   const handleHeadingClick = useCallback((id: string, line: number) => {
     setActiveHeadingId(id);
-    // Scroll editor to the heading line
-    const editorElement = document.querySelector('.editor-pane') as HTMLElement;
-    if (editorElement) {
-      const lineIndex = Math.max(0, line - 1);
-      const lineHeight = 24; // Approximate line height
-      editorElement.scrollTop = lineIndex * lineHeight;
-    }
-  }, [setActiveHeadingId]);
+    const textarea = document.querySelector('textarea.editor-pane') as HTMLTextAreaElement | null;
+    if (!textarea) return;
+
+    const lineIndex = Math.max(0, line - 1);
+    const lines = content.split('\n');
+    const cursorPos = lines.slice(0, lineIndex).reduce((sum, l) => sum + l.length + 1, 0);
+
+    textarea.focus();
+    textarea.setSelectionRange(cursorPos, cursorPos);
+
+    const computedLineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 24;
+    textarea.scrollTop = Math.max(0, lineIndex * computedLineHeight - textarea.clientHeight * 0.3);
+  }, [content, setActiveHeadingId]);
 
   // Update content when active tab changes
   useEffect(() => {
@@ -488,7 +480,7 @@ const App: React.FC = () => {
         onFileSelect={handleFileSelect}
         onOpenFolder={openDirectory}
         onCreateFile={(folder) => handleCreateFile(folder)}
-        onNewFolder={(folder) => handleNewFolder(folder)}
+        onNewFolder={(folder, name) => handleNewFolder(folder, name)}
         onOpenSettings={() => setSettingsOpen(true)}
         onRename={handleRename}
         onDelete={async (file) => {
@@ -529,7 +521,10 @@ const App: React.FC = () => {
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
 
         <div className="flex-1 flex overflow-hidden relative">
-          <SplitView highlighter={highlighter} />
+          <SplitView
+            highlighter={highlighter}
+            onContentChange={handleContentChange}
+          />
           {isOutlineOpen && (
             <OutlinePanel
               headings={outlineHeadings}

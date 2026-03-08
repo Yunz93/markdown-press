@@ -10,7 +10,7 @@ interface SidebarProps {
   onFileSelect: (file: FileNode) => void;
   onOpenFolder: () => void;
   onCreateFile: (parentFolder?: FileNode) => void;
-  onCreateFolder: (parentFolder?: FileNode) => void;
+  onNewFolder: (parentFolder?: FileNode, name?: string) => void;
   onOpenSettings: () => void;
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
@@ -533,7 +533,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         label="Folder name:"
         defaultValue=""
         onConfirm={(value) => {
-          onNewFolder(dialogState.file?.type === 'folder' ? dialogState.file : undefined);
+          onNewFolder(dialogState.file?.type === 'folder' ? dialogState.file : undefined, value);
           setDialogState({ type: null });
         }}
         onCancel={() => setDialogState({ type: null })}

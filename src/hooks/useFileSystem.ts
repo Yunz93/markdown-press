@@ -13,14 +13,11 @@ export function useFileSystem() {
   const {
     files,
     setFiles,
-    setContent,
-    setActiveTab,
     setCurrentFilePath,
     setRootFolderPath,
-    updateFileContent,
+    clearAllCache,
     showNotification,
     addTab,
-    fileContents
   } = useAppStore();
 
   /**
@@ -83,6 +80,8 @@ export function useFileSystem() {
           () => fs.readDirectory(dirPath),
           'Failed to read directory'
         );
+        clearAllCache();
+        setCurrentFilePath(null);
         setFiles(fileNodes);
         setRootFolderPath(dirPath);
         showNotification('Folder opened successfully', 'success');
@@ -90,7 +89,7 @@ export function useFileSystem() {
     } catch (error) {
       handleFileSystemError(error, 'Failed to open folder');
     }
-  }, [setFiles, setRootFolderPath, showNotification, handleFileSystemError]);
+  }, [clearAllCache, setCurrentFilePath, setFiles, setRootFolderPath, showNotification, handleFileSystemError]);
 
   /**
    * Read a file
@@ -98,7 +97,6 @@ export function useFileSystem() {
   const readFile = useCallback(async (file: FileNode): Promise<string> => {
     return withErrorHandling(
       async () => {
-        console.log('Reading file:', file.path, 'type:', file.type);
         const fs = await getFileSystem();
         return await fs.readFile(file.path);
       },

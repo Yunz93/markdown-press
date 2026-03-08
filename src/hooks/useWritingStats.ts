@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../store/appStore';
+import { parseFrontmatter } from '../utils/frontmatter';
 
 export interface WritingStats {
   characters: number;
@@ -16,9 +17,7 @@ export const useWritingStats = () => {
   const stats: WritingStats = useMemo(() => {
     // Exclude code blocks and frontmatter
     const textWithoutCode = content.replace(/```[\s\S]*?```/g, '');
-    const textWithoutFrontmatter = textWithoutCode.startsWith('---')
-      ? textWithoutCode.substring(textWithoutCode.indexOf('---', 3) + 3)
-      : textWithoutCode;
+    const textWithoutFrontmatter = parseFrontmatter(textWithoutCode).body;
 
     const characters = textWithoutFrontmatter.length;
     const charactersNoSpace = textWithoutFrontmatter.replace(/\s/g, '').length;

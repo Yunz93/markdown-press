@@ -2,11 +2,11 @@ import katex from 'katex';
 import mermaid from 'mermaid';
 
 // KaTeX options
-const katexOptions = {
+const katexOptions: katex.KatexOptions = {
   throwOnError: false,
   displayMode: false,
   output: 'html',
-  trust: true,
+  trust: false,
 };
 
 /**
@@ -88,7 +88,7 @@ export function initKaTeX(md: any) {
   });
 
   // Render function for display math
-  md.renderer.rules.katex_display = (tokens: any[], idx: any[]) => {
+  md.renderer.rules.katex_display = (tokens: any[], idx: number) => {
     const content = tokens[idx].content;
     try {
       return `<div class="katex-display">${katex.renderToString(content, { ...katexOptions, displayMode: true })}</div>`;
@@ -106,7 +106,7 @@ export function initMermaid(md: any) {
   mermaid.initialize({
     startOnLoad: false,
     theme: 'default',
-    securityLevel: 'loose',
+    securityLevel: 'strict',
     fontFamily: 'inherit',
   });
 
@@ -143,12 +143,12 @@ export async function renderMermaidDiagrams(container?: HTMLElement | null) {
   if (elements.length === 0) return;
 
   try {
-    const { insert } = await mermaid.render('mermaid', (elements[0] as HTMLElement).textContent || '');
+    const renderBatchId = Date.now();
 
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i] as HTMLElement;
       const code = el.textContent || '';
-      const id = el.id || `mermaid-${i}`;
+      const id = el.id || `mermaid-${renderBatchId}-${i}`;
 
       try {
         const { svg } = await mermaid.render(id, code);

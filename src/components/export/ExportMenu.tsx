@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { exportToHtml, downloadHtml, exportToPdf, exportToPlainText, downloadPlainText } from '../../utils/export';
+import type { FileNode } from '../../types';
 
 interface ExportMenuProps {
   onClose?: () => void;
@@ -8,8 +9,20 @@ interface ExportMenuProps {
 
 export type ExportFormat = 'html' | 'pdf' | 'plaintext';
 
+function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.children) {
+      const found = findFileInTree(node.children, id);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
 export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
-  const { content, activeFile } = useAppStore();
+  const { content, activeTabId, files } = useAppStore();
+  const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const [isExporting, setIsExporting] = useState(false);
   const [format, setFormat] = useState<ExportFormat | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');

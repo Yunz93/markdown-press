@@ -11,7 +11,6 @@ export function useUndoRedo() {
     redo,
     canUndo,
     canRedo,
-    content,
     activeTabId
   } = useAppStore();
 

@@ -38,11 +38,8 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
     files,
     openTabs,
     activeTabId,
-    content,
     setActiveTab,
     closeTab,
-    setContent,
-    setActiveFileId,
     setCurrentFilePath,
   } = useAppStore();
 
@@ -53,30 +50,14 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
     const file = fileMap.get(fileId);
     if (file) {
       setActiveTab(fileId);
-      setActiveFileId(fileId);
       setCurrentFilePath(file.path);
-      // Load content from cache or file
-      const cachedContent = useAppStore.getState().fileContents[fileId];
-      setContent(cachedContent || file.content || '');
     }
-  }, [fileMap, setActiveTab, setActiveFileId, setCurrentFilePath, setContent]);
+  }, [fileMap, setActiveTab, setCurrentFilePath]);
 
   const handleCloseTab = useCallback((e: React.MouseEvent, fileId: string) => {
     e.stopPropagation();
     closeTab(fileId);
   }, [closeTab]);
-
-  const handleTabDoubleClick = useCallback((e: React.MouseEvent, fileId: string) => {
-    e.stopPropagation();
-    // Rename file on double click
-    const file = fileMap.get(fileId);
-    if (file) {
-      const newName = prompt('Rename file:', file.name);
-      if (newName && newName !== file.name) {
-        // Rename will be handled by parent component
-      }
-    }
-  }, [fileMap]);
 
   if (openTabs.length === 0) {
     return null;
@@ -100,7 +81,6 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                 : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
             onClick={() => handleTabClick(fileId)}
-            onDoubleClick={(e) => handleTabDoubleClick(e, fileId)}
             title={file.path}
           >
             <span className="truncate text-xs font-medium flex-1">

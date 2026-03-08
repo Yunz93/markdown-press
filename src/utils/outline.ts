@@ -1,3 +1,5 @@
+import { parseFrontmatter } from './frontmatter';
+
 export interface HeadingNode {
   id: string;
   level: 1 | 2 | 3 | 4 | 5 | 6;
@@ -7,14 +9,7 @@ export interface HeadingNode {
 }
 
 export const parseHeadings = (content: string): HeadingNode[] => {
-  // Remove frontmatter if exists
-  let contentWithoutFrontmatter = content;
-  if (content.trim().startsWith('---')) {
-    const endIdx = content.indexOf('---', 3);
-    if (endIdx !== -1) {
-      contentWithoutFrontmatter = content.substring(endIdx + 3);
-    }
-  }
+  const { body: contentWithoutFrontmatter } = parseFrontmatter(content);
 
   const headingRegex = /^(#{1,6})\s+(.+)$/gm;
   const headings: HeadingNode[] = [];

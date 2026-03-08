@@ -41,8 +41,6 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
 
   const {
     settings,
-    setContent,
-    activeFileId,
     viewMode,
     setViewMode,
     showNotification

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../store/appStore';
 
 interface EditorPaneProps {
@@ -22,11 +22,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     setContent,
     settings,
     isSaving,
-    activeTabId,
-    undo,
-    redo,
-    canUndo,
-    canRedo
+    activeTabId
   } = useAppStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -58,8 +54,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
+    if (onContentChange) {
+      onContentChange(newContent);
+      return;
+    }
     setContent(newContent);
-    onContentChange?.(newContent);
   }, [setContent, onContentChange]);
 
   const handleScroll = useCallback(() => {
@@ -82,28 +81,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       });
     }
   }, [onScroll]);
-
-  // Handle keyboard shortcuts for undo/redo
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const isMod = e.ctrlKey || e.metaKey;
-
-    if (isMod) {
-      // Undo: Ctrl+Z or Cmd+Z
-      if (e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        if (canUndo()) {
-          undo();
-        }
-      }
-      // Redo: Ctrl+Shift+Z or Cmd+Shift+Z, or Ctrl+Y
-      else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
-        e.preventDefault();
-        if (canRedo()) {
-          redo();
-        }
-      }
-    }
-  }, [undo, redo, canUndo, canRedo]);
 
   if (!activeTabId) {
     return (
@@ -134,11 +111,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         value={content}
         onChange={handleChange}
         onScroll={handleScroll}
-        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         spellCheck={false}
         className={`
-          flex-1 w-full h-full p-8 resize-none focus:outline-none bg-transparent
+          editor-pane flex-1 w-full h-full p-8 resize-none focus:outline-none bg-transparent
           ${settings.wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}
         `}
         style={{

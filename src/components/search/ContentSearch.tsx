@@ -16,7 +16,7 @@ interface SearchMatch {
  * Content search component with find and replace functionality
  */
 export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
-  const { content, setContent, activeTabId } = useAppStore();
+  const { content, setContent, activeTabId, updateTabContent } = useAppStore();
   const [searchText, setSearchText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [matches, setMatches] = useState<SearchMatch[]>([]);
@@ -113,7 +113,10 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
       replaceText +
       content.substring(match.index + match.length);
     setContent(newContent);
-  }, [matches, currentMatchIndex, content, replaceText, setContent, activeTabId]);
+    if (activeTabId) {
+      updateTabContent(activeTabId, newContent);
+    }
+  }, [matches, currentMatchIndex, content, replaceText, setContent, activeTabId, updateTabContent]);
 
   // Replace all matches
   const replaceAllMatches = useCallback(() => {
@@ -147,7 +150,10 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
     }
 
     setContent(newContent);
-  }, [matches, content, searchText, replaceText, caseSensitive, useRegex, setContent, activeTabId]);
+    if (activeTabId) {
+      updateTabContent(activeTabId, newContent);
+    }
+  }, [matches, content, searchText, replaceText, caseSensitive, useRegex, setContent, activeTabId, updateTabContent]);
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -173,12 +179,15 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   useEffect(() => {
     if (matches.length > 0) {
       const match = matches[currentMatchIndex];
-      const editorElement = document.querySelector('.editor-pane') as HTMLElement;
-      if (editorElement) {
-        const lines = content.substring(0, match.index).split('\n');
-        const lineHeight = 24; // Approximate line height
-        editorElement.scrollTop = (lines.length - 5) * lineHeight;
-      }
+      const editorElement = document.querySelector('textarea.editor-pane') as HTMLTextAreaElement | null;
+      if (!editorElement) return;
+
+      editorElement.focus();
+      editorElement.setSelectionRange(match.index, match.index + match.length);
+
+      const lineIndex = content.substring(0, match.index).split('\n').length - 1;
+      const lineHeight = parseFloat(getComputedStyle(editorElement).lineHeight) || 24;
+      editorElement.scrollTop = Math.max(0, lineIndex * lineHeight - editorElement.clientHeight * 0.3);
     }
   }, [matches, currentMatchIndex, content]);
 

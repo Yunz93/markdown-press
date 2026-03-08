@@ -1,8 +1,8 @@
 import DOMPurify from 'dompurify';
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo } from 'react';
 import MarkdownIt from 'markdown-it';
 import taskLists from 'markdown-it-task-lists';
-import { initKaTeX, initMermaid, renderMermaidDiagrams, applyKatexDarkTheme } from './markdown-extensions';
+import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensions';
 
 // Create markdown-it instance with configuration
 const createMarkdownIt = () => {
@@ -37,15 +37,23 @@ export function useMarkdownRenderer(highlighter: any | null, themeMode: string) 
   const md = useMemo(() => getMarkdownIt(), []);
 
   useEffect(() => {
-    if (!highlighter) return;
+    if (!highlighter) return undefined;
 
     const theme = themeMode === 'dark' || themeMode === 'solarized-dark' ? 'github-dark' : 'github-light';
+    const previousFence = md.renderer.rules.fence;
 
-    // Configure fence rule for syntax highlighting
-    md.renderer.rules.fence = (tokens, idx) => {
+    // Layer Shiki highlighting on top of the existing fence rule (Mermaid-aware).
+    md.renderer.rules.fence = (tokens, idx, options, env, self) => {
       const token = tokens[idx];
-      const lang = token.info.trim();
+      const lang = token.info.trim().toLowerCase();
       const supportedLangs = highlighter.getLoadedLanguages?.() || [];
+
+      // Keep Mermaid rendering behavior from the previous fence rule.
+      if (lang === 'mermaid' || lang === 'mmd') {
+        return previousFence
+          ? previousFence(tokens, idx, options, env, self)
+          : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
+      }
 
       if (lang && supportedLangs.includes(lang)) {
         try {
@@ -55,8 +63,14 @@ export function useMarkdownRenderer(highlighter: any | null, themeMode: string) 
         }
       }
 
-      // Fallback to default code block
+      if (previousFence) {
+        return previousFence(tokens, idx, options, env, self);
+      }
       return `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
+    };
+
+    return () => {
+      md.renderer.rules.fence = previousFence;
     };
   }, [highlighter, themeMode, md]);
 
@@ -65,44 +79,15 @@ export function useMarkdownRenderer(highlighter: any | null, themeMode: string) 
     applyKatexDarkTheme();
   }, [themeMode]);
 
-  // Render Mermaid diagrams after content changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      renderMermaidDiagrams();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [themeMode]);
-
   return md;
 }
 
 /**
  * Render markdown to HTML with sanitization
  */
-export function renderMarkdown(markdown: string, highlighter?: any, themeMode: string = 'light'): string {
+export function renderMarkdown(markdown: string): string {
   const md = getMarkdownIt();
-
-  let renderedHtml: string;
-
-  if (highlighter) {
-    const theme = themeMode === 'dark' || themeMode === 'solarized-dark' ? 'github-dark' : 'github-light';
-    const supportedLangs = highlighter.getLoadedLanguages?.() || [];
-
-    renderedHtml = md.render(markdown, {
-      highlight: (str: string, lang: string) => {
-        if (lang && supportedLangs.includes(lang)) {
-          try {
-            return highlighter.codeToHtml(str.trim(), { lang, theme });
-          } catch (error) {
-            console.warn(`Shiki failed for ${lang}:`, error);
-          }
-        }
-        return '';
-      }
-    });
-  } else {
-    renderedHtml = md.render(markdown);
-  }
+  const renderedHtml = md.render(markdown);
 
   // Sanitize HTML to prevent XSS attacks
   return DOMPurify.sanitize(renderedHtml, {

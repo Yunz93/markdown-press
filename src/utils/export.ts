@@ -1,4 +1,5 @@
 import { renderMarkdown } from './markdown';
+import { parseFrontmatter } from './frontmatter';
 
 export interface ExportOptions {
   title?: string;
@@ -295,15 +296,7 @@ export function exportToPdf(htmlContent: string, filename: string): void {
  */
 export function exportToPlainText(content: string): string {
   // Remove markdown formatting
-  let text = content;
-
-  // Remove frontmatter
-  if (text.startsWith('---')) {
-    const endIdx = text.indexOf('---', 3);
-    if (endIdx !== -1) {
-      text = text.substring(endIdx + 3);
-    }
-  }
+  let text = parseFrontmatter(content).body;
 
   // Remove code blocks (keep content)
   text = text.replace(/```[\s\S]*?```/g, (match) => {

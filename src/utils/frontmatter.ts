@@ -1,7 +1,7 @@
 import yaml from 'js-yaml';
 import type { Frontmatter, ParsedMarkdown } from '../types';
 
-const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---/;
+const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
 /**
  * Parse frontmatter from markdown content
@@ -78,7 +78,7 @@ export function removeFrontmatter(content: string): string {
 export function getFrontmatterValue(
   content: string,
   key: string
-): string | string[] | null {
+): Frontmatter[keyof Frontmatter] | null {
   const parsed = parseFrontmatter(content);
   return parsed.frontmatter?.[key] ?? null;
 }

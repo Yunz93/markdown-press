@@ -240,23 +240,23 @@ export class BrowserFileSystem implements IFileSystem {
 
       const nodes: FileNode[] = [];
 
-      for await (const entry of dirHandle.values()) {
-        const fullPath = `${dirPath}/${entry.name}`;
+      for await (const [name, entry] of (dirHandle as any).entries()) {
+        const fullPath = `${dirPath}/${name}`;
 
-        if (entry.kind === 'file' && (entry.name.endsWith('.md') || entry.name.endsWith('.markdown'))) {
+        if (entry.kind === 'file' && (name.endsWith('.md') || name.endsWith('.markdown'))) {
           nodes.push({
             id: fullPath,
-            name: entry.name,
+            name,
             type: 'file',
             path: fullPath,
             isTrash: false
           });
-        } else if (entry.kind === 'directory' && !entry.name.startsWith('.')) {
+        } else if (entry.kind === 'directory' && !name.startsWith('.')) {
           const children = await this.readDirectory(fullPath, rootPath);
           if (children.length > 0) {
             nodes.push({
               id: fullPath,
-              name: entry.name,
+              name,
               type: 'folder',
               path: fullPath,
               children,

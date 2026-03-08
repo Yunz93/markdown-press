@@ -1,7 +1,8 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { parseFrontmatter } from '../../utils/frontmatter';
-import { useMarkdownRenderer } from '../../utils/markdown';
+import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
+import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { useWritingStats } from '../../hooks/useWritingStats';
 
 interface PreviewPaneProps {
@@ -16,7 +17,7 @@ const SCROLL_THRESHOLD = 5;
 export const PreviewPane: React.FC<PreviewPaneProps> = ({ highlighter, onScroll, scrollPercentage }) => {
   const { content, settings } = useAppStore();
   const previewRef = useRef<HTMLDivElement>(null);
-  const md = useMarkdownRenderer(highlighter, settings.themeMode);
+  useMarkdownRenderer(highlighter, settings.themeMode);
   const stats = useWritingStats();
 
   const isSyncingScroll = useRef(false);
@@ -76,13 +77,20 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({ highlighter, onScroll,
     const { frontmatter, body } = parseFrontmatter(content);
 
     try {
-      const bodyHTML = md.render(body);
+      const bodyHTML = renderMarkdown(body);
       return { frontmatter, bodyHTML };
     } catch (error) {
       console.error('Markdown rendering error:', error);
       return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
     }
-  }, [content, md]);
+  }, [content]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      renderMermaidDiagrams(previewRef.current);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [parsedContent.bodyHTML, settings.themeMode]);
 
   return (
     <div

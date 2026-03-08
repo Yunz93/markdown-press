@@ -6,9 +6,10 @@ import { PreviewPane } from './PreviewPane';
 
 interface SplitViewProps {
   highlighter?: any;
+  onContentChange?: (content: string) => void;
 }
 
-export const SplitView: React.FC<SplitViewProps> = ({ highlighter }) => {
+export const SplitView: React.FC<SplitViewProps> = ({ highlighter, onContentChange }) => {
   const { viewMode } = useAppStore();
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
@@ -87,6 +88,7 @@ export const SplitView: React.FC<SplitViewProps> = ({ highlighter }) => {
           }}
         >
           <EditorPane
+            onContentChange={onContentChange}
             onScroll={handleEditorScroll}
             scrollPercentage={activeSide === 'preview' ? scrollPercentage : undefined}
           />
