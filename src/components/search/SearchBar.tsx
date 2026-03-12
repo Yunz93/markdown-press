@@ -114,15 +114,39 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
-          <button onClick={() => setShowReplace(!showReplace)} className="search-btn">
+          <button onClick={() => setShowReplace(!showReplace)} className="search-btn gap-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {showReplace ? (
+                <>
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </>
+              ) : (
+                <>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </>
+              )}
+            </svg>
             {showReplace ? 'Hide' : 'Replace'}
           </button>
           {showReplace && (
             <>
-              <button onClick={replace} disabled={results.length === 0} className="search-btn">
+              <button onClick={replace} disabled={results.length === 0} className="search-btn gap-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="16 3 21 3 21 8" />
+                  <line x1="4" y1="20" x2="21" y2="3" />
+                  <polyline points="21 16 21 21 16 21" />
+                </svg>
                 Replace
               </button>
-              <button onClick={replaceAll} disabled={results.length === 0} className="search-btn">
+              <button onClick={replaceAll} disabled={results.length === 0} className="search-btn gap-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 1l4 4-4 4" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <path d="M7 23l-4-4 4-4" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
                 All
               </button>
             </>

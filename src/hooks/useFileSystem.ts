@@ -4,6 +4,9 @@ import { useAppStore } from '../store/appStore';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import type { FileNode } from '../types';
 
+const TRASH_DIR_NAME = '.trash';
+const TRASH_ROOT_MARKER = '__root__';
+
 function getPathSeparator(path: string): '/' | '\\' {
   return path.includes('\\') ? '\\' : '/';
 }
@@ -21,6 +24,77 @@ function joinPath(basePath: string, segment: string): string {
   return `${basePath}${sep}${segment}`;
 }
 
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function joinPathSegments(basePath: string, ...segments: string[]): string {
+  return segments.filter(Boolean).reduce((acc, segment) => joinPath(acc, segment), basePath);
+}
+
+function getRelativePathFromRoot(path: string, rootPath: string): string {
+  const normalizedPath = normalizePath(path);
+  const normalizedRoot = normalizePath(rootPath);
+  if (normalizedPath === normalizedRoot) return '';
+  const withSlash = `${normalizedRoot}/`;
+  if (normalizedPath.startsWith(withSlash)) {
+    return normalizedPath.slice(withSlash.length);
+  }
+  return normalizedPath;
+}
+
+function getParentRelativePath(relativePath: string): string {
+  const parts = relativePath.split('/').filter(Boolean);
+  if (parts.length <= 1) return '';
+  return parts.slice(0, -1).join('/');
+}
+
+function isPathInTrash(path: string, rootPath: string): boolean {
+  const normalizedPath = normalizePath(path);
+  const normalizedRoot = normalizePath(rootPath);
+  return normalizedPath === `${normalizedRoot}/${TRASH_DIR_NAME}` ||
+    normalizedPath.startsWith(`${normalizedRoot}/${TRASH_DIR_NAME}/`);
+}
+
+function createTrashContainerName(parentRelativePath: string): string {
+  const encodedParent = encodeURIComponent(parentRelativePath || TRASH_ROOT_MARKER);
+  return `${Date.now()}__${encodedParent}`;
+}
+
+function parseTrashPathInfo(path: string, rootPath: string): { containerName: string; originalRelativePath: string } | null {
+  const normalizedPath = normalizePath(path);
+  const normalizedRoot = normalizePath(rootPath);
+  const trashPrefix = `${normalizedRoot}/${TRASH_DIR_NAME}/`;
+  if (!normalizedPath.startsWith(trashPrefix)) return null;
+
+  const remainder = normalizedPath.slice(trashPrefix.length);
+  const parts = remainder.split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+
+  const [containerName, ...itemParts] = parts;
+  const match = containerName.match(/^\d+__(.+)$/);
+  const encodedParent = match?.[1];
+  let parentRelativePath = '';
+  if (encodedParent) {
+    try {
+      const decoded = decodeURIComponent(encodedParent);
+      parentRelativePath = decoded === TRASH_ROOT_MARKER ? '' : decoded;
+    } catch {
+      parentRelativePath = '';
+    }
+  }
+
+  const originalRelativePath = [
+    ...parentRelativePath.split('/').filter(Boolean),
+    ...itemParts
+  ].join('/');
+
+  return {
+    containerName,
+    originalRelativePath
+  };
+}
+
 /**
  * Hook for file system operations
  * Automatically selects the appropriate file system implementation based on environment
@@ -35,6 +109,34 @@ export function useFileSystem() {
     showNotification,
     addTab,
   } = useAppStore();
+
+  const updateKnowledgeBaseMetadata = useCallback((path: string) => {
+    const name = getPathBasename(path);
+    const now = new Date().toISOString();
+
+    useAppStore.getState().updateSettings((state) => {
+      const existing = state.settings.knowledgeBases || [];
+      const next = [{ path, name, lastOpenedAt: now }, ...existing.filter((kb) => kb.path !== path)]
+        .slice(0, 20);
+
+      return {
+        knowledgeBases: next,
+        lastKnowledgeBasePath: path
+      };
+    });
+  }, []);
+
+  const refreshFileTree = useCallback(async (): Promise<void> => {
+    const rootPath = useAppStore.getState().rootFolderPath;
+    if (!rootPath) return;
+
+    const fs = await getFileSystem();
+    const fileNodes = await withErrorHandling(
+      () => fs.readDirectory(rootPath),
+      'Failed to refresh knowledge base'
+    );
+    setFiles(fileNodes);
+  }, [setFiles]);
 
   /**
    * Handle file system errors with user-friendly notifications
@@ -81,27 +183,43 @@ export function useFileSystem() {
   }, [setFiles, addTab, setCurrentFilePath, showNotification, handleFileSystemError]);
 
   /**
-   * Open a directory
+   * Open a knowledge base directory.
+   * If path is provided, opens directly; otherwise prompts user to select.
    */
-  const openDirectory = useCallback(async () => {
+  const openKnowledgeBase = useCallback(async (
+    path?: string,
+    options?: { silentSuccess?: boolean }
+  ): Promise<string | null> => {
     try {
       const fs = await getFileSystem();
-      const dirPath = await fs.openDirectory();
+      const dirPath = path || await fs.openDirectory();
       if (dirPath) {
         const fileNodes = await withErrorHandling(
           () => fs.readDirectory(dirPath),
-          'Failed to read directory'
+          'Failed to read knowledge base'
         );
         clearAllCache();
         setCurrentFilePath(null);
         setFiles(fileNodes);
         setRootFolderPath(dirPath);
-        showNotification('Folder opened successfully', 'success');
+        updateKnowledgeBaseMetadata(dirPath);
+        if (!options?.silentSuccess) {
+          showNotification('Knowledge base opened successfully', 'success');
+        }
       }
+      return dirPath || null;
     } catch (error) {
-      handleFileSystemError(error, 'Failed to open folder');
+      handleFileSystemError(error, 'Failed to open knowledge base');
+      return null;
     }
-  }, [clearAllCache, setCurrentFilePath, setFiles, setRootFolderPath, showNotification, handleFileSystemError]);
+  }, [clearAllCache, setCurrentFilePath, setFiles, setRootFolderPath, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata]);
+
+  /**
+   * Backward-compatible alias used by existing UI call sites.
+   */
+  const openDirectory = useCallback(async () => {
+    await openKnowledgeBase();
+  }, [openKnowledgeBase]);
 
   /**
    * Read a file
@@ -157,7 +275,7 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const basePath = folderPath || useAppStore.getState().rootFolderPath;
       if (!basePath) {
-        showNotification('No folder opened. Please open a folder first.', 'error');
+        showNotification('No knowledge base opened. Please open one first.', 'error');
         return null;
       }
 
@@ -193,7 +311,7 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const basePath = parentPath || useAppStore.getState().rootFolderPath;
       if (!basePath) {
-        showNotification('No folder opened. Please open a folder first.', 'error');
+        showNotification('No knowledge base opened. Please open one first.', 'error');
         return null;
       }
 
@@ -264,17 +382,156 @@ export function useFileSystem() {
    */
   const deleteFile = useCallback(async (file: FileNode): Promise<void> => {
     try {
+      const rootPath = useAppStore.getState().rootFolderPath;
+      const parsedTrashInfo = rootPath ? parseTrashPathInfo(file.path, rootPath) : null;
       const fs = await getFileSystem();
       await withErrorHandling(
         () => fs.deleteFile(file.path),
         'Failed to delete file'
       );
-      useAppStore.getState().removeFile(file.id);
+
+      if (rootPath && parsedTrashInfo) {
+        const trashContainerPath = joinPath(joinPath(rootPath, TRASH_DIR_NAME), parsedTrashInfo.containerName);
+        const containerChildren = await withErrorHandling(
+          () => fs.readDirectory(trashContainerPath),
+          'Failed to inspect trash container'
+        );
+        if (containerChildren.length === 0) {
+          await withErrorHandling(
+            () => fs.deleteFile(trashContainerPath),
+            'Failed to cleanup empty trash container'
+          );
+        }
+        await refreshFileTree();
+      } else {
+        useAppStore.getState().removeFile(file.id);
+      }
     } catch (error) {
       handleFileSystemError(error, 'Failed to delete file');
       throw error; // Re-throw to let caller handle it
     }
-  }, [handleFileSystemError]);
+  }, [refreshFileTree, handleFileSystemError]);
+
+  /**
+   * Move a file/folder to .trash (soft delete)
+   */
+  const moveToTrash = useCallback(async (file: FileNode): Promise<string | null> => {
+    try {
+      const rootPath = useAppStore.getState().rootFolderPath;
+      if (!rootPath) {
+        showNotification('No knowledge base opened. Please open one first.', 'error');
+        return null;
+      }
+
+      if (isPathInTrash(file.path, rootPath)) {
+        showNotification('Item is already in trash.', 'error');
+        return null;
+      }
+
+      const fs = await getFileSystem();
+      if (!fs.moveFile) {
+        showNotification('Move to trash is not supported in this environment.', 'error');
+        return null;
+      }
+
+      const trashRootPath = joinPath(rootPath, TRASH_DIR_NAME);
+      await withErrorHandling(
+        () => fs.createDirectory(trashRootPath),
+        'Failed to create trash directory'
+      );
+
+      const relativePath = getRelativePathFromRoot(file.path, rootPath);
+      const parentRelativePath = getParentRelativePath(relativePath);
+      const containerName = createTrashContainerName(parentRelativePath);
+      const containerPath = joinPath(trashRootPath, containerName);
+
+      await withErrorHandling(
+        () => fs.createDirectory(containerPath),
+        'Failed to prepare trash container'
+      );
+
+      const movedPath = await withErrorHandling(
+        () => fs.moveFile!(file.path, containerPath),
+        'Failed to move item to trash'
+      );
+
+      await refreshFileTree();
+      showNotification('Moved to trash', 'success');
+      return movedPath;
+    } catch (error) {
+      handleFileSystemError(error, 'Failed to move item to trash');
+      return null;
+    }
+  }, [showNotification, refreshFileTree, handleFileSystemError]);
+
+  /**
+   * Restore a file/folder from .trash to original location
+   */
+  const restoreFromTrash = useCallback(async (file: FileNode): Promise<string | null> => {
+    try {
+      const rootPath = useAppStore.getState().rootFolderPath;
+      if (!rootPath) {
+        showNotification('No knowledge base opened. Please open one first.', 'error');
+        return null;
+      }
+
+      const parsed = parseTrashPathInfo(file.path, rootPath);
+      if (!parsed) {
+        showNotification('Invalid trash item path.', 'error');
+        return null;
+      }
+
+      const fs = await getFileSystem();
+      if (!fs.moveFile) {
+        showNotification('Restore from trash is not supported in this environment.', 'error');
+        return null;
+      }
+
+      const targetParentRelative = getParentRelativePath(parsed.originalRelativePath);
+      const targetParentPath = targetParentRelative
+        ? joinPathSegments(rootPath, ...targetParentRelative.split('/').filter(Boolean))
+        : rootPath;
+
+      await withErrorHandling(
+        () => fs.createDirectory(targetParentPath),
+        'Failed to prepare restore target'
+      );
+
+      const targetPath = joinPath(targetParentPath, getPathBasename(file.path));
+      const targetExists = await withErrorHandling(
+        () => fs.fileExists(targetPath),
+        'Failed to check restore target'
+      );
+      if (targetExists) {
+        showNotification('Restore target already exists. Please rename or move the existing item first.', 'error');
+        return null;
+      }
+
+      const restoredPath = await withErrorHandling(
+        () => fs.moveFile!(file.path, targetParentPath),
+        'Failed to restore item from trash'
+      );
+
+      const trashContainerPath = joinPath(joinPath(rootPath, TRASH_DIR_NAME), parsed.containerName);
+      const containerChildren = await withErrorHandling(
+        () => fs.readDirectory(trashContainerPath),
+        'Failed to inspect trash container'
+      );
+      if (containerChildren.length === 0) {
+        await withErrorHandling(
+          () => fs.deleteFile(trashContainerPath),
+          'Failed to cleanup empty trash container'
+        );
+      }
+
+      await refreshFileTree();
+      showNotification('Restored from trash', 'success');
+      return restoredPath;
+    } catch (error) {
+      handleFileSystemError(error, 'Failed to restore item from trash');
+      return null;
+    }
+  }, [showNotification, refreshFileTree, handleFileSystemError]);
 
   /**
    * Move a file to a new folder
@@ -323,6 +580,7 @@ export function useFileSystem() {
     files,
     openFile,
     openDirectory,
+    openKnowledgeBase,
     readFile,
     writeFile,
     saveFile,
@@ -330,6 +588,8 @@ export function useFileSystem() {
     createFolder,
     renameFile,
     deleteFile,
+    moveToTrash,
+    restoreFromTrash,
     moveFile,
     revealInExplorer,
     hasUnsavedChanges,

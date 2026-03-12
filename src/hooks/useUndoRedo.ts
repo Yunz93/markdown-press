@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, selectContent } from '../store/appStore';
 
 /**
  * Hook for undo/redo functionality
@@ -54,7 +54,8 @@ export function useUndoRedo() {
  * Hook for tracking content history stats
  */
 export function useHistoryStats() {
-  const { history, content } = useAppStore();
+  const history = useAppStore((state) => state.history);
+  const content = useAppStore(selectContent);
 
   return {
     pastLength: history.past.length,

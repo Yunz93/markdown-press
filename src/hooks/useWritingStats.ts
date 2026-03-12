@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, selectContent } from '../store/appStore';
 import { parseFrontmatter } from '../utils/frontmatter';
 
 export interface WritingStats {
@@ -12,7 +12,7 @@ export interface WritingStats {
 }
 
 export const useWritingStats = () => {
-  const content = useAppStore((state) => state.content);
+  const content = useAppStore(selectContent);
 
   const stats: WritingStats = useMemo(() => {
     // Exclude code blocks and frontmatter

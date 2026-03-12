@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, selectContent } from '../../store/appStore';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -17,8 +17,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   onScroll,
   scrollPercentage
 }) => {
+  const content = useAppStore(selectContent);
   const {
-    content,
     setContent,
     settings,
     isSaving,

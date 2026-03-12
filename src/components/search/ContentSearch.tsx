@@ -203,8 +203,21 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Find</span>
             <button
               onClick={() => setShowReplace(!showReplace)}
-              className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {showReplace ? (
+                  <>
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </>
+                )}
+              </svg>
               {showReplace ? 'Hide Replace' : 'Show Replace'}
             </button>
           </div>
@@ -233,25 +246,35 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <button
                 onClick={() => setCaseSensitive(!caseSensitive)}
-                className={`p-1 rounded text-xs font-medium transition-colors ${
+                className={`p-1 rounded transition-colors ${
                   caseSensitive
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                 }`}
                 title="Case sensitive"
               >
-                Aa
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 20l4-10 4 10" />
+                  <line x1="5.5" y1="16" x2="10.5" y2="16" />
+                  <path d="M16 8h4a2 2 0 0 1 0 4h-4v8" />
+                </svg>
               </button>
               <button
                 onClick={() => setUseRegex(!useRegex)}
-                className={`p-1 rounded text-xs font-medium transition-colors ${
+                className={`p-1 rounded transition-colors ${
                   useRegex
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                 }`}
                 title="Regular expression"
               >
-                .*
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="4 7 8 7 8 11" />
+                  <polyline points="20 17 16 17 16 13" />
+                  <line x1="8" y1="7" x2="16" y2="15" />
+                  <line x1="16" y1="9" x2="16" y2="9" />
+                  <line x1="8" y1="15" x2="8" y2="15" />
+                </svg>
               </button>
             </div>
           </div>
@@ -302,15 +325,26 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
               <button
                 onClick={replaceCurrentMatch}
                 disabled={matches.length === 0}
-                className="flex-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="16 3 21 3 21 8" />
+                  <line x1="4" y1="20" x2="21" y2="3" />
+                  <polyline points="21 16 21 21 16 21" />
+                </svg>
                 Replace
               </button>
               <button
                 onClick={replaceAllMatches}
                 disabled={matches.length === 0}
-                className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 1l4 4-4 4" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <path d="M7 23l-4-4 4-4" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
                 Replace All
               </button>
             </div>

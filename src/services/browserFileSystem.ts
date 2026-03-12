@@ -232,35 +232,40 @@ export class BrowserFileSystem implements IFileSystem {
   /**
    * Read directory and return file nodes
    */
-  async readDirectory(dirPath: string, rootPath: string = dirPath): Promise<FileNode[]> {
+  async readDirectory(dirPath: string, rootPath: string = dirPath, inTrash: boolean = false): Promise<FileNode[]> {
     try {
       const dirHandle = dirPath === this.rootPath && this.directoryHandle
         ? this.directoryHandle
         : await this.getDirectoryHandle(this.directoryHandle!, this.getRelativePath(dirPath));
 
       const nodes: FileNode[] = [];
+      const normalizedDirPath = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
+      const normalizedRootPath = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
+      const isAtRoot = normalizedDirPath === normalizedRootPath;
 
       for await (const [name, entry] of (dirHandle as any).entries()) {
         const fullPath = `${dirPath}/${name}`;
+        const isTrashDirectory = entry.kind === 'directory' && isAtRoot && name === '.trash';
+        const nodeInTrash = inTrash || isTrashDirectory;
 
-        if (entry.kind === 'file' && (name.endsWith('.md') || name.endsWith('.markdown'))) {
+        if (entry.kind === 'file' && (nodeInTrash || name.endsWith('.md') || name.endsWith('.markdown'))) {
           nodes.push({
             id: fullPath,
             name,
             type: 'file',
             path: fullPath,
-            isTrash: false
+            isTrash: nodeInTrash
           });
-        } else if (entry.kind === 'directory' && !name.startsWith('.')) {
-          const children = await this.readDirectory(fullPath, rootPath);
-          if (children.length > 0) {
+        } else if (entry.kind === 'directory' && (!name.startsWith('.') || isTrashDirectory || inTrash)) {
+          const children = await this.readDirectory(fullPath, rootPath, nodeInTrash);
+          if (children.length > 0 || nodeInTrash) {
             nodes.push({
               id: fullPath,
               name,
               type: 'folder',
               path: fullPath,
               children,
-              isTrash: false
+              isTrash: nodeInTrash
             });
           }
         }

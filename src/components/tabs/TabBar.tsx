@@ -64,7 +64,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
   }
 
   return (
-    <div className="tab-bar flex items-center h-10 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+    <div className="tab-bar flex items-center h-11 px-2 gap-1 bg-white/70 dark:bg-black/40 backdrop-blur-md border-b border-gray-200/60 dark:border-white/10 overflow-x-auto">
       {openTabs.map((fileId) => {
         const file = fileMap.get(fileId);
         if (!file) return null;
@@ -75,10 +75,10 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
         return (
           <div
             key={fileId}
-            className={`tab flex items-center gap-2 px-3 py-1.5 min-w-0 max-w-[200px] cursor-pointer border-r border-gray-200 dark:border-gray-700 transition-colors ${
+            className={`tab flex items-center gap-2 px-3 py-1.5 min-w-0 max-w-[220px] cursor-pointer rounded-lg border transition-colors ${
               isActive
-                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-white/10 shadow-sm'
+                : 'bg-transparent text-gray-600 dark:text-gray-400 border-transparent hover:bg-black/5 dark:hover:bg-white/5'
             }`}
             onClick={() => handleTabClick(fileId)}
             title={file.path}

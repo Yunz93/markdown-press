@@ -63,6 +63,14 @@ const tabs: TabConfig[] = [
   )},
 ];
 
+const shortcutLabels: Record<string, string> = {
+  save: 'Save File',
+  toggleView: 'Toggle View Mode',
+  aiAnalyze: 'AI Enhance',
+  search: 'Search',
+  settings: 'Open Settings',
+};
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -165,7 +173,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">AI Content Enhancement</h3>
-                  <p className="text-sm text-gray-500 mb-6">Use Google Gemini to automatically generate frontmatter, summaries, and SEO tags.</p>
+                  <p className="text-sm text-gray-500 mb-6">Use the configured Gemini model to optimize markdown formatting, fix spelling, and refresh SEO metadata.</p>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -194,6 +202,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </button>
                       </div>
                       <p className="text-[10px] text-gray-400">Your API key is stored locally and never shared. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini Model</label>
+                      <input
+                        type="text"
+                        value={settings.geminiModel || 'gemini-2.0-flash-exp'}
+                        onChange={(e) => onUpdateSettings({ ...settings, geminiModel: e.target.value })}
+                        placeholder="gemini-2.0-flash-exp"
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                      />
+                      <p className="text-[10px] text-gray-400">Example: <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">gemini-2.0-flash-exp</code></p>
                     </div>
                   </div>
                 </div>
@@ -225,7 +244,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }`}
                       >
                         <div className={`w-full h-16 rounded-lg mb-2 shadow-inner ${theme.bg} ${theme.border} border`}></div>
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{theme.label}</span>
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {theme.mode === 'light' && (
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="5" />
+                              <line x1="12" y1="1" x2="12" y2="3" />
+                              <line x1="12" y1="21" x2="12" y2="23" />
+                              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            </svg>
+                          )}
+                          {theme.mode === 'dark' && (
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                            </svg>
+                          )}
+                          {theme.mode === 'solarized-light' && (
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 2v20M2 12h20" />
+                            </svg>
+                          )}
+                          {theme.mode === 'solarized-dark' && (
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M2 12h20" />
+                              <path d="M12 2a10 10 0 0 0 0 20" />
+                            </svg>
+                          )}
+                          {theme.mode === 'custom' && (
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                            </svg>
+                          )}
+                          <span>{theme.label}</span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -279,7 +331,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       >
                         <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 shadow-sm ${
                           settings.wordWrap ? 'translate-x-4' : 'translate-x-0'
-                        }`} />
+                        }`}>
+                          <svg className="w-2.5 h-2.5 text-gray-500 m-[3px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M4 7h10a3 3 0 1 1 0 6H8" />
+                            <polyline points="8 10 5 13 8 16" />
+                          </svg>
+                        </span>
                       </button>
                     </div>
 
@@ -336,9 +393,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <button
                       onClick={handleAddMetadata}
-                      className="px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
                     >
-                      + Add Field
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      Add Field
                     </button>
                   </div>
 
@@ -432,8 +493,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="space-y-3">
                     {Object.entries(settings.shortcuts).map(([key, value]) => (
                       <div key={key} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
-                        <span className="text-sm font-medium capitalize text-gray-700 dark:text-gray-200">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                          {shortcutLabels[key] || key.replace(/([A-Z])/g, ' $1').trim()}
                         </span>
                         <input
                           type="text"
@@ -452,8 +513,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-4 border-t border-gray-200/50 dark:border-white/10 flex justify-end">
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black text-sm font-medium rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-1.5 px-6 py-2 bg-black dark:bg-white text-white dark:text-black text-sm font-medium rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-sm"
             >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
               Done
             </button>
           </div>

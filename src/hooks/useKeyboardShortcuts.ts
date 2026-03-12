@@ -6,6 +6,8 @@ interface UseKeyboardShortcutsOptions {
   onSave?: () => void;
   onToggleView?: () => void;
   onAIAnalyze?: () => void;
+  onSearch?: () => void;
+  onOpenSettings?: () => void;
 }
 
 // Parse shortcut string like "Ctrl+S" into structured format
@@ -37,7 +39,7 @@ const matchesShortcut = (event: KeyboardEvent, shortcut: string) => {
  * Hook for keyboard shortcuts management
  */
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) {
-  const { onSave, onToggleView, onAIAnalyze } = options;
+  const { onSave, onToggleView, onAIAnalyze, onSearch, onOpenSettings } = options;
 
   const {
     settings,
@@ -83,7 +85,21 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       }
       return;
     }
-  }, [settings.shortcuts, onSave, onToggleView, onAIAnalyze, viewMode, setViewMode, showNotification]);
+
+    // Check search shortcut
+    if (matchesShortcut(event, shortcuts.search)) {
+      event.preventDefault();
+      onSearch?.();
+      return;
+    }
+
+    // Check open settings shortcut
+    if (matchesShortcut(event, shortcuts.settings)) {
+      event.preventDefault();
+      onOpenSettings?.();
+      return;
+    }
+  }, [settings.shortcuts, onSave, onToggleView, onAIAnalyze, onSearch, onOpenSettings, viewMode, setViewMode, showNotification]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -96,7 +112,9 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
  */
 export function useGlobalKeyboardShortcuts(
   executeSave: () => Promise<void>,
-  handleAIAnalyze: () => Promise<void>
+  handleAIAnalyze: () => Promise<void>,
+  onSearch?: () => void,
+  onOpenSettings?: () => void
 ) {
   const { settings, viewMode, setViewMode, showNotification } = useAppStore();
 
@@ -123,9 +141,19 @@ export function useGlobalKeyboardShortcuts(
         e.preventDefault();
         handleAIAnalyze();
       }
+      // Search: Ctrl+F (default)
+      else if (matchesShortcut(e, shortcuts.search)) {
+        e.preventDefault();
+        onSearch?.();
+      }
+      // Open settings: Ctrl+0 (default)
+      else if (matchesShortcut(e, shortcuts.settings)) {
+        e.preventDefault();
+        onOpenSettings?.();
+      }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [executeSave, handleAIAnalyze, settings.shortcuts, viewMode, setViewMode, showNotification]);
+  }, [executeSave, handleAIAnalyze, onSearch, onOpenSettings, settings.shortcuts, viewMode, setViewMode, showNotification]);
 }

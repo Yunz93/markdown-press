@@ -2,13 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { createFileSlice, type FileState, type FileActions, initialFileState } from './fileStore';
 import { createTabSlice, type TabState, type TabActions, initialTabState } from './tabStore';
-import { createEditorSlice, type EditorState, type EditorActions, initialEditorState } from './editorStore';
+import { createEditorSlice, type EditorState, type EditorActions, initialEditorState, selectContent } from './editorStore';
 import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings } from './uiStore';
 import { ViewMode, type FileNode, type AppSettings, type Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 
 // Re-export types from slice stores
 export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
+// Re-export selector for convenience
+export { selectContent };
 
 // Complete AppState combines all slices
 export interface AppState extends
@@ -36,6 +38,23 @@ export const useAppStore = create<AppState>()(
     {
       name: 'markdown-press-settings',
       partialize: (state) => ({ settings: (state as any).settings }),
+      merge: (persistedState, currentState) => {
+        const persistedSettings = (persistedState as any)?.settings ?? {};
+        const mergedSettings = {
+          ...defaultSettings,
+          ...persistedSettings,
+          shortcuts: {
+            ...defaultSettings.shortcuts,
+            ...(persistedSettings.shortcuts ?? {})
+          }
+        };
+
+        return {
+          ...currentState,
+          ...(persistedState as any),
+          settings: mergedSettings
+        };
+      },
     }
   )
 );
@@ -83,7 +102,6 @@ export function useTabStore(): TabState & TabActions {
 export function useEditorStore(): EditorState & EditorActions {
   return useAppStore((state) => ({
     ...initialEditorState,
-    content: state.content,
     viewMode: state.viewMode,
     history: state.history,
     setContent: state.setContent,

@@ -39,17 +39,26 @@ export interface AIAnalysisResult {
   summary: string;
   suggestedTags: string[];
   seoTitle: string;
+  optimizedMarkdown: string;
 }
 
 export interface ShortcutConfig {
   save: string;
   toggleView: string;
   aiAnalyze: string;
+  search: string;
+  settings: string;
 }
 
 export interface MetadataField {
   key: string;
   defaultValue: string;
+}
+
+export interface KnowledgeBaseMeta {
+  path: string;
+  name: string;
+  lastOpenedAt: string;
 }
 
 export interface AppSettings {
@@ -58,7 +67,10 @@ export interface AppSettings {
   fontFamily: string;
   githubRepo: string;
   geminiApiKey?: string;
+  geminiModel?: string;
   shortcuts: ShortcutConfig;
+  knowledgeBases: KnowledgeBaseMeta[];
+  lastKnowledgeBasePath?: string;
   themeMode: 'light' | 'dark' | 'solarized-light' | 'solarized-dark' | 'custom';
   customCss: string;
   metadataFields: MetadataField[];

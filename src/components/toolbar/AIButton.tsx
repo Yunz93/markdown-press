@@ -17,10 +17,10 @@ export const AIButton: React.FC<AIButtonProps> = ({
       disabled={disabled || isLoading}
       title={isLoading ? 'AI Enhancing' : 'AI Enhance'}
       className={`
-        p-2 rounded-lg transition-all active:scale-95
+        inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-95
         ${isLoading
           ? 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-wait'
-          : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20'
+          : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20'
         }
       `}
     >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
@@ -8,10 +8,8 @@ interface SidebarProps {
   files: FileNode[];
   activeFileId: string | null;
   onFileSelect: (file: FileNode) => void;
-  onOpenFolder: () => void;
   onCreateFile: (parentFolder?: FileNode) => void;
   onNewFolder: (parentFolder?: FileNode, name?: string) => void;
-  onOpenSettings: () => void;
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
   onReveal: (path: string) => void;
@@ -20,6 +18,9 @@ interface SidebarProps {
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
+  currentKnowledgeBaseName?: string;
+  currentKnowledgeBasePath?: string | null;
+  onSwitchKnowledgeBase: () => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -247,14 +248,21 @@ const PromptDialog: React.FC<{
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
             >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
               Confirm
             </button>
           </div>
@@ -299,14 +307,21 @@ const ConfirmDialog: React.FC<{
         <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${variantStyles[variant]}`}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${variantStyles[variant]}`}
           >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
             {confirmText}
           </button>
         </div>
@@ -317,11 +332,26 @@ const ConfirmDialog: React.FC<{
 };
 
 const getTrashItems = (nodes: FileNode[]): FileNode[] => {
-  let trash: FileNode[] = [];
-  nodes.forEach(node => {
-    if (node.isTrash) trash.push(node);
-    if (node.children) trash = trash.concat(getTrashItems(node.children));
-  });
+  const getTrashDepth = (path: string): number => {
+    const segments = path.split(/[\\/]+/).filter(Boolean);
+    const trashIndex = segments.lastIndexOf('.trash');
+    if (trashIndex < 0) return -1;
+    return segments.length - trashIndex - 1;
+  };
+
+  const trash: FileNode[] = [];
+  const collect = (items: FileNode[]) => {
+    for (const node of items) {
+      if (node.isTrash && getTrashDepth(node.path) === 2) {
+        trash.push(node);
+      }
+      if (node.children) {
+        collect(node.children);
+      }
+    }
+  };
+
+  collect(nodes);
   return trash;
 };
 
@@ -329,10 +359,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   files,
   activeFileId,
   onFileSelect,
-  onOpenFolder,
   onCreateFile,
   onNewFolder,
-  onOpenSettings,
   onRename,
   onDelete,
   onReveal,
@@ -341,6 +369,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRestoreFromTrash,
   onDeleteForever,
   onMoveNode,
+  currentKnowledgeBaseName,
+  currentKnowledgeBasePath,
+  onSwitchKnowledgeBase,
   isOpen,
   onClose
 }) => {
@@ -388,26 +419,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto] gap-2">
-            <button
-              onClick={onOpenFolder}
-              className="w-full flex items-center justify-center gap-2 px-3 bg-white dark:bg-white/10 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/20 transition-all border border-gray-200 dark:border-white/5 shadow-sm active:scale-95"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-              </svg>
-              <span className="text-xs font-semibold">Open Folder</span>
-            </button>
-
+          <div className="grid grid-cols-1 gap-2">
             <button
               onClick={() => onCreateFile()}
-              className="flex items-center justify-center w-10 h-full bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80 transition-all shadow-sm active:scale-95 group"
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80 transition-all shadow-sm active:scale-95"
               title="New Note"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
+              <span className="text-xs font-semibold">New Note</span>
             </button>
           </div>
         </div>
@@ -419,9 +441,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               <p className="text-xs mb-3">No local files opened.</p>
-              <button onClick={onOpenFolder} className="text-accent-DEFAULT hover:underline text-xs font-medium">
-                Open Folder
-              </button>
+              <p className="text-xs text-gray-400">Use the knowledge base button below to open a vault.</p>
             </div>
           ) : (
             <div className="space-y-0.5">
@@ -480,14 +500,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <button
-            onClick={onOpenSettings}
-            className="flex items-center gap-2 w-full px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors text-sm font-medium"
+            onClick={onSwitchKnowledgeBase}
+            className="flex items-center justify-between gap-2 w-full px-3 py-2.5 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.03] hover:bg-gray-100/80 dark:hover:bg-white/[0.06] transition-colors"
+            title={currentKnowledgeBasePath || 'Open Knowledge Base'}
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <div className="flex items-center gap-2 min-w-0">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+              </svg>
+              <p className="text-sm font-medium truncate min-w-0">
+                {currentKnowledgeBaseName || 'Open Knowledge Base'}
+              </p>
+            </div>
+            <svg className="w-4 h-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+              <polyline points="9 13 12 10 15 13" />
+              <line x1="12" y1="10" x2="12" y2="16" />
             </svg>
-            <span>Settings</span>
           </button>
         </div>
       </aside>

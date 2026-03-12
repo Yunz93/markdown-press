@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, selectContent } from '../store/appStore';
 
 export interface SearchOptions {
   caseSensitive?: boolean;
@@ -16,7 +16,7 @@ export interface SearchResult {
 }
 
 export const useSearch = () => {
-  const content = useAppStore((state) => state.content);
+  const content = useAppStore(selectContent);
   const setContent = useAppStore((state) => state.setContent);
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState<SearchOptions>({});

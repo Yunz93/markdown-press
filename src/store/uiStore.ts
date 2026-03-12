@@ -44,7 +44,10 @@ export const defaultSettings: AppSettings = {
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Microsoft YaHei"',
   githubRepo: '',
   geminiApiKey: '',
-  shortcuts: { save: 'Ctrl+S', toggleView: 'Ctrl+E', aiAnalyze: 'Ctrl+J' },
+  geminiModel: 'gemini-2.0-flash-exp',
+  shortcuts: { save: 'Ctrl+S', toggleView: 'Ctrl+E', aiAnalyze: 'Ctrl+J', search: 'Ctrl+F', settings: 'Ctrl+0' },
+  knowledgeBases: [],
+  lastKnowledgeBasePath: '',
   themeMode: typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   customCss: '',
   metadataFields: [

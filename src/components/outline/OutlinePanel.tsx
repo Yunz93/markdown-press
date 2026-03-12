@@ -55,6 +55,14 @@ const HeadingItem: React.FC<HeadingItemProps> = ({
           onClick={() => onItemClick(node.id, node.line!)}
           title={node.text}
         >
+          <span className="heading-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="8" y1="4" x2="6" y2="20" />
+              <line x1="14" y1="4" x2="12" y2="20" />
+              <line x1="4" y1="9" x2="18" y2="9" />
+              <line x1="3" y1="15" x2="17" y2="15" />
+            </svg>
+          </span>
           <span className={`heading-level h${node.level}`}>{node.text.charAt(0)}</span>
           <span className="heading-title">{node.text}</span>
         </button>

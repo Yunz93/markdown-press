@@ -7,9 +7,16 @@ import { PreviewPane } from './PreviewPane';
 interface SplitViewProps {
   highlighter?: any;
   onContentChange?: (content: string) => void;
+  isOutlineOpen: boolean;
+  onToggleOutline: () => void;
 }
 
-export const SplitView: React.FC<SplitViewProps> = ({ highlighter, onContentChange }) => {
+export const SplitView: React.FC<SplitViewProps> = ({
+  highlighter,
+  onContentChange,
+  isOutlineOpen,
+  onToggleOutline
+}) => {
   const { viewMode } = useAppStore();
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
@@ -118,6 +125,8 @@ export const SplitView: React.FC<SplitViewProps> = ({ highlighter, onContentChan
             highlighter={highlighter}
             onScroll={handlePreviewScroll}
             scrollPercentage={activeSide === 'editor' ? scrollPercentage : undefined}
+            isOutlineOpen={isOutlineOpen}
+            onToggleOutline={onToggleOutline}
           />
         </div>
       )}

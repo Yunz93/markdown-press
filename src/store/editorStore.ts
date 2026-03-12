@@ -9,9 +9,10 @@ export interface HistoryState {
 
 /**
  * Editor store state interface
+ * Note: `content` is NOT stored here. It is derived from
+ * `fileContents[activeTabId]` via the `selectContent` selector.
  */
 export interface EditorState {
-  content: string;
   viewMode: ViewMode;
   history: HistoryState;
 }
@@ -33,7 +34,6 @@ export interface EditorActions {
  * Initial editor state
  */
 export const initialEditorState: EditorState = {
-  content: '',
   viewMode: ViewMode.SPLIT,
   history: {
     past: [],
@@ -42,38 +42,57 @@ export const initialEditorState: EditorState = {
   },
 };
 
+// Combined type needed by the slice to access fileContents + activeTabId
+interface EditorSliceContext {
+  activeTabId: string | null;
+  fileContents: Record<string, string>;
+  updateTabContent: (fileId: string, content: string) => void;
+}
+
+/**
+ * Selector: derive current content from fileContents[activeTabId].
+ * Use this instead of reading `state.content` directly.
+ */
+export function selectContent(state: EditorState & EditorSliceContext): string {
+  return state.activeTabId ? (state.fileContents[state.activeTabId] ?? '') : '';
+}
+
 /**
  * Create editor store slice
  */
 export function createEditorSlice(
-  set: (fn: (state: EditorState) => Partial<EditorState>) => void,
-  get: () => EditorState & EditorActions
+  set: (fn: (state: EditorState & EditorSliceContext) => Partial<EditorState & EditorSliceContext>) => void,
+  get: () => EditorState & EditorActions & EditorSliceContext
 ): EditorState & EditorActions {
   return {
     ...initialEditorState,
 
     setContent: (content, skipHistory = false) => set((state) => {
+      const { activeTabId, fileContents, history } = state;
+      if (!activeTabId) return {};
+
+      const current = fileContents[activeTabId] ?? '';
+
       if (skipHistory) {
-        return { content };
+        return {
+          fileContents: { ...fileContents, [activeTabId]: content },
+        };
       }
 
       // Don't add to history if content is the same
-      if (state.content === content) {
-        return state;
-      }
+      if (current === content) return {};
 
-      const newPast = [...state.history.past, state.content];
-      // Limit history size
-      const trimmedPast = newPast.length > state.history.maxHistory
-        ? newPast.slice(-state.history.maxHistory)
+      const newPast = [...history.past, current];
+      const trimmedPast = newPast.length > history.maxHistory
+        ? newPast.slice(-history.maxHistory)
         : newPast;
 
       return {
-        content,
+        fileContents: { ...fileContents, [activeTabId]: content },
         history: {
-          ...state.history,
+          ...history,
           past: trimmedPast,
-          future: [], // Clear future on new content
+          future: [],
         },
       };
     }),
@@ -81,33 +100,39 @@ export function createEditorSlice(
     setViewMode: (mode) => set(() => ({ viewMode: mode })),
 
     undo: () => set((state) => {
-      const { past, future, maxHistory } = state.history;
-      if (past.length === 0) return state;
+      const { activeTabId, fileContents, history } = state;
+      if (!activeTabId) return {};
+      const { past, future, maxHistory } = history;
+      if (past.length === 0) return {};
 
+      const current = fileContents[activeTabId] ?? '';
       const previous = past[past.length - 1];
       const newPast = past.slice(0, -1);
 
       return {
-        content: previous,
+        fileContents: { ...fileContents, [activeTabId]: previous },
         history: {
           past: newPast,
-          future: [state.content, ...future],
+          future: [current, ...future],
           maxHistory,
         },
       };
     }),
 
     redo: () => set((state) => {
-      const { past, future, maxHistory } = state.history;
-      if (future.length === 0) return state;
+      const { activeTabId, fileContents, history } = state;
+      if (!activeTabId) return {};
+      const { past, future, maxHistory } = history;
+      if (future.length === 0) return {};
 
+      const current = fileContents[activeTabId] ?? '';
       const next = future[0];
       const newFuture = future.slice(1);
 
       return {
-        content: next,
+        fileContents: { ...fileContents, [activeTabId]: next },
         history: {
-          past: [...past, state.content],
+          past: [...past, current],
           future: newFuture,
           maxHistory,
         },

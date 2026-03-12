@@ -56,63 +56,35 @@ function isRetryableError(error: any): boolean {
   );
 }
 
-/**
- * Split content into chunks if too long
- */
-function chunkContent(content: string, maxLength: number = 4000): string[] {
-  if (content.length <= maxLength) {
-    return [content];
-  }
-
-  const chunks: string[] = [];
-  let remaining = content;
-
-  while (remaining.length > 0) {
-    if (remaining.length <= maxLength) {
-      chunks.push(remaining);
-      break;
-    }
-
-    // Try to find a good breaking point (paragraph or sentence)
-    let breakPoint = remaining.lastIndexOf('\n\n', maxLength);
-    if (breakPoint === -1 || breakPoint < maxLength * 0.5) {
-      breakPoint = remaining.lastIndexOf('\n', maxLength);
-    }
-    if (breakPoint === -1 || breakPoint < maxLength * 0.5) {
-      breakPoint = remaining.lastIndexOf('. ', maxLength);
-    }
-    if (breakPoint === -1 || breakPoint < maxLength * 0.5) {
-      breakPoint = maxLength;
-    }
-
-    chunks.push(remaining.substring(0, breakPoint + 1));
-    remaining = remaining.substring(breakPoint + 1);
-  }
-
-  return chunks;
-}
-
-export const analyzeContent = async (content: string, apiKey: string): Promise<AIAnalysisResult> => {
+export const analyzeContent = async (
+  content: string,
+  apiKey: string,
+  modelName: string = "gemini-2.0-flash-exp"
+): Promise<AIAnalysisResult> => {
   if (!apiKey) {
     throw new Error("Gemini API key is required");
   }
 
   const ai = getAIInstance(apiKey);
 
-  // Handle long content by analyzing the first chunk
-  const chunks = chunkContent(content, 4000);
-  const contentToAnalyze = chunks.length > 1
-    ? chunks[0] + '\n\n[Content truncated for analysis...]'
-    : chunks[0];
-
   const prompt = `
-    Analyze the following Markdown blog post content.
-    1. Generate a concise SEO-friendly summary (max 160 characters).
-    2. Suggest 5 relevant SEO tags.
-    3. Create a catchy title if the current one is weak, otherwise return the likely title.
+    You are editing Markdown content for publication quality.
+    Do all of the following:
+    1. Fix spelling and obvious grammar issues.
+    2. Improve Markdown structure and formatting without changing meaning.
+    3. Keep code blocks, links, and technical terms intact.
+    4. Generate a concise SEO summary (max 160 characters).
+    5. Suggest 5 relevant SEO tags.
+    6. Propose a better SEO title only if the current title is weak.
 
-    Content:
-    ${contentToAnalyze}
+    Return strict JSON with these fields:
+    - summary: string
+    - suggestedTags: string[]
+    - seoTitle: string
+    - optimizedMarkdown: string
+
+    Markdown content:
+    ${content}
   `;
 
   let lastError: Error | null = null;
@@ -125,7 +97,7 @@ export const analyzeContent = async (content: string, apiKey: string): Promise<A
       });
 
       const responsePromise = ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
+        model: modelName || "gemini-2.0-flash-exp",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -137,9 +109,10 @@ export const analyzeContent = async (content: string, apiKey: string): Promise<A
                 type: Type.ARRAY,
                 items: { type: Type.STRING }
               },
-              seoTitle: { type: Type.STRING }
+              seoTitle: { type: Type.STRING },
+              optimizedMarkdown: { type: Type.STRING }
             },
-            required: ["summary", "suggestedTags", "seoTitle"]
+            required: ["summary", "suggestedTags", "seoTitle", "optimizedMarkdown"]
           }
         }
       });

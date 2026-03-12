@@ -276,57 +276,48 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Recursively read directory and return file nodes
    */
-  async readDirectory(dirPath: string, _rootPath: string = dirPath): Promise<FileNode[]> {
+  async readDirectory(dirPath: string, rootPath: string = dirPath, inTrash: boolean = false): Promise<FileNode[]> {
     try {
       const entries = await readDir(dirPath);
       const nodes: FileNode[] = [];
+      const normalizedDirPath = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
+      const normalizedRootPath = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
+      const isAtRoot = normalizedDirPath === normalizedRootPath;
 
       for (const entry of entries) {
         if (!entry.name) continue;
-        if (!this.showHiddenFiles && entry.name.startsWith('.')) continue;
+        const isTrashDirectory = entry.isDirectory && isAtRoot && entry.name === '.trash';
+        const nodeInTrash = inTrash || isTrashDirectory;
+        if (!this.showHiddenFiles && entry.name.startsWith('.') && !isTrashDirectory && !inTrash) continue;
 
         const fullPath = await join(dirPath, entry.name);
         const ext = entry.name.toLowerCase();
 
         if (entry.isDirectory) {
-          const children = await this.readDirectory(fullPath, _rootPath);
+          const children = await this.readDirectory(fullPath, rootPath, nodeInTrash);
           nodes.push({
             id: fullPath,
             name: entry.name,
             type: 'folder',
             path: fullPath,
             children,
-            isTrash: false
+            isTrash: nodeInTrash
           });
         }
-        // Check if it's a markdown file
-        else if (MARKDOWN_EXTENSIONS.some(e => ext.endsWith(e))) {
+        else {
+          const shouldIncludeFile =
+            nodeInTrash ||
+            MARKDOWN_EXTENSIONS.some(e => ext.endsWith(e)) ||
+            (this.showImages && IMAGE_EXTENSIONS.some(e => ext.endsWith(e))) ||
+            (this.showConfigFiles && CONFIG_EXTENSIONS.some(e => ext.endsWith(e)));
+
+          if (!shouldIncludeFile) continue;
           nodes.push({
             id: fullPath,
             name: entry.name,
             type: 'file',
             path: fullPath,
-            isTrash: false
-          });
-        }
-        // Check if it's an image file
-        else if (this.showImages && IMAGE_EXTENSIONS.some(e => ext.endsWith(e))) {
-          nodes.push({
-            id: fullPath,
-            name: entry.name,
-            type: 'file',
-            path: fullPath,
-            isTrash: false
-          });
-        }
-        // Check if it's a config file
-        else if (this.showConfigFiles && CONFIG_EXTENSIONS.some(e => ext.endsWith(e))) {
-          nodes.push({
-            id: fullPath,
-            name: entry.name,
-            type: 'file',
-            path: fullPath,
-            isTrash: false
+            isTrash: nodeInTrash
           });
         }
       }
