@@ -4,7 +4,7 @@ import { useAppStore } from '../store/appStore';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import type { FileNode } from '../types';
 
-const TRASH_DIR_NAME = '.trash';
+const TRASH_DIR_NAMES = ['.trash', '_markdown_press_trash'] as const;
 const TRASH_ROOT_MARKER = '__root__';
 
 function getPathSeparator(path: string): '/' | '\\' {
@@ -52,8 +52,10 @@ function getParentRelativePath(relativePath: string): string {
 function isPathInTrash(path: string, rootPath: string): boolean {
   const normalizedPath = normalizePath(path);
   const normalizedRoot = normalizePath(rootPath);
-  return normalizedPath === `${normalizedRoot}/${TRASH_DIR_NAME}` ||
-    normalizedPath.startsWith(`${normalizedRoot}/${TRASH_DIR_NAME}/`);
+  return TRASH_DIR_NAMES.some((trashDirName) =>
+    normalizedPath === `${normalizedRoot}/${trashDirName}` ||
+    normalizedPath.startsWith(`${normalizedRoot}/${trashDirName}/`)
+  );
 }
 
 function createTrashContainerName(parentRelativePath: string): string {
@@ -61,38 +63,65 @@ function createTrashContainerName(parentRelativePath: string): string {
   return `${Date.now()}__${encodedParent}`;
 }
 
-function parseTrashPathInfo(path: string, rootPath: string): { containerName: string; originalRelativePath: string } | null {
+function parseTrashPathInfo(
+  path: string,
+  rootPath: string
+): { trashDirName: string; containerName: string; originalRelativePath: string } | null {
   const normalizedPath = normalizePath(path);
   const normalizedRoot = normalizePath(rootPath);
-  const trashPrefix = `${normalizedRoot}/${TRASH_DIR_NAME}/`;
-  if (!normalizedPath.startsWith(trashPrefix)) return null;
+  for (const trashDirName of TRASH_DIR_NAMES) {
+    const trashPrefix = `${normalizedRoot}/${trashDirName}/`;
+    if (!normalizedPath.startsWith(trashPrefix)) continue;
 
-  const remainder = normalizedPath.slice(trashPrefix.length);
-  const parts = remainder.split('/').filter(Boolean);
-  if (parts.length < 2) return null;
+    const remainder = normalizedPath.slice(trashPrefix.length);
+    const parts = remainder.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
 
-  const [containerName, ...itemParts] = parts;
-  const match = containerName.match(/^\d+__(.+)$/);
-  const encodedParent = match?.[1];
-  let parentRelativePath = '';
-  if (encodedParent) {
+    const [containerName, ...itemParts] = parts;
+    const match = containerName.match(/^\d+__(.+)$/);
+    const encodedParent = match?.[1];
+    let parentRelativePath = '';
+    if (encodedParent) {
+      try {
+        const decoded = decodeURIComponent(encodedParent);
+        parentRelativePath = decoded === TRASH_ROOT_MARKER ? '' : decoded;
+      } catch {
+        parentRelativePath = '';
+      }
+    }
+
+    const originalRelativePath = [
+      ...parentRelativePath.split('/').filter(Boolean),
+      ...itemParts
+    ].join('/');
+
+    return {
+      trashDirName,
+      containerName,
+      originalRelativePath
+    };
+  }
+
+  return null;
+}
+
+async function ensureTrashRootDirectory(fs: Awaited<ReturnType<typeof getFileSystem>>, rootPath: string): Promise<{
+  trashDirName: string;
+  trashRootPath: string;
+}> {
+  let lastError: unknown = null;
+
+  for (const trashDirName of TRASH_DIR_NAMES) {
+    const trashRootPath = joinPath(rootPath, trashDirName);
     try {
-      const decoded = decodeURIComponent(encodedParent);
-      parentRelativePath = decoded === TRASH_ROOT_MARKER ? '' : decoded;
-    } catch {
-      parentRelativePath = '';
+      await fs.createDirectory(trashRootPath);
+      return { trashDirName, trashRootPath };
+    } catch (error) {
+      lastError = error;
     }
   }
 
-  const originalRelativePath = [
-    ...parentRelativePath.split('/').filter(Boolean),
-    ...itemParts
-  ].join('/');
-
-  return {
-    containerName,
-    originalRelativePath
-  };
+  throw lastError ?? new Error('Unable to create trash directory');
 }
 
 /**
@@ -364,15 +393,20 @@ export function useFileSystem() {
     try {
       const fs = await getFileSystem();
       const newPath = await withErrorHandling(
-        () => fs.renameFile(file.path, newName),
-        'Failed to rename file'
+        () => fs.renameEntry
+          ? fs.renameEntry(file.path, newName, file.type === 'folder')
+          : fs.renameFile(file.path, newName),
+        `Failed to rename ${file.type}`
       );
       if (newPath) {
-        useAppStore.getState().updateFileName(file.id, newName.endsWith('.md') ? newName : `${newName}.md`, newPath);
+        const normalizedName = file.type === 'file'
+          ? (newName.endsWith('.md') ? newName : `${newName}.md`)
+          : newName;
+        useAppStore.getState().updateFileName(file.id, normalizedName, newPath);
       }
       return newPath;
     } catch (error) {
-      handleFileSystemError(error, 'Failed to rename file');
+      handleFileSystemError(error, `Failed to rename ${file.type}`);
       return null;
     }
   }, [handleFileSystemError]);
@@ -391,7 +425,7 @@ export function useFileSystem() {
       );
 
       if (rootPath && parsedTrashInfo) {
-        const trashContainerPath = joinPath(joinPath(rootPath, TRASH_DIR_NAME), parsedTrashInfo.containerName);
+        const trashContainerPath = joinPath(joinPath(rootPath, parsedTrashInfo.trashDirName), parsedTrashInfo.containerName);
         const containerChildren = await withErrorHandling(
           () => fs.readDirectory(trashContainerPath),
           'Failed to inspect trash container'
@@ -413,7 +447,7 @@ export function useFileSystem() {
   }, [refreshFileTree, handleFileSystemError]);
 
   /**
-   * Move a file/folder to .trash (soft delete)
+   * Move a file/folder to trash (soft delete)
    */
   const moveToTrash = useCallback(async (file: FileNode): Promise<string | null> => {
     try {
@@ -434,9 +468,8 @@ export function useFileSystem() {
         return null;
       }
 
-      const trashRootPath = joinPath(rootPath, TRASH_DIR_NAME);
-      await withErrorHandling(
-        () => fs.createDirectory(trashRootPath),
+      const { trashRootPath } = await withErrorHandling(
+        () => ensureTrashRootDirectory(fs, rootPath),
         'Failed to create trash directory'
       );
 
@@ -465,7 +498,7 @@ export function useFileSystem() {
   }, [showNotification, refreshFileTree, handleFileSystemError]);
 
   /**
-   * Restore a file/folder from .trash to original location
+   * Restore a file/folder from trash to original location
    */
   const restoreFromTrash = useCallback(async (file: FileNode): Promise<string | null> => {
     try {
@@ -512,7 +545,7 @@ export function useFileSystem() {
         'Failed to restore item from trash'
       );
 
-      const trashContainerPath = joinPath(joinPath(rootPath, TRASH_DIR_NAME), parsed.containerName);
+      const trashContainerPath = joinPath(joinPath(rootPath, parsed.trashDirName), parsed.containerName);
       const containerChildren = await withErrorHandling(
         () => fs.readDirectory(trashContainerPath),
         'Failed to inspect trash container'

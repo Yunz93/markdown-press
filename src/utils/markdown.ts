@@ -17,6 +17,18 @@ const createMarkdownIt = () => {
   initKaTeX(md);
   initMermaid(md);
 
+  const defaultImageRenderer = md.renderer.rules.image;
+  md.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const token = tokens[idx];
+    token.attrSet('decoding', 'async');
+
+    if (defaultImageRenderer) {
+      return defaultImageRenderer(tokens, idx, options, env, self);
+    }
+
+    return self.renderToken(tokens, idx, options);
+  };
+
   return md;
 };
 

@@ -37,7 +37,9 @@ A modern, AI-powered Markdown editor built with Tauri, React, and TypeScript. Wr
 
 ## Screenshots
 
-> Add your screenshots here
+### Main Workspace
+
+![Markdown Press preview](docs/assets/markdown-press-preview.png)
 
 ## Tech Stack
 
@@ -172,7 +174,7 @@ markdown-press/
 | `Ctrl/Cmd + S` | Save file |
 | `Ctrl/Cmd + Shift + A` | AI Analyze |
 | `Ctrl/Cmd + F` | Search |
-| `Ctrl/Cmd + ,` | Open Settings |
+| `Ctrl/Cmd + 0` | Open Settings |
 | `Ctrl/Cmd + O` | Toggle Outline |
 
 ## Contributing

@@ -334,7 +334,10 @@ const ConfirmDialog: React.FC<{
 const getTrashItems = (nodes: FileNode[]): FileNode[] => {
   const getTrashDepth = (path: string): number => {
     const segments = path.split(/[\\/]+/).filter(Boolean);
-    const trashIndex = segments.lastIndexOf('.trash');
+    const trashIndex = Math.max(
+      segments.lastIndexOf('.trash'),
+      segments.lastIndexOf('_markdown_press_trash')
+    );
     if (trashIndex < 0) return -1;
     return segments.length - trashIndex - 1;
   };

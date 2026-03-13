@@ -1,35 +1,68 @@
 import { renderMarkdown } from './markdown';
 import { parseFrontmatter } from './frontmatter';
+import { renderMermaidDiagrams } from './markdown-extensions';
 import katexCss from 'katex/dist/katex.min.css?inline';
+import githubMarkdownCss from 'github-markdown-css/github-markdown.css?inline';
+import { isTauriEnvironment } from '../types/filesystem';
 
 export interface ExportOptions {
   title?: string;
   theme?: 'light' | 'dark';
   includeTOC?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
+  includeProperties?: boolean;
 }
 
-/**
- * Export markdown content to HTML
- */
-export async function exportToHtml(
-  content: string,
-  options: ExportOptions = {}
-): Promise<string> {
-  const { title = 'Exported Document', theme = 'light', includeTOC = false } = options;
+interface SaveExportOptions {
+  content: string | Uint8Array;
+  filename: string;
+  defaultExtension: string;
+  mimeType: string;
+  description: string;
+}
 
-  // Convert markdown to HTML
-  const htmlContent = renderMarkdown(content);
+const PREVIEW_PANEL_WIDTH_PX = 768;
+const PREVIEW_MARKDOWN_PADDING_PX = 45;
 
-  // Generate table of contents if requested
-  const toc = includeTOC ? generateTOC(content) : '';
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-  const html = `<!DOCTYPE html>
-<html lang="en" data-theme="${theme}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <style>
+function renderProperties(frontmatter: Record<string, unknown> | null): string {
+  if (!frontmatter || Object.keys(frontmatter).length === 0) return '';
+
+  const rows = Object.entries(frontmatter)
+    .map(([key, value]) => {
+      const formattedValue = Array.isArray(value) ? value.join(', ') : String(value ?? '');
+      return `
+        <div class="export-properties-row">
+          <div class="export-properties-key">${escapeHtml(key)}</div>
+          <div class="export-properties-value">${escapeHtml(formattedValue)}</div>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `
+    <section class="export-properties">
+      <div class="export-properties-header">Properties</div>
+      <div class="export-properties-table">${rows}</div>
+    </section>
+  `;
+}
+
+function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSize?: number): string {
+  const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
+  const resolvedFontSize = fontSize ?? 16;
+
+  return `
+    ${githubMarkdownCss}
     ${katexCss}
 
     :root {
@@ -44,119 +77,147 @@ export async function exportToHtml(
 
     * {
       box-sizing: border-box;
+    }
+
+    html, body {
       margin: 0;
+      padding: 0;
+      background-color: var(--bg-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .export-stage {
+      min-height: 100vh;
+      background: ${theme === 'dark' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(249, 250, 251, 0.6)'};
       padding: 0;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
-      font-size: 16px;
+    .export-document {
+      font-family: ${resolvedFontFamily};
+      font-size: ${resolvedFontSize}px;
       line-height: 1.6;
-      background-color: var(--bg-primary);
+      background-color: transparent;
       color: var(--text-primary);
-      padding: 2rem;
-      max-width: 980px;
+      padding: 32px 32px 96px;
+      max-width: ${PREVIEW_PANEL_WIDTH_PX}px;
       margin: 0 auto;
     }
 
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.5em;
-      margin-bottom: 0.5em;
-      font-weight: 600;
-      line-height: 1.25;
+    .export-document .markdown-body {
+      box-sizing: border-box;
+      min-width: 200px;
+      max-width: 980px;
+      margin: 0;
+      padding: ${PREVIEW_MARKDOWN_PADDING_PX}px;
+      background: transparent !important;
+      color: var(--text-primary);
+      font-family: inherit !important;
+      font-size: inherit !important;
+    }
+
+    html:not(.dark) .export-document .markdown-body,
+    .export-document[data-theme="light"] .markdown-body {
+      color: #000000 !important;
+      --color-fg-default: #000000 !important;
+      --color-fg-muted: #444444 !important;
+      --color-canvas-default: transparent !important;
+    }
+
+    html.dark .export-document .markdown-body,
+    .export-document[data-theme="dark"] .markdown-body {
+      color: #c9d1d9;
+      --color-canvas-default: transparent;
+    }
+
+    .export-document .markdown-body,
+    .export-document .markdown-body h1,
+    .export-document .markdown-body h2,
+    .export-document .markdown-body h3,
+    .export-document .markdown-body h4,
+    .export-document .markdown-body h5,
+    .export-document .markdown-body h6,
+    .export-document .markdown-body p,
+    .export-document .markdown-body li,
+    .export-document .markdown-body td,
+    .export-document .markdown-body th,
+    .export-document .markdown-body blockquote {
       color: var(--text-primary);
     }
 
-    h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); }
-    h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); }
-    h3 { font-size: 1.25em; }
-    h4 { font-size: 1em; }
-    h5 { font-size: 0.875em; }
-    h6 { font-size: 0.85em; color: var(--text-secondary); }
-
-    p { margin: 1em 0; }
-
-    a {
-      color: var(--accent-color);
-      text-decoration: none;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    code {
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-      font-size: 0.85em;
+    .export-document .markdown-body pre,
+    .export-document .markdown-body code {
       background-color: var(--code-bg);
-      padding: 0.2em 0.4em;
-      border-radius: 6px;
     }
 
-    pre {
-      background-color: var(--code-bg);
-      border-radius: 6px;
-      padding: 1em;
-      overflow-x: auto;
-      margin: 1em 0;
+    .export-document .markdown-body table th,
+    .export-document .markdown-body table td {
+      border-color: var(--border-color);
     }
 
-    pre code {
+    .export-document .markdown-body table tr {
       background-color: transparent;
-      padding: 0;
     }
 
-    blockquote {
-      margin: 1em 0;
-      padding: 0.5em 1em;
-      border-left: 4px solid var(--accent-color);
-      color: var(--text-secondary);
-    }
-
-    ul, ol {
-      margin: 1em 0;
-      padding-left: 2em;
-    }
-
-    li {
-      margin: 0.5em 0;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 1em 0;
-    }
-
-    th, td {
-      border: 1px solid var(--border-color);
-      padding: 0.75em;
-      text-align: left;
-    }
-
-    th {
+    .export-document .markdown-body table tr:nth-child(2n) {
       background-color: var(--bg-secondary);
+    }
+
+    .export-properties {
+      margin-bottom: 32px;
+      border: 1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#e5e7eb'};
+      border-radius: 12px;
+      overflow: hidden;
+      background: ${theme === 'dark' ? 'rgba(20, 20, 20, 0.75)' : 'rgba(255, 255, 255, 0.75)'};
+      box-shadow: ${theme === 'dark' ? 'none' : '0 8px 24px rgba(15, 23, 42, 0.05)'};
+    }
+
+    .export-properties-header {
+      padding: 8px 16px;
+      border-bottom: 1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#e5e7eb'};
+      background: ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 250, 251, 0.7)'};
+      font-size: 12px;
       font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: ${theme === 'dark' ? '#9ca3af' : '#6b7280'};
     }
 
-    tr:nth-child(even) {
-      background-color: var(--bg-secondary);
+    .export-properties-table {
+      display: table;
+      width: 100%;
+      border-collapse: collapse;
     }
 
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin: 1em auto;
+    .export-properties-row {
+      display: table-row;
     }
 
-    hr {
-      border: none;
-      border-top: 1px solid var(--border-color);
-      margin: 2em 0;
+    .export-properties-row:hover {
+      background: ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'};
     }
 
-    .toc {
+    .export-properties-key,
+    .export-properties-value {
+      display: table-cell;
+      padding: 8px 12px;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    .export-properties-key {
+      width: 160px;
+      font-weight: 500;
+      color: ${theme === 'dark' ? '#9ca3af' : '#6b7280'};
+    }
+
+    .export-properties-value {
+      color: var(--text-primary);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .export-document .toc {
       background-color: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: 6px;
@@ -164,53 +225,112 @@ export async function exportToHtml(
       margin: 1em 0;
     }
 
-    .toc h2 {
+    .export-document .toc h2 {
       margin-top: 0;
       font-size: 1.25em;
       border-bottom: none;
     }
 
-    .toc ul {
+    .export-document .toc ul {
       list-style: none;
     }
 
-    .toc ul ul {
+    .export-document .toc ul ul {
       padding-left: 1.5em;
     }
 
-    .katex-display {
+    .export-document .katex-display {
       overflow-x: auto;
       overflow-y: hidden;
       padding: 0.5em 0;
     }
 
+    .export-document img,
+    .export-document svg {
+      max-width: 100%;
+      height: auto;
+    }
+
     @media print {
-      body {
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+
+      .export-stage {
+        background: transparent;
+      }
+
+      .export-document {
         padding: 0;
         max-width: none;
       }
 
-      pre {
+      .export-document pre {
         page-break-inside: avoid;
       }
 
-      h1, h2, h3 {
+      .export-document h1, .export-document h2, .export-document h3 {
         page-break-after: avoid;
       }
     }
 
     @media (max-width: 768px) {
-      body {
+      .export-document {
         padding: 1rem;
       }
     }
+  `;
+}
+
+function buildExportDocument(contentHtml: string, toc: string): string {
+  return `
+    <div class="export-stage">
+      <div class="export-document">
+        ${toc}
+        ${contentHtml}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Export markdown content to HTML
+ */
+export function exportToHtml(
+  content: string,
+  options: ExportOptions = {}
+): string {
+  const {
+    title = 'Exported Document',
+    theme = 'light',
+    includeTOC = false,
+    fontFamily,
+    fontSize,
+    includeProperties = true,
+  } = options;
+
+  const { frontmatter, body } = parseFrontmatter(content);
+  const htmlContent = renderMarkdown(body);
+
+  // Generate table of contents if requested
+  const toc = includeTOC ? generateTOC(body) : '';
+  const styles = buildExportStyles(theme, fontFamily, fontSize);
+  const propertiesHtml = includeProperties ? renderProperties(frontmatter) : '';
+  const documentMarkup = buildExportDocument(`${propertiesHtml}<article class="markdown-body">${htmlContent}</article>`, toc);
+
+  const html = `<!DOCTYPE html>
+<html lang="en" data-theme="${theme}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>
+    ${styles}
   </style>
 </head>
 <body>
-  ${toc}
-  <article class="markdown-body">
-    ${htmlContent}
-  </article>
+  ${documentMarkup}
 </body>
 </html>`;
 
@@ -261,36 +381,331 @@ function generateTOC(content: string): string {
 /**
  * Trigger download of HTML file
  */
-export function downloadHtml(htmlContent: string, filename: string): void {
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+function ensureFileExtension(filename: string, extension: string): string {
+  const baseFilename = filename.replace(/\.md$/i, '');
+  const normalizedExtension = extension.startsWith('.') ? extension : `.${extension}`;
+  return baseFilename.toLowerCase().endsWith(normalizedExtension.toLowerCase())
+    ? baseFilename
+    : `${baseFilename}${normalizedExtension}`;
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === 'AbortError' || error.message.toLowerCase().includes('aborted');
+}
+
+async function saveExportFile({
+  content,
+  filename,
+  defaultExtension,
+  mimeType,
+  description,
+}: SaveExportOptions): Promise<boolean> {
+  const suggestedName = ensureFileExtension(filename, defaultExtension);
+
+  if (isTauriEnvironment()) {
+    const [{ save }, { writeFile, writeTextFile }] = await Promise.all([
+      import('@tauri-apps/plugin-dialog'),
+      import('@tauri-apps/plugin-fs')
+    ]);
+
+    const targetPath = await save({
+      defaultPath: suggestedName,
+      filters: [{ name: description, extensions: [defaultExtension.replace(/^\./, '')] }]
+    });
+
+    if (!targetPath) {
+      return false;
+    }
+
+    if (typeof content === 'string') {
+      await writeTextFile(targetPath, content);
+      return true;
+    }
+
+    await writeFile(targetPath, content);
+    return true;
+  }
+
+  if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+    try {
+      const handle = await (window as Window & {
+        showSaveFilePicker: (options?: {
+          suggestedName?: string;
+          types?: Array<{
+            description?: string;
+            accept: Record<string, string[]>;
+          }>;
+        }) => Promise<FileSystemFileHandle>;
+      }).showSaveFilePicker({
+        suggestedName,
+        types: [{
+          description,
+          accept: { [mimeType]: [defaultExtension.startsWith('.') ? defaultExtension : `.${defaultExtension}`] }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      return true;
+    } catch (error) {
+      if (isAbortLikeError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename.endsWith('.html') ? filename : `${filename}.html`;
+  a.download = suggestedName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return true;
 }
 
-/**
- * Export to PDF (using browser print dialog)
- */
-export function exportToPdf(htmlContent: string, filename: string): void {
-  // Create a new window with the HTML content
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups to export PDF');
+async function waitForImages(container: HTMLElement): Promise<void> {
+  const images = Array.from(container.querySelectorAll('img'));
+  const pendingImages = images.filter((image) => !image.complete);
+
+  if (pendingImages.length === 0) {
     return;
   }
 
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  await Promise.all(
+    pendingImages.map((image) => new Promise<void>((resolve) => {
+      image.addEventListener('load', () => resolve(), { once: true });
+      image.addEventListener('error', () => resolve(), { once: true });
+    }))
+  );
+}
 
-  // Wait for content to load, then print
-  printWindow.onload = () => {
-    printWindow.print();
-  };
+async function waitForNextPaint(frames = 2): Promise<void> {
+  for (let index = 0; index < frames; index += 1) {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
+}
+
+export async function downloadHtml(htmlContent: string, filename: string): Promise<boolean> {
+  return saveExportFile({
+    content: htmlContent,
+    filename,
+    defaultExtension: '.html',
+    mimeType: 'text/html;charset=utf-8',
+    description: 'HTML Document',
+  });
+}
+
+function hasUrlScheme(value: string): boolean {
+  return /^[a-z][a-z\d+\-.]*:/i.test(value);
+}
+
+function isAbsoluteFilePath(value: string): boolean {
+  return /^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(value);
+}
+
+function decodeFileUrlPath(fileUrl: string): string {
+  try {
+    const url = new URL(fileUrl);
+    const decodedPath = decodeURIComponent(url.pathname);
+    return /^\/[a-zA-Z]:\//.test(decodedPath) ? decodedPath.slice(1) : decodedPath;
+  } catch {
+    return fileUrl.replace(/^file:\/\//i, '');
+  }
+}
+
+function isRemoteHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function normalizeRemoteImageUrl(value: string): string {
+  if (value.startsWith('//') && typeof window !== 'undefined') {
+    return `${window.location.protocol}${value}`;
+  }
+  return value;
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function inlineRemoteImage(src: string): Promise<string> {
+  const normalizedSrc = normalizeRemoteImageUrl(src);
+  const response = await fetch(normalizedSrc, {
+    mode: 'cors',
+    credentials: 'omit',
+    cache: 'force-cache',
+    referrerPolicy: 'no-referrer',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch remote image: ${response.status}`);
+  }
+
+  return blobToDataUrl(await response.blob());
+}
+
+async function resolveImageSource(src: string, sourceFilePath?: string): Promise<string> {
+  const trimmedSrc = src.trim();
+  if (!trimmedSrc || trimmedSrc.startsWith('data:') || trimmedSrc.startsWith('blob:')) {
+    return trimmedSrc;
+  }
+
+  if (isTauriEnvironment()) {
+    if (trimmedSrc.startsWith('asset:') || trimmedSrc.startsWith('tauri:')) {
+      return trimmedSrc;
+    }
+
+    const { convertFileSrc } = await import('@tauri-apps/api/core');
+    const { dirname, join, normalize } = await import('@tauri-apps/api/path');
+
+    let absolutePath = '';
+    if (trimmedSrc.startsWith('file://')) {
+      absolutePath = decodeFileUrlPath(trimmedSrc);
+    } else if (isAbsoluteFilePath(trimmedSrc)) {
+      absolutePath = trimmedSrc;
+    } else if (sourceFilePath && !hasUrlScheme(trimmedSrc)) {
+      absolutePath = await join(await dirname(sourceFilePath), trimmedSrc);
+    } else {
+      return trimmedSrc;
+    }
+
+    return convertFileSrc(await normalize(absolutePath));
+  }
+
+  if (!hasUrlScheme(trimmedSrc) && sourceFilePath && typeof window !== 'undefined') {
+    try {
+      return new URL(trimmedSrc, window.location.href).toString();
+    } catch {
+      return trimmedSrc;
+    }
+  }
+
+  return trimmedSrc;
+}
+
+async function prepareExportImages(container: HTMLElement, sourceFilePath?: string): Promise<void> {
+  const images = Array.from(container.querySelectorAll('img'));
+  await Promise.all(images.map(async (image) => {
+    const rawSrc = image.getAttribute('src');
+    if (!rawSrc) return;
+
+    const resolvedSrc = await resolveImageSource(rawSrc, sourceFilePath);
+    if (!resolvedSrc) return;
+
+    image.crossOrigin = 'anonymous';
+    image.referrerPolicy = 'no-referrer';
+
+    let exportSrc = resolvedSrc;
+    if (isRemoteHttpUrl(resolvedSrc)) {
+      try {
+        exportSrc = await inlineRemoteImage(resolvedSrc);
+      } catch (error) {
+        console.warn('Failed to inline remote image for PDF export:', resolvedSrc, error);
+      }
+    }
+
+    if (exportSrc !== rawSrc) {
+      image.setAttribute('src', exportSrc);
+      image.src = exportSrc;
+    }
+  }));
+}
+
+/**
+ * Export to PDF (generates a real PDF file and lets the user choose where to save it)
+ */
+export async function exportToPdf(htmlContent: string, filename: string, sourceFilePath?: string): Promise<boolean> {
+  const { default: html2pdf } = await import('html2pdf.js');
+  const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
+  const styleContent = Array.from(parsed.head.querySelectorAll('style'))
+    .map((style) => style.textContent || '')
+    .join('\n');
+  const theme = parsed.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const backgroundColor = theme === 'dark' ? '#0d1117' : '#ffffff';
+
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.position = 'fixed';
+  host.style.left = '-10000px';
+  host.style.top = '0';
+  host.style.width = `${PREVIEW_PANEL_WIDTH_PX + 64}px`;
+  host.style.background = backgroundColor;
+  host.style.pointerEvents = 'none';
+  host.style.visibility = 'hidden';
+  host.style.opacity = '0';
+  host.style.overflow = 'visible';
+  host.style.contain = 'layout style';
+  host.innerHTML = `<style>${styleContent}</style>${parsed.body.innerHTML}`;
+  document.body.appendChild(host);
+
+  const exportRoot = host.querySelector('.export-document') as HTMLElement | null;
+  const renderTarget = exportRoot || host;
+
+  try {
+    renderTarget.setAttribute('data-theme', theme);
+
+    await prepareExportImages(renderTarget, sourceFilePath);
+    await renderMermaidDiagrams(renderTarget);
+    await waitForImages(renderTarget);
+    if ('fonts' in document) {
+      await document.fonts.ready;
+    }
+    await waitForNextPaint(3);
+
+    const worker = html2pdf()
+      .set({
+        margin: [12, 12, 12, 12],
+        filename: filename.endsWith('.pdf') ? filename : `${filename}.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        enableLinks: true,
+        html2canvas: {
+          scale: 2.5,
+          useCORS: true,
+          backgroundColor,
+          windowWidth: renderTarget.scrollWidth,
+          scrollX: 0,
+          scrollY: 0
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
+        },
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          avoid: ['pre', 'blockquote', 'table', 'img', '.export-properties']
+        } as unknown
+      })
+      .from(renderTarget)
+      .toPdf();
+
+    const pdfArrayBuffer = await worker.outputPdf('arraybuffer');
+    return saveExportFile({
+      content: new Uint8Array(pdfArrayBuffer),
+      filename,
+      defaultExtension: '.pdf',
+      mimeType: 'application/pdf',
+      description: 'PDF Document',
+    });
+  } finally {
+    if (host.parentNode) {
+      host.parentNode.removeChild(host);
+    }
+  }
 }
 
 /**
@@ -337,14 +752,12 @@ export function exportToPlainText(content: string): string {
 /**
  * Trigger download of plain text file
  */
-export function downloadPlainText(text: string, filename: string): void {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename.endsWith('.txt') ? filename : `${filename}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+export async function downloadPlainText(text: string, filename: string): Promise<boolean> {
+  return saveExportFile({
+    content: text,
+    filename,
+    defaultExtension: '.txt',
+    mimeType: 'text/plain;charset=utf-8',
+    description: 'Plain Text Document',
+  });
 }

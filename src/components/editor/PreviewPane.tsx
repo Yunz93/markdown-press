@@ -3,14 +3,12 @@ import { useAppStore, selectContent } from '../../store/appStore';
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
-import { useWritingStats } from '../../hooks/useWritingStats';
+import { hydrateCachedPreviewImageSources, warmPreviewImage } from '../../utils/previewImageCache';
 
 interface PreviewPaneProps {
   highlighter?: any;
   onScroll?: (percentage: number) => void;
   scrollPercentage?: number;
-  isOutlineOpen: boolean;
-  onToggleOutline: () => void;
 }
 
 // Lower threshold for smoother sync
@@ -19,15 +17,12 @@ const SCROLL_THRESHOLD = 5;
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
   highlighter,
   onScroll,
-  scrollPercentage,
-  isOutlineOpen,
-  onToggleOutline
+  scrollPercentage
 }) => {
-  const { settings, activeTabId } = useAppStore();
+  const { settings, currentFilePath } = useAppStore();
   const content = useAppStore(selectContent);
   const previewRef = useRef<HTMLDivElement>(null);
   useMarkdownRenderer(highlighter, settings.themeMode);
-  const stats = useWritingStats();
 
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
@@ -86,13 +81,13 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     const { frontmatter, body } = parseFrontmatter(content);
 
     try {
-      const bodyHTML = renderMarkdown(body);
+      const bodyHTML = hydrateCachedPreviewImageSources(renderMarkdown(body), currentFilePath || undefined);
       return { frontmatter, bodyHTML };
     } catch (error) {
       console.error('Markdown rendering error:', error);
       return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
     }
-  }, [content]);
+  }, [content, currentFilePath]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -100,6 +95,35 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     }, 50);
     return () => window.clearTimeout(timer);
   }, [parsedContent.bodyHTML, settings.themeMode]);
+
+  useEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+
+    let cancelled = false;
+    const images = Array.from(container.querySelectorAll('article.markdown-body img'));
+
+    void Promise.all(images.map(async (image) => {
+      const originalSrc = image.getAttribute('data-original-src') || image.getAttribute('src');
+      if (!originalSrc) return;
+
+      const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
+      if (cancelled || !image.isConnected || !cachedSrc) return;
+
+      if (image.getAttribute('data-original-src') !== originalSrc) {
+        image.setAttribute('data-original-src', originalSrc);
+      }
+
+      if (image.getAttribute('src') !== cachedSrc) {
+        image.setAttribute('src', cachedSrc);
+        image.src = cachedSrc;
+      }
+    }));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parsedContent.bodyHTML, currentFilePath]);
 
   return (
     <div
@@ -139,58 +163,6 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           dangerouslySetInnerHTML={{ __html: parsedContent.bodyHTML }}
         />
       </div>
-
-      {/* Writing Stats Footer */}
-      {activeTabId && (
-        <div className="sticky bottom-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200/50 dark:border-white/5 px-6 py-2">
-          <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-            <div className="stat-item flex items-center gap-1.5" title="Characters">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 7V4h16v3M9 20h6M12 4v16" />
-              </svg>
-              <span>{stats.characters.toLocaleString()}</span>
-            </div>
-            <div className="stat-item flex items-center gap-1.5" title="Words">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 19h16M4 15l4-11 4 11 4-11 4 11" />
-              </svg>
-              <span>{stats.words.toLocaleString()}</span>
-            </div>
-            <div className="stat-item flex items-center gap-1.5 hidden md:flex" title="Paragraphs">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="4" y1="6" x2="20" y2="6" />
-                <line x1="4" y1="12" x2="20" y2="12" />
-                <line x1="4" y1="18" x2="20" y2="18" />
-              </svg>
-              <span>{stats.paragraphs.toLocaleString()}</span>
-            </div>
-            <div className="stat-item flex items-center gap-1.5 hidden lg:flex" title="Reading time">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              <span>{stats.readingTimeMinutes} min</span>
-            </div>
-          </div>
-          <button
-            onClick={onToggleOutline}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-            title="Toggle Outline (Ctrl+O)"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="8" y1="6" x2="21" y2="6" />
-              <line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" />
-              <circle cx="4" cy="6" r="2" fill="currentColor" />
-              <circle cx="4" cy="12" r="2" fill="currentColor" />
-              <circle cx="4" cy="18" r="2" fill="currentColor" />
-            </svg>
-            {isOutlineOpen ? 'Hide Outline' : 'Show Outline'}
-          </button>
-        </div>
-        </div>
-      )}
     </div>
   );
 };

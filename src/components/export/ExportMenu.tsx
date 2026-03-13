@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, selectContent } from '../../store/appStore';
 import { exportToHtml, downloadHtml, exportToPdf, exportToPlainText, downloadPlainText } from '../../utils/export';
 import type { FileNode } from '../../types';
 
@@ -21,7 +21,8 @@ function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
 }
 
 export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
-  const { content, activeTabId, files } = useAppStore();
+  const content = useAppStore(selectContent);
+  const { activeTabId, files, settings, showNotification } = useAppStore();
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const [isExporting, setIsExporting] = useState(false);
   const [format, setFormat] = useState<ExportFormat | null>(null);
@@ -38,29 +39,44 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
       const filename = activeFile?.name?.replace('.md', '') || 'export';
 
       if (exportFormat === 'html') {
-        const html = await exportToHtml(content, {
+        const html = exportToHtml(content, {
           theme,
           includeTOC,
+          fontFamily: settings.fontFamily,
+          fontSize: settings.fontSize,
         });
-        downloadHtml(html, filename);
+        const saved = await downloadHtml(html, filename);
+        if (saved) {
+          showNotification('HTML exported', 'success');
+        }
       } else if (exportFormat === 'pdf') {
-        const html = await exportToHtml(content, {
+        const html = exportToHtml(content, {
           theme,
           includeTOC,
+          fontFamily: settings.fontFamily,
+          fontSize: settings.fontSize,
+          includeProperties: false,
         });
-        exportToPdf(html, filename);
+        const saved = await exportToPdf(html, filename, activeFile?.path);
+        if (saved) {
+          showNotification('PDF exported', 'success');
+        }
       } else if (exportFormat === 'plaintext') {
         const text = exportToPlainText(content);
-        downloadPlainText(text, filename);
+        const saved = await downloadPlainText(text, filename);
+        if (saved) {
+          showNotification('Plain text exported', 'success');
+        }
       }
     } catch (error) {
       console.error('Export failed:', error);
+      showNotification('Export failed', 'error');
     } finally {
       setIsExporting(false);
       setFormat(null);
       onClose?.();
     }
-  }, [content, activeFile, theme, includeTOC, onClose]);
+  }, [content, activeFile, theme, includeTOC, onClose, settings.fontFamily, settings.fontSize, showNotification]);
 
   const fileName = activeFile?.name?.replace('.md', '') || 'document';
 

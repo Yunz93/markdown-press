@@ -101,14 +101,34 @@ export function createFileSlice(
 
     updateFileName: (fileId, newName, newPath) => {
       set((state) => {
+        const updateNodeAndChildren = (node: FileNode, oldBasePath: string, nextBasePath: string): FileNode => {
+          const nextPath = node.path === oldBasePath
+            ? nextBasePath
+            : node.path.replace(oldBasePath, nextBasePath);
+          const nextId = node.id === oldBasePath
+            ? nextBasePath
+            : node.id.replace(oldBasePath, nextBasePath);
+
+          return {
+            ...node,
+            name: node.id === fileId ? newName : node.name,
+            path: nextPath,
+            id: nextId,
+            children: node.children?.map((child) => updateNodeAndChildren(child, oldBasePath, nextBasePath))
+          };
+        };
+
         const updateTree = (nodes: FileNode[]): FileNode[] =>
-          nodes.map((node) =>
-            node.id === fileId
-              ? { ...node, name: newName, path: newPath }
-              : node.children
-                ? { ...node, children: updateTree(node.children) }
-                : node
-          );
+          nodes.map((node) => {
+            if (node.id === fileId) {
+              return updateNodeAndChildren(node, node.path, newPath);
+            }
+            if (node.children) {
+              return { ...node, children: updateTree(node.children) };
+            }
+            return node;
+          });
+
         return { files: updateTree(state.files) };
       });
     },

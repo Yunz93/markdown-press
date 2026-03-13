@@ -10,6 +10,7 @@ export class BrowserFileSystem implements IFileSystem {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private fileHandles: Map<string, FileSystemFileHandle> = new Map();
   private rootPath: string = '';
+  private static readonly TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
 
   static getInstance(): BrowserFileSystem {
     if (!BrowserFileSystem.instance) {
@@ -184,6 +185,25 @@ export class BrowserFileSystem implements IFileSystem {
     }
   }
 
+  async renameEntry(oldPath: string, newName: string, isDirectory: boolean): Promise<string> {
+    try {
+      if (!this.directoryHandle) {
+        throw new Error('Cannot rename without directory context');
+      }
+
+      const oldRelativePath = this.getRelativePath(oldPath);
+      const parentPath = oldRelativePath.includes('/')
+        ? oldRelativePath.substring(0, oldRelativePath.lastIndexOf('/'))
+        : '';
+      const parentFullPath = parentPath ? `${this.rootPath}/${parentPath}` : this.rootPath;
+
+      return await this.moveEntry(oldPath, parentFullPath, newName, isDirectory);
+    } catch (error) {
+      console.error('Failed to rename entry:', error);
+      throw error;
+    }
+  }
+
   /**
    * Delete a file
    */
@@ -193,12 +213,13 @@ export class BrowserFileSystem implements IFileSystem {
         const relativePath = this.getRelativePath(path);
         const parentPath = relativePath.substring(0, relativePath.lastIndexOf('/'));
         const fileName = relativePath.substring(relativePath.lastIndexOf('/') + 1);
+        const kind = await this.getEntryKind(path);
 
         const parentHandle = parentPath
           ? await this.getDirectoryHandle(this.directoryHandle, parentPath)
           : this.directoryHandle;
 
-        await parentHandle.removeEntry(fileName);
+        await parentHandle.removeEntry(fileName, { recursive: kind === 'directory' });
       }
 
       this.fileHandles.delete(path);
@@ -245,7 +266,7 @@ export class BrowserFileSystem implements IFileSystem {
 
       for await (const [name, entry] of (dirHandle as any).entries()) {
         const fullPath = `${dirPath}/${name}`;
-        const isTrashDirectory = entry.kind === 'directory' && isAtRoot && name === '.trash';
+        const isTrashDirectory = entry.kind === 'directory' && isAtRoot && BrowserFileSystem.TRASH_DIRECTORY_NAMES.has(name);
         const nodeInTrash = inTrash || isTrashDirectory;
 
         if (entry.kind === 'file' && (nodeInTrash || name.endsWith('.md') || name.endsWith('.markdown'))) {
@@ -320,10 +341,100 @@ export class BrowserFileSystem implements IFileSystem {
    * Move a file (not implemented for browser)
    */
   async moveFile(sourcePath: string, targetPath: string): Promise<string> {
-    throw new Error('Move operation not supported in browser');
+    const kind = await this.getEntryKind(sourcePath);
+    if (!kind) {
+      throw new Error('Source entry not found');
+    }
+
+    return this.moveEntry(sourcePath, targetPath, undefined, kind === 'directory');
   }
 
   // Helper methods
+
+  private async moveEntry(
+    sourcePath: string,
+    targetDirectoryPath: string,
+    newName?: string,
+    isDirectory?: boolean
+  ): Promise<string> {
+    if (!this.directoryHandle) {
+      throw new Error('No directory opened');
+    }
+
+    const kind = isDirectory !== undefined
+      ? (isDirectory ? 'directory' : 'file')
+      : await this.getEntryKind(sourcePath);
+
+    if (!kind) {
+      throw new Error('Source entry not found');
+    }
+
+    const sourceRelativePath = this.getRelativePath(sourcePath);
+    const sourceName = sourceRelativePath.split('/').filter(Boolean).pop();
+    if (!sourceName) {
+      throw new Error('Invalid source path');
+    }
+
+    const entryName = newName || sourceName;
+    const targetRelativeDir = this.getRelativePath(targetDirectoryPath);
+    const destinationRelativePath = targetRelativeDir ? `${targetRelativeDir}/${entryName}` : entryName;
+
+    if (kind === 'file') {
+      const content = await this.readFile(sourcePath);
+      const targetHandle = await this.getFileHandle(this.directoryHandle, destinationRelativePath, true);
+      const writable = await targetHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      await this.deleteFile(sourcePath);
+
+      const nextPath = `${this.rootPath}/${destinationRelativePath}`;
+      this.fileHandles.set(nextPath, targetHandle);
+      return nextPath;
+    }
+
+    const sourceHandle = await this.getDirectoryHandle(this.directoryHandle, sourceRelativePath);
+    const targetHandle = await this.getDirectoryHandle(this.directoryHandle, destinationRelativePath, true);
+    await this.copyDirectoryContents(sourceHandle, targetHandle);
+    await this.deleteFile(sourcePath);
+    return `${this.rootPath}/${destinationRelativePath}`;
+  }
+
+  private async copyDirectoryContents(
+    sourceHandle: FileSystemDirectoryHandle,
+    targetHandle: FileSystemDirectoryHandle
+  ): Promise<void> {
+    for await (const [name, entry] of (sourceHandle as any).entries()) {
+      if (entry.kind === 'file') {
+        const file = await (entry as FileSystemFileHandle).getFile();
+        const writableHandle = await targetHandle.getFileHandle(name, { create: true });
+        const writable = await writableHandle.createWritable();
+        await writable.write(await file.text());
+        await writable.close();
+      } else {
+        const nextTarget = await targetHandle.getDirectoryHandle(name, { create: true });
+        await this.copyDirectoryContents(entry as FileSystemDirectoryHandle, nextTarget);
+      }
+    }
+  }
+
+  private async getEntryKind(path: string): Promise<'file' | 'directory' | null> {
+    if (!this.directoryHandle) return null;
+
+    const relativePath = this.getRelativePath(path);
+    try {
+      await this.getFileHandle(this.directoryHandle, relativePath);
+      return 'file';
+    } catch {
+      // continue
+    }
+
+    try {
+      await this.getDirectoryHandle(this.directoryHandle, relativePath);
+      return 'directory';
+    } catch {
+      return null;
+    }
+  }
 
   private getRelativePath(path: string): string {
     if (path.startsWith(this.rootPath)) {

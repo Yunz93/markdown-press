@@ -43,18 +43,23 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
     }
 
     try {
-      const htmlContent = await exportToHtml(content, {
+      const htmlContent = exportToHtml(content, {
         title: activeFile.name.replace('.md', ''),
-        theme: settings.themeMode === 'dark' ? 'dark' : 'light',
+        theme: 'light',
         includeTOC: false,
+        fontFamily: settings.fontFamily,
+        fontSize: settings.fontSize,
+        includeProperties: false,
       });
-      exportToPdf(htmlContent, activeFile.name);
-      showNotification('PDF export dialog opened', 'success');
+      const saved = await exportToPdf(htmlContent, activeFile.name, activeFile.path);
+      if (saved) {
+        showNotification('PDF exported', 'success');
+      }
     } catch (error) {
       console.error('Failed to export PDF:', error);
       showNotification('Failed to export PDF', 'error');
     }
-  }, [activeTabId, content, files, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, settings.fontFamily, settings.fontSize, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
     if (!activeTabId) {

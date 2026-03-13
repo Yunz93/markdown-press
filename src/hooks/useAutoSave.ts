@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, selectContent } from '../store/appStore';
 import { getFileSystem } from '../types/filesystem';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 
@@ -28,8 +28,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     retryDelayMs = 1000
   } = options;
 
+  const content = useAppStore(selectContent);
   const {
-    content,
     activeTabId,
     currentFilePath,
     isSaving,

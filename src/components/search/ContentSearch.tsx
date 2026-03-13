@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, selectContent } from '../../store/appStore';
 
 interface ContentSearchProps {
   onClose: () => void;
@@ -16,7 +16,8 @@ interface SearchMatch {
  * Content search component with find and replace functionality
  */
 export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
-  const { content, setContent, activeTabId, updateTabContent } = useAppStore();
+  const content = useAppStore(selectContent);
+  const { setContent, activeTabId, updateTabContent } = useAppStore();
   const [searchText, setSearchText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [matches, setMatches] = useState<SearchMatch[]>([]);

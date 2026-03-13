@@ -94,6 +94,14 @@ const App: React.FC = () => {
     void openKnowledgeBase(lastKnowledgeBase, { silentSuccess: true });
   }, [settingsHydrated, settings.lastKnowledgeBasePath, rootFolderPath, openKnowledgeBase]);
 
+  // Keep the watched/saved path derived from the active tab and current file tree.
+  useEffect(() => {
+    const nextPath = activeTabId ? findFileInTree(files, activeTabId)?.path ?? null : null;
+    if (currentFilePath !== nextPath) {
+      setCurrentFilePath(nextPath);
+    }
+  }, [activeTabId, files, currentFilePath, setCurrentFilePath]);
+
   // Watch active file for external changes and auto-reload when safe
   useEffect(() => {
     if (!activeTabId || !currentFilePath) return;

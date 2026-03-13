@@ -11,6 +11,7 @@ export interface IFileSystem {
   writeFile(path: string, content: string): Promise<void>;
   saveFile(path: string | null, content: string): Promise<string | null>;
   renameFile(oldPath: string, newName: string): Promise<string>;
+  renameEntry?(oldPath: string, newName: string, isDirectory: boolean): Promise<string>;
   deleteFile(path: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
   readDirectory(dirPath: string, rootPath?: string): Promise<FileNode[]>;

@@ -22,6 +22,13 @@ function isSameOrChildPath(path: string, parentPath: string): boolean {
   return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`);
 }
 
+function collectAffectedOpenTabIds(files: FileNode[], openTabs: string[], target: FileNode): string[] {
+  return openTabs.filter((tabId) => {
+    const node = findFileInTree(files, tabId);
+    return node?.type === 'file' && isSameOrChildPath(node.path, target.path);
+  });
+}
+
 /**
  * Encapsulates all file CRUD and drag-and-drop operations from App.tsx.
  */
@@ -30,6 +37,7 @@ export function useFileOperations() {
     files,
     activeTabId,
     fileContents,
+    openTabs,
     settings,
     addTab,
     closeTab,
@@ -118,10 +126,9 @@ export function useFileOperations() {
     const movedPath = await moveToTrash(file);
     if (!movedPath) return;
 
-    if (activeTabId && isSameOrChildPath(activeTabId, file.path)) {
-      closeTab(activeTabId);
-    }
-  }, [moveToTrash, activeTabId, closeTab]);
+    const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
+    affectedTabIds.forEach((tabId) => closeTab(tabId));
+  }, [moveToTrash, files, openTabs, closeTab]);
 
   const handleRestoreFromTrash = useCallback(async (file: FileNode) => {
     await restoreFromTrash(file);
@@ -129,12 +136,14 @@ export function useFileOperations() {
 
   const handleDeleteForever = useCallback(async (file: FileNode) => {
     try {
+      const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
       await deleteFile(file);
+      affectedTabIds.forEach((tabId) => closeTab(tabId));
       showNotification('Permanently deleted.', 'success');
     } catch {
       showNotification('Failed to delete file.', 'error');
     }
-  }, [deleteFile, showNotification]);
+  }, [files, openTabs, deleteFile, closeTab, showNotification]);
 
   const handleMoveNode = useCallback(async (sourceId: string, targetId: string) => {
     const sourceFile = findFileInTree(files, sourceId);
@@ -192,15 +201,14 @@ export function useFileOperations() {
 
   const handleDelete = useCallback(async (file: FileNode) => {
     try {
+      const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
       await deleteFile(file);
-      if (activeTabId === file.id) {
-        closeTab(file.id);
-      }
+      affectedTabIds.forEach((tabId) => closeTab(tabId));
       showNotification('Deleted', 'success');
     } catch {
       showNotification('Failed to delete file.', 'error');
     }
-  }, [deleteFile, activeTabId, closeTab, showNotification]);
+  }, [files, openTabs, deleteFile, closeTab, showNotification]);
 
   return {
     handleFileSelect,

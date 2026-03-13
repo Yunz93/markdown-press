@@ -10,6 +10,7 @@ import type { IFileSystem } from '../types/filesystem';
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
 const CONFIG_EXTENSIONS = ['.json', '.yaml', '.yml', '.toml'];
+const TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
 
 type LineEnding = '\n' | '\r\n';
 
@@ -29,6 +30,15 @@ export class TauriFileSystem implements IFileSystem {
   private showImages: boolean = true;
   private showConfigFiles: boolean = false;
   private fileFormatStates: Map<string, FileFormatState> = new Map();
+
+  private async isDirectory(path: string): Promise<boolean> {
+    try {
+      await readDir(path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   static getInstance(): TauriFileSystem {
     if (!TauriFileSystem.instance) {
@@ -193,6 +203,22 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
+  async renameEntry(oldPath: string, newName: string, isDirectory: boolean): Promise<string> {
+    try {
+      if (!isDirectory) {
+        return await this.renameFile(oldPath, newName);
+      }
+
+      const dir = await dirname(oldPath);
+      const newPath = await join(dir, newName);
+      await rename(oldPath, newPath);
+      return newPath;
+    } catch (error) {
+      console.error('Failed to rename entry:', error);
+      throw error;
+    }
+  }
+
   /**
    * Move a file to a new location
    */
@@ -286,7 +312,7 @@ export class TauriFileSystem implements IFileSystem {
 
       for (const entry of entries) {
         if (!entry.name) continue;
-        const isTrashDirectory = entry.isDirectory && isAtRoot && entry.name === '.trash';
+        const isTrashDirectory = entry.isDirectory && isAtRoot && TRASH_DIRECTORY_NAMES.has(entry.name);
         const nodeInTrash = inTrash || isTrashDirectory;
         if (!this.showHiddenFiles && entry.name.startsWith('.') && !isTrashDirectory && !inTrash) continue;
 
@@ -350,6 +376,9 @@ export class TauriFileSystem implements IFileSystem {
     try {
       await mkdir(path, { recursive: true });
     } catch (error) {
+      if (await exists(path) && await this.isDirectory(path)) {
+        return;
+      }
       console.error('Failed to create directory:', error);
       throw error;
     }

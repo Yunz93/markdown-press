@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-shell": "^2.3.5",
     "dompurify": "^3.3.1",
     "github-markdown-css": "^5.9.0",
+    "html2pdf.js": "^0.14.0",
     "js-yaml": "4.1.0",
     "katex": "^0.16.33",
     "lucide-react": "^0.563.0",
