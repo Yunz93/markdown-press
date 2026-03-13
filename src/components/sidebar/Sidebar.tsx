@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
 import type { FileNode } from '../../types';
+import appIcon from '../../app-icon.png';
 
 interface SidebarProps {
   files: FileNode[];
@@ -409,9 +410,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 flex flex-col gap-4">
           <div className="flex justify-between items-center px-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-gradient-to-br from-gray-800 to-black dark:from-white dark:to-gray-300 rounded-lg shadow-lg flex items-center justify-center text-white dark:text-black font-bold text-xs tracking-tighter">
-                MP
-              </div>
+              <img
+                src={appIcon}
+                alt="Markdown Press"
+                className="w-8 h-8 rounded-lg shadow-lg object-cover"
+              />
               <span className="font-semibold text-gray-800 dark:text-gray-100 tracking-tight">Markdown Press</span>
             </div>
             <button onClick={onClose} className="md:hidden p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors">
