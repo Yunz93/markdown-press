@@ -272,7 +272,8 @@ const App: React.FC = () => {
           onAIAnalyze={handleAIAnalyze}
           isAnalyzing={isAnalyzing}
           isSaving={isSaving}
-          onMenuClick={() => setSidebarOpen(true)}
+          isSidebarOpen={isSidebarOpen}
+          onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
           onToggleTheme={toggleTheme}
           themeMode={settings.themeMode}
           onPublishBlog={handlePublishBlog}

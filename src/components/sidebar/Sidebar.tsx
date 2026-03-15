@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
 import type { FileNode } from '../../types';
-import appIcon from '../../app-icon.png';
 
 interface SidebarProps {
   files: FileNode[];
@@ -359,6 +358,35 @@ const getTrashItems = (nodes: FileNode[]): FileNode[] => {
   return trash;
 };
 
+const normalizeSearchTarget = (name: string): string => name.replace(/\.md$/i, '').toLowerCase();
+
+const filterNodesByFileName = (nodes: FileNode[], query: string): FileNode[] => {
+  if (!query.trim()) return nodes.filter((node) => !node.isTrash);
+
+  const normalizedQuery = query.trim().toLowerCase();
+
+  return nodes.reduce<FileNode[]>((acc, node) => {
+    if (node.isTrash) return acc;
+
+    if (node.type === 'folder') {
+      const filteredChildren = filterNodesByFileName(node.children ?? [], normalizedQuery);
+      if (filteredChildren.length > 0) {
+        acc.push({
+          ...node,
+          children: filteredChildren,
+        });
+      }
+      return acc;
+    }
+
+    if (normalizeSearchTarget(node.name).includes(normalizedQuery) || node.name.toLowerCase().includes(normalizedQuery)) {
+      acc.push(node);
+    }
+
+    return acc;
+  }, []);
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   files,
   activeFileId,
@@ -382,6 +410,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [dialogState, setDialogState] = useState<DialogState>({ type: null });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
     e.preventDefault();
@@ -392,6 +421,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const closeContextMenu = () => setContextMenu(null);
 
   const trashItems = getTrashItems(files);
+  const filteredFiles = useMemo(
+    () => filterNodesByFileName(files, searchQuery),
+    [files, searchQuery]
+  );
+  const hasSearchQuery = searchQuery.trim().length > 0;
+  const hasVisibleFiles = filteredFiles.length > 0;
 
   return (
     <>
@@ -403,20 +438,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside className={`
-        fixed md:relative z-30 h-full w-72 flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
+        fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
+        transition-[transform,width,opacity,border-color] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
         glass border-r border-gray-200/50 dark:border-white/5
-        ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${isOpen
+          ? 'translate-x-0 md:w-72 opacity-100'
+          : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:border-r-transparent pointer-events-none'
+        }
       `}>
-        <div className="p-4 flex flex-col gap-4">
-          <div className="flex justify-between items-center px-2">
-            <div className="flex items-center gap-2.5">
-              <img
-                src={appIcon}
-                alt="Markdown Press"
-                className="w-8 h-8 rounded-lg shadow-lg object-cover"
-              />
-              <span className="font-semibold text-gray-800 dark:text-gray-100 tracking-tight">Markdown Press</span>
-            </div>
+        <div className="px-4 pt-3 pb-4 flex flex-col gap-3">
+          <div className="flex justify-end items-center px-2 md:hidden">
             <button onClick={onClose} className="md:hidden p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -425,17 +456,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-2">
+          <div className="flex items-center gap-2 md:mt-1">
+            <label className="relative flex-1">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search files"
+                className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white dark:focus:bg-white/[0.06]"
+              />
+            </label>
             <button
               onClick={() => onCreateFile()}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80 transition-all shadow-sm active:scale-95"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/85 dark:bg-white/[0.04] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08] active:scale-95"
               title="New Note"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span className="text-xs font-semibold">New Note</span>
             </button>
           </div>
         </div>
@@ -449,10 +494,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-xs mb-3">No local files opened.</p>
               <p className="text-xs text-gray-400">Use the knowledge base button below to open a vault.</p>
             </div>
+          ) : !hasVisibleFiles ? (
+            <div className="flex flex-col items-center justify-center h-40 px-6 text-center text-gray-400 dark:text-gray-600">
+              <svg className="mb-3 h-8 w-8 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No matching files</p>
+              {hasSearchQuery && (
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  Try another filename keyword.
+                </p>
+              )}
+            </div>
           ) : (
             <div className="space-y-0.5">
-              {files
-                .filter(node => !node.isTrash)
+              {filteredFiles
                 .map(node => (
                   <FileTreeItem
                     key={node.id}
@@ -465,6 +522,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     level={0}
                     onContextMenu={handleContextMenu}
                     onMoveNode={onMoveNode}
+                    forceExpanded={hasSearchQuery}
                   />
                 ))}
             </div>

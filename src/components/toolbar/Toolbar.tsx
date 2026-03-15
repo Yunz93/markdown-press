@@ -10,6 +10,7 @@ interface ToolbarProps {
   onAIAnalyze: () => void;
   isAnalyzing: boolean;
   isSaving: boolean;
+  isSidebarOpen: boolean;
   onMenuClick: () => void;
   onToggleTheme: () => void;
   themeMode: 'light' | 'dark' | 'solarized-light' | 'solarized-dark' | 'custom';
@@ -24,6 +25,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onAIAnalyze,
   isAnalyzing,
   isSaving,
+  isSidebarOpen,
   onMenuClick,
   onToggleTheme,
   themeMode,
@@ -37,12 +39,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="flex items-center gap-4 overflow-hidden">
         <button
           onClick={onMenuClick}
-          className="md:hidden p-2 -ml-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+          className="inline-flex h-8 w-8 items-center justify-center -ml-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+          title={isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="18" x2="21" y2="18" />
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+            {isSidebarOpen ? <line x1="6" y1="12" x2="7.5" y2="12" /> : <line x1="5.5" y1="12" x2="7.5" y2="12" />}
           </svg>
         </button>
 
@@ -63,7 +66,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </span>
                 )}
               </div>
-              <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium">Markdown</span>
             </>
           ) : (
             <span className="text-gray-400 text-sm font-medium">No file selected</span>
@@ -71,38 +73,40 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] px-2 py-1">
+      <div className="flex items-center gap-2.5">
         <button
           onClick={onToggleTheme}
-          className="inline-flex h-8 w-8 items-center justify-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
           {isDark ? (
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
             </svg>
           ) : (
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
           )}
         </button>
 
-        <AIButton
-          onClick={onAIAnalyze}
-          isLoading={isAnalyzing}
-          disabled={!fileName}
-        />
+        <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
+          <AIButton
+            onClick={onAIAnalyze}
+            isLoading={isAnalyzing}
+            disabled={!fileName}
+          />
 
-        <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+          <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+        </div>
 
         {onPublishBlog && (
           <button
             onClick={onPublishBlog}
-            className="inline-flex h-8 w-8 items-center justify-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
             title="Publish Blog"
           >
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
@@ -113,10 +117,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {onExportPdf && (
           <button
             onClick={onExportPdf}
-            className="inline-flex h-8 w-8 items-center justify-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
             title="Export Preview PDF"
           >
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />

@@ -8,6 +8,7 @@ interface FileTreeItemProps {
   onSelect: (node: FileNode) => void;
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
+  forceExpanded?: boolean;
 }
 
 export const FileTreeItem: React.FC<FileTreeItemProps> = ({
@@ -16,7 +17,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   activeId,
   onSelect,
   onContextMenu,
-  onMoveNode
+  onMoveNode,
+  forceExpanded = false
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -79,6 +81,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
 
   const isActive = node.id === activeId;
 
+  const showChildren = isFolder && (expanded || forceExpanded) && node.children;
+
   return (
     <div
       className="select-none"
@@ -136,7 +140,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
         )}
       </div>
 
-      {isFolder && expanded && node.children && (
+      {showChildren && (
         <div className="ml-0 mt-0.5 space-y-0.5">
           {node.children
             .filter(child => !child.isTrash)
@@ -149,6 +153,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
                 level={level + 1}
                 onContextMenu={onContextMenu}
                 onMoveNode={onMoveNode}
+                forceExpanded={forceExpanded}
               />
             ))}
         </div>

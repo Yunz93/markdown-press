@@ -1,11 +1,13 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
+import { renderMarkdownSourceHighlight } from '../../utils/markdownSourceHighlight';
 
 interface EditorPaneProps {
   placeholder?: string;
   onContentChange?: (content: string) => void;
   onScroll?: (percentage: number) => void;
   scrollPercentage?: number;
+  highlighter?: any;
 }
 
 // Lower threshold for smoother sync
@@ -15,7 +17,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   placeholder = 'Type here...',
   onContentChange,
   onScroll,
-  scrollPercentage
+  scrollPercentage,
+  highlighter
 }) => {
   const content = useAppStore(selectContent);
   const {
@@ -26,8 +29,20 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   } = useAppStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
+  const deferredContent = useDeferredValue(content);
+
+  const syncHighlightScroll = useCallback(() => {
+    if (!textareaRef.current || !highlightRef.current) return;
+    highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+    highlightRef.current.scrollLeft = textareaRef.current.scrollLeft;
+  }, []);
+
+  const highlightedContent = useMemo(() => (
+    renderMarkdownSourceHighlight(deferredContent, settings.themeMode, highlighter)
+  ), [deferredContent, settings.themeMode, highlighter]);
 
   // Sync scroll from other side
   useEffect(() => {
@@ -42,6 +57,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         // Use requestAnimationFrame for smoother scrolling
         requestAnimationFrame(() => {
           el.scrollTop = targetScroll;
+          syncHighlightScroll();
 
           // Reset syncing flag after a short delay
           requestAnimationFrame(() => {
@@ -50,7 +66,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         });
       }
     }
-  }, [scrollPercentage]);
+  }, [scrollPercentage, syncHighlightScroll]);
+
+  useEffect(() => {
+    syncHighlightScroll();
+  }, [highlightedContent, syncHighlightScroll]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
@@ -62,7 +82,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   }, [setContent, onContentChange]);
 
   const handleScroll = useCallback(() => {
-    if (!textareaRef.current || !onScroll || isSyncingScroll.current) return;
+    if (!textareaRef.current || isSyncingScroll.current) return;
+
+    syncHighlightScroll();
+    if (!onScroll) return;
 
     const el = textareaRef.current;
     const scrollHeight = el.scrollHeight - el.clientHeight;
@@ -80,7 +103,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         onScroll(percentage);
       });
     }
-  }, [onScroll]);
+  }, [onScroll, syncHighlightScroll]);
 
   if (!activeTabId) {
     return (
@@ -95,7 +118,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="editor-pane-layout h-full flex flex-col relative">
       {isSaving && (
         <div className="absolute top-2 right-4 z-10 flex items-center gap-1 text-xs text-gray-400 animate-pulse">
           <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24">
@@ -106,23 +129,48 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        value={content}
-        onChange={handleChange}
-        onScroll={handleScroll}
-        placeholder={placeholder}
-        spellCheck={false}
-        className={`
-          editor-pane flex-1 w-full h-full p-8 resize-none focus:outline-none bg-transparent
-          ${settings.wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}
-        `}
-        style={{
-          lineHeight: '1.6',
-          fontSize: `${settings.fontSize}px`,
-          fontFamily: settings.fontFamily,
-        }}
-      />
+      <div className="editor-pane-backdrop flex-1 min-h-0 overflow-hidden">
+        <div className="editor-pane-scroll h-full overflow-y-auto overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
+          <div className="editor-pane-frame mx-auto w-full max-w-5xl">
+            <div className="editor-pane-sheet mx-auto w-full max-w-4xl">
+              <div
+                ref={highlightRef}
+                aria-hidden="true"
+                className={`editor-pane-highlight-layer absolute inset-0 overflow-auto pointer-events-none ${
+                  settings.wordWrap ? 'wrapped' : 'nowrap'
+                }`}
+              >
+                <div
+                  className="editor-pane-highlight"
+                  style={{
+                    lineHeight: '1.95',
+                    fontSize: `${settings.fontSize}px`,
+                    fontFamily: settings.fontFamily,
+                  }}
+                  dangerouslySetInnerHTML={{ __html: highlightedContent }}
+                />
+              </div>
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={handleChange}
+                onScroll={handleScroll}
+                placeholder={placeholder}
+                spellCheck={false}
+                className={`
+                  editor-pane syntax-highlighted relative z-10 w-full h-full min-h-[calc(100vh-12rem)] resize-none border-0 bg-transparent focus:outline-none
+                  ${settings.wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}
+                `}
+                style={{
+                  lineHeight: '1.95',
+                  fontSize: `${settings.fontSize}px`,
+                  fontFamily: settings.fontFamily,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

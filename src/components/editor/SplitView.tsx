@@ -98,6 +98,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             }}
           >
             <EditorPane
+              highlighter={highlighter}
               onContentChange={onContentChange}
               onScroll={handleEditorScroll}
               scrollPercentage={activeSide === 'preview' ? scrollPercentage : undefined}

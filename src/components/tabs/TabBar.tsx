@@ -64,44 +64,44 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
   }
 
   return (
-    <div className="tab-bar flex items-center h-11 px-2 gap-1 bg-white/70 dark:bg-black/40 backdrop-blur-md border-b border-gray-200/60 dark:border-white/10 overflow-x-auto">
-      {openTabs.map((fileId) => {
-        const file = fileMap.get(fileId);
-        if (!file) return null;
+    <div className="tab-bar bg-white/78 dark:bg-black/42 backdrop-blur-md">
+      <div className="tab-strip">
+        {openTabs.map((fileId) => {
+          const file = fileMap.get(fileId);
+          if (!file) return null;
 
-        const isActive = activeTabId === fileId;
-        const hasChanges = false; // Could track dirty state in future
+          const isActive = activeTabId === fileId;
+          const hasChanges = false; // Could track dirty state in future
 
-        return (
-          <div
-            key={fileId}
-            className={`tab flex items-center gap-2 px-3 py-1.5 min-w-0 max-w-[220px] cursor-pointer rounded-lg border transition-colors ${
-              isActive
-                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-white/10 shadow-sm'
-                : 'bg-transparent text-gray-600 dark:text-gray-400 border-transparent hover:bg-black/5 dark:hover:bg-white/5'
-            }`}
-            onClick={() => handleTabClick(fileId)}
-            title={file.path}
-          >
-            <span className="truncate text-xs font-medium flex-1">
-              {file.name}
-            </span>
-            {hasChanges && (
-              <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-            )}
-            <button
-              className="close-tab p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-              onClick={(e) => handleCloseTab(e, fileId)}
-              title="Close tab"
+          return (
+            <div
+              key={fileId}
+              className={`tab browser-tab ${isActive ? 'is-active' : 'is-inactive'}`}
+              onClick={() => handleTabClick(fileId)}
+              title={file.path}
             >
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        );
-      })}
+              <div className="tab-surface">
+                <span className="truncate text-xs font-medium flex-1">
+                  {file.name}
+                </span>
+                {hasChanges && (
+                  <span className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />
+                )}
+                <button
+                  className="close-tab p-0.5 rounded-md hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-colors flex-shrink-0"
+                  onClick={(e) => handleCloseTab(e, fileId)}
+                  title="Close tab"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
