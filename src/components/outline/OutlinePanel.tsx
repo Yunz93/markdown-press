@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import type { HeadingNode } from '../../utils/outline';
+
+const MIN_OUTLINE_WIDTH = 180;
+const MAX_OUTLINE_WIDTH = 360;
 
 interface OutlinePanelProps {
   headings: HeadingNode[];
   activeHeadingId: string | null;
   onHeadingClick: (id: string, line: number) => void;
+  width: number;
+  onWidthChange: (width: number) => void;
 }
 
 interface HeadingItemProps {
@@ -55,15 +60,6 @@ const HeadingItem: React.FC<HeadingItemProps> = ({
           onClick={() => onItemClick(node.id, node.line!)}
           title={node.text}
         >
-          <span className="heading-icon" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="8" y1="4" x2="6" y2="20" />
-              <line x1="14" y1="4" x2="12" y2="20" />
-              <line x1="4" y1="9" x2="18" y2="9" />
-              <line x1="3" y1="15" x2="17" y2="15" />
-            </svg>
-          </span>
-          <span className={`heading-level h${node.level}`}>{node.text.charAt(0)}</span>
           <span className="heading-title">{node.text}</span>
         </button>
       </div>
@@ -88,22 +84,64 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
   headings,
   activeHeadingId,
   onHeadingClick,
+  width,
+  onWidthChange,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (window.innerWidth < 768) return;
+
+    event.preventDefault();
+
+    const handlePointerMove = (moveEvent: MouseEvent) => {
+      const panelRect = panelRef.current?.getBoundingClientRect();
+      const nextWidth = (panelRect?.right ?? window.innerWidth) - moveEvent.clientX;
+      onWidthChange(Math.min(MAX_OUTLINE_WIDTH, Math.max(MIN_OUTLINE_WIDTH, nextWidth)));
+    };
+
+    const handlePointerUp = () => {
+      document.removeEventListener('mousemove', handlePointerMove);
+      document.removeEventListener('mouseup', handlePointerUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerUp);
+  }, [onWidthChange]);
 
   if (headings.length === 0) {
     return (
-      <div className="outline-panel empty">
+      <div
+        ref={panelRef}
+        className="outline-panel empty relative"
+        style={{ width: `${width}px` }}
+      >
         <div className="outline-header">
           <span className="title">目录</span>
         </div>
         <p className="empty-message">No headings found</p>
+        <div
+          className="absolute inset-y-0 left-0 hidden w-4 cursor-col-resize md:block"
+          onMouseDown={handleResizeStart}
+          aria-hidden
+        >
+          <div className="absolute left-0 top-0 h-full w-px bg-gray-200/70 dark:bg-white/10" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`outline-panel ${isCollapsed ? 'collapsed' : ''}`}>
+    <div
+      ref={panelRef}
+      className={`outline-panel relative ${isCollapsed ? 'collapsed' : ''}`}
+      style={{ width: `${width}px` }}
+    >
       <div className="outline-header">
         <span className="title">目录</span>
         <button
@@ -138,6 +176,13 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
           ))}
         </div>
       )}
+      <div
+        className="absolute inset-y-0 left-0 hidden w-4 cursor-col-resize md:block"
+        onMouseDown={handleResizeStart}
+        aria-hidden
+      >
+        <div className="absolute left-0 top-0 h-full w-px bg-gray-200/70 dark:bg-white/10" />
+      </div>
     </div>
   );
 };

@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
 import type { FileNode } from '../../types';
+
+const MIN_SIDEBAR_WIDTH = 240;
+const MAX_SIDEBAR_WIDTH = 420;
 
 interface SidebarProps {
   files: FileNode[];
@@ -22,6 +25,8 @@ interface SidebarProps {
   currentKnowledgeBasePath?: string | null;
   onSwitchKnowledgeBase: () => void;
   isOpen: boolean;
+  width: number;
+  onWidthChange: (width: number) => void;
   onClose: () => void;
 }
 
@@ -405,12 +410,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentKnowledgeBasePath,
   onSwitchKnowledgeBase,
   isOpen,
+  width,
+  onWidthChange,
   onClose
 }) => {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [dialogState, setDialogState] = useState<DialogState>({ type: null });
   const [searchQuery, setSearchQuery] = useState('');
+  const sidebarRef = useRef<HTMLElement | null>(null);
 
   const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
     e.preventDefault();
@@ -428,6 +436,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const hasSearchQuery = searchQuery.trim().length > 0;
   const hasVisibleFiles = filteredFiles.length > 0;
 
+  const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (window.innerWidth < 768) return;
+
+    event.preventDefault();
+
+    const handlePointerMove = (moveEvent: MouseEvent) => {
+      const sidebarRect = sidebarRef.current?.getBoundingClientRect();
+      const nextWidth = moveEvent.clientX - (sidebarRect?.left ?? 0);
+      onWidthChange(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, nextWidth)));
+    };
+
+    const handlePointerUp = () => {
+      document.removeEventListener('mousemove', handlePointerMove);
+      document.removeEventListener('mouseup', handlePointerUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerUp);
+  }, [onWidthChange]);
+
   return (
     <>
       {isOpen && (
@@ -437,15 +469,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      <aside className={`
+      <aside
+        ref={sidebarRef}
+        style={{ '--sidebar-width': `${width}px` } as React.CSSProperties}
+        className={`
         fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
         transition-[transform,width,opacity,border-color] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
         glass border-r border-gray-200/50 dark:border-white/5
         ${isOpen
-          ? 'translate-x-0 md:w-72 opacity-100'
+          ? 'translate-x-0 md:w-[var(--sidebar-width)] opacity-100'
           : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:border-r-transparent pointer-events-none'
         }
-      `}>
+      `}
+      >
         <div className="px-4 pt-3 pb-4 flex flex-col gap-3">
           <div className="flex justify-end items-center px-2 md:hidden">
             <button onClick={onClose} className="md:hidden p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors">
@@ -583,6 +619,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </svg>
           </button>
         </div>
+
+        {isOpen && (
+          <div
+            className="absolute inset-y-0 right-0 hidden w-4 cursor-col-resize md:block"
+            onMouseDown={handleResizeStart}
+            aria-hidden
+          >
+            <div className="absolute right-0 top-0 h-full w-px bg-gray-200/70 dark:bg-white/10" />
+          </div>
+        )}
       </aside>
 
       {/* Context Menu Portal */}

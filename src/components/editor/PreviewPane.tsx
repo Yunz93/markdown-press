@@ -1,14 +1,18 @@
-import React, { useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useRef, useMemo, useEffect, useCallback, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { hydrateCachedPreviewImageSources, warmPreviewImage } from '../../utils/previewImageCache';
+import { resolveWikiLinkFile } from '../../utils/wikiLinks';
+import { useFileOperations } from '../../hooks/useFileOperations';
+import { getPaneLayoutMetrics } from './paneLayout';
 
 interface PreviewPaneProps {
   highlighter?: any;
   onScroll?: (percentage: number) => void;
   scrollPercentage?: number;
+  density?: 'comfortable' | 'compact';
 }
 
 // Lower threshold for smoother sync
@@ -17,15 +21,46 @@ const SCROLL_THRESHOLD = 5;
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
   highlighter,
   onScroll,
-  scrollPercentage
+  scrollPercentage,
+  density = 'comfortable'
 }) => {
-  const { settings, currentFilePath } = useAppStore();
+  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
   const previewRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef<HTMLDivElement>(null);
   useMarkdownRenderer(highlighter, settings.themeMode);
+  const { handleFileSelect } = useFileOperations();
 
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
+  const isCompact = density === 'compact';
+  const hasActiveFile = Boolean(activeTabId);
+  const [paneWidth, setPaneWidth] = useState(0);
+  const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
+  const layoutStyle = useMemo(() => ({
+    '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
+    '--pane-backdrop-py': `${layoutMetrics.backdropPaddingY}px`,
+    '--pane-frame-max-width': `${layoutMetrics.frameMaxWidth}px`,
+    '--pane-sheet-max-width': `${layoutMetrics.sheetMaxWidth}px`,
+    '--pane-sheet-radius': `${layoutMetrics.sheetRadius}px`,
+    '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
+    '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
+    '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
+  }) as React.CSSProperties, [layoutMetrics]);
+
+  useEffect(() => {
+    const layout = layoutRef.current;
+    if (!layout) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setPaneWidth(entry.contentRect.width);
+    });
+
+    resizeObserver.observe(layout);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Sync scroll from other side
   useEffect(() => {
@@ -75,19 +110,44 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     }
   }, [onScroll]);
 
+  const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const link = target?.closest('a[data-wikilink]') as HTMLAnchorElement | null;
+    if (!link) return;
+
+    event.preventDefault();
+
+    const wikiTarget = link.getAttribute('data-wikilink');
+    if (!wikiTarget) return;
+
+    const matchedFile = resolveWikiLinkFile(files, wikiTarget, rootFolderPath, currentFilePath);
+    if (!matchedFile) {
+      showNotification(`Linked file not found: ${wikiTarget}`, 'error');
+      return;
+    }
+
+    await handleFileSelect(matchedFile);
+  }, [files, rootFolderPath, currentFilePath, handleFileSelect, showNotification]);
+
   const parsedContent = useMemo(() => {
     if (!content) return { frontmatter: null, bodyHTML: '' };
 
     const { frontmatter, body } = parseFrontmatter(content);
 
     try {
-      const bodyHTML = hydrateCachedPreviewImageSources(renderMarkdown(body), currentFilePath || undefined);
+      const bodyHTML = hydrateCachedPreviewImageSources(
+        renderMarkdown(body, {
+          highlighter,
+          themeMode: settings.themeMode,
+        }),
+        currentFilePath || undefined
+      );
       return { frontmatter, bodyHTML };
     } catch (error) {
       console.error('Markdown rendering error:', error);
       return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
     }
-  }, [content, currentFilePath]);
+  }, [content, currentFilePath, highlighter, settings.themeMode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -127,16 +187,20 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
   return (
     <div
-      ref={previewRef}
+      ref={(node) => {
+        previewRef.current = node;
+        layoutRef.current = node;
+      }}
       onScroll={handleScroll}
-      className="editor-pane-layout h-full overflow-y-auto transition-colors"
-      style={{ pointerEvents: 'auto' }}
+      onClick={handlePreviewClick}
+      className={`editor-pane-layout h-full min-w-0 overflow-y-auto transition-colors ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
+      style={{ pointerEvents: 'auto', ...layoutStyle }}
     >
-      <div className="editor-pane-backdrop min-h-full px-4 py-6 md:px-8 md:py-8">
-        <div className="editor-pane-frame mx-auto w-full max-w-5xl">
+      <div className={`editor-pane-backdrop min-h-full ${hasActiveFile ? '' : 'h-full'}`}>
+        <div className={`editor-pane-frame w-full ${hasActiveFile ? '' : 'h-full'}`}>
         {parsedContent.frontmatter && (
           <div
-            className="preview-pane-properties mx-auto mb-4 w-full max-w-4xl border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden glass animate-fade-in group/metadata"
+            className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden glass animate-fade-in group/metadata"
             style={{ fontSize: `${settings.fontSize * 0.7}px` }}
           >
             <div className="preview-pane-properties-header px-4 py-2 border-b border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
@@ -161,9 +225,9 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
             </div>
           </div>
         )}
-          <div className="editor-pane-sheet preview-pane-sheet mx-auto w-full max-w-4xl">
+          <div className={`editor-pane-sheet preview-pane-sheet w-full ${hasActiveFile ? '' : 'h-full min-h-0'}`}>
             <article
-              className="markdown-body preview-pane-document"
+              className={`markdown-body preview-pane-document ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
               style={{ fontFamily: settings.fontFamily, fontSize: `${settings.fontSize}px` }}
               dangerouslySetInnerHTML={{ __html: parsedContent.bodyHTML }}
             />

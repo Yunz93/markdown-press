@@ -61,6 +61,8 @@ export interface KnowledgeBaseMeta {
   lastOpenedAt: string;
 }
 
+export type ThemeMode = 'light' | 'dark';
+
 export interface AppSettings {
   fontSize: number;
   wordWrap: boolean;
@@ -71,8 +73,7 @@ export interface AppSettings {
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;
-  themeMode: 'light' | 'dark' | 'solarized-light' | 'solarized-dark' | 'custom';
-  customCss: string;
+  themeMode: ThemeMode;
   metadataFields: MetadataField[];
   autoSaveInterval: number; // Auto-save interval in milliseconds
 }

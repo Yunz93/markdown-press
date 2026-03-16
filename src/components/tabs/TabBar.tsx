@@ -64,7 +64,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
   }
 
   return (
-    <div className="tab-bar bg-white/78 dark:bg-black/42 backdrop-blur-md">
+    <div className="tab-bar min-w-0 bg-white/78 dark:bg-black/42 backdrop-blur-md">
       <div className="tab-strip">
         {openTabs.map((fileId) => {
           const file = fileMap.get(fileId);

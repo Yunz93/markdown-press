@@ -1,6 +1,16 @@
 import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 
+function getSystemThemeMode() {
+  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+function normalizeThemeMode(themeMode: unknown): AppSettings['themeMode'] {
+  return themeMode === 'dark' ? 'dark' : 'light';
+}
+
 /**
  * UI store state interface
  */
@@ -48,8 +58,7 @@ export const defaultSettings: AppSettings = {
   shortcuts: { save: 'Ctrl+S', toggleView: 'Ctrl+E', aiAnalyze: 'Ctrl+J', search: 'Ctrl+F', settings: 'Ctrl+0' },
   knowledgeBases: [],
   lastKnowledgeBasePath: '',
-  themeMode: typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
-  customCss: '',
+  themeMode: getSystemThemeMode(),
   metadataFields: [
     { key: 'category', defaultValue: '' },
     { key: 'tags', defaultValue: '[]' },
@@ -99,14 +108,23 @@ export function createUISlice(
 
     setPublishing: (publishing) => set(() => ({ isPublishing: publishing })),
 
-    setSettings: (settings) => set(() => ({ settings })),
-
-    updateSettings: (updatesOrFn) => set((state) => ({
+    setSettings: (settings) => set(() => ({
       settings: {
-        ...state.settings,
-        ...(typeof updatesOrFn === 'function' ? updatesOrFn(state) : updatesOrFn)
+        ...settings,
+        themeMode: normalizeThemeMode(settings.themeMode),
       }
     })),
+
+    updateSettings: (updatesOrFn) => set((state) => {
+      const updates = typeof updatesOrFn === 'function' ? updatesOrFn(state) : updatesOrFn;
+      return {
+        settings: {
+          ...state.settings,
+          ...updates,
+          themeMode: normalizeThemeMode(updates.themeMode ?? state.settings.themeMode),
+        }
+      };
+    }),
 
     showNotification: (msg, type) => {
       set(() => ({ notification: { msg, type } }));
@@ -120,3 +138,5 @@ export function createUISlice(
     setActiveHeadingId: (id) => set(() => ({ activeHeadingId: id })),
   };
 }
+
+export { normalizeThemeMode };

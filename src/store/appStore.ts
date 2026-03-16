@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { createFileSlice, type FileState, type FileActions, initialFileState } from './fileStore';
 import { createTabSlice, type TabState, type TabActions, initialTabState } from './tabStore';
 import { createEditorSlice, type EditorState, type EditorActions, initialEditorState, selectContent } from './editorStore';
-import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings } from './uiStore';
+import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings, normalizeThemeMode } from './uiStore';
 import { ViewMode, type FileNode, type AppSettings, type Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 
@@ -43,6 +43,7 @@ export const useAppStore = create<AppState>()(
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
+          themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
           shortcuts: {
             ...defaultSettings.shortcuts,
             ...(persistedSettings.shortcuts ?? {})

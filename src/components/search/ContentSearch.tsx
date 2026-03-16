@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
+import { focusEditorSelection } from '../../utils/contentEditableSelection';
 
 interface ContentSearchProps {
   onClose: () => void;
@@ -180,11 +181,10 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   useEffect(() => {
     if (matches.length > 0) {
       const match = matches[currentMatchIndex];
-      const editorElement = document.querySelector('textarea.editor-pane') as HTMLTextAreaElement | null;
+      const editorElement = document.querySelector('[contenteditable="true"].editor-pane') as HTMLDivElement | null;
       if (!editorElement) return;
 
-      editorElement.focus();
-      editorElement.setSelectionRange(match.index, match.index + match.length);
+      focusEditorSelection(editorElement, match.index, match.index + match.length);
 
       const lineIndex = content.substring(0, match.index).split('\n').length - 1;
       const lineHeight = parseFloat(getComputedStyle(editorElement).lineHeight) || 24;

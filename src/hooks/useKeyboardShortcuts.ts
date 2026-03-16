@@ -10,6 +10,12 @@ interface UseKeyboardShortcutsOptions {
   onOpenSettings?: () => void;
 }
 
+function getNextViewMode(viewMode: ViewMode): ViewMode {
+  if (viewMode === ViewMode.EDITOR) return ViewMode.SPLIT;
+  if (viewMode === ViewMode.SPLIT) return ViewMode.PREVIEW;
+  return ViewMode.EDITOR;
+}
+
 // Parse shortcut string like "Ctrl+S" into structured format
 const parseShortcut = (shortcut: string) => {
   const parts = shortcut.toLowerCase().split('+').map(p => p.trim());
@@ -70,9 +76,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       if (onToggleView) {
         onToggleView();
       } else {
-        // Default toggle behavior
-        setViewMode(viewMode === ViewMode.PREVIEW ? ViewMode.EDITOR :
-                    viewMode === ViewMode.EDITOR ? ViewMode.PREVIEW : ViewMode.SPLIT);
+        setViewMode(getNextViewMode(viewMode));
       }
       return;
     }
@@ -133,8 +137,7 @@ export function useGlobalKeyboardShortcuts(
       // Toggle view: Ctrl+E
       else if (matchesShortcut(e, shortcuts.toggleView)) {
         e.preventDefault();
-        setViewMode(viewMode === ViewMode.PREVIEW ? ViewMode.EDITOR :
-                    viewMode === ViewMode.EDITOR ? ViewMode.PREVIEW : ViewMode.SPLIT);
+        setViewMode(getNextViewMode(viewMode));
       }
       // AI Analyze: Ctrl+J
       else if (matchesShortcut(e, shortcuts.aiAnalyze)) {

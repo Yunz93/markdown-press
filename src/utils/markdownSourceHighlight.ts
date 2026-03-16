@@ -147,12 +147,29 @@ function renderLinkToken(value: string, isImage: boolean): string {
   ].join('');
 }
 
+function renderWikiLinkToken(value: string): string {
+  const match = value.match(/^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/);
+  if (!match) return span('md-token-link', value);
+
+  const [, target, alias] = match;
+  return [
+    span('md-token-bracket', '[['),
+    span('md-token-wikilink-target', target),
+    alias
+      ? `${span('md-token-frontmatter-punctuation', '|')}${span('md-token-wikilink-alias', alias)}`
+      : '',
+    span('md-token-bracket', ']]'),
+  ].join('');
+}
+
 function renderInlineToken(type: string, value: string): string {
   switch (type) {
     case 'image':
       return renderLinkToken(value, true);
     case 'link':
       return renderLinkToken(value, false);
+    case 'wikilink':
+      return renderWikiLinkToken(value);
     case 'inline-code':
       return wrapDelimToken('md-token-inline-code', value, 1);
     case 'bold':
@@ -170,6 +187,7 @@ function renderInlineToken(type: string, value: string): string {
 
 function highlightInline(text: string): string {
   const patterns = [
+    { type: 'wikilink', regex: /\[\[[^\]\n]+(?:\|[^\]\n]+)?\]\]/g },
     { type: 'image', regex: /!\[[^\]\n]*\]\([^)]+\)/g },
     { type: 'link', regex: /\[[^\]\n]+\]\([^)]+\)/g },
     { type: 'inline-code', regex: /`[^`\n]+`/g },
@@ -222,8 +240,7 @@ function highlightInline(text: string): string {
 }
 
 function normalizeContentForMirror(content: string): string {
-  if (!content) return ' ';
-  return content.endsWith('\n') ? `${content} ` : content;
+  return content;
 }
 
 function renderFenceLine(line: string): string {
@@ -361,5 +378,5 @@ export function renderMarkdownSourceHighlight(
     return rendered.html;
   });
 
-  return `<pre class="editor-source-fallback"><code>${highlightedLines.join('\n')}</code></pre>`;
+  return `<div class="editor-source-fallback">${highlightedLines.join('\n')}</div>`;
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAppStore, selectContent } from './store/appStore';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useViewMode } from './hooks/useViewMode';
@@ -20,6 +20,43 @@ import { OutlinePanel } from './components/outline/OutlinePanel';
 import { ContentSearch } from './components/search/ContentSearch';
 import { TabBar } from './components/tabs/TabBar';
 import { useExportActions } from './hooks/useExportActions';
+import { ViewMode } from './types';
+import { focusEditorSelection } from './utils/contentEditableSelection';
+
+const SIDEBAR_WIDTH_STORAGE_KEY = 'markdown-press.sidebar-width';
+const OUTLINE_WIDTH_STORAGE_KEY = 'markdown-press.outline-width';
+const DEFAULT_SIDEBAR_WIDTH = 288;
+const DEFAULT_OUTLINE_WIDTH = 240;
+const MIN_SIDEBAR_WIDTH = 240;
+const MAX_SIDEBAR_WIDTH = 420;
+const MIN_OUTLINE_WIDTH = 180;
+const MAX_OUTLINE_WIDTH = 360;
+const MIN_RESPONSIVE_SIDEBAR_WIDTH = 160;
+const MIN_SINGLE_VIEW_WORKSPACE_WIDTH = 760;
+const MIN_SPLIT_WORKSPACE_WIDTH = 920;
+const OUTLINE_PANEL_GAP = 32;
+const SHELL_EDGE_GAP = 24;
+
+function getMinimumWorkspaceWidth(viewMode: ViewMode): number {
+  return viewMode === ViewMode.SPLIT ? MIN_SPLIT_WORKSPACE_WIDTH : MIN_SINGLE_VIEW_WORKSPACE_WIDTH;
+}
+
+function clampPanelWidth(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getStoredPanelWidth(storageKey: string, fallback: number, min: number, max: number): number {
+  if (typeof window === 'undefined') return fallback;
+
+  const rawValue = window.localStorage.getItem(storageKey);
+  const parsedValue = rawValue ? Number(rawValue) : Number.NaN;
+
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return clampPanelWidth(parsedValue, min, max);
+}
 
 function getPathBasename(path: string | null | undefined): string {
   if (!path) return '';
@@ -74,14 +111,37 @@ const App: React.FC = () => {
   useOutline();
   useUndoRedo();
 
-  useThemeSync(settings.themeMode, settings.customCss);
+  useThemeSync(settings.themeMode);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave);
 
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
+  const [mainContentWidth, setMainContentWidth] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth : 0
+  ));
+  const [viewportWidth, setViewportWidth] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth : 1440
+  ));
+  const [sidebarWidth, setSidebarWidth] = useState(() => (
+    getStoredPanelWidth(
+      SIDEBAR_WIDTH_STORAGE_KEY,
+      DEFAULT_SIDEBAR_WIDTH,
+      MIN_SIDEBAR_WIDTH,
+      MAX_SIDEBAR_WIDTH
+    )
+  ));
+  const [outlineWidth, setOutlineWidth] = useState(() => (
+    getStoredPanelWidth(
+      OUTLINE_WIDTH_STORAGE_KEY,
+      DEFAULT_OUTLINE_WIDTH,
+      MIN_OUTLINE_WIDTH,
+      MAX_OUTLINE_WIDTH
+    )
+  ));
   const autoOpenAttemptedRef = React.useRef(false);
+  const mainContentRef = useRef<HTMLElement | null>(null);
 
   // Auto-open last knowledge base after hydration
   useEffect(() => {
@@ -165,6 +225,41 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const mainEl = mainContentRef.current;
+    if (!mainEl) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setMainContentWidth(entry.contentRect.width);
+    });
+
+    resizeObserver.observe(mainEl);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(OUTLINE_WIDTH_STORAGE_KEY, String(outlineWidth));
+  }, [outlineWidth]);
+
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts(
     async () => {
@@ -180,23 +275,30 @@ const App: React.FC = () => {
 
   const handleHeadingClick = useCallback((id: string, line: number) => {
     setActiveHeadingId(id);
-    const textarea = document.querySelector('textarea.editor-pane') as HTMLTextAreaElement | null;
-    if (!textarea) return;
+    const editor = document.querySelector('[contenteditable="true"].editor-pane') as HTMLDivElement | null;
+    if (!editor) return;
 
     const lineIndex = Math.max(0, line - 1);
     const lines = content.split('\n');
     const cursorPos = lines.slice(0, lineIndex).reduce((sum, l) => sum + l.length + 1, 0);
 
-    textarea.focus();
-    textarea.setSelectionRange(cursorPos, cursorPos);
+    focusEditorSelection(editor, cursorPos, cursorPos);
 
-    const computedLineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 24;
-    textarea.scrollTop = Math.max(0, lineIndex * computedLineHeight - textarea.clientHeight * 0.3);
+    const computedLineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 24;
+    editor.scrollTop = Math.max(0, lineIndex * computedLineHeight - editor.clientHeight * 0.3);
   }, [content, setActiveHeadingId]);
 
   const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
   }, [setContent]);
+
+  const handleSidebarWidthChange = useCallback((nextWidth: number) => {
+    setSidebarWidth(clampPanelWidth(nextWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH));
+  }, []);
+
+  const handleOutlineWidthChange = useCallback((nextWidth: number) => {
+    setOutlineWidth(clampPanelWidth(nextWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH));
+  }, []);
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
     await openDirectory();
@@ -211,6 +313,29 @@ const App: React.FC = () => {
     !rootFolderPath &&
     files.length === 0 &&
     !hasKnowledgeBaseHistory;
+  const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
+  const responsiveOutlineWidth = Math.min(
+    outlineWidth,
+    Math.max(MIN_OUTLINE_WIDTH, Math.floor(mainContentWidth * 0.22))
+  );
+  const outlineReservationWidth = isOutlineOpen ? responsiveOutlineWidth + OUTLINE_PANEL_GAP : 0;
+  const maxSidebarWidthForViewport = Math.max(
+    MIN_RESPONSIVE_SIDEBAR_WIDTH,
+    viewportWidth - minimumWorkspaceWidth - outlineReservationWidth - SHELL_EDGE_GAP
+  );
+  const responsiveSidebarWidth = isSidebarOpen
+    ? Math.min(sidebarWidth, maxSidebarWidthForViewport)
+    : sidebarWidth;
+  const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - OUTLINE_PANEL_GAP;
+  const canShowOutlinePanel = outlineHeadings.length > 0 && workspaceWidthWithOutline >= minimumWorkspaceWidth;
+  const isOutlineVisible = isOutlineOpen && canShowOutlinePanel;
+  const canShowOutlineToggle = viewMode !== ViewMode.SPLIT && outlineHeadings.length > 0;
+  const contentDensity = (
+    viewMode === ViewMode.SPLIT ||
+    mainContentWidth < 1360 ||
+    (isSidebarOpen && mainContentWidth < 1500) ||
+    isOutlineVisible
+  ) ? 'compact' : 'comfortable';
 
   if (shouldShowKnowledgeBaseOnboarding) {
     return (
@@ -261,10 +386,15 @@ const App: React.FC = () => {
         currentKnowledgeBasePath={rootFolderPath}
         onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
         isOpen={isSidebarOpen}
+        width={responsiveSidebarWidth}
+        onWidthChange={handleSidebarWidthChange}
         onClose={() => setSidebarOpen(false)}
       />
 
-      <main className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black transition-colors duration-300">
+      <main
+        ref={mainContentRef}
+        className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black transition-colors duration-300"
+      >
         <Toolbar
           fileName={activeFile?.name || ''}
           viewMode={viewMode}
@@ -282,18 +412,23 @@ const App: React.FC = () => {
 
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
 
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 min-w-0 flex overflow-hidden relative">
           <SplitView
             highlighter={highlighter}
             onContentChange={handleContentChange}
-            isOutlineOpen={isOutlineOpen}
+            isOutlineOpen={isOutlineVisible}
+            canShowOutline={canShowOutlinePanel}
+            canShowOutlineToggle={canShowOutlineToggle}
+            contentDensity={contentDensity}
             onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
           />
-          {isOutlineOpen && (
+          {isOutlineVisible && (
             <OutlinePanel
               headings={outlineHeadings}
               activeHeadingId={activeHeadingId}
               onHeadingClick={handleHeadingClick}
+              width={responsiveOutlineWidth}
+              onWidthChange={handleOutlineWidthChange}
             />
           )}
           {isSearchBarOpen && (

@@ -1,21 +1,13 @@
 import { useEffect } from 'react';
+import type { ThemeMode } from '../types';
 
 /**
- * Syncs the active theme to the DOM (dark class + custom CSS style tag).
+ * Syncs the active theme to the DOM.
  * Extracted from App.tsx to keep the component clean.
  */
-export function useThemeSync(themeMode: string, customCss: string) {
+export function useThemeSync(themeMode: ThemeMode) {
   useEffect(() => {
-    const isDark = themeMode === 'dark' || themeMode === 'solarized-dark';
+    const isDark = themeMode === 'dark';
     document.documentElement.classList.toggle('dark', isDark);
-
-    const styleId = 'theme-style';
-    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
-    if (!styleEl) {
-      styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      document.head.appendChild(styleEl);
-    }
-    styleEl.textContent = themeMode === 'custom' ? customCss : '';
-  }, [themeMode, customCss]);
+  }, [themeMode]);
 }

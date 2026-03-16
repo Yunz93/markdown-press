@@ -20,7 +20,7 @@ export function useSettings() {
     updateSettings((state) => {
       const current = state.settings.themeMode;
       return {
-        themeMode: current === 'dark' || current === 'solarized-dark' ? 'light' : 'dark'
+        themeMode: current === 'dark' ? 'light' : 'dark'
       };
     });
   }, [updateSettings]);
@@ -43,10 +43,6 @@ export function useSettings() {
 
   const updateShortcuts = useCallback((shortcuts: AppSettings['shortcuts']) => {
     updateSettings({ shortcuts });
-  }, [updateSettings]);
-
-  const updateCustomCss = useCallback((customCss: string) => {
-    updateSettings({ customCss });
   }, [updateSettings]);
 
   const updateMetadataFields = useCallback((metadataFields: MetadataField[]) => {
@@ -90,7 +86,6 @@ export function useSettings() {
     updateFontFamily,
     updateGithubRepo,
     updateShortcuts,
-    updateCustomCss,
     updateMetadataFields,
     addMetadataField,
     removeMetadataField,

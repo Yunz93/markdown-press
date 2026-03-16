@@ -8,7 +8,7 @@ interface SettingsModalProps {
   onUpdateSettings: (updates: Partial<AppSettings>) => void;
 }
 
-type SettingsTab = 'general' | 'editor' | 'appearance' | 'metadata' | 'shortcuts' | 'ai';
+type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai';
 
 interface TabConfig {
   id: SettingsTab;
@@ -17,11 +17,6 @@ interface TabConfig {
 }
 
 const tabs: TabConfig[] = [
-  { id: 'appearance', label: 'Appearance', icon: (props) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-    </svg>
-  )},
   { id: 'editor', label: 'Editor', icon: (props) => (
     <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <polyline points="4 7 4 4 20 4 20 7" />
@@ -71,14 +66,140 @@ const shortcutLabels: Record<string, string> = {
   settings: 'Open Settings',
 };
 
+type ShortcutGroupId = 'workspace' | 'editing' | 'search' | 'panels';
+
+interface ShortcutItemConfig {
+  id: string;
+  label: string;
+  description: string;
+  editable?: boolean;
+  settingKey?: keyof AppSettings['shortcuts'];
+  shortcuts?: string[];
+}
+
+interface ShortcutGroupConfig {
+  id: ShortcutGroupId;
+  label: string;
+  description: string;
+  items: ShortcutItemConfig[];
+}
+
+const shortcutGroups: ShortcutGroupConfig[] = [
+  {
+    id: 'workspace',
+    label: 'Workspace',
+    description: 'Core app actions and view switching.',
+    items: [
+      {
+        id: 'save',
+        label: 'Save File',
+        description: 'Save the current note to disk.',
+        editable: true,
+        settingKey: 'save',
+      },
+      {
+        id: 'toggleView',
+        label: 'Toggle View Mode',
+        description: 'Cycle through Editor, Split, and Preview modes.',
+        editable: true,
+        settingKey: 'toggleView',
+      },
+      {
+        id: 'toggleOutline',
+        label: 'Toggle Outline',
+        description: 'Show or hide the document outline panel when available.',
+        shortcuts: ['Ctrl+O'],
+      },
+      {
+        id: 'openSettings',
+        label: 'Open Settings',
+        description: 'Open the settings dialog.',
+        editable: true,
+        settingKey: 'settings',
+      },
+    ],
+  },
+  {
+    id: 'editing',
+    label: 'Editing',
+    description: 'Writing and content-editing shortcuts.',
+    items: [
+      {
+        id: 'aiAnalyze',
+        label: 'AI Enhance',
+        description: 'Run AI enhancement on the current note.',
+        editable: true,
+        settingKey: 'aiAnalyze',
+      },
+      {
+        id: 'undo',
+        label: 'Undo',
+        description: 'Revert the most recent content change.',
+        shortcuts: ['Ctrl+Z'],
+      },
+      {
+        id: 'redo',
+        label: 'Redo',
+        description: 'Reapply the last undone change.',
+        shortcuts: ['Ctrl+Shift+Z', 'Ctrl+Y'],
+      },
+    ],
+  },
+  {
+    id: 'search',
+    label: 'Search',
+    description: 'Open search and navigate between matches.',
+    items: [
+      {
+        id: 'search',
+        label: 'Open Search',
+        description: 'Open the in-note search panel.',
+        editable: true,
+        settingKey: 'search',
+      },
+      {
+        id: 'nextMatch',
+        label: 'Next Match',
+        description: 'Jump to the next search result in the search panel.',
+        shortcuts: ['Enter', 'F3'],
+      },
+      {
+        id: 'previousMatch',
+        label: 'Previous Match',
+        description: 'Jump to the previous search result in the search panel.',
+        shortcuts: ['Shift+Enter', 'Shift+F3'],
+      },
+    ],
+  },
+  {
+    id: 'panels',
+    label: 'Panels & Dialogs',
+    description: 'Dismiss transient UI such as search, dialogs, and menus.',
+    items: [
+      {
+        id: 'closePanel',
+        label: 'Close Active Panel',
+        description: 'Close the active search panel, dialog, or context menu.',
+        shortcuts: ['Escape'],
+      },
+    ],
+  },
+];
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   settings,
   onUpdateSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('editor');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<Record<ShortcutGroupId, boolean>>({
+    workspace: true,
+    editing: true,
+    search: true,
+    panels: true,
+  });
 
   // Normalize shortcut input to standard format (e.g., "Ctrl+S")
   const normalizeShortcut = (input: string): string => {
@@ -108,6 +229,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onUpdateSettings({
       shortcuts: { ...settings.shortcuts, [key]: normalized }
     });
+  };
+
+  const toggleShortcutGroup = (groupId: ShortcutGroupId) => {
+    setExpandedShortcutGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
   };
 
   const isValidGithubRepo = (repo: string): boolean => {
@@ -219,85 +347,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
             
-            {/* Appearance Tab */}
-            {activeTab === 'appearance' && (
-              <div className="space-y-8 animate-fade-in-02s">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Theme</h3>
-                  <p className="text-sm text-gray-500 mb-4">Choose a look for your workspace.</p>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-                    {[
-                      { mode: 'light', label: 'Light', bg: 'bg-white', border: 'border-gray-200' },
-                      { mode: 'dark', label: 'Dark', bg: 'bg-gray-900', border: 'border-gray-800' },
-                      { mode: 'solarized-light', label: 'Solarized Light', bg: 'bg-[#fdf6e3]', border: 'border-[#eee8d5]' },
-                      { mode: 'solarized-dark', label: 'Solarized Dark', bg: 'bg-[#002b36]', border: 'border-[#073642]' },
-                      { mode: 'custom', label: 'Custom CSS', bg: 'bg-gradient-to-br from-indigo-50 to-purple-50', border: 'border-indigo-100' }
-                    ].map(theme => (
-                      <button
-                        key={theme.mode}
-                        onClick={() => onUpdateSettings({ ...settings, themeMode: theme.mode as any })}
-                        className={`p-3 border rounded-xl text-center transition-all relative overflow-hidden group ${
-                          settings.themeMode === theme.mode
-                            ? 'ring-2 ring-accent-DEFAULT ring-offset-2 dark:ring-offset-black'
-                            : 'hover:border-gray-400'
-                        }`}
-                      >
-                        <div className={`w-full h-16 rounded-lg mb-2 shadow-inner ${theme.bg} ${theme.border} border`}></div>
-                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
-                          {theme.mode === 'light' && (
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="5" />
-                              <line x1="12" y1="1" x2="12" y2="3" />
-                              <line x1="12" y1="21" x2="12" y2="23" />
-                              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                            </svg>
-                          )}
-                          {theme.mode === 'dark' && (
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                            </svg>
-                          )}
-                          {theme.mode === 'solarized-light' && (
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="10" />
-                              <path d="M12 2v20M2 12h20" />
-                            </svg>
-                          )}
-                          {theme.mode === 'solarized-dark' && (
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M2 12h20" />
-                              <path d="M12 2a10 10 0 0 0 0 20" />
-                            </svg>
-                          )}
-                          {theme.mode === 'custom' && (
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-                            </svg>
-                          )}
-                          <span>{theme.label}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {settings.themeMode === 'custom' && (
-                    <div className="space-y-3 animate-fade-in-02s">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">CSS Override</label>
-                      <textarea
-                        value={settings.customCss}
-                        onChange={(e) => onUpdateSettings({ ...settings, customCss: e.target.value })}
-                        placeholder=".bg-white { background: red !important; }"
-                        className="w-full h-48 p-3 font-mono text-xs bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT resize-none"
-                        spellCheck={false}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Editor Tab */}
             {activeTab === 'editor' && (
               <div className="space-y-6 animate-fade-in-02s">
@@ -489,21 +538,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'shortcuts' && (
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Key Bindings</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Key Bindings</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                    Shortcuts are grouped by workflow. Editable shortcuts can be changed here; built-in shortcuts are shown for reference.
+                  </p>
+
                   <div className="space-y-3">
-                    {Object.entries(settings.shortcuts).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                          {shortcutLabels[key] || key.replace(/([A-Z])/g, ' $1').trim()}
-                        </span>
-                        <input
-                          type="text"
-                          value={value}
-                          onChange={(e) => handleShortcutChange(key, e.target.value)}
-                          className="w-24 px-2 py-1 border border-gray-200 dark:border-white/10 rounded-md text-xs font-mono text-center bg-white dark:bg-black/20 focus:border-accent-DEFAULT outline-none uppercase tracking-wide"
-                        />
-                      </div>
-                    ))}
+                    {shortcutGroups.map((group) => {
+                      const isExpanded = expandedShortcutGroups[group.id];
+
+                      return (
+                        <section
+                          key={group.id}
+                          className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.04] overflow-hidden"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleShortcutGroup(group.id)}
+                            className="flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{group.label}</h4>
+                                <span className="inline-flex items-center rounded-full bg-white/80 dark:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                  {group.items.length}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{group.description}</p>
+                            </div>
+                            <svg
+                              className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="border-t border-gray-200/70 dark:border-white/10 px-4 py-3">
+                              <div className="space-y-2.5">
+                                {group.items.map((item) => {
+                                  const editableValue = item.settingKey ? settings.shortcuts[item.settingKey] : '';
+                                  const itemShortcuts = item.editable ? [editableValue] : (item.shortcuts ?? []);
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-start justify-between gap-4 rounded-xl bg-white/85 dark:bg-black/20 px-3 py-3 border border-gray-100 dark:border-white/5"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                            {item.label}
+                                          </span>
+                                          {item.editable && (
+                                            <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                              Custom
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                          {item.description}
+                                        </p>
+                                      </div>
+
+                                      {item.editable && item.settingKey ? (
+                                        <input
+                                          type="text"
+                                          value={editableValue}
+                                          onChange={(e) => handleShortcutChange(item.settingKey, e.target.value)}
+                                          aria-label={shortcutLabels[item.settingKey] || item.label}
+                                          className="w-28 shrink-0 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-2.5 py-1.5 text-center font-mono text-xs uppercase tracking-wide text-gray-700 dark:text-gray-200 outline-none focus:border-accent-DEFAULT"
+                                        />
+                                      ) : (
+                                        <div className="flex shrink-0 flex-wrap justify-end gap-1.5 max-w-[180px]">
+                                          {itemShortcuts.map((shortcut) => (
+                                            <span
+                                              key={shortcut}
+                                              className="inline-flex items-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-[11px] font-mono text-gray-600 dark:text-gray-300"
+                                            >
+                                              {shortcut}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
