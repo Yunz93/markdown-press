@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { basename } from '@tauri-apps/api/path';
 import { useAppStore } from '../store/appStore';
 import { useFileSystem } from './useFileSystem';
 import type { FileNode } from '../types';
@@ -22,6 +21,31 @@ function isSameOrChildPath(path: string, parentPath: string): boolean {
   return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`);
 }
 
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function getParentPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  const idx = normalized.lastIndexOf('/');
+  if (idx <= 0) return '';
+  return normalized.slice(0, idx);
+}
+
+function buildMovedPathMap(sourceNode: FileNode, newRootPath: string): Record<string, string> {
+  const pathMap: Record<string, string> = {};
+  const sourceRootPath = sourceNode.path;
+
+  const visit = (node: FileNode) => {
+    const suffix = node.path.slice(sourceRootPath.length);
+    pathMap[node.path] = `${newRootPath}${suffix}`;
+    node.children?.forEach(visit);
+  };
+
+  visit(sourceNode);
+  return pathMap;
+}
+
 function collectAffectedOpenTabIds(files: FileNode[], openTabs: string[], target: FileNode): string[] {
   return openTabs.filter((tabId) => {
     const node = findFileInTree(files, tabId);
@@ -36,6 +60,7 @@ export function useFileOperations() {
   const {
     files,
     activeTabId,
+    rootFolderPath,
     fileContents,
     openTabs,
     settings,
@@ -55,6 +80,7 @@ export function useFileOperations() {
     moveToTrash,
     restoreFromTrash,
     moveFile,
+    refreshFileTree,
     revealInExplorer,
   } = useFileSystem();
 
@@ -145,32 +171,101 @@ export function useFileOperations() {
     }
   }, [files, openTabs, deleteFile, closeTab, showNotification]);
 
-  const handleMoveNode = useCallback(async (sourceId: string, targetId: string) => {
-    const sourceFile = findFileInTree(files, sourceId);
-    const targetFolder = findFileInTree(files, targetId);
+  const remapPathReferencesAfterMove = useCallback((pathMap: Record<string, string>) => {
+    useAppStore.setState((state) => {
+      const remapPath = (path: string): string => pathMap[path] ?? path;
+      const remapRecord = (record: Record<string, string>): Record<string, string> => {
+        const nextRecord: Record<string, string> = {};
+        for (const [key, value] of Object.entries(record)) {
+          nextRecord[remapPath(key)] = value;
+        }
+        return nextRecord;
+      };
 
-    if (!sourceFile || !targetFolder || targetFolder.type !== 'folder') {
-      showNotification('Can only move files to folders', 'error');
+      const remappedOpenTabs = state.openTabs.map(remapPath);
+      const nextOpenTabs = remappedOpenTabs.filter((tabId, index) => remappedOpenTabs.indexOf(tabId) === index);
+      const nextActiveTabId = state.activeTabId ? remapPath(state.activeTabId) : null;
+      const validatedActiveTabId = nextActiveTabId && nextOpenTabs.includes(nextActiveTabId)
+        ? nextActiveTabId
+        : (nextOpenTabs[0] ?? null);
+
+      return {
+        openTabs: nextOpenTabs,
+        activeTabId: validatedActiveTabId,
+        currentFilePath: state.currentFilePath ? remapPath(state.currentFilePath) : null,
+        fileContents: remapRecord(state.fileContents),
+        lastSavedContent: remapRecord(state.lastSavedContent),
+      };
+    });
+  }, []);
+
+  const moveNodeToTargetPath = useCallback(async (sourceNode: FileNode, targetPath: string) => {
+    const normalizedTargetPath = normalizePath(targetPath);
+    const normalizedSourceParent = normalizePath(getParentPath(sourceNode.path));
+
+    if (!normalizedTargetPath) {
+      showNotification('Invalid target folder', 'error');
       return;
     }
-    if (sourceFile.type !== 'file') {
-      showNotification('Only files can be moved for now', 'error');
+
+    if (normalizedTargetPath === normalizedSourceParent) {
       return;
     }
-    if (sourceId === targetId) return;
+
+    if (sourceNode.type === 'folder' && isSameOrChildPath(targetPath, sourceNode.path)) {
+      showNotification('Cannot move a folder into itself', 'error');
+      return;
+    }
+
+    if (sourceNode.isTrash) {
+      showNotification('Cannot move trash items from this area', 'error');
+      return;
+    }
 
     try {
-      const fileName = await basename(sourceFile.path);
-      const newPath = await moveFile(sourceFile, targetFolder.path);
-      if (newPath) {
-        useAppStore.getState().updateFileName(sourceId, fileName, newPath);
-        showNotification('File moved', 'success');
-      }
+      const newPath = await moveFile(sourceNode, targetPath);
+      if (!newPath) return;
+
+      const pathMap = buildMovedPathMap(sourceNode, newPath);
+      remapPathReferencesAfterMove(pathMap);
+      await refreshFileTree();
+      showNotification(sourceNode.type === 'folder' ? 'Folder moved' : 'File moved', 'success');
     } catch (e) {
-      console.error('Failed to move file:', e);
-      showNotification('Failed to move file', 'error');
+      console.error('Failed to move item:', e);
+      showNotification(sourceNode.type === 'folder' ? 'Failed to move folder' : 'Failed to move file', 'error');
     }
-  }, [files, moveFile, showNotification]);
+  }, [moveFile, refreshFileTree, remapPathReferencesAfterMove, showNotification]);
+
+  const handleMoveNode = useCallback(async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const sourceNode = findFileInTree(files, sourceId);
+    const targetFolder = findFileInTree(files, targetId);
+
+    if (!sourceNode || !targetFolder || targetFolder.type !== 'folder') {
+      showNotification('Can only move items to folders', 'error');
+      return;
+    }
+    if (targetFolder.isTrash) {
+      showNotification('Cannot move items into trash directly', 'error');
+      return;
+    }
+    await moveNodeToTargetPath(sourceNode, targetFolder.path);
+  }, [files, moveNodeToTargetPath, showNotification]);
+
+  const handleMoveToRoot = useCallback(async (sourceId: string) => {
+    if (!rootFolderPath) {
+      showNotification('No knowledge base opened.', 'error');
+      return;
+    }
+
+    const sourceNode = findFileInTree(files, sourceId);
+    if (!sourceNode) {
+      showNotification('Item not found', 'error');
+      return;
+    }
+
+    await moveNodeToTargetPath(sourceNode, rootFolderPath);
+  }, [files, rootFolderPath, moveNodeToTargetPath, showNotification]);
 
   const handleNewFolder = useCallback(async (parentFolder?: FileNode, name?: string) => {
     if (!name || !name.trim()) return;
@@ -219,6 +314,7 @@ export function useFileOperations() {
     handleDeleteForever,
     handleDelete,
     handleMoveNode,
+    handleMoveToRoot,
     handleNewFolder,
     handleRevealInExplorer,
     handleOpenInFileExplorer,

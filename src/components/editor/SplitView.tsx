@@ -32,34 +32,15 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const [scrollPercentage, setScrollPercentage] = useState(0);
   const [activeSide, setActiveSide] = useState<'editor' | 'preview' | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const scrollTimerRef = React.useRef<number | null>(null);
 
   const handleEditorScroll = useCallback((p: number) => {
     setActiveSide('editor');
     setScrollPercentage(p);
-    // Clear existing timer
-    if (scrollTimerRef.current) {
-      window.clearTimeout(scrollTimerRef.current);
-    }
-    // Reset active side after scrolling stops
-    scrollTimerRef.current = window.setTimeout(() => {
-      setActiveSide(null);
-      scrollTimerRef.current = null;
-    }, 100); // Reduced to 100ms for faster response
   }, []);
 
   const handlePreviewScroll = useCallback((p: number) => {
     setActiveSide('preview');
     setScrollPercentage(p);
-    // Clear existing timer
-    if (scrollTimerRef.current) {
-      window.clearTimeout(scrollTimerRef.current);
-    }
-    // Reset active side after scrolling stops
-    scrollTimerRef.current = window.setTimeout(() => {
-      setActiveSide(null);
-      scrollTimerRef.current = null;
-    }, 100); // Reduced to 100ms for faster response
   }, []);
 
   const handleMouseDown = useCallback(() => {

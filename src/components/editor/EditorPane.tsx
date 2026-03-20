@@ -1,8 +1,13 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
-import { renderMarkdownSourceHighlight } from '../../utils/markdownSourceHighlight';
-import { getSelectionOffsets, setSelectionOffsets } from '../../utils/contentEditableSelection';
 import { getPaneLayoutMetrics } from './paneLayout';
+import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
+import { Compartment, EditorSelection, EditorState, type Extension, type StateCommand } from '@codemirror/state';
+import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -14,14 +19,105 @@ interface EditorPaneProps {
 }
 
 const SCROLL_THRESHOLD = 5;
+const SCROLL_EMIT_THRESHOLD = 0.001;
+const SYNC_SCROLL_EASING = 0.24;
+const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
+const CURSOR_VERTICAL_OFFSET_EM = ((EDITOR_LINE_HEIGHT - 1) / 2).toFixed(3);
 
-function applyTextEdit(content: string, start: number, end: number, insertedText: string): string {
-  return `${content.slice(0, start)}${insertedText}${content.slice(end)}`;
-}
+const lightMarkdownStyle = HighlightStyle.define([
+  { tag: [tags.heading, tags.strong, tags.emphasis], color: '#7c3aed' },
+  { tag: [tags.link, tags.url], color: '#0f9aa8' },
+  { tag: [tags.quote, tags.list, tags.separator, tags.punctuation], color: '#8b5cf6' },
+  { tag: [tags.monospace, tags.literal], color: '#475569' },
+  { tag: [tags.keyword, tags.bool], color: '#d97706' },
+  { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
+]);
 
-function normalizeEditorText(value: string): string {
-  return value.replace(/\u00a0/g, ' ');
+const darkMarkdownStyle = HighlightStyle.define([
+  { tag: [tags.heading, tags.strong, tags.emphasis], color: '#d8b4fe' },
+  { tag: [tags.link, tags.url], color: '#67e8f9' },
+  { tag: [tags.quote, tags.list, tags.separator, tags.punctuation], color: '#c084fc' },
+  { tag: [tags.monospace, tags.literal], color: '#bfdbfe' },
+  { tag: [tags.keyword, tags.bool], color: '#fbbf24' },
+  { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
+]);
+
+const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
+  const changes = state.changeByRange((range) => ({
+    changes: { from: range.from, to: range.to, insert: '  ' },
+    range: EditorSelection.cursor(range.from + 2),
+  }));
+
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+function createEditorTheme(
+  themeMode: 'light' | 'dark',
+  fontFamily: string,
+  fontSize: number
+): Extension {
+  const isDark = themeMode === 'dark';
+
+  return EditorView.theme({
+    '&': {
+      height: '100%',
+      width: '100%',
+      background: 'transparent',
+    },
+    '&.cm-focused': {
+      outline: 'none',
+    },
+    '.cm-scroller': {
+      overflow: 'auto',
+      lineHeight: String(EDITOR_LINE_HEIGHT),
+      fontFamily,
+      width: '100%',
+    },
+    '.cm-content': {
+      minHeight: 'calc(100vh - 12rem)',
+      flexBasis: '100%',
+      width: '100%',
+      minWidth: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      padding: 'var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom) !important',
+      fontFamily,
+      fontSize: `${fontSize}px`,
+      letterSpacing: '0.01em',
+      tabSize: '2',
+      caretColor: isDark ? '#c084fc' : '#7c3aed',
+    },
+    '.cm-line': {
+      padding: '0 !important',
+    },
+    '.cm-content, .cm-line': {
+      color: isDark ? '#e5eef9' : '#1f2937',
+    },
+    '.cm-gutters': {
+      display: 'none',
+    },
+    '.cm-activeLine': {
+      background: 'transparent',
+    },
+    '.cm-selectionBackground': {
+      background: isDark ? 'rgba(192, 132, 252, 0.22)' : 'rgba(168, 85, 247, 0.18)',
+    },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
+      background: isDark ? 'rgba(192, 132, 252, 0.22)' : 'rgba(168, 85, 247, 0.18)',
+    },
+    '.cm-cursor, .cm-dropCursor': {
+      borderLeftColor: isDark ? '#c084fc' : '#7c3aed',
+    },
+    '.cm-cursorLayer .cm-cursor': {
+      height: '1em !important',
+      transform: `translateY(${CURSOR_VERTICAL_OFFSET_EM}em)`,
+    },
+    '.cm-placeholder': {
+      color: isDark ? 'rgba(148, 163, 184, 0.72)' : 'rgba(100, 116, 139, 0.72)',
+    },
+  }, { dark: isDark });
 }
 
 export const EditorPane: React.FC<EditorPaneProps> = ({
@@ -32,32 +128,26 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   highlighter,
   density = 'comfortable'
 }) => {
-  const content = useAppStore(selectContent);
-  const {
-    setContent,
-    settings,
-    isSaving,
-    activeTabId
-  } = useAppStore();
+  void highlighter;
 
-  const editorRef = useRef<HTMLDivElement>(null);
+  const content = useAppStore(selectContent);
+  const { setContent, settings, isSaving, activeTabId } = useAppStore();
+
+  const editorRootRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
-  const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
-  const isComposingRef = useRef(false);
-  const isMeasuringCaretRef = useRef(false);
-  const [caretState, setCaretState] = useState<{
-    visible: boolean;
-    top: number;
-    left: number;
-    height: number;
-  }>({
-    visible: false,
-    top: 0,
-    left: 0,
-    height: settings.fontSize,
-  });
+  const onScrollRef = useRef(onScroll);
+  const emitAnimationFrameRef = useRef<number | null>(null);
+  const pendingEmittedPercentageRef = useRef<number | null>(null);
+  const syncAnimationFrameRef = useRef<number | null>(null);
+  const syncTargetScrollTopRef = useRef<number | null>(null);
+
+  const themeCompartment = useRef(new Compartment()).current;
+  const wrapCompartment = useRef(new Compartment()).current;
+  const syntaxCompartment = useRef(new Compartment()).current;
+  const placeholderCompartment = useRef(new Compartment()).current;
 
   const updateContent = useCallback((nextContent: string) => {
     if (onContentChange) {
@@ -66,10 +156,84 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
     setContent(nextContent);
   }, [onContentChange, setContent]);
+  const updateContentRef = useRef(updateContent);
 
-  const highlightedContent = useMemo(() => (
-    content ? renderMarkdownSourceHighlight(content, settings.themeMode, highlighter) : ''
-  ), [content, settings.themeMode, highlighter]);
+  const emitScrollPercentage = useCallback((scrollContainer: HTMLElement) => {
+    if (isSyncingScroll.current) return;
+
+    const onScrollCallback = onScrollRef.current;
+    if (!onScrollCallback) return;
+
+    const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    if (scrollHeight <= 0) return;
+
+    const percentage = scrollContainer.scrollTop / scrollHeight;
+    if (Math.abs(percentage - lastScrollPercentage.current) <= SCROLL_EMIT_THRESHOLD) return;
+
+    lastScrollPercentage.current = percentage;
+    pendingEmittedPercentageRef.current = percentage;
+
+    if (emitAnimationFrameRef.current !== null) return;
+
+    emitAnimationFrameRef.current = requestAnimationFrame(() => {
+      emitAnimationFrameRef.current = null;
+      const pendingPercentage = pendingEmittedPercentageRef.current;
+      pendingEmittedPercentageRef.current = null;
+      if (pendingPercentage === null) return;
+      onScrollCallback(pendingPercentage);
+    });
+  }, []);
+
+  const cancelSyncedScroll = useCallback(() => {
+    if (syncAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(syncAnimationFrameRef.current);
+      syncAnimationFrameRef.current = null;
+    }
+    syncTargetScrollTopRef.current = null;
+    isSyncingScroll.current = false;
+  }, []);
+
+  const animateSyncedScroll = useCallback((scrollDom: HTMLElement, targetScrollTop: number) => {
+    const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
+    const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
+    syncTargetScrollTopRef.current = clampedTarget;
+
+    if (syncAnimationFrameRef.current !== null) return;
+
+    isSyncingScroll.current = true;
+
+    const step = () => {
+      const currentView = editorViewRef.current;
+      if (!currentView || currentView.scrollDOM !== scrollDom) {
+        syncAnimationFrameRef.current = null;
+        syncTargetScrollTopRef.current = null;
+        isSyncingScroll.current = false;
+        return;
+      }
+
+      const target = syncTargetScrollTopRef.current;
+      if (target === null) {
+        syncAnimationFrameRef.current = null;
+        isSyncingScroll.current = false;
+        return;
+      }
+
+      const delta = target - scrollDom.scrollTop;
+      if (Math.abs(delta) <= SYNC_SCROLL_STOP_PX) {
+        scrollDom.scrollTop = target;
+        syncAnimationFrameRef.current = null;
+        syncTargetScrollTopRef.current = null;
+        isSyncingScroll.current = false;
+        return;
+      }
+
+      scrollDom.scrollTop += delta * SYNC_SCROLL_EASING;
+      syncAnimationFrameRef.current = requestAnimationFrame(step);
+    };
+
+    syncAnimationFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
   const [paneWidth, setPaneWidth] = useState(0);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
   const layoutStyle = useMemo(() => ({
@@ -82,6 +246,25 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
   }) as React.CSSProperties, [layoutMetrics]);
+
+  useEffect(() => {
+    onScrollRef.current = onScroll;
+  }, [onScroll]);
+
+  useEffect(() => {
+    return () => {
+      if (emitAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(emitAnimationFrameRef.current);
+        emitAnimationFrameRef.current = null;
+      }
+      pendingEmittedPercentageRef.current = null;
+      cancelSyncedScroll();
+    };
+  }, [cancelSyncedScroll]);
+
+  useEffect(() => {
+    updateContentRef.current = updateContent;
+  }, [updateContent]);
 
   useEffect(() => {
     const layout = layoutRef.current;
@@ -97,244 +280,152 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  const updateCaret = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const selection = window.getSelection();
-    if (
-      !selection ||
-      selection.rangeCount === 0 ||
-      !selection.isCollapsed ||
-      document.activeElement !== editor
-    ) {
-      setCaretState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    if (!editor.contains(range.startContainer)) {
-      setCaretState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-      return;
-    }
-
-    const offsets = getSelectionOffsets(editor);
-    if (!offsets || offsets.start !== offsets.end) {
-      setCaretState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-      return;
-    }
-
-    const marker = document.createElement('span');
-    marker.textContent = '\u200b';
-    marker.setAttribute('aria-hidden', 'true');
-    marker.style.position = 'relative';
-    marker.style.display = 'inline-block';
-    marker.style.width = '0';
-    marker.style.overflow = 'hidden';
-    marker.style.pointerEvents = 'none';
-    marker.style.lineHeight = 'inherit';
-
-    const caretRange = range.cloneRange();
-    isMeasuringCaretRef.current = true;
-    caretRange.insertNode(marker);
-    const rect = marker.getBoundingClientRect();
-    marker.remove();
-    setSelectionOffsets(editor, offsets.start, offsets.end, { focus: false });
-    isMeasuringCaretRef.current = false;
-
-    const fontSize = settings.fontSize;
-    const caretHeight = Math.max(1, Math.round(fontSize * 1.02));
-    const lineBoxHeight = rect.height || fontSize * EDITOR_LINE_HEIGHT;
-    const top = rect.top + Math.max(0, (lineBoxHeight - caretHeight) / 2);
-    const left = rect.left;
-
-    setCaretState((prev) => {
-      if (
-        prev.visible &&
-        Math.abs(prev.top - top) < 0.5 &&
-        Math.abs(prev.left - left) < 0.5 &&
-        Math.abs(prev.height - caretHeight) < 0.5
-      ) {
-        return prev;
+  useEffect(() => {
+    if (!activeTabId) {
+      const existingView = editorViewRef.current;
+      if (existingView) {
+        clearActiveEditorView(existingView);
+        existingView.destroy();
+        editorViewRef.current = null;
       }
-
-      return {
-        visible: true,
-        top,
-        left,
-        height: caretHeight,
-      };
-    });
-  }, [settings.fontSize]);
-
-  const syncExternalScroll = useCallback((targetPercentage: number) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const targetScroll = (editor.scrollHeight - editor.clientHeight) * targetPercentage;
-    if (Math.abs(editor.scrollTop - targetScroll) <= SCROLL_THRESHOLD) {
       return;
     }
 
-    isSyncingScroll.current = true;
-    requestAnimationFrame(() => {
-      editor.scrollTop = targetScroll;
-      requestAnimationFrame(() => {
-        isSyncingScroll.current = false;
-      });
+    const root = editorRootRef.current;
+    if (!root || editorViewRef.current) return;
+
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: content,
+        extensions: [
+          history(),
+          keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Tab', run: insertTwoSpaces }]),
+          markdown(),
+          themeCompartment.of(createEditorTheme(settings.themeMode, settings.fontFamily, settings.fontSize)),
+          wrapCompartment.of(settings.wordWrap ? EditorView.lineWrapping : []),
+          syntaxCompartment.of(syntaxHighlighting(settings.themeMode === 'dark' ? darkMarkdownStyle : lightMarkdownStyle)),
+          placeholderCompartment.of(cmPlaceholder(placeholder)),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              updateContentRef.current(update.state.doc.toString());
+            }
+          }),
+        ],
+      }),
+      parent: root,
     });
-  }, []);
 
-  useEffect(() => {
-    if (scrollPercentage === undefined || isSyncingScroll.current) return;
-    syncExternalScroll(scrollPercentage);
-  }, [scrollPercentage, syncExternalScroll]);
-
-  useLayoutEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    if (editor.innerHTML !== highlightedContent) {
-      editor.innerHTML = highlightedContent;
-    }
-
-    if (pendingSelectionRef.current) {
-      const selection = pendingSelectionRef.current;
-      setSelectionOffsets(editor, selection.start, selection.end, { focus: document.activeElement === editor });
-      pendingSelectionRef.current = null;
-    }
-
-    requestAnimationFrame(() => {
-      updateCaret();
-    });
-  }, [highlightedContent, updateCaret]);
-
-  useEffect(() => {
-    const handleSelectionChange = () => {
-      if (isMeasuringCaretRef.current) return;
-      updateCaret();
+    const handleDomScroll = () => {
+      emitScrollPercentage(view.scrollDOM);
+    };
+    const handleUserScrollIntent = () => {
+      cancelSyncedScroll();
     };
 
-    const handleWindowResize = () => {
-      updateCaret();
-    };
+    view.scrollDOM.addEventListener('scroll', handleDomScroll, { passive: true });
+    view.scrollDOM.addEventListener('wheel', handleUserScrollIntent, { passive: true });
+    view.scrollDOM.addEventListener('touchstart', handleUserScrollIntent, { passive: true });
+    view.scrollDOM.addEventListener('pointerdown', handleUserScrollIntent, { passive: true });
 
-    const handleWindowScroll = () => {
-      updateCaret();
-    };
-
-    document.addEventListener('selectionchange', handleSelectionChange);
-    window.addEventListener('resize', handleWindowResize);
-    window.addEventListener('scroll', handleWindowScroll, true);
+    editorViewRef.current = view;
+    registerActiveEditorView(view);
 
     return () => {
-      document.removeEventListener('selectionchange', handleSelectionChange);
-      window.removeEventListener('resize', handleWindowResize);
-      window.removeEventListener('scroll', handleWindowScroll, true);
+      cancelSyncedScroll();
+      view.scrollDOM.removeEventListener('scroll', handleDomScroll);
+      view.scrollDOM.removeEventListener('wheel', handleUserScrollIntent);
+      view.scrollDOM.removeEventListener('touchstart', handleUserScrollIntent);
+      view.scrollDOM.removeEventListener('pointerdown', handleUserScrollIntent);
+      clearActiveEditorView(view);
+      view.destroy();
+      if (editorViewRef.current === view) {
+        editorViewRef.current = null;
+      }
     };
-  }, [updateCaret]);
+  }, [
+    activeTabId,
+    content,
+    placeholder,
+    settings.fontFamily,
+    settings.fontSize,
+    settings.themeMode,
+    settings.wordWrap,
+    placeholderCompartment,
+    syntaxCompartment,
+    themeCompartment,
+    wrapCompartment,
+    emitScrollPercentage,
+    cancelSyncedScroll,
+  ]);
 
-  const applyManualEdit = useCallback((insertedText: string) => {
-    const editor = editorRef.current;
-    if (!editor) return;
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
 
-    const selection = getSelectionOffsets(editor);
-    if (!selection) return;
-
-    const nextContent = applyTextEdit(content, selection.start, selection.end, insertedText);
-    const nextOffset = selection.start + insertedText.length;
-    pendingSelectionRef.current = { start: nextOffset, end: nextOffset };
-    updateContent(nextContent);
-  }, [content, updateContent]);
-
-  const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    const editor = e.currentTarget;
-    const selection = getSelectionOffsets(editor);
-    if (selection) {
-      pendingSelectionRef.current = selection;
-    }
-
-    if (isComposingRef.current) {
-      return;
-    }
-
-    updateContent(normalizeEditorText(editor.textContent ?? ''));
-    requestAnimationFrame(() => {
-      updateCaret();
+    view.dispatch({
+      effects: themeCompartment.reconfigure(createEditorTheme(settings.themeMode, settings.fontFamily, settings.fontSize)),
     });
-  }, [updateContent, updateCaret]);
+  }, [settings.themeMode, settings.fontFamily, settings.fontSize, themeCompartment]);
 
-  const handleCompositionStart = useCallback(() => {
-    isComposingRef.current = true;
-  }, []);
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
 
-  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
-    isComposingRef.current = false;
-    const editor = e.currentTarget;
-    const selection = getSelectionOffsets(editor);
-    if (selection) {
-      pendingSelectionRef.current = selection;
-    }
-    updateContent(normalizeEditorText(editor.textContent ?? ''));
-    requestAnimationFrame(() => {
-      updateCaret();
+    view.dispatch({
+      effects: wrapCompartment.reconfigure(settings.wordWrap ? EditorView.lineWrapping : []),
     });
-  }, [updateContent, updateCaret]);
+  }, [settings.wordWrap, wrapCompartment]);
 
-  const handleBeforeInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    const nativeEvent = e.nativeEvent as InputEvent;
-    if (nativeEvent.isComposing) return;
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
 
-    if (nativeEvent.inputType === 'insertParagraph' || nativeEvent.inputType === 'insertLineBreak') {
-      e.preventDefault();
-      applyManualEdit('\n');
-    }
-  }, [applyManualEdit]);
-
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData('text/plain');
-    applyManualEdit(pastedText);
-  }, [applyManualEdit]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      applyManualEdit('  ');
-    }
-  }, [applyManualEdit]);
-
-  const handleScroll = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor || isSyncingScroll.current) return;
-
-    updateCaret();
-
-    if (!onScroll) return;
-
-    const scrollHeight = editor.scrollHeight - editor.clientHeight;
-    if (scrollHeight <= 0) return;
-
-    const percentage = editor.scrollTop / scrollHeight;
-    if (Math.abs(percentage - lastScrollPercentage.current) <= 0.001) {
-      return;
-    }
-
-    lastScrollPercentage.current = percentage;
-    requestAnimationFrame(() => {
-      onScroll(percentage);
+    view.dispatch({
+      effects: syntaxCompartment.reconfigure(
+        syntaxHighlighting(settings.themeMode === 'dark' ? darkMarkdownStyle : lightMarkdownStyle)
+      ),
     });
-  }, [onScroll, updateCaret]);
+  }, [settings.themeMode, syntaxCompartment]);
 
-  const handleFocus = useCallback(() => {
-    requestAnimationFrame(() => {
-      updateCaret();
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    view.dispatch({
+      effects: placeholderCompartment.reconfigure(cmPlaceholder(placeholder)),
     });
-  }, [updateCaret]);
+  }, [placeholder, placeholderCompartment]);
 
-  const handleBlur = useCallback(() => {
-    setCaretState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-  }, []);
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const currentContent = view.state.doc.toString();
+    if (currentContent === content) return;
+
+    const anchor = Math.min(view.state.selection.main.anchor, content.length);
+    const head = Math.min(view.state.selection.main.head, content.length);
+
+    view.dispatch({
+      changes: { from: 0, to: currentContent.length, insert: content },
+      selection: { anchor, head },
+    });
+  }, [content]);
+
+  useEffect(() => {
+    if (scrollPercentage === undefined) return;
+
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const scrollDom = view.scrollDOM;
+    const maxScrollTop = scrollDom.scrollHeight - scrollDom.clientHeight;
+    if (maxScrollTop <= 0) return;
+
+    const targetScrollTop = maxScrollTop * scrollPercentage;
+    if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= SCROLL_THRESHOLD) return;
+    animateSyncedScroll(scrollDom, targetScrollTop);
+  }, [scrollPercentage, animateSyncedScroll]);
 
   if (!activeTabId) {
     return (
@@ -368,45 +459,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         <div className="editor-pane-scroll h-full overflow-hidden">
           <div className="editor-pane-frame h-full w-full">
             <div className="editor-pane-sheet h-full w-full">
-              {caretState.visible && (
-                <div
-                  aria-hidden="true"
-                  className="editor-pane-custom-caret"
-                  style={{
-                    top: `${caretState.top}px`,
-                    left: `${caretState.left}px`,
-                    height: `${caretState.height}px`,
-                    backgroundColor: settings.themeMode === 'dark' ? '#c084fc' : '#7c3aed',
-                  }}
-                />
-              )}
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                role="textbox"
-                aria-multiline="true"
-                spellCheck={false}
-                data-placeholder={placeholder}
-                onInput={handleInput}
-                onBeforeInput={handleBeforeInput}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                onScroll={handleScroll}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-                className={`editor-pane editor-pane-editable h-full min-h-[calc(100vh-12rem)] w-full border-0 bg-transparent focus:outline-none ${
-                  settings.wordWrap ? 'wrapped' : 'nowrap'
-                }`}
-                style={{
-                  lineHeight: String(EDITOR_LINE_HEIGHT),
-                  fontSize: `${settings.fontSize}px`,
-                  fontFamily: settings.fontFamily,
-                  caretColor: 'transparent',
-                }}
-              />
+              <div ref={editorRootRef} className="editor-pane-codemirror h-full w-full" />
             </div>
           </div>
         </div>

@@ -16,6 +16,11 @@ export function useUndoRedo() {
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.defaultPrevented) return;
+
+    const activeElement = document.activeElement as HTMLElement | null;
+    if (activeElement?.closest('.cm-editor')) return;
+
     const isMod = e.ctrlKey || e.metaKey;
 
     if (!isMod || !activeTabId) return;

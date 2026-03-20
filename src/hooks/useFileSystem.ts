@@ -611,6 +611,7 @@ export function useFileSystem() {
 
   return {
     files,
+    refreshFileTree,
     openFile,
     openDirectory,
     openKnowledgeBase,

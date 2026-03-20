@@ -21,6 +21,7 @@ interface SidebarProps {
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
+  onMoveToRoot: (sourceId: string) => void;
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string | null;
   onSwitchKnowledgeBase: () => void;
@@ -406,6 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRestoreFromTrash,
   onDeleteForever,
   onMoveNode,
+  onMoveToRoot,
   currentKnowledgeBaseName,
   currentKnowledgeBasePath,
   onSwitchKnowledgeBase,
@@ -418,7 +420,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showTrash, setShowTrash] = useState(false);
   const [dialogState, setDialogState] = useState<DialogState>({ type: null });
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRootDragOver, setIsRootDragOver] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
+
+  const extractDraggedNodeId = useCallback((event: React.DragEvent): string | null => {
+    const rawPayload = event.dataTransfer.getData('application/json');
+    if (!rawPayload) return null;
+
+    try {
+      const parsed = JSON.parse(rawPayload) as { id?: string };
+      return parsed.id ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
     e.preventDefault();
@@ -459,6 +474,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
     document.addEventListener('mousemove', handlePointerMove);
     document.addEventListener('mouseup', handlePointerUp);
   }, [onWidthChange]);
+
+  const handleRootDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    const sourceId = extractDraggedNodeId(event);
+    if (!sourceId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setIsRootDragOver(true);
+  }, [extractDraggedNodeId]);
+
+  const handleRootDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+    setIsRootDragOver(false);
+  }, []);
+
+  const handleRootDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const sourceId = extractDraggedNodeId(event);
+    setIsRootDragOver(false);
+    if (!sourceId) return;
+    onMoveToRoot(sourceId);
+  }, [extractDraggedNodeId, onMoveToRoot]);
 
   return (
     <>
@@ -521,7 +558,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-2 scrollbar-hide">
+        <div
+          className={`flex-1 overflow-y-auto py-2 scrollbar-hide transition-colors ${isRootDragOver ? 'bg-accent-DEFAULT/10 dark:bg-accent-DEFAULT/10' : ''}`}
+          onDragOver={handleRootDragOver}
+          onDragLeave={handleRootDragLeave}
+          onDrop={handleRootDrop}
+          onDragEnd={() => setIsRootDragOver(false)}
+        >
           {files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600 px-6 text-center">
               <svg className="w-8 h-8 mb-3 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
-import { focusEditorSelection } from '../../utils/contentEditableSelection';
+import { focusEditorRangeByOffset } from '../../utils/editorSelectionBridge';
 
 interface ContentSearchProps {
   onClose: () => void;
@@ -181,16 +181,9 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   useEffect(() => {
     if (matches.length > 0) {
       const match = matches[currentMatchIndex];
-      const editorElement = document.querySelector('[contenteditable="true"].editor-pane') as HTMLDivElement | null;
-      if (!editorElement) return;
-
-      focusEditorSelection(editorElement, match.index, match.index + match.length);
-
-      const lineIndex = content.substring(0, match.index).split('\n').length - 1;
-      const lineHeight = parseFloat(getComputedStyle(editorElement).lineHeight) || 24;
-      editorElement.scrollTop = Math.max(0, lineIndex * lineHeight - editorElement.clientHeight * 0.3);
+      focusEditorRangeByOffset(match.index, match.index + match.length, { alignTopRatio: 0.3 });
     }
-  }, [matches, currentMatchIndex, content]);
+  }, [matches, currentMatchIndex]);
 
   return (
     <div

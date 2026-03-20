@@ -17,6 +17,9 @@ interface PreviewPaneProps {
 
 // Lower threshold for smoother sync
 const SCROLL_THRESHOLD = 5;
+const SCROLL_EMIT_THRESHOLD = 0.001;
+const SYNC_SCROLL_EASING = 0.24;
+const SYNC_SCROLL_STOP_PX = 0.8;
 
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
   highlighter,
@@ -33,6 +36,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
+  const emitAnimationFrameRef = useRef<number | null>(null);
+  const pendingEmittedPercentageRef = useRef<number | null>(null);
+  const syncAnimationFrameRef = useRef<number | null>(null);
+  const syncTargetScrollTopRef = useRef<number | null>(null);
   const isCompact = density === 'compact';
   const hasActiveFile = Boolean(activeTabId);
   const [paneWidth, setPaneWidth] = useState(0);
@@ -62,9 +69,70 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
+  const cancelSyncedScroll = useCallback(() => {
+    if (syncAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(syncAnimationFrameRef.current);
+      syncAnimationFrameRef.current = null;
+    }
+    syncTargetScrollTopRef.current = null;
+    isSyncingScroll.current = false;
+  }, []);
+
+  const animateSyncedScroll = useCallback((element: HTMLElement, targetScrollTop: number) => {
+    const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
+    syncTargetScrollTopRef.current = clampedTarget;
+
+    if (syncAnimationFrameRef.current !== null) return;
+
+    isSyncingScroll.current = true;
+
+    const step = () => {
+      const currentElement = previewRef.current;
+      if (!currentElement || currentElement !== element) {
+        syncAnimationFrameRef.current = null;
+        syncTargetScrollTopRef.current = null;
+        isSyncingScroll.current = false;
+        return;
+      }
+
+      const target = syncTargetScrollTopRef.current;
+      if (target === null) {
+        syncAnimationFrameRef.current = null;
+        isSyncingScroll.current = false;
+        return;
+      }
+
+      const delta = target - currentElement.scrollTop;
+      if (Math.abs(delta) <= SYNC_SCROLL_STOP_PX) {
+        currentElement.scrollTop = target;
+        syncAnimationFrameRef.current = null;
+        syncTargetScrollTopRef.current = null;
+        isSyncingScroll.current = false;
+        return;
+      }
+
+      currentElement.scrollTop += delta * SYNC_SCROLL_EASING;
+      syncAnimationFrameRef.current = requestAnimationFrame(step);
+    };
+
+    syncAnimationFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (emitAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(emitAnimationFrameRef.current);
+        emitAnimationFrameRef.current = null;
+      }
+      pendingEmittedPercentageRef.current = null;
+      cancelSyncedScroll();
+    };
+  }, [cancelSyncedScroll]);
+
   // Sync scroll from other side
   useEffect(() => {
-    if (scrollPercentage !== undefined && previewRef.current && !isSyncingScroll.current) {
+    if (scrollPercentage !== undefined && previewRef.current) {
       const el = previewRef.current;
       const scrollHeight = el.scrollHeight - el.clientHeight;
 
@@ -74,20 +142,29 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
       // Only update if significantly different to avoid jitter
       if (Math.abs(el.scrollTop - targetScroll) > SCROLL_THRESHOLD) {
-        isSyncingScroll.current = true;
-
-        // Use requestAnimationFrame for smoother scrolling
-        requestAnimationFrame(() => {
-          el.scrollTop = targetScroll;
-
-          // Reset syncing flag after a short delay
-          requestAnimationFrame(() => {
-            isSyncingScroll.current = false;
-          });
-        });
+        animateSyncedScroll(el, targetScroll);
       }
     }
-  }, [scrollPercentage]);
+  }, [scrollPercentage, animateSyncedScroll]);
+
+  useEffect(() => {
+    const element = previewRef.current;
+    if (!element) return;
+
+    const handleUserScrollIntent = () => {
+      cancelSyncedScroll();
+    };
+
+    element.addEventListener('wheel', handleUserScrollIntent, { passive: true });
+    element.addEventListener('touchstart', handleUserScrollIntent, { passive: true });
+    element.addEventListener('pointerdown', handleUserScrollIntent, { passive: true });
+
+    return () => {
+      element.removeEventListener('wheel', handleUserScrollIntent);
+      element.removeEventListener('touchstart', handleUserScrollIntent);
+      element.removeEventListener('pointerdown', handleUserScrollIntent);
+    };
+  }, [cancelSyncedScroll]);
 
   const handleScroll = useCallback(() => {
     if (!previewRef.current || !onScroll || isSyncingScroll.current) return;
@@ -100,12 +177,18 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     const percentage = el.scrollTop / scrollHeight;
 
     // Only emit if significantly different
-    if (Math.abs(percentage - lastScrollPercentage.current) > 0.001) {
+    if (Math.abs(percentage - lastScrollPercentage.current) > SCROLL_EMIT_THRESHOLD) {
       lastScrollPercentage.current = percentage;
+      pendingEmittedPercentageRef.current = percentage;
 
-      // Use requestAnimationFrame to batch scroll events
-      requestAnimationFrame(() => {
-        onScroll(percentage);
+      if (emitAnimationFrameRef.current !== null) return;
+
+      emitAnimationFrameRef.current = requestAnimationFrame(() => {
+        emitAnimationFrameRef.current = null;
+        const pendingPercentage = pendingEmittedPercentageRef.current;
+        pendingEmittedPercentageRef.current = null;
+        if (pendingPercentage === null) return;
+        onScroll(pendingPercentage);
       });
     }
   }, [onScroll]);

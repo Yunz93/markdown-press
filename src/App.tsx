@@ -21,7 +21,7 @@ import { ContentSearch } from './components/search/ContentSearch';
 import { TabBar } from './components/tabs/TabBar';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
-import { focusEditorSelection } from './utils/contentEditableSelection';
+import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'markdown-press.sidebar-width';
 const OUTLINE_WIDTH_STORAGE_KEY = 'markdown-press.outline-width';
@@ -275,17 +275,12 @@ const App: React.FC = () => {
 
   const handleHeadingClick = useCallback((id: string, line: number) => {
     setActiveHeadingId(id);
-    const editor = document.querySelector('[contenteditable="true"].editor-pane') as HTMLDivElement | null;
-    if (!editor) return;
 
     const lineIndex = Math.max(0, line - 1);
     const lines = content.split('\n');
     const cursorPos = lines.slice(0, lineIndex).reduce((sum, l) => sum + l.length + 1, 0);
 
-    focusEditorSelection(editor, cursorPos, cursorPos);
-
-    const computedLineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 24;
-    editor.scrollTop = Math.max(0, lineIndex * computedLineHeight - editor.clientHeight * 0.3);
+    focusEditorRangeByOffset(cursorPos, cursorPos, { alignTopRatio: 0.3 });
   }, [content, setActiveHeadingId]);
 
   const handleContentChange = useCallback((newContent: string) => {
@@ -382,6 +377,7 @@ const App: React.FC = () => {
         onRestoreFromTrash={fileOps.handleRestoreFromTrash}
         onDeleteForever={fileOps.handleDeleteForever}
         onMoveNode={fileOps.handleMoveNode}
+        onMoveToRoot={fileOps.handleMoveToRoot}
         currentKnowledgeBaseName={currentKnowledgeBaseName}
         currentKnowledgeBasePath={rootFolderPath}
         onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
