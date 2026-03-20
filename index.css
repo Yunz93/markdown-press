@@ -112,7 +112,7 @@ body {
   background: rgba(192, 132, 252, 0.22);
 }
 
-.editor-pane-scroll {
+.preview-pane-layout {
   scrollbar-gutter: stable both-edges;
 }
 
@@ -468,6 +468,49 @@ body {
   width: max-content;
   max-width: 100%;
   overflow-x: auto;
+}
+
+.preview-pane-document.markdown-body ul,
+.preview-pane-document.markdown-body ol {
+  margin: 1rem 0;
+  padding-left: 1.6rem;
+}
+
+.preview-pane-document.markdown-body ul {
+  list-style: disc;
+}
+
+.preview-pane-document.markdown-body ul ul {
+  list-style: circle;
+}
+
+.preview-pane-document.markdown-body ul ul ul {
+  list-style: square;
+}
+
+.preview-pane-document.markdown-body ol {
+  list-style: decimal;
+}
+
+.preview-pane-document.markdown-body ol ol {
+  list-style: lower-alpha;
+}
+
+.preview-pane-document.markdown-body ol ol ol {
+  list-style: lower-roman;
+}
+
+.preview-pane-document.markdown-body li > ul,
+.preview-pane-document.markdown-body li > ol {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.preview-pane-document.markdown-body .contains-task-list,
+.preview-pane-document.markdown-body .contains-task-list ul,
+.preview-pane-document.markdown-body .contains-task-list ol {
+  list-style: none;
+  padding-left: 0;
 }
 
 .preview-pane-document.markdown-body ul li::marker,

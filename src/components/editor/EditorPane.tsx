@@ -3,7 +3,7 @@ import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
 import { Compartment, EditorSelection, EditorState, type Extension, type StateCommand } from '@codemirror/state';
-import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
+import { EditorView, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
@@ -23,7 +23,6 @@ const SCROLL_EMIT_THRESHOLD = 0.001;
 const SYNC_SCROLL_EASING = 0.24;
 const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
-const CURSOR_VERTICAL_OFFSET_EM = ((EDITOR_LINE_HEIGHT - 1) / 2).toFixed(3);
 
 const lightMarkdownStyle = HighlightStyle.define([
   { tag: [tags.heading, tags.strong, tags.emphasis], color: '#7c3aed' },
@@ -65,6 +64,8 @@ function createEditorTheme(
       height: '100%',
       width: '100%',
       background: 'transparent',
+      fontFamily,
+      fontSize: `${fontSize}px`,
     },
     '&.cm-focused': {
       outline: 'none',
@@ -72,8 +73,8 @@ function createEditorTheme(
     '.cm-scroller': {
       overflow: 'auto',
       lineHeight: String(EDITOR_LINE_HEIGHT),
-      fontFamily,
       width: '100%',
+      scrollbarGutter: 'stable both-edges',
     },
     '.cm-content': {
       minHeight: 'calc(100vh - 12rem)',
@@ -83,8 +84,6 @@ function createEditorTheme(
       maxWidth: '100%',
       boxSizing: 'border-box',
       padding: 'var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom) !important',
-      fontFamily,
-      fontSize: `${fontSize}px`,
       letterSpacing: '0.01em',
       tabSize: '2',
       caretColor: isDark ? '#c084fc' : '#7c3aed',
@@ -107,12 +106,18 @@ function createEditorTheme(
     '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
       background: isDark ? 'rgba(192, 132, 252, 0.22)' : 'rgba(168, 85, 247, 0.18)',
     },
-    '.cm-cursor, .cm-dropCursor': {
-      borderLeftColor: isDark ? '#c084fc' : '#7c3aed',
+    '.cm-cursor': {
+      width: '2px',
+      marginLeft: '-1px',
+      borderLeft: 'none',
+      backgroundColor: isDark ? '#c084fc' : '#7c3aed',
+      borderRadius: '999px',
+      opacity: '0.95',
     },
-    '.cm-cursorLayer .cm-cursor': {
-      height: '1em !important',
-      transform: `translateY(${CURSOR_VERTICAL_OFFSET_EM}em)`,
+    '.cm-dropCursor': {
+      borderLeftColor: isDark ? '#c084fc' : '#7c3aed',
+      borderLeftWidth: '2px',
+      marginLeft: '-1px',
     },
     '.cm-placeholder': {
       color: isDark ? 'rgba(148, 163, 184, 0.72)' : 'rgba(100, 116, 139, 0.72)',
@@ -301,6 +306,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Tab', run: insertTwoSpaces }]),
           markdown(),
+          drawSelection(),
           themeCompartment.of(createEditorTheme(settings.themeMode, settings.fontFamily, settings.fontSize)),
           wrapCompartment.of(settings.wordWrap ? EditorView.lineWrapping : []),
           syntaxCompartment.of(syntaxHighlighting(settings.themeMode === 'dark' ? darkMarkdownStyle : lightMarkdownStyle)),
@@ -344,7 +350,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     };
   }, [
     activeTabId,
-    content,
     placeholder,
     settings.fontFamily,
     settings.fontSize,
