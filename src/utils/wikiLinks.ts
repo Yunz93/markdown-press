@@ -19,7 +19,10 @@ export function parseWikiLinkReference(raw: string): {
   const [targetPart, aliasPart] = raw.split('|');
   const target = (targetPart ?? '').trim();
   const cleanedTarget = stripWikiLinkMetadata(target);
-  const fallbackLabel = stripMarkdownExtension(cleanedTarget.split('/').filter(Boolean).pop() || cleanedTarget);
+  const headingPart = target.includes('#') ? target.split('#').slice(1).join('#').trim() : '';
+  const fallbackLabel = target.startsWith('#')
+    ? headingPart
+    : stripMarkdownExtension(cleanedTarget.split('/').filter(Boolean).pop() || cleanedTarget);
 
   return {
     target,

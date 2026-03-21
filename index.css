@@ -25,6 +25,19 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+.editor-pane-layout,
+.preview-scroll-container,
+.editor-pane-layout .cm-scroller {
+  scrollbar-width: none;
+}
+
+.editor-pane-layout::-webkit-scrollbar,
+.preview-scroll-container::-webkit-scrollbar,
+.editor-pane-layout .cm-scroller::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
@@ -409,6 +422,44 @@ body {
   height: auto;
 }
 
+.preview-pane-document.markdown-body .preview-attachment-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: 1rem 0;
+  border-radius: 1rem;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.preview-pane-document.markdown-body .preview-attachment-file {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.92);
+  color: #334155;
+  cursor: default;
+  user-select: none;
+}
+
+.preview-pane-document.markdown-body .preview-attachment-file-name {
+  font-weight: 600;
+}
+
+.preview-pane-document.markdown-body .preview-attachment-file-hint {
+  font-size: 0.88em;
+  color: #64748b;
+}
+
+.preview-pane-document.markdown-body .preview-attachment-file-missing {
+  border-style: dashed;
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.92);
+}
+
 .preview-pane-document.markdown-body h1,
 .preview-pane-document.markdown-body h2,
 .preview-pane-document.markdown-body h3,
@@ -474,6 +525,29 @@ body {
   width: max-content;
   max-width: 100%;
   overflow-x: auto;
+  border-collapse: collapse;
+  color: #1f2937;
+}
+
+.preview-pane-document.markdown-body table tr {
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid rgba(148, 163, 184, 0.26);
+}
+
+.preview-pane-document.markdown-body table tr:nth-child(2n) {
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.preview-pane-document.markdown-body table th {
+  background: rgba(241, 245, 249, 0.96);
+  color: #334155;
+  font-weight: 600;
+}
+
+.preview-pane-document.markdown-body table th,
+.preview-pane-document.markdown-body table td {
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  color: inherit;
 }
 
 .preview-pane-document.markdown-body ul,
@@ -512,11 +586,52 @@ body {
   margin-bottom: 0.35rem;
 }
 
-.preview-pane-document.markdown-body .contains-task-list,
-.preview-pane-document.markdown-body .contains-task-list ul,
-.preview-pane-document.markdown-body .contains-task-list ol {
+.preview-pane-document.markdown-body .task-list-item {
+  position: relative;
   list-style: none;
-  padding-left: 0;
+  min-width: 0;
+  padding-left: 0.34rem;
+}
+
+.preview-pane-document.markdown-body .task-list-item::marker {
+  content: '';
+}
+
+.preview-pane-document.markdown-body .task-list-item + .task-list-item {
+  margin-top: 0.45rem;
+}
+
+.preview-pane-document.markdown-body .task-list-item > p {
+  margin: 0;
+}
+
+.preview-pane-document.markdown-body .task-list-item-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  top: calc((1.95em - 1em) / 2);
+  left: -1.18rem;
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  border: 1.5px solid #94a3b8;
+  border-radius: 0.28rem;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  cursor: default;
+}
+
+.preview-pane-document.markdown-body .task-list-item-checkbox:checked {
+  border-color: #2563eb;
+  background-color: #2563eb;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='white' d='M6.4 11.2 3.6 8.4l-1.1 1.1 3.9 3.9 7.1-7.1-1.1-1.1z'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 0.82em 0.82em;
+}
+
+.preview-pane-document-compact.markdown-body .task-list-item-checkbox {
+  top: calc((1.85em - 1em) / 2);
 }
 
 .preview-pane-document.markdown-body ul li::marker,
@@ -539,6 +654,25 @@ body {
 
 .dark .preview-pane-document.markdown-body a {
   color: #67e8f9;
+}
+
+.dark .preview-pane-document.markdown-body .preview-attachment-image {
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
+}
+
+.dark .preview-pane-document.markdown-body .preview-attachment-file {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.84);
+  color: #dbeafe;
+}
+
+.dark .preview-pane-document.markdown-body .preview-attachment-file-hint {
+  color: #94a3b8;
+}
+
+.dark .preview-pane-document.markdown-body .preview-attachment-file-missing {
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.24);
 }
 
 .dark .preview-pane-document.markdown-body hr {
@@ -571,6 +705,40 @@ body {
 .dark .preview-pane-document.markdown-body pre .shiki code {
   background: transparent !important;
   color: inherit;
+}
+
+.dark .preview-pane-document.markdown-body table {
+  color: #e5eef9;
+}
+
+.dark .preview-pane-document.markdown-body table tr {
+  background: rgba(15, 23, 42, 0.78);
+  border-top-color: rgba(148, 163, 184, 0.16);
+}
+
+.dark .preview-pane-document.markdown-body table tr:nth-child(2n) {
+  background: rgba(30, 41, 59, 0.82);
+}
+
+.dark .preview-pane-document.markdown-body table th {
+  background: rgba(30, 41, 59, 0.94);
+  color: #cbd5e1;
+}
+
+.dark .preview-pane-document.markdown-body table th,
+.dark .preview-pane-document.markdown-body table td {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.dark .preview-pane-document.markdown-body .task-list-item-checkbox {
+  border-color: rgba(148, 163, 184, 0.68);
+  background: rgba(15, 23, 42, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .preview-pane-document.markdown-body .task-list-item-checkbox:checked {
+  border-color: #60a5fa;
+  background-color: #60a5fa;
 }
 
 @media (max-width: 960px) {

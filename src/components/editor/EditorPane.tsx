@@ -24,6 +24,7 @@ const SCROLL_EMIT_THRESHOLD = 0.001;
 const SYNC_SCROLL_EASING = 0.24;
 const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
+const SCROLLBAR_VISIBILITY_DURATION_MS = 720;
 
 const lightMarkdownStyle = HighlightStyle.define([
   { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], color: '#4f46e5', fontWeight: '700' },
@@ -263,6 +264,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
+  const scrollbarHideTimeoutRef = useRef<number | null>(null);
 
   const themeCompartment = useRef(new Compartment()).current;
   const wrapCompartment = useRef(new Compartment()).current;
@@ -313,6 +315,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     isSyncingScroll.current = false;
   }, [activeTabId]);
 
+  const revealScrollbar = useCallback(() => {
+    setIsScrollbarVisible(true);
+    if (scrollbarHideTimeoutRef.current !== null) {
+      window.clearTimeout(scrollbarHideTimeoutRef.current);
+    }
+    scrollbarHideTimeoutRef.current = window.setTimeout(() => {
+      setIsScrollbarVisible(false);
+      scrollbarHideTimeoutRef.current = null;
+    }, SCROLLBAR_VISIBILITY_DURATION_MS);
+  }, []);
+
   const animateSyncedScroll = useCallback((scrollDom: HTMLElement, targetScrollTop: number) => {
     const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
     const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
@@ -355,6 +368,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   }, []);
 
   const [paneWidth, setPaneWidth] = useState(0);
+  const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
   const layoutStyle = useMemo(() => ({
     '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
@@ -447,10 +461,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     });
 
     const handleDomScroll = () => {
+      revealScrollbar();
       emitScrollPercentage(view.scrollDOM);
     };
     const handleUserScrollIntent = () => {
       cancelSyncedScroll();
+      revealScrollbar();
     };
 
     view.scrollDOM.addEventListener('scroll', handleDomScroll, { passive: true });
@@ -595,7 +611,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   return (
     <div
       ref={layoutRef}
-      className="editor-pane-layout h-full min-w-0 flex flex-col relative"
+      className={`editor-pane-layout h-full min-w-0 flex flex-col relative ${isScrollbarVisible ? 'scrollbar-visible' : ''}`}
       style={layoutStyle}
     >
       {isSaving && (

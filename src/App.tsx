@@ -22,7 +22,7 @@ import { TabBar } from './components/tabs/TabBar';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
-import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
+import { emitPreviewHeadingScrollCommand, requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'markdown-press.sidebar-width';
@@ -36,6 +36,7 @@ const MAX_OUTLINE_WIDTH = 360;
 const MIN_RESPONSIVE_SIDEBAR_WIDTH = 160;
 const MIN_SINGLE_VIEW_WORKSPACE_WIDTH = 760;
 const MIN_SPLIT_WORKSPACE_WIDTH = 920;
+const MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE = 720;
 const OUTLINE_PANEL_GAP = 32;
 const SHELL_EDGE_GAP = 24;
 
@@ -291,7 +292,9 @@ const App: React.FC = () => {
     }
 
     if (viewMode !== ViewMode.EDITOR) {
-      requestPreviewHeadingScroll(id, { alignTopRatio: 0.18, behavior: 'smooth' });
+      const scrollOptions = { alignTopRatio: 0.18, behavior: 'smooth' as const };
+      requestPreviewHeadingScroll(id, scrollOptions);
+      emitPreviewHeadingScrollCommand(id, scrollOptions);
     }
   }, [content, setActiveHeadingId, viewMode]);
 
@@ -334,9 +337,12 @@ const App: React.FC = () => {
     ? Math.min(sidebarWidth, maxSidebarWidthForViewport)
     : sidebarWidth;
   const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - OUTLINE_PANEL_GAP;
-  const canShowOutlinePanel = outlineHeadings.length > 0 && workspaceWidthWithOutline >= minimumWorkspaceWidth;
+  const minimumWorkspaceWidthWithOutline = viewMode === ViewMode.SPLIT
+    ? MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE
+    : minimumWorkspaceWidth;
+  const canShowOutlinePanel = outlineHeadings.length > 0 && workspaceWidthWithOutline >= minimumWorkspaceWidthWithOutline;
   const isOutlineVisible = isOutlineOpen && canShowOutlinePanel;
-  const canShowOutlineToggle = viewMode !== ViewMode.SPLIT && outlineHeadings.length > 0;
+  const canShowOutlineToggle = outlineHeadings.length > 0;
   const contentDensity = (
     viewMode === ViewMode.SPLIT ||
     mainContentWidth < 1360 ||

@@ -4,11 +4,12 @@ import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { hydrateCachedPreviewImageSources, warmPreviewImage } from '../../utils/previewImageCache';
-import { resolveWikiLinkFile } from '../../utils/wikiLinks';
+import { parseWikiLinkReference, resolveWikiLinkFile } from '../../utils/wikiLinks';
 import { useFileOperations } from '../../hooks/useFileOperations';
+import { getFileSystem } from '../../types/filesystem';
 import { getPaneLayoutMetrics } from './paneLayout';
-import { clearActivePreviewElement, flushPendingPreviewHeadingScroll, registerActivePreviewElement, scrollPreviewToHeading } from '../../utils/previewNavigationBridge';
-import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
+import { clearActivePreviewElement, flushPendingPreviewHeadingScroll, PREVIEW_HEADING_SCROLL_EVENT, registerActivePreviewElement, requestPreviewHeadingScroll, scrollPreviewToHeading, type PreviewHeadingScrollEventDetail } from '../../utils/previewNavigationBridge';
+import { createHeadingSlug, flattenHeadingNodes, parseHeadings, type HeadingNode } from '../../utils/outline';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 
 interface PreviewPaneProps {
@@ -23,6 +24,142 @@ const SCROLL_THRESHOLD = 5;
 const SCROLL_EMIT_THRESHOLD = 0.001;
 const SYNC_SCROLL_EASING = 0.24;
 const SYNC_SCROLL_STOP_PX = 0.8;
+const SCROLLBAR_VISIBILITY_DURATION_MS = 720;
+const HEADING_SCROLL_RETRY_DELAYS_MS = [48, 140];
+
+interface HeadingScrollOptions {
+  alignTopRatio?: number;
+  behavior?: ScrollBehavior;
+}
+
+interface ResolvedAttachmentTarget {
+  path: string;
+  name: string;
+}
+
+function isExternalLink(href: string): boolean {
+  return /^(https?:|mailto:|tel:)/i.test(href.trim());
+}
+
+function isImageAttachment(fileName: string): boolean {
+  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
+}
+
+function findHeadingDefinitionByReference(headings: HeadingNode[], rawReference: string): HeadingNode | null {
+  const normalizedReference = rawReference.trim().replace(/^#+/, '').trim();
+  if (!normalizedReference) return null;
+
+  const headingCandidates = Array.from(new Set([
+    normalizedReference,
+    createHeadingSlug(normalizedReference),
+  ]));
+
+  return headings.find((heading) =>
+    headingCandidates.includes(heading.id)
+    || headingCandidates.includes(createHeadingSlug(heading.text))
+    || headingCandidates.includes(heading.text.trim())
+  ) ?? null;
+}
+
+function findHeadingElementByReference(container: HTMLElement | null, rawReference: string): HTMLElement | null {
+  if (!container) return null;
+
+  const normalizedReference = rawReference.trim().replace(/^#+/, '').trim();
+  if (!normalizedReference) return null;
+
+  const headingCandidates = Array.from(new Set([
+    normalizedReference,
+    createHeadingSlug(normalizedReference),
+  ]));
+
+  return Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-heading-id]')).find((element) => {
+    const headingId = element.dataset.headingId ?? '';
+    const headingSlug = element.dataset.headingSlug ?? '';
+    const headingText = (element.dataset.headingText ?? '').trim();
+    return headingCandidates.includes(headingId)
+      || headingCandidates.includes(headingSlug)
+      || headingCandidates.includes(headingText);
+  }) ?? null;
+}
+
+function scrollContainerToHeading(container: HTMLElement, target: HTMLElement, options?: HeadingScrollOptions): void {
+  const alignTopRatio = Math.min(Math.max(options?.alignTopRatio ?? 0.18, 0, 1), 1);
+  const targetTop = container.scrollTop
+    + target.getBoundingClientRect().top
+    - container.getBoundingClientRect().top
+    - container.clientHeight * alignTopRatio;
+
+  container.scrollTo({
+    top: Math.max(0, targetTop),
+    behavior: options?.behavior ?? 'smooth',
+  });
+}
+
+function upgradeRawWikiSyntax(container: HTMLElement): void {
+  const article = container.querySelector('article.markdown-body');
+  if (!article) return;
+
+  const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      if (parent.closest('a, code, pre, script, style')) return NodeFilter.FILTER_REJECT;
+      if (!node.textContent?.includes('[[')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  const textNodes: Text[] = [];
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    textNodes.push(currentNode as Text);
+    currentNode = walker.nextNode();
+  }
+
+  const wikiSyntaxRegex = /(!)?\[\[([^\]\n]+)\]\]/g;
+
+  for (const textNode of textNodes) {
+    const source = textNode.textContent ?? '';
+    wikiSyntaxRegex.lastIndex = 0;
+
+    let match = wikiSyntaxRegex.exec(source);
+    if (!match) continue;
+
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+
+    while (match) {
+      const [fullMatch, embedFlag, rawContent] = match;
+      const matchIndex = match.index;
+      if (matchIndex > lastIndex) {
+        fragment.append(document.createTextNode(source.slice(lastIndex, matchIndex)));
+      }
+
+      const { target, displayText } = parseWikiLinkReference(rawContent);
+      const anchor = document.createElement('a');
+      anchor.className = `markdown-link ${embedFlag ? 'markdown-embed' : 'markdown-wikilink'}`;
+      anchor.setAttribute('href', '#');
+      anchor.dataset.wikilink = target;
+      anchor.textContent = displayText || target;
+
+      if (embedFlag) {
+        anchor.dataset.wikiEmbed = 'true';
+        anchor.dataset.wikiTarget = target;
+        anchor.dataset.wikiLabel = displayText || target;
+      }
+
+      fragment.append(anchor);
+      lastIndex = matchIndex + fullMatch.length;
+      match = wikiSyntaxRegex.exec(source);
+    }
+
+    if (lastIndex < source.length) {
+      fragment.append(document.createTextNode(source.slice(lastIndex)));
+    }
+
+    textNode.replaceWith(fragment);
+  }
+}
 
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
   highlighter,
@@ -36,7 +173,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const previewRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   useMarkdownRenderer(highlighter, settings.themeMode);
-  const { handleFileSelect } = useFileOperations();
+  const { handleFileSelect, handleRevealInExplorer } = useFileOperations();
 
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
@@ -44,9 +181,13 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
+  const scrollbarHideTimeoutRef = useRef<number | null>(null);
+  const headingScrollAnimationFrameRef = useRef<number | null>(null);
+  const headingScrollTimeoutRefs = useRef<number[]>([]);
   const isCompact = density === 'compact';
   const hasActiveFile = Boolean(activeTabId);
   const [paneWidth, setPaneWidth] = useState(0);
+  const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
   const layoutStyle = useMemo(() => ({
     '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
@@ -89,6 +230,29 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     }
     syncTargetScrollTopRef.current = null;
     isSyncingScroll.current = false;
+  }, []);
+
+  const clearHeadingScrollRetries = useCallback(() => {
+    if (headingScrollAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(headingScrollAnimationFrameRef.current);
+      headingScrollAnimationFrameRef.current = null;
+    }
+
+    for (const timeoutId of headingScrollTimeoutRefs.current) {
+      window.clearTimeout(timeoutId);
+    }
+    headingScrollTimeoutRefs.current = [];
+  }, []);
+
+  const revealScrollbar = useCallback(() => {
+    setIsScrollbarVisible(true);
+    if (scrollbarHideTimeoutRef.current !== null) {
+      window.clearTimeout(scrollbarHideTimeoutRef.current);
+    }
+    scrollbarHideTimeoutRef.current = window.setTimeout(() => {
+      setIsScrollbarVisible(false);
+      scrollbarHideTimeoutRef.current = null;
+    }, SCROLLBAR_VISIBILITY_DURATION_MS);
   }, []);
 
   const animateSyncedScroll = useCallback((element: HTMLElement, targetScrollTop: number) => {
@@ -138,10 +302,15 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         cancelAnimationFrame(emitAnimationFrameRef.current);
         emitAnimationFrameRef.current = null;
       }
+      if (scrollbarHideTimeoutRef.current !== null) {
+        window.clearTimeout(scrollbarHideTimeoutRef.current);
+        scrollbarHideTimeoutRef.current = null;
+      }
       pendingEmittedPercentageRef.current = null;
       cancelSyncedScroll();
+      clearHeadingScrollRetries();
     };
-  }, [cancelSyncedScroll]);
+  }, [cancelSyncedScroll, clearHeadingScrollRetries]);
 
   // Sync scroll from other side
   useEffect(() => {
@@ -166,6 +335,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
     const handleUserScrollIntent = () => {
       cancelSyncedScroll();
+      revealScrollbar();
     };
 
     element.addEventListener('wheel', handleUserScrollIntent, { passive: true });
@@ -177,12 +347,13 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       element.removeEventListener('touchstart', handleUserScrollIntent);
       element.removeEventListener('pointerdown', handleUserScrollIntent);
     };
-  }, [cancelSyncedScroll]);
+  }, [cancelSyncedScroll, revealScrollbar]);
 
   const handleScroll = useCallback(() => {
     if (!previewRef.current || !onScroll || isSyncingScroll.current) return;
 
     const el = previewRef.current;
+    revealScrollbar();
     const scrollHeight = el.scrollHeight - el.clientHeight;
 
     if (scrollHeight <= 0) return;
@@ -204,59 +375,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         onScroll(pendingPercentage);
       });
     }
-  }, [onScroll]);
-
-  const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    const wikilink = target?.closest('a[data-wikilink]') as HTMLAnchorElement | null;
-    if (wikilink) {
-      event.preventDefault();
-
-      const wikiTarget = wikilink.getAttribute('data-wikilink');
-      if (!wikiTarget) return;
-
-      const matchedFile = resolveWikiLinkFile(files, wikiTarget, rootFolderPath, currentFilePath);
-      if (!matchedFile) {
-        showNotification(`Linked file not found: ${wikiTarget}`, 'error');
-        return;
-      }
-
-      await handleFileSelect(matchedFile);
-      return;
-    }
-
-    const anchorLink = target?.closest('a[href^="#"]') as HTMLAnchorElement | null;
-    if (!anchorLink) return;
-
-    const rawHash = anchorLink.getAttribute('href');
-    if (!rawHash || rawHash === '#') return;
-
-    const normalizedHash = decodeURIComponent(rawHash.slice(1)).trim();
-    if (!normalizedHash) return;
-
-    event.preventDefault();
-
-    const headingCandidates = Array.from(new Set([
-      normalizedHash,
-      createHeadingSlug(normalizedHash),
-    ]));
-
-    const previewContainer = previewRef.current;
-    const matchedHeading = previewContainer
-      ? Array.from(previewContainer.querySelectorAll<HTMLElement>('article.markdown-body [data-heading-id]')).find((element) => {
-          const headingId = element.dataset.headingId ?? '';
-          const headingSlug = element.dataset.headingSlug ?? '';
-          const headingText = (element.dataset.headingText ?? '').trim();
-          return headingCandidates.includes(headingId)
-            || headingCandidates.includes(headingSlug)
-            || headingCandidates.includes(headingText);
-        })
-      : null;
-
-    if (!matchedHeading) return;
-
-    scrollPreviewToHeading(matchedHeading.dataset.headingId ?? matchedHeading.id, { behavior: 'smooth' });
-  }, [files, rootFolderPath, currentFilePath, handleFileSelect, showNotification]);
+  }, [onScroll, revealScrollbar]);
 
   const parsedContent = useMemo(() => {
     if (!content) return { frontmatter: null, bodyHTML: '' };
@@ -280,12 +399,340 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
   const flattenedHeadings = useMemo(() => flattenHeadingNodes(parseHeadings(content)), [content]);
 
+  const resolveAttachmentTarget = useCallback(async (rawTarget: string): Promise<ResolvedAttachmentTarget | null> => {
+    const normalizedTarget = rawTarget.trim();
+    if (!normalizedTarget) return null;
+
+    const matchedFile = resolveWikiLinkFile(files, normalizedTarget, rootFolderPath, currentFilePath);
+    if (matchedFile) {
+      return {
+        path: matchedFile.path,
+        name: matchedFile.name,
+      };
+    }
+
+    try {
+      const fs = await getFileSystem();
+      const { dirname, join, normalize } = await import('@tauri-apps/api/path');
+      const candidates = new Set<string>();
+
+      if (/^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(normalizedTarget)) {
+        candidates.add(normalizedTarget);
+      }
+
+      if (currentFilePath) {
+        candidates.add(await join(await dirname(currentFilePath), normalizedTarget));
+      }
+
+      if (rootFolderPath) {
+        candidates.add(await join(rootFolderPath, normalizedTarget));
+      }
+
+      for (const candidate of candidates) {
+        const normalizedCandidate = await normalize(candidate);
+        if (await fs.fileExists(normalizedCandidate)) {
+          const fileName = normalizedCandidate.split(/[\\/]/).pop() || normalizedTarget.split('/').pop() || normalizedTarget;
+          return {
+            path: normalizedCandidate,
+            name: fileName,
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Failed to resolve attachment target:', normalizedTarget, error);
+    }
+
+    return null;
+  }, [files, rootFolderPath, currentFilePath]);
+
+  const scrollToHeadingWithRetry = useCallback((headingId: string, options?: HeadingScrollOptions): boolean => {
+    clearHeadingScrollRetries();
+
+    const attemptScroll = (rawReference?: string) => {
+      const container = previewRef.current;
+      if (!container) return false;
+
+      const target = findHeadingElementByReference(container, headingId)
+        || (rawReference ? findHeadingElementByReference(container, rawReference) : null);
+
+      if (target) {
+        scrollContainerToHeading(container, target, options);
+        requestPreviewHeadingScroll(target.dataset.headingId ?? target.id, options);
+        return true;
+      }
+
+      if (scrollPreviewToHeading(headingId, options)) {
+        return true;
+      }
+
+      requestPreviewHeadingScroll(headingId, options);
+      return false;
+    };
+
+    if (attemptScroll(headingId)) {
+      return true;
+    }
+
+    headingScrollAnimationFrameRef.current = requestAnimationFrame(() => {
+      headingScrollAnimationFrameRef.current = null;
+      if (attemptScroll(headingId)) return;
+
+      headingScrollTimeoutRefs.current = HEADING_SCROLL_RETRY_DELAYS_MS.map((delay) => window.setTimeout(() => {
+        attemptScroll(headingId);
+      }, delay));
+    });
+
+    return false;
+  }, [clearHeadingScrollRetries]);
+
+  const navigateToWikilink = useCallback(async (wikiTarget: string): Promise<boolean> => {
+    const matchedHeading = findHeadingDefinitionByReference(flattenedHeadings, wikiTarget);
+    if (matchedHeading) {
+      scrollToHeadingWithRetry(matchedHeading.id, { behavior: 'smooth' });
+      return true;
+    }
+
+    if (wikiTarget.trim().startsWith('#')) {
+      const matchedElement = findHeadingElementByReference(previewRef.current, wikiTarget);
+      if (!matchedElement) {
+        showNotification(`Heading not found: ${wikiTarget}`, 'error');
+        return true;
+      }
+
+      scrollToHeadingWithRetry(matchedElement.dataset.headingId ?? matchedElement.id, { behavior: 'smooth' });
+      return true;
+    }
+
+    const matchedFile = resolveWikiLinkFile(files, wikiTarget, rootFolderPath, currentFilePath);
+    if (!matchedFile) {
+      showNotification(`Linked file not found: ${wikiTarget}`, 'error');
+      return true;
+    }
+
+    await handleFileSelect(matchedFile);
+    return true;
+  }, [flattenedHeadings, files, rootFolderPath, currentFilePath, handleFileSelect, scrollToHeadingWithRetry, showNotification]);
+
+  const navigateToHashLink = useCallback((normalizedHash: string): boolean => {
+    const matchedHeading = findHeadingDefinitionByReference(flattenedHeadings, normalizedHash);
+    if (matchedHeading) {
+      return scrollToHeadingWithRetry(matchedHeading.id, { behavior: 'smooth' }) || true;
+    }
+
+    if (normalizedHash.trim().startsWith('#')) {
+      const fallbackHeading = findHeadingDefinitionByReference(flattenedHeadings, normalizedHash.trim().slice(1));
+      if (fallbackHeading) {
+        return scrollToHeadingWithRetry(fallbackHeading.id, { behavior: 'smooth' }) || true;
+      }
+    }
+
+    const matchedElement = findHeadingElementByReference(previewRef.current, normalizedHash);
+    if (!matchedElement && normalizedHash.trim().startsWith('#')) {
+      const fallbackElement = findHeadingElementByReference(previewRef.current, normalizedHash.trim().slice(1));
+      if (!fallbackElement) return false;
+
+      return scrollToHeadingWithRetry(fallbackElement.dataset.headingId ?? fallbackElement.id, { behavior: 'smooth' }) || true;
+    }
+
+    if (!matchedElement) return false;
+
+    return scrollToHeadingWithRetry(matchedElement.dataset.headingId ?? matchedElement.id, { behavior: 'smooth' }) || true;
+  }, [flattenedHeadings, scrollToHeadingWithRetry]);
+
+  useLayoutEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+
+    upgradeRawWikiSyntax(container);
+  }, [parsedContent.bodyHTML]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePreviewHeadingScroll = (event: Event) => {
+      const detail = (event as CustomEvent<PreviewHeadingScrollEventDetail>).detail;
+      if (!detail?.id) return;
+      scrollToHeadingWithRetry(detail.id, detail.options);
+    };
+
+    window.addEventListener(PREVIEW_HEADING_SCROLL_EVENT, handlePreviewHeadingScroll);
+    return () => window.removeEventListener(PREVIEW_HEADING_SCROLL_EVENT, handlePreviewHeadingScroll);
+  }, [scrollToHeadingWithRetry]);
+
+  useLayoutEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+
+    const headingElements = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'));
+
+    headingElements.forEach((element, index) => {
+      const heading = flattenedHeadings[index];
+      if (!heading) {
+        element.removeAttribute('data-heading-id');
+        element.removeAttribute('data-heading-slug');
+        element.removeAttribute('data-heading-text');
+        return;
+      }
+
+      element.id = heading.id;
+      element.dataset.headingId = heading.id;
+      element.dataset.headingSlug = createHeadingSlug(heading.text);
+      element.dataset.headingText = heading.text;
+    });
+
+    flushPendingPreviewHeadingScroll();
+  }, [flattenedHeadings, parsedContent.bodyHTML]);
+
+  const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const embedLink = target?.closest('a[data-wiki-embed="true"], a.markdown-embed') as HTMLAnchorElement | null;
+    if (embedLink) {
+      event.preventDefault();
+      return;
+    }
+
+    const wikilink = target?.closest('a[data-wikilink]') as HTMLAnchorElement | null;
+    if (wikilink) {
+      event.preventDefault();
+
+      const wikiTarget = wikilink.getAttribute('data-wikilink');
+      if (!wikiTarget) return;
+      await navigateToWikilink(wikiTarget);
+      return;
+    }
+
+    const externalLink = target?.closest('a[href]') as HTMLAnchorElement | null;
+    const href = externalLink?.getAttribute('href')?.trim() ?? '';
+    if (externalLink && href && !href.startsWith('#') && isExternalLink(href)) {
+      event.preventDefault();
+
+      try {
+        const { open } = await import('@tauri-apps/plugin-shell');
+        await open(href);
+      } catch (error) {
+        console.error('Failed to open external link:', href, error);
+        showNotification('Failed to open link in browser', 'error');
+      }
+      return;
+    }
+
+    const anchorLink = target?.closest('a[href^="#"]') as HTMLAnchorElement | null;
+    if (!anchorLink) return;
+
+    const rawHash = anchorLink.getAttribute('href');
+    if (!rawHash || rawHash === '#') return;
+
+    const normalizedHash = decodeURIComponent(rawHash.slice(1)).trim();
+    if (!normalizedHash) return;
+
+    event.preventDefault();
+    navigateToHashLink(normalizedHash);
+  }, [navigateToWikilink, navigateToHashLink, showNotification]);
+
+  const handlePreviewDoubleClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const embedLink = target?.closest('a[data-wiki-embed="true"], a.markdown-embed') as HTMLAnchorElement | null;
+    const embedTarget = embedLink?.dataset.wikiTarget?.trim() || embedLink?.dataset.wikilink?.trim();
+    if (embedTarget) {
+      event.preventDefault();
+      const resolvedAttachment = await resolveAttachmentTarget(embedTarget);
+      if (!resolvedAttachment) return;
+      if (!isImageAttachment(resolvedAttachment.name)) {
+        await handleRevealInExplorer(resolvedAttachment.path);
+      }
+      return;
+    }
+
+    const wikilink = target?.closest('a[data-wikilink]') as HTMLAnchorElement | null;
+    const wikiTarget = wikilink?.getAttribute('data-wikilink');
+    if (wikiTarget) {
+      event.preventDefault();
+      await navigateToWikilink(wikiTarget);
+      return;
+    }
+
+    const anchorLink = target?.closest('a[href^="#"]') as HTMLAnchorElement | null;
+    const rawHash = anchorLink?.getAttribute('href');
+    if (rawHash && rawHash !== '#') {
+      event.preventDefault();
+      navigateToHashLink(decodeURIComponent(rawHash.slice(1)).trim());
+      return;
+    }
+
+    const attachment = target?.closest('[data-attachment-path]') as HTMLElement | null;
+    const attachmentPath = attachment?.dataset.attachmentPath;
+    if (!attachmentPath) return;
+
+    event.preventDefault();
+    await handleRevealInExplorer(attachmentPath);
+  }, [handleRevealInExplorer, navigateToHashLink, navigateToWikilink, resolveAttachmentTarget]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       renderMermaidDiagrams(previewRef.current);
     }, 50);
     return () => window.clearTimeout(timer);
   }, [parsedContent.bodyHTML, settings.themeMode]);
+
+  useEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+
+    let cancelled = false;
+    const embeds = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-wiki-embed="true"], article.markdown-body a.markdown-embed'));
+
+    const enhanceEmbeds = async () => {
+      for (const embed of embeds) {
+        if (cancelled || !embed.isConnected) return;
+
+        const target = embed.dataset.wikiTarget?.trim() || embed.dataset.wikilink?.trim();
+        const label = embed.dataset.wikiLabel?.trim() || embed.textContent?.trim() || '';
+        if (!target) continue;
+
+        const file = await resolveAttachmentTarget(target);
+        if (!file) {
+          embed.className = 'preview-attachment-file preview-attachment-file-missing';
+          embed.textContent = `Missing attachment: ${label || target}`;
+          continue;
+        }
+
+        if (isImageAttachment(file.name)) {
+          const image = document.createElement('img');
+          image.className = 'preview-attachment-image';
+          image.alt = label || file.name;
+          image.setAttribute('data-original-src', file.path);
+          image.setAttribute('src', file.path);
+
+          embed.replaceWith(image);
+
+          try {
+            const warmedSrc = await warmPreviewImage(file.path, currentFilePath || undefined);
+            if (!cancelled && image.isConnected) {
+              image.src = warmedSrc;
+            }
+          } catch {
+            // Fall back to the raw file path if warming fails.
+          }
+          continue;
+        }
+
+        const attachment = document.createElement('a');
+        attachment.className = 'preview-attachment-file';
+        attachment.setAttribute('href', '#');
+        attachment.dataset.attachmentPath = file.path;
+        attachment.dataset.attachmentName = file.name;
+        attachment.title = `Double-click to reveal ${file.name}`;
+        attachment.innerHTML = `<span class="preview-attachment-file-name">${label || file.name}</span><span class="preview-attachment-file-hint">Double-click to reveal in Finder</span>`;
+        embed.replaceWith(attachment);
+      }
+    };
+
+    void enhanceEmbeds();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parsedContent.bodyHTML, currentFilePath, resolveAttachmentTarget]);
 
   useEffect(() => {
     const container = previewRef.current;
@@ -325,30 +772,6 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     return () => clearActivePreviewElement(container);
   }, [activeTabId]);
 
-  useLayoutEffect(() => {
-    const container = previewRef.current;
-    if (!container) return;
-
-    const headingElements = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'));
-
-    headingElements.forEach((element, index) => {
-      const heading = flattenedHeadings[index];
-      if (!heading) {
-        element.removeAttribute('data-heading-id');
-        element.removeAttribute('data-heading-slug');
-        element.removeAttribute('data-heading-text');
-        return;
-      }
-
-      element.id = heading.id;
-      element.dataset.headingId = heading.id;
-      element.dataset.headingSlug = createHeadingSlug(heading.text);
-      element.dataset.headingText = heading.text;
-    });
-
-    flushPendingPreviewHeadingScroll();
-  }, [flattenedHeadings, parsedContent.bodyHTML]);
-
   return (
     <div
       ref={(node) => {
@@ -357,7 +780,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       }}
       onScroll={handleScroll}
       onClick={handlePreviewClick}
-      className={`editor-pane-layout h-full min-w-0 overflow-y-auto transition-colors ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
+      onDoubleClick={handlePreviewDoubleClick}
+      className={`editor-pane-layout preview-scroll-container h-full min-w-0 overflow-y-auto transition-colors ${isScrollbarVisible ? 'scrollbar-visible' : ''} ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
       style={{ pointerEvents: 'auto', ...layoutStyle }}
     >
       <div className={`editor-pane-backdrop min-h-full ${hasActiveFile ? '' : 'h-full'}`}>

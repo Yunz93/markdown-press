@@ -1,9 +1,16 @@
 let activePreviewElement: HTMLElement | null = null;
 let pendingPreviewScrollRequest: { id: string; options?: PreviewScrollOptions } | null = null;
 
-interface PreviewScrollOptions {
+export const PREVIEW_HEADING_SCROLL_EVENT = 'markdown-press:preview-heading-scroll';
+
+export interface PreviewScrollOptions {
   alignTopRatio?: number;
   behavior?: ScrollBehavior;
+}
+
+export interface PreviewHeadingScrollEventDetail {
+  id: string;
+  options?: PreviewScrollOptions;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -68,4 +75,12 @@ export function flushPendingPreviewHeadingScroll(): boolean {
 
   const { id, options } = pendingPreviewScrollRequest;
   return scrollPreviewToHeading(id, options);
+}
+
+export function emitPreviewHeadingScrollCommand(id: string, options?: PreviewScrollOptions): void {
+  if (typeof window === 'undefined') return;
+
+  window.dispatchEvent(new CustomEvent<PreviewHeadingScrollEventDetail>(PREVIEW_HEADING_SCROLL_EVENT, {
+    detail: { id, options },
+  }));
 }

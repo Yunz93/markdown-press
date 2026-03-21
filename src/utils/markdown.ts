@@ -20,28 +20,36 @@ const createMarkdownIt = () => {
     breaks: true,
   }).use(taskLists);
 
-  md.inline.ruler.before('link', 'wikilink', (state, silent) => {
+  const parseWikiSyntax = (state: MarkdownIt.StateInline, silent: boolean, embed: boolean) => {
     const start = state.pos;
     const source = state.src;
+    const linkStart = embed ? start + 1 : start;
 
-    if (source[start] !== '[' || source[start + 1] !== '[') {
+    if (embed) {
+      if (source[start] !== '!' || source[start + 1] !== '[' || source[start + 2] !== '[') {
+        return false;
+      }
+    } else if (source[linkStart] !== '[' || source[linkStart + 1] !== '[') {
       return false;
     }
 
-    const end = source.indexOf(']]', start + 2);
+    const end = source.indexOf(']]', linkStart + 2);
     if (end === -1) return false;
 
-    const rawContent = source.slice(start + 2, end).trim();
+    const rawContent = source.slice(linkStart + 2, end).trim();
     if (!rawContent || rawContent.includes('\n')) return false;
 
     if (!silent) {
-      const token = state.push('wikilink', '', 0);
+      const token = state.push(embed ? 'wikiembed' : 'wikilink', '', 0);
       token.content = rawContent;
     }
 
     state.pos = end + 2;
     return true;
-  });
+  };
+
+  md.inline.ruler.before('image', 'wikiembed', (state, silent) => parseWikiSyntax(state, silent, true));
+  md.inline.ruler.before('link', 'wikilink', (state, silent) => parseWikiSyntax(state, silent, false));
 
   md.renderer.rules.wikilink = (tokens, idx) => {
     const rawContent = tokens[idx].content;
@@ -49,6 +57,14 @@ const createMarkdownIt = () => {
     const escapedTarget = md.utils.escapeHtml(target);
     const escapedLabel = md.utils.escapeHtml(displayText || target);
     return `<a class="markdown-link markdown-wikilink" href="#" data-wikilink="${escapedTarget}">${escapedLabel}</a>`;
+  };
+
+  md.renderer.rules.wikiembed = (tokens, idx) => {
+    const rawContent = tokens[idx].content;
+    const { target, displayText } = parseWikiLinkReference(rawContent);
+    const escapedTarget = md.utils.escapeHtml(target);
+    const escapedLabel = md.utils.escapeHtml(displayText || target);
+    return `<a class="markdown-link markdown-embed" href="#" data-wikilink="${escapedTarget}" data-wiki-embed="true" data-wiki-target="${escapedTarget}" data-wiki-label="${escapedLabel}">${escapedLabel}</a>`;
   };
 
   // Initialize extensions
@@ -134,7 +150,7 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   // Sanitize HTML to prevent XSS attacks
   return DOMPurify.sanitize(renderedHtml, {
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
-    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'data-wikilink'], // iframe attributes
+    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'data-wikilink', 'data-wiki-embed', 'data-wiki-target', 'data-wiki-label'], // iframe attributes
   });
 }
 

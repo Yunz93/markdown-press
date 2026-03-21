@@ -2,12 +2,6 @@ import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
 
-function getSystemThemeMode() {
-  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
-}
-
 function normalizeThemeMode(themeMode: unknown): AppSettings['themeMode'] {
   return themeMode === 'dark' ? 'dark' : 'light';
 }
@@ -60,7 +54,7 @@ export const defaultSettings: AppSettings = {
   shortcuts: { save: 'Ctrl+S', toggleView: 'Ctrl+E', aiAnalyze: 'Ctrl+J', search: 'Ctrl+F', settings: 'Ctrl+0' },
   knowledgeBases: [],
   lastKnowledgeBasePath: '',
-  themeMode: getSystemThemeMode(),
+  themeMode: 'dark',
   metadataFields: [
     { key: 'category', defaultValue: '' },
     { key: 'tags', defaultValue: '[]' },
