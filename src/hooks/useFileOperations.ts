@@ -169,6 +169,29 @@ export function useFileOperations() {
     }
   }, [files, openTabs, deleteFile, closeTab, showNotification]);
 
+  const handleEmptyTrash = useCallback(async (trashItems: FileNode[]) => {
+    if (trashItems.length === 0) {
+      showNotification('Trash is already empty.', 'info');
+      return;
+    }
+
+    try {
+      const affectedTabIds = new Set<string>();
+      trashItems.forEach((item) => {
+        collectAffectedOpenTabIds(files, openTabs, item).forEach((tabId) => affectedTabIds.add(tabId));
+      });
+
+      for (const item of trashItems) {
+        await deleteFile(item);
+      }
+
+      affectedTabIds.forEach((tabId) => closeTab(tabId));
+      showNotification('Trash emptied.', 'success');
+    } catch {
+      showNotification('Failed to empty trash.', 'error');
+    }
+  }, [files, openTabs, deleteFile, closeTab, showNotification]);
+
   const remapPathReferencesAfterMove = useCallback((pathMap: Record<string, string>) => {
     useAppStore.setState((state) => {
       const remapPath = (path: string): string => pathMap[path] ?? path;
@@ -310,6 +333,7 @@ export function useFileOperations() {
     handleMoveToTrash,
     handleRestoreFromTrash,
     handleDeleteForever,
+    handleEmptyTrash,
     handleDelete,
     handleMoveNode,
     handleMoveToRoot,

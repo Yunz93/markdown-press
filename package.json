@@ -9,7 +9,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:release": "node scripts/release-smoke-check.mjs --app"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

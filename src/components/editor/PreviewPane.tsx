@@ -4,11 +4,11 @@ import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { hydrateCachedPreviewImageSources, warmPreviewImage } from '../../utils/previewImageCache';
-import { parseWikiLinkReference, resolveWikiLinkFile } from '../../utils/wikiLinks';
+import { resolveWikiLinkFile } from '../../utils/wikiLinks';
 import { useFileOperations } from '../../hooks/useFileOperations';
-import { getFileSystem } from '../../types/filesystem';
+import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { getPaneLayoutMetrics } from './paneLayout';
-import { clearActivePreviewElement, flushPendingPreviewHeadingScroll, PREVIEW_HEADING_SCROLL_EVENT, registerActivePreviewElement, requestPreviewHeadingScroll, scrollPreviewToHeading, type PreviewHeadingScrollEventDetail } from '../../utils/previewNavigationBridge';
+import { flushPendingPreviewHeadingScroll, registerPreviewPane, unregisterPreviewPane } from '../../utils/previewNavigationBridge';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings, type HeadingNode } from '../../utils/outline';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 
@@ -24,17 +24,11 @@ const SCROLL_THRESHOLD = 5;
 const SCROLL_EMIT_THRESHOLD = 0.001;
 const SYNC_SCROLL_EASING = 0.24;
 const SYNC_SCROLL_STOP_PX = 0.8;
-const SCROLLBAR_VISIBILITY_DURATION_MS = 720;
 const HEADING_SCROLL_RETRY_DELAYS_MS = [48, 140];
 
 interface HeadingScrollOptions {
   alignTopRatio?: number;
   behavior?: ScrollBehavior;
-}
-
-interface ResolvedAttachmentTarget {
-  path: string;
-  name: string;
 }
 
 function isExternalLink(href: string): boolean {
@@ -95,72 +89,6 @@ function scrollContainerToHeading(container: HTMLElement, target: HTMLElement, o
   });
 }
 
-function upgradeRawWikiSyntax(container: HTMLElement): void {
-  const article = container.querySelector('article.markdown-body');
-  if (!article) return;
-
-  const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-      if (parent.closest('a, code, pre, script, style')) return NodeFilter.FILTER_REJECT;
-      if (!node.textContent?.includes('[[')) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  const textNodes: Text[] = [];
-  let currentNode = walker.nextNode();
-  while (currentNode) {
-    textNodes.push(currentNode as Text);
-    currentNode = walker.nextNode();
-  }
-
-  const wikiSyntaxRegex = /(!)?\[\[([^\]\n]+)\]\]/g;
-
-  for (const textNode of textNodes) {
-    const source = textNode.textContent ?? '';
-    wikiSyntaxRegex.lastIndex = 0;
-
-    let match = wikiSyntaxRegex.exec(source);
-    if (!match) continue;
-
-    const fragment = document.createDocumentFragment();
-    let lastIndex = 0;
-
-    while (match) {
-      const [fullMatch, embedFlag, rawContent] = match;
-      const matchIndex = match.index;
-      if (matchIndex > lastIndex) {
-        fragment.append(document.createTextNode(source.slice(lastIndex, matchIndex)));
-      }
-
-      const { target, displayText } = parseWikiLinkReference(rawContent);
-      const anchor = document.createElement('a');
-      anchor.className = `markdown-link ${embedFlag ? 'markdown-embed' : 'markdown-wikilink'}`;
-      anchor.setAttribute('href', '#');
-      anchor.dataset.wikilink = target;
-      anchor.textContent = displayText || target;
-
-      if (embedFlag) {
-        anchor.dataset.wikiEmbed = 'true';
-        anchor.dataset.wikiTarget = target;
-        anchor.dataset.wikiLabel = displayText || target;
-      }
-
-      fragment.append(anchor);
-      lastIndex = matchIndex + fullMatch.length;
-      match = wikiSyntaxRegex.exec(source);
-    }
-
-    if (lastIndex < source.length) {
-      fragment.append(document.createTextNode(source.slice(lastIndex)));
-    }
-
-    textNode.replaceWith(fragment);
-  }
-}
-
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
   highlighter,
   onScroll,
@@ -181,13 +109,11 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
-  const scrollbarHideTimeoutRef = useRef<number | null>(null);
   const headingScrollAnimationFrameRef = useRef<number | null>(null);
   const headingScrollTimeoutRefs = useRef<number[]>([]);
   const isCompact = density === 'compact';
   const hasActiveFile = Boolean(activeTabId);
   const [paneWidth, setPaneWidth] = useState(0);
-  const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
   const layoutStyle = useMemo(() => ({
     '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
@@ -244,17 +170,6 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     headingScrollTimeoutRefs.current = [];
   }, []);
 
-  const revealScrollbar = useCallback(() => {
-    setIsScrollbarVisible(true);
-    if (scrollbarHideTimeoutRef.current !== null) {
-      window.clearTimeout(scrollbarHideTimeoutRef.current);
-    }
-    scrollbarHideTimeoutRef.current = window.setTimeout(() => {
-      setIsScrollbarVisible(false);
-      scrollbarHideTimeoutRef.current = null;
-    }, SCROLLBAR_VISIBILITY_DURATION_MS);
-  }, []);
-
   const animateSyncedScroll = useCallback((element: HTMLElement, targetScrollTop: number) => {
     const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
     const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
@@ -302,10 +217,6 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         cancelAnimationFrame(emitAnimationFrameRef.current);
         emitAnimationFrameRef.current = null;
       }
-      if (scrollbarHideTimeoutRef.current !== null) {
-        window.clearTimeout(scrollbarHideTimeoutRef.current);
-        scrollbarHideTimeoutRef.current = null;
-      }
       pendingEmittedPercentageRef.current = null;
       cancelSyncedScroll();
       clearHeadingScrollRetries();
@@ -335,7 +246,6 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
     const handleUserScrollIntent = () => {
       cancelSyncedScroll();
-      revealScrollbar();
     };
 
     element.addEventListener('wheel', handleUserScrollIntent, { passive: true });
@@ -347,13 +257,12 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       element.removeEventListener('touchstart', handleUserScrollIntent);
       element.removeEventListener('pointerdown', handleUserScrollIntent);
     };
-  }, [cancelSyncedScroll, revealScrollbar]);
+  }, [cancelSyncedScroll]);
 
   const handleScroll = useCallback(() => {
     if (!previewRef.current || !onScroll || isSyncingScroll.current) return;
 
     const el = previewRef.current;
-    revealScrollbar();
     const scrollHeight = el.scrollHeight - el.clientHeight;
 
     if (scrollHeight <= 0) return;
@@ -375,7 +284,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         onScroll(pendingPercentage);
       });
     }
-  }, [onScroll, revealScrollbar]);
+  }, [onScroll]);
 
   const parsedContent = useMemo(() => {
     if (!content) return { frontmatter: null, bodyHTML: '' };
@@ -398,52 +307,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   }, [content, currentFilePath, highlighter, settings.themeMode]);
 
   const flattenedHeadings = useMemo(() => flattenHeadingNodes(parseHeadings(content)), [content]);
-
-  const resolveAttachmentTarget = useCallback(async (rawTarget: string): Promise<ResolvedAttachmentTarget | null> => {
-    const normalizedTarget = rawTarget.trim();
-    if (!normalizedTarget) return null;
-
-    const matchedFile = resolveWikiLinkFile(files, normalizedTarget, rootFolderPath, currentFilePath);
-    if (matchedFile) {
-      return {
-        path: matchedFile.path,
-        name: matchedFile.name,
-      };
-    }
-
-    try {
-      const fs = await getFileSystem();
-      const { dirname, join, normalize } = await import('@tauri-apps/api/path');
-      const candidates = new Set<string>();
-
-      if (/^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(normalizedTarget)) {
-        candidates.add(normalizedTarget);
-      }
-
-      if (currentFilePath) {
-        candidates.add(await join(await dirname(currentFilePath), normalizedTarget));
-      }
-
-      if (rootFolderPath) {
-        candidates.add(await join(rootFolderPath, normalizedTarget));
-      }
-
-      for (const candidate of candidates) {
-        const normalizedCandidate = await normalize(candidate);
-        if (await fs.fileExists(normalizedCandidate)) {
-          const fileName = normalizedCandidate.split(/[\\/]/).pop() || normalizedTarget.split('/').pop() || normalizedTarget;
-          return {
-            path: normalizedCandidate,
-            name: fileName,
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Failed to resolve attachment target:', normalizedTarget, error);
-    }
-
-    return null;
-  }, [files, rootFolderPath, currentFilePath]);
+  const attachmentResolverContext = useMemo(
+    () => createAttachmentResolverContext(files, rootFolderPath, currentFilePath),
+    [files, rootFolderPath, currentFilePath]
+  );
 
   const scrollToHeadingWithRetry = useCallback((headingId: string, options?: HeadingScrollOptions): boolean => {
     clearHeadingScrollRetries();
@@ -457,15 +324,9 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
       if (target) {
         scrollContainerToHeading(container, target, options);
-        requestPreviewHeadingScroll(target.dataset.headingId ?? target.id, options);
         return true;
       }
 
-      if (scrollPreviewToHeading(headingId, options)) {
-        return true;
-      }
-
-      requestPreviewHeadingScroll(headingId, options);
       return false;
     };
 
@@ -543,26 +404,6 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     const container = previewRef.current;
     if (!container) return;
 
-    upgradeRawWikiSyntax(container);
-  }, [parsedContent.bodyHTML]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handlePreviewHeadingScroll = (event: Event) => {
-      const detail = (event as CustomEvent<PreviewHeadingScrollEventDetail>).detail;
-      if (!detail?.id) return;
-      scrollToHeadingWithRetry(detail.id, detail.options);
-    };
-
-    window.addEventListener(PREVIEW_HEADING_SCROLL_EVENT, handlePreviewHeadingScroll);
-    return () => window.removeEventListener(PREVIEW_HEADING_SCROLL_EVENT, handlePreviewHeadingScroll);
-  }, [scrollToHeadingWithRetry]);
-
-  useLayoutEffect(() => {
-    const container = previewRef.current;
-    if (!container) return;
-
     const headingElements = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'));
 
     headingElements.forEach((element, index) => {
@@ -580,8 +421,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       element.dataset.headingText = heading.text;
     });
 
-    flushPendingPreviewHeadingScroll();
-  }, [flattenedHeadings, parsedContent.bodyHTML]);
+    flushPendingPreviewHeadingScroll(activeTabId);
+  }, [activeTabId, flattenedHeadings, parsedContent.bodyHTML]);
 
   const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -635,7 +476,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     const embedTarget = embedLink?.dataset.wikiTarget?.trim() || embedLink?.dataset.wikilink?.trim();
     if (embedTarget) {
       event.preventDefault();
-      const resolvedAttachment = await resolveAttachmentTarget(embedTarget);
+      const resolvedAttachment = await resolveAttachmentTarget(attachmentResolverContext, embedTarget);
       if (!resolvedAttachment) return;
       if (!isImageAttachment(resolvedAttachment.name)) {
         await handleRevealInExplorer(resolvedAttachment.path);
@@ -665,7 +506,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
     event.preventDefault();
     await handleRevealInExplorer(attachmentPath);
-  }, [handleRevealInExplorer, navigateToHashLink, navigateToWikilink, resolveAttachmentTarget]);
+  }, [attachmentResolverContext, handleRevealInExplorer, navigateToHashLink, navigateToWikilink]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -689,7 +530,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         const label = embed.dataset.wikiLabel?.trim() || embed.textContent?.trim() || '';
         if (!target) continue;
 
-        const file = await resolveAttachmentTarget(target);
+        const file = await resolveAttachmentTarget(attachmentResolverContext, target);
         if (!file) {
           embed.className = 'preview-attachment-file preview-attachment-file-missing';
           embed.textContent = `Missing attachment: ${label || target}`;
@@ -732,7 +573,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [parsedContent.bodyHTML, currentFilePath, resolveAttachmentTarget]);
+  }, [attachmentResolverContext, currentFilePath, parsedContent.bodyHTML]);
 
   useEffect(() => {
     const container = previewRef.current;
@@ -765,11 +606,11 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
   useLayoutEffect(() => {
     const container = previewRef.current;
-    if (!container) return;
+    if (!container || !activeTabId) return;
 
-    registerActivePreviewElement(container);
-    flushPendingPreviewHeadingScroll();
-    return () => clearActivePreviewElement(container);
+    registerPreviewPane(activeTabId, container);
+    flushPendingPreviewHeadingScroll(activeTabId);
+    return () => unregisterPreviewPane(activeTabId, container);
   }, [activeTabId]);
 
   return (
@@ -781,7 +622,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       onScroll={handleScroll}
       onClick={handlePreviewClick}
       onDoubleClick={handlePreviewDoubleClick}
-      className={`editor-pane-layout preview-scroll-container h-full min-w-0 overflow-y-auto transition-colors ${isScrollbarVisible ? 'scrollbar-visible' : ''} ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
+      className={`editor-pane-layout preview-scroll-container h-full min-w-0 overflow-y-auto transition-colors ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
       style={{ pointerEvents: 'auto', ...layoutStyle }}
     >
       <div className={`editor-pane-backdrop min-h-full ${hasActiveFile ? '' : 'h-full'}`}>

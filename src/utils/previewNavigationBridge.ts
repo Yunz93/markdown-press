@@ -1,16 +1,22 @@
-let activePreviewElement: HTMLElement | null = null;
-let pendingPreviewScrollRequest: { id: string; options?: PreviewScrollOptions } | null = null;
+interface RegisteredPreviewPane {
+  element: HTMLElement;
+}
 
-export const PREVIEW_HEADING_SCROLL_EVENT = 'markdown-press:preview-heading-scroll';
+interface PendingPreviewScrollRequest {
+  id: string;
+  options?: PreviewScrollOptions;
+}
+
+const previewPanes = new Map<string, RegisteredPreviewPane>();
+const pendingPreviewScrollRequests = new Map<string, PendingPreviewScrollRequest>();
 
 export interface PreviewScrollOptions {
   alignTopRatio?: number;
   behavior?: ScrollBehavior;
 }
 
-export interface PreviewHeadingScrollEventDetail {
-  id: string;
-  options?: PreviewScrollOptions;
+function getPreviewPaneKey(tabId: string | null | undefined): string {
+  return tabId ?? '__no-active-tab__';
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -28,7 +34,6 @@ function findPreviewHeading(container: HTMLElement, id: string): HTMLElement | n
 
 function performScroll(container: HTMLElement, id: string, options?: PreviewScrollOptions): boolean {
   const target = findPreviewHeading(container, id);
-
   if (!target) return false;
 
   const alignTopRatio = clamp(options?.alignTopRatio ?? 0.18, 0, 1);
@@ -45,42 +50,48 @@ function performScroll(container: HTMLElement, id: string, options?: PreviewScro
   return true;
 }
 
-export function registerActivePreviewElement(element: HTMLElement | null): void {
-  activePreviewElement = element;
+export function registerPreviewPane(tabId: string | null | undefined, element: HTMLElement): void {
+  previewPanes.set(getPreviewPaneKey(tabId), { element });
 }
 
-export function clearActivePreviewElement(element: HTMLElement): void {
-  if (activePreviewElement === element) {
-    activePreviewElement = null;
+export function unregisterPreviewPane(tabId: string | null | undefined, element: HTMLElement): void {
+  const key = getPreviewPaneKey(tabId);
+  const registeredPane = previewPanes.get(key);
+  if (registeredPane?.element === element) {
+    previewPanes.delete(key);
   }
 }
 
-export function scrollPreviewToHeading(id: string, options?: PreviewScrollOptions): boolean {
-  if (!activePreviewElement) return false;
+export function scrollPreviewToHeading(
+  tabId: string | null | undefined,
+  id: string,
+  options?: PreviewScrollOptions
+): boolean {
+  const key = getPreviewPaneKey(tabId);
+  const registeredPane = previewPanes.get(key);
+  if (!registeredPane) return false;
 
-  const didScroll = performScroll(activePreviewElement, id, options);
+  const didScroll = performScroll(registeredPane.element, id, options);
   if (didScroll) {
-    pendingPreviewScrollRequest = null;
+    pendingPreviewScrollRequests.delete(key);
   }
   return didScroll;
 }
 
-export function requestPreviewHeadingScroll(id: string, options?: PreviewScrollOptions): boolean {
-  pendingPreviewScrollRequest = { id, options };
-  return scrollPreviewToHeading(id, options);
+export function requestPreviewHeadingScroll(
+  tabId: string | null | undefined,
+  id: string,
+  options?: PreviewScrollOptions
+): boolean {
+  const key = getPreviewPaneKey(tabId);
+  pendingPreviewScrollRequests.set(key, { id, options });
+  return scrollPreviewToHeading(tabId, id, options);
 }
 
-export function flushPendingPreviewHeadingScroll(): boolean {
-  if (!pendingPreviewScrollRequest) return false;
+export function flushPendingPreviewHeadingScroll(tabId: string | null | undefined): boolean {
+  const key = getPreviewPaneKey(tabId);
+  const pendingRequest = pendingPreviewScrollRequests.get(key);
+  if (!pendingRequest) return false;
 
-  const { id, options } = pendingPreviewScrollRequest;
-  return scrollPreviewToHeading(id, options);
-}
-
-export function emitPreviewHeadingScrollCommand(id: string, options?: PreviewScrollOptions): void {
-  if (typeof window === 'undefined') return;
-
-  window.dispatchEvent(new CustomEvent<PreviewHeadingScrollEventDetail>(PREVIEW_HEADING_SCROLL_EVENT, {
-    detail: { id, options },
-  }));
+  return scrollPreviewToHeading(tabId, pendingRequest.id, pendingRequest.options);
 }

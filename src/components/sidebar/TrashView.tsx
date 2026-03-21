@@ -5,6 +5,7 @@ interface TrashViewProps {
   trashItems: FileNode[];
   onRestore: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
+  onEmptyTrash: () => void;
   onContextMenu?: (e: React.MouseEvent, node: FileNode) => void;
 }
 
@@ -12,6 +13,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
   trashItems,
   onRestore,
   onDeleteForever,
+  onEmptyTrash,
   onContextMenu
 }) => {
   if (trashItems.length === 0) {
@@ -24,6 +26,15 @@ export const TrashView: React.FC<TrashViewProps> = ({
 
   return (
     <div className="mt-2 max-h-32 overflow-y-auto bg-black/5 dark:bg-white/5 rounded-lg p-1">
+      <div className="mb-1 flex items-center justify-end px-1">
+        <button
+          onClick={onEmptyTrash}
+          className="rounded-md px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+          title="Empty Trash"
+        >
+          Empty Trash
+        </button>
+      </div>
       {trashItems.map(node => (
         <div
           key={node.id}

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
-import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type Extension, type StateCommand } from '@codemirror/state';
+import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateCommand } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
@@ -24,36 +24,20 @@ const SCROLL_EMIT_THRESHOLD = 0.001;
 const SYNC_SCROLL_EASING = 0.24;
 const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
-const SCROLLBAR_VISIBILITY_DURATION_MS = 720;
 
-const lightMarkdownStyle = HighlightStyle.define([
-  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], color: '#4f46e5', fontWeight: '700' },
-  { tag: tags.strong, color: '#c2410c', fontWeight: '700' },
-  { tag: tags.emphasis, color: '#0f766e', fontStyle: 'italic' },
-  { tag: [tags.link, tags.url], color: '#0369a1' },
-  { tag: [tags.quote, tags.list], color: '#64748b' },
-  { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], color: '#94a3b8' },
-  { tag: [tags.monospace, tags.literal, tags.string], color: '#0f766e' },
-  { tag: [tags.keyword, tags.operatorKeyword], color: '#c2410c' },
-  { tag: [tags.bool, tags.atom], color: '#b45309' },
-  { tag: tags.number, color: '#0f766e' },
-  { tag: [tags.propertyName, tags.attributeName, tags.labelName], color: '#2563eb' },
-  { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
-]);
-
-const darkMarkdownStyle = HighlightStyle.define([
-  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], color: '#a5b4fc', fontWeight: '700' },
-  { tag: tags.strong, color: '#fdba74', fontWeight: '700' },
-  { tag: tags.emphasis, color: '#5eead4', fontStyle: 'italic' },
-  { tag: [tags.link, tags.url], color: '#7dd3fc' },
-  { tag: [tags.quote, tags.list], color: '#94a3b8' },
-  { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], color: '#64748b' },
-  { tag: [tags.monospace, tags.literal, tags.string], color: '#86efac' },
-  { tag: [tags.keyword, tags.operatorKeyword], color: '#fdba74' },
-  { tag: [tags.bool, tags.atom], color: '#fbbf24' },
-  { tag: tags.number, color: '#5eead4' },
-  { tag: [tags.propertyName, tags.attributeName, tags.labelName], color: '#93c5fd' },
-  { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
+const markdownHighlightStyle = HighlightStyle.define([
+  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], class: 'tok-heading mp-tok-heading' },
+  { tag: tags.strong, class: 'tok-strong mp-tok-strong' },
+  { tag: tags.emphasis, class: 'tok-emphasis mp-tok-emphasis' },
+  { tag: [tags.link, tags.url], class: 'tok-link mp-tok-link' },
+  { tag: [tags.quote, tags.list], class: 'mp-tok-muted' },
+  { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], class: 'tok-punctuation tok-meta mp-tok-muted-soft' },
+  { tag: [tags.monospace, tags.literal, tags.string], class: 'tok-string mp-tok-code' },
+  { tag: [tags.keyword, tags.operatorKeyword], class: 'tok-keyword mp-tok-keyword' },
+  { tag: [tags.bool, tags.atom], class: 'tok-bool tok-atom mp-tok-atom' },
+  { tag: tags.number, class: 'tok-number mp-tok-number' },
+  { tag: [tags.propertyName, tags.attributeName, tags.labelName], class: 'tok-propertyName tok-labelName mp-tok-property' },
+  { tag: tags.comment, class: 'tok-comment mp-tok-comment' },
 ]);
 
 function buildFrontmatterDecorations(view: EditorView): DecorationSet {
@@ -153,93 +137,6 @@ const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
   return true;
 };
 
-function createEditorTheme(
-  themeMode: 'light' | 'dark',
-  fontFamily: string,
-  fontSize: number
-): Extension {
-  const isDark = themeMode === 'dark';
-
-  return EditorView.theme({
-    '&': {
-      height: '100%',
-      width: '100%',
-      background: 'transparent',
-      fontFamily,
-      fontSize: `${fontSize}px`,
-    },
-    '&.cm-focused': {
-      outline: 'none',
-    },
-    '.cm-scroller': {
-      overflow: 'auto',
-      lineHeight: String(EDITOR_LINE_HEIGHT),
-      width: '100%',
-      scrollbarGutter: 'stable both-edges',
-    },
-    '.cm-content': {
-      minHeight: 'calc(100vh - 12rem)',
-      flexBasis: '100%',
-      width: '100%',
-      minWidth: '100%',
-      maxWidth: '100%',
-      boxSizing: 'border-box',
-      padding: 'var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom) !important',
-      letterSpacing: '0.01em',
-      tabSize: '2',
-      caretColor: isDark ? '#c084fc' : '#7c3aed',
-    },
-    '.cm-line': {
-      padding: '0 !important',
-    },
-    '.cm-content, .cm-line': {
-      color: isDark ? '#e5eef9' : '#1f2937',
-    },
-    '.cm-gutters': {
-      display: 'none',
-    },
-    '.cm-activeLine': {
-      background: 'transparent',
-    },
-    '.cm-selectionBackground': {
-      background: isDark ? 'rgba(192, 132, 252, 0.22)' : 'rgba(168, 85, 247, 0.18)',
-    },
-    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
-      background: isDark ? 'rgba(192, 132, 252, 0.22)' : 'rgba(168, 85, 247, 0.18)',
-    },
-    '.cm-cursor': {
-      width: '2px',
-      marginLeft: '-1px',
-      borderLeft: 'none',
-      backgroundColor: isDark ? '#c084fc' : '#7c3aed',
-      borderRadius: '999px',
-      opacity: '0.95',
-    },
-    '.cm-dropCursor': {
-      borderLeftColor: isDark ? '#c084fc' : '#7c3aed',
-      borderLeftWidth: '2px',
-      marginLeft: '-1px',
-    },
-    '.cm-placeholder': {
-      color: isDark ? 'rgba(148, 163, 184, 0.72)' : 'rgba(100, 116, 139, 0.72)',
-    },
-    '.cm-frontmatter-line, .cm-frontmatter-line span': {
-      color: `${isDark ? '#cbd5e1' : '#475569'} !important`,
-    },
-    '.cm-frontmatter-mark, .cm-frontmatter-punctuation': {
-      color: `${isDark ? '#64748b' : '#94a3b8'} !important`,
-    },
-    '.cm-frontmatter-key': {
-      color: `${isDark ? '#93c5fd' : '#2563eb'} !important`,
-      fontWeight: '600',
-    },
-    '.cm-frontmatter-comment, .cm-frontmatter-comment span': {
-      color: '#94a3b8 !important',
-      fontStyle: 'italic',
-    },
-  }, { dark: isDark });
-}
-
 export const EditorPane: React.FC<EditorPaneProps> = ({
   placeholder = 'Type here...',
   onContentChange,
@@ -264,11 +161,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
-  const scrollbarHideTimeoutRef = useRef<number | null>(null);
 
-  const themeCompartment = useRef(new Compartment()).current;
   const wrapCompartment = useRef(new Compartment()).current;
-  const syntaxCompartment = useRef(new Compartment()).current;
   const placeholderCompartment = useRef(new Compartment()).current;
 
   const updateContent = useCallback((nextContent: string) => {
@@ -315,17 +209,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     isSyncingScroll.current = false;
   }, [activeTabId]);
 
-  const revealScrollbar = useCallback(() => {
-    setIsScrollbarVisible(true);
-    if (scrollbarHideTimeoutRef.current !== null) {
-      window.clearTimeout(scrollbarHideTimeoutRef.current);
-    }
-    scrollbarHideTimeoutRef.current = window.setTimeout(() => {
-      setIsScrollbarVisible(false);
-      scrollbarHideTimeoutRef.current = null;
-    }, SCROLLBAR_VISIBILITY_DURATION_MS);
-  }, []);
-
   const animateSyncedScroll = useCallback((scrollDom: HTMLElement, targetScrollTop: number) => {
     const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
     const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
@@ -368,7 +251,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   }, []);
 
   const [paneWidth, setPaneWidth] = useState(0);
-  const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
   const layoutStyle = useMemo(() => ({
     '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
@@ -379,7 +261,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
-  }) as React.CSSProperties, [layoutMetrics]);
+    '--editor-font-family': fontFamily,
+    '--editor-font-size': `${settings.fontSize}px`,
+    '--editor-line-height': String(EDITOR_LINE_HEIGHT),
+  }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
 
   useEffect(() => {
     onScrollRef.current = onScroll;
@@ -446,9 +331,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           markdown(),
           drawSelection(),
           frontmatterDecorations,
-          themeCompartment.of(createEditorTheme(settings.themeMode, fontFamily, settings.fontSize)),
           wrapCompartment.of(settings.wordWrap ? EditorView.lineWrapping : []),
-          syntaxCompartment.of(syntaxHighlighting(settings.themeMode === 'dark' ? darkMarkdownStyle : lightMarkdownStyle)),
+          syntaxHighlighting(markdownHighlightStyle),
           placeholderCompartment.of(cmPlaceholder(placeholder)),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
@@ -461,12 +345,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     });
 
     const handleDomScroll = () => {
-      revealScrollbar();
       emitScrollPercentage(view.scrollDOM);
     };
     const handleUserScrollIntent = () => {
       cancelSyncedScroll();
-      revealScrollbar();
     };
 
     view.scrollDOM.addEventListener('scroll', handleDomScroll, { passive: true });
@@ -496,13 +378,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   }, [
     activeTabId,
     placeholder,
-    fontFamily,
-    settings.fontSize,
-    settings.themeMode,
     settings.wordWrap,
     placeholderCompartment,
-    syntaxCompartment,
-    themeCompartment,
     wrapCompartment,
     emitScrollPercentage,
     cancelSyncedScroll,
@@ -513,29 +390,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     if (!view) return;
 
     view.dispatch({
-      effects: themeCompartment.reconfigure(createEditorTheme(settings.themeMode, fontFamily, settings.fontSize)),
-    });
-  }, [settings.themeMode, fontFamily, settings.fontSize, themeCompartment]);
-
-  useEffect(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-
-    view.dispatch({
       effects: wrapCompartment.reconfigure(settings.wordWrap ? EditorView.lineWrapping : []),
     });
   }, [settings.wordWrap, wrapCompartment]);
-
-  useEffect(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-
-    view.dispatch({
-      effects: syntaxCompartment.reconfigure(
-        syntaxHighlighting(settings.themeMode === 'dark' ? darkMarkdownStyle : lightMarkdownStyle)
-      ),
-    });
-  }, [settings.themeMode, syntaxCompartment]);
 
   useEffect(() => {
     const view = editorViewRef.current;
@@ -611,7 +468,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   return (
     <div
       ref={layoutRef}
-      className={`editor-pane-layout h-full min-w-0 flex flex-col relative ${isScrollbarVisible ? 'scrollbar-visible' : ''}`}
+      className="editor-pane-layout h-full min-w-0 flex flex-col relative"
       style={layoutStyle}
     >
       {isSaving && (

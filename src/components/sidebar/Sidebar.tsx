@@ -20,6 +20,7 @@ interface SidebarProps {
   onMoveToTrash: (file: FileNode) => void;
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
+  onEmptyTrash: (files: FileNode[]) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
   onMoveToRoot: (sourceId: string) => void;
   currentKnowledgeBaseName?: string;
@@ -38,10 +39,12 @@ interface ContextMenuState {
 }
 
 interface DialogState {
-  type: 'rename' | 'delete' | 'newFolder' | 'newFile' | null;
+  type: 'rename' | 'delete' | 'newFolder' | 'newFile' | 'emptyTrash' | null;
   file?: FileNode;
   defaultValue?: string;
 }
+
+const TRASH_ROOT_NAMES = new Set(['.trash', '_markdown_press_trash']);
 
 // Custom Context Menu component with Portal
 const ContextMenu: React.FC<{
@@ -366,13 +369,20 @@ const getTrashItems = (nodes: FileNode[]): FileNode[] => {
 
 const normalizeSearchTarget = (name: string): string => name.replace(/\.md$/i, '').toLowerCase();
 
+const isTrashRootNode = (node: FileNode): boolean => (
+  node.type === 'folder' &&
+  TRASH_ROOT_NAMES.has(node.name)
+);
+
 const filterNodesByFileName = (nodes: FileNode[], query: string): FileNode[] => {
-  if (!query.trim()) return nodes.filter((node) => !node.isTrash);
+  if (!query.trim()) {
+    return nodes.filter((node) => !node.isTrash && !isTrashRootNode(node));
+  }
 
   const normalizedQuery = query.trim().toLowerCase();
 
   return nodes.reduce<FileNode[]>((acc, node) => {
-    if (node.isTrash) return acc;
+    if (node.isTrash || isTrashRootNode(node)) return acc;
 
     if (node.type === 'folder') {
       const filteredChildren = filterNodesByFileName(node.children ?? [], normalizedQuery);
@@ -406,6 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onMoveToTrash,
   onRestoreFromTrash,
   onDeleteForever,
+  onEmptyTrash,
   onMoveNode,
   onMoveToRoot,
   currentKnowledgeBaseName,
@@ -637,6 +648,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 trashItems={trashItems}
                 onRestore={onRestoreFromTrash}
                 onDeleteForever={onDeleteForever}
+                onEmptyTrash={() => setDialogState({ type: 'emptyTrash' })}
                 onContextMenu={handleContextMenu}
               />
             )}
@@ -749,6 +761,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           if (dialogState.file) {
             onDelete(dialogState.file);
           }
+          setDialogState({ type: null });
+        }}
+        onCancel={() => setDialogState({ type: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={dialogState.type === 'emptyTrash'}
+        title="Empty Trash"
+        message={`Permanently delete all ${trashItems.length} item${trashItems.length === 1 ? '' : 's'} in trash? This action cannot be undone.`}
+        confirmText="Empty Trash"
+        variant="danger"
+        onConfirm={() => {
+          onEmptyTrash(trashItems);
           setDialogState({ type: null });
         }}
         onCancel={() => setDialogState({ type: null })}

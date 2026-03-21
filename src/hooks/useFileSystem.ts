@@ -4,7 +4,9 @@ import { useAppStore } from '../store/appStore';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import type { FileNode } from '../types';
 
-const TRASH_DIR_NAMES = ['.trash', '_markdown_press_trash'] as const;
+const PRIMARY_TRASH_DIR_NAME = '.trash';
+const LEGACY_TRASH_DIR_NAMES = ['_markdown_press_trash'] as const;
+const TRASH_DIR_NAMES = [PRIMARY_TRASH_DIR_NAME, ...LEGACY_TRASH_DIR_NAMES] as const;
 const TRASH_ROOT_MARKER = '__root__';
 
 function getPathSeparator(path: string): '/' | '\\' {
@@ -109,19 +111,12 @@ async function ensureTrashRootDirectory(fs: Awaited<ReturnType<typeof getFileSys
   trashDirName: string;
   trashRootPath: string;
 }> {
-  let lastError: unknown = null;
-
-  for (const trashDirName of TRASH_DIR_NAMES) {
-    const trashRootPath = joinPath(rootPath, trashDirName);
-    try {
-      await fs.createDirectory(trashRootPath);
-      return { trashDirName, trashRootPath };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError ?? new Error('Unable to create trash directory');
+  const trashRootPath = joinPath(rootPath, PRIMARY_TRASH_DIR_NAME);
+  await fs.createDirectory(trashRootPath);
+  return {
+    trashDirName: PRIMARY_TRASH_DIR_NAME,
+    trashRootPath
+  };
 }
 
 /**

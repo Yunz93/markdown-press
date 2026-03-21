@@ -22,7 +22,7 @@ import { TabBar } from './components/tabs/TabBar';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
-import { emitPreviewHeadingScrollCommand, requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
+import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'markdown-press.sidebar-width';
@@ -35,13 +35,27 @@ const MIN_OUTLINE_WIDTH = 180;
 const MAX_OUTLINE_WIDTH = 360;
 const MIN_RESPONSIVE_SIDEBAR_WIDTH = 160;
 const MIN_SINGLE_VIEW_WORKSPACE_WIDTH = 760;
+const MIN_EDITOR_WORKSPACE_WIDTH_WITH_OUTLINE = 620;
 const MIN_SPLIT_WORKSPACE_WIDTH = 920;
+const MIN_PREVIEW_WORKSPACE_WIDTH_WITH_OUTLINE = 620;
 const MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE = 720;
 const OUTLINE_PANEL_GAP = 32;
 const SHELL_EDGE_GAP = 24;
 
 function getMinimumWorkspaceWidth(viewMode: ViewMode): number {
   return viewMode === ViewMode.SPLIT ? MIN_SPLIT_WORKSPACE_WIDTH : MIN_SINGLE_VIEW_WORKSPACE_WIDTH;
+}
+
+function getMinimumWorkspaceWidthWithOutline(viewMode: ViewMode): number {
+  if (viewMode === ViewMode.SPLIT) {
+    return MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE;
+  }
+
+  if (viewMode === ViewMode.PREVIEW) {
+    return MIN_PREVIEW_WORKSPACE_WIDTH_WITH_OUTLINE;
+  }
+
+  return MIN_EDITOR_WORKSPACE_WIDTH_WITH_OUTLINE;
 }
 
 function clampPanelWidth(value: number, min: number, max: number): number {
@@ -293,10 +307,9 @@ const App: React.FC = () => {
 
     if (viewMode !== ViewMode.EDITOR) {
       const scrollOptions = { alignTopRatio: 0.18, behavior: 'smooth' as const };
-      requestPreviewHeadingScroll(id, scrollOptions);
-      emitPreviewHeadingScrollCommand(id, scrollOptions);
+      requestPreviewHeadingScroll(activeTabId, id, scrollOptions);
     }
-  }, [content, setActiveHeadingId, viewMode]);
+  }, [activeTabId, content, setActiveHeadingId, viewMode]);
 
   const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
@@ -337,18 +350,24 @@ const App: React.FC = () => {
     ? Math.min(sidebarWidth, maxSidebarWidthForViewport)
     : sidebarWidth;
   const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - OUTLINE_PANEL_GAP;
-  const minimumWorkspaceWidthWithOutline = viewMode === ViewMode.SPLIT
-    ? MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE
-    : minimumWorkspaceWidth;
-  const canShowOutlinePanel = outlineHeadings.length > 0 && workspaceWidthWithOutline >= minimumWorkspaceWidthWithOutline;
+  const minimumWorkspaceWidthWithOutline = getMinimumWorkspaceWidthWithOutline(viewMode);
+  const canShowOutlinePanel = Boolean(activeTabId) && workspaceWidthWithOutline >= minimumWorkspaceWidthWithOutline;
   const isOutlineVisible = isOutlineOpen && canShowOutlinePanel;
-  const canShowOutlineToggle = outlineHeadings.length > 0;
+  const canShowOutlineToggle = Boolean(activeTabId);
   const contentDensity = (
     viewMode === ViewMode.SPLIT ||
     mainContentWidth < 1360 ||
     (isSidebarOpen && mainContentWidth < 1500) ||
     isOutlineVisible
   ) ? 'compact' : 'comfortable';
+
+  if (!settingsHydrated) {
+    return (
+      <div className="h-screen bg-gray-50 dark:bg-black text-gray-500 dark:text-gray-400 flex items-center justify-center">
+        <div className="text-sm font-medium tracking-wide">Loading workspace...</div>
+      </div>
+    );
+  }
 
   if (shouldShowKnowledgeBaseOnboarding) {
     return (
@@ -394,6 +413,7 @@ const App: React.FC = () => {
         onMoveToTrash={fileOps.handleMoveToTrash}
         onRestoreFromTrash={fileOps.handleRestoreFromTrash}
         onDeleteForever={fileOps.handleDeleteForever}
+        onEmptyTrash={fileOps.handleEmptyTrash}
         onMoveNode={fileOps.handleMoveNode}
         onMoveToRoot={fileOps.handleMoveToRoot}
         currentKnowledgeBaseName={currentKnowledgeBaseName}
