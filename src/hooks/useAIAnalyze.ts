@@ -1,9 +1,8 @@
 import { useCallback } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
 import { analyzeContent } from '../services/geminiService';
-import { parseFrontmatter } from '../utils/frontmatter';
+import { generateFrontmatter, parseFrontmatter } from '../utils/frontmatter';
 import { type Frontmatter } from '../types';
-import * as yaml from 'js-yaml';
 
 /**
  * Encapsulates the AI-powered content analysis and frontmatter merge logic.
@@ -55,8 +54,7 @@ export function useAIAnalyze() {
         ...(existingFrontmatter?.layout !== undefined && { layout: existingFrontmatter.layout }),
       };
 
-      const frontmatterYaml = yaml.dump(mergedFrontmatter, { skipInvalid: true });
-      const frontmatterBlock = `---\n${frontmatterYaml}---\n\n`;
+      const frontmatterBlock = generateFrontmatter(mergedFrontmatter);
       const optimizedBody = (result.optimizedMarkdown || body).trim();
       const newContent = `${frontmatterBlock}${optimizedBody}\n`;
 

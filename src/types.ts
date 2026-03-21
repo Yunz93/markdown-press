@@ -66,7 +66,8 @@ export type ThemeMode = 'light' | 'dark';
 export interface AppSettings {
   fontSize: number;
   wordWrap: boolean;
-  fontFamily: string;
+  englishFontFamily: string;
+  chineseFontFamily: string;
   githubRepo: string;
   geminiApiKey?: string;
   geminiModel?: string;

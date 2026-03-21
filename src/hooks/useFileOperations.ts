@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useFileSystem } from './useFileSystem';
 import type { FileNode } from '../types';
-import * as yaml from 'js-yaml';
+import { generateFrontmatter } from '../utils/frontmatter';
 
 function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   for (const node of nodes) {
@@ -102,9 +102,11 @@ export function useFileOperations() {
     }
   }, [readFile, addTab, setCurrentFilePath, updateTabContent, showNotification, fileContents]);
 
-  const handleCreateFile = useCallback(async (parentFolder?: FileNode) => {
+  const handleCreateFile = useCallback(async (parentFolder?: FileNode, fileName?: string) => {
     const timestamp = Date.now();
-    const fileName = `note-${timestamp}.md`;
+    const normalizedName = (fileName?.trim() || `note-${timestamp}`).replace(/\.md$/i, '');
+    const finalFileName = `${normalizedName}.md`;
+    const documentTitle = normalizedName;
     const now = new Date().toISOString().split('T')[0];
     const meta: Record<string, unknown> = {};
 
@@ -123,14 +125,10 @@ export function useFileOperations() {
       meta[f.key] = parseDefaultValue(f.defaultValue);
     });
 
-    let initialContent = '';
-    try {
-      initialContent = `---\n${yaml.dump(meta)}---\n\n# Untitled\n\n`;
-    } catch {
-      initialContent = `# Untitled\n\n`;
-    }
+    const frontmatterBlock = Object.keys(meta).length > 0 ? generateFrontmatter(meta) : '';
+    const initialContent = `${frontmatterBlock}# ${documentTitle}\n\n`;
 
-    const newFile = await createFile(fileName, initialContent, parentFolder?.path);
+    const newFile = await createFile(finalFileName, initialContent, parentFolder?.path);
     if (newFile) {
       addTab(newFile.id, initialContent);
       setCurrentFilePath(newFile.path);

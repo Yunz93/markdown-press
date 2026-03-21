@@ -11,7 +11,7 @@ interface SidebarProps {
   files: FileNode[];
   activeFileId: string | null;
   onFileSelect: (file: FileNode) => void;
-  onCreateFile: (parentFolder?: FileNode) => void;
+  onCreateFile: (parentFolder?: FileNode, fileName?: string) => void;
   onNewFolder: (parentFolder?: FileNode, name?: string) => void;
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
@@ -38,7 +38,7 @@ interface ContextMenuState {
 }
 
 interface DialogState {
-  type: 'rename' | 'delete' | 'newFolder' | null;
+  type: 'rename' | 'delete' | 'newFolder' | 'newFile' | null;
   file?: FileNode;
   defaultValue?: string;
 }
@@ -542,11 +542,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search files"
-                className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white dark:focus:bg-white/[0.06]"
+                className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.04] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white dark:focus:bg-white/[0.06]"
               />
             </label>
             <button
-              onClick={() => onCreateFile()}
+              onClick={() => setDialogState({ type: 'newFile', defaultValue: 'Untitled' })}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/85 dark:bg-white/[0.04] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08] active:scale-95"
               title="New Note"
             >
@@ -651,7 +651,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
               </svg>
-              <p className="text-sm font-medium truncate min-w-0">
+              <p className="text-sm font-semibold truncate min-w-0">
                 {currentKnowledgeBaseName || 'Open Knowledge Base'}
               </p>
             </div>
@@ -685,13 +685,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onDelete={() => setDialogState({ type: 'delete', file: contextMenu.node })}
           onReveal={() => onReveal(contextMenu.node.path)}
           onOpenInBrowser={onOpenInBrowser ? () => onOpenInBrowser(contextMenu.node) : undefined}
-          onCreateFile={() => onCreateFile(contextMenu.node.type === 'folder' ? contextMenu.node : undefined)}
+          onCreateFile={() => setDialogState({
+            type: 'newFile',
+            file: contextMenu.node.type === 'folder' ? contextMenu.node : undefined,
+            defaultValue: 'Untitled',
+          })}
           onCreateFolder={() => setDialogState({ type: 'newFolder', file: contextMenu.node })}
           onMoveToTrash={() => onMoveToTrash(contextMenu.node)}
           onRestoreFromTrash={() => onRestoreFromTrash(contextMenu.node)}
           onDeleteForever={() => setDialogState({ type: 'delete', file: contextMenu.node })}
         />
       )}
+
+      {/* New File Dialog */}
+      <PromptDialog
+        isOpen={dialogState.type === 'newFile'}
+        title="New File"
+        label="File name:"
+        defaultValue={dialogState.defaultValue || 'Untitled'}
+        onConfirm={(value) => {
+          onCreateFile(dialogState.file?.type === 'folder' ? dialogState.file : undefined, value);
+          setDialogState({ type: null });
+        }}
+        onCancel={() => setDialogState({ type: null })}
+      />
 
       {/* Rename Dialog */}
       <PromptDialog

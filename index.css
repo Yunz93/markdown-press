@@ -213,39 +213,42 @@ body {
 .editor-source-fallback .md-token-task,
 .editor-source-fallback .md-token-frontmatter-mark,
 .editor-source-fallback .md-token-frontmatter-punctuation {
-  color: #8b5cf6;
+  color: #94a3b8;
 }
 
 .editor-source-fallback .md-token-heading-text,
-.editor-source-fallback .md-token-strong,
+.editor-source-fallback .md-token-strong {
+  color: #4f46e5;
+}
+
 .editor-source-fallback .md-token-emphasis {
-  color: #7c3aed;
+  color: #0f766e;
 }
 
 .editor-source-fallback .md-token-link-text,
 .editor-source-fallback .md-token-image-alt,
 .editor-source-fallback .md-token-frontmatter-key,
 .editor-source-fallback .md-token-wikilink-target {
-  color: #0f9aa8;
+  color: #2563eb;
 }
 
 .editor-source-fallback .md-token-wikilink-alias {
-  color: #7c3aed;
+  color: #4f46e5;
 }
 
 .editor-source-fallback .md-token-link-url,
 .editor-source-fallback .md-token-image-url,
 .editor-source-fallback .md-token-frontmatter-string {
-  color: #0f766e;
+  color: #0369a1;
 }
 
 .editor-source-fallback .md-token-frontmatter-value {
-  color: #334155;
+  color: #475569;
 }
 
 .editor-source-fallback .md-token-frontmatter-number,
 .editor-source-fallback .md-token-frontmatter-bool {
-  color: #d97706;
+  color: #b45309;
 }
 
 .editor-source-fallback .md-token-frontmatter-comment {
@@ -256,12 +259,12 @@ body {
 .editor-source-fallback .md-token-inline-code,
 .editor-source-fallback .md-token-code-block,
 .editor-source-fallback .md-token-fence-info {
-  color: #475569;
+  color: #0f766e;
 }
 
 .editor-source-fallback .md-token-rule,
 .editor-source-fallback .md-token-strike {
-  color: #a78bfa;
+  color: #64748b;
 }
 
 .dark .editor-source-fallback {
@@ -277,30 +280,33 @@ body {
 .dark .editor-source-fallback .md-token-task,
 .dark .editor-source-fallback .md-token-frontmatter-mark,
 .dark .editor-source-fallback .md-token-frontmatter-punctuation {
-  color: #c084fc;
+  color: #64748b;
 }
 
 .dark .editor-source-fallback .md-token-heading-text,
-.dark .editor-source-fallback .md-token-strong,
+.dark .editor-source-fallback .md-token-strong {
+  color: #a5b4fc;
+}
+
 .dark .editor-source-fallback .md-token-emphasis {
-  color: #d8b4fe;
+  color: #5eead4;
 }
 
 .dark .editor-source-fallback .md-token-link-text,
 .dark .editor-source-fallback .md-token-image-alt,
 .dark .editor-source-fallback .md-token-frontmatter-key,
 .dark .editor-source-fallback .md-token-wikilink-target {
-  color: #67e8f9;
+  color: #93c5fd;
 }
 
 .dark .editor-source-fallback .md-token-wikilink-alias {
-  color: #d8b4fe;
+  color: #a5b4fc;
 }
 
 .dark .editor-source-fallback .md-token-link-url,
 .dark .editor-source-fallback .md-token-image-url,
 .dark .editor-source-fallback .md-token-frontmatter-string {
-  color: #5eead4;
+  color: #7dd3fc;
 }
 
 .dark .editor-source-fallback .md-token-frontmatter-value {
@@ -320,12 +326,12 @@ body {
 .dark .editor-source-fallback .md-token-inline-code,
 .dark .editor-source-fallback .md-token-code-block,
 .dark .editor-source-fallback .md-token-fence-info {
-  color: #bfdbfe;
+  color: #86efac;
 }
 
 .dark .editor-source-fallback .md-token-rule,
 .dark .editor-source-fallback .md-token-strike {
-  color: #a5b4fc;
+  color: #94a3b8;
 }
 
 .preview-pane-properties {
@@ -1011,9 +1017,10 @@ html:not(.dark) .markdown-body {
 }
 
 .tab-surface {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr) 1rem;
   align-items: center;
-  gap: 0.5rem;
+  column-gap: 0.5rem;
   min-width: 0;
   padding: 0.7rem 0.9rem 0.6rem;
   border: 1px solid transparent;
@@ -1025,6 +1032,25 @@ html:not(.dark) .markdown-body {
     color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
+}
+
+.tab-side-spacer {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.tab-title {
+  min-width: 0;
+  text-align: center;
+}
+
+.tab-actions {
+  min-width: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
 }
 
 .browser-tab.is-active {

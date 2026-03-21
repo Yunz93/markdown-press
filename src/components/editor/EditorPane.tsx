@@ -1,13 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
-import { Compartment, EditorSelection, EditorState, type Extension, type StateCommand } from '@codemirror/state';
-import { EditorView, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
+import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type Extension, type StateCommand } from '@codemirror/state';
+import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import { getCompositeFontFamily } from '../../utils/fontSettings';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -25,22 +26,121 @@ const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
 
 const lightMarkdownStyle = HighlightStyle.define([
-  { tag: [tags.heading, tags.strong, tags.emphasis], color: '#7c3aed' },
-  { tag: [tags.link, tags.url], color: '#0f9aa8' },
-  { tag: [tags.quote, tags.list, tags.separator, tags.punctuation], color: '#8b5cf6' },
-  { tag: [tags.monospace, tags.literal], color: '#475569' },
-  { tag: [tags.keyword, tags.bool], color: '#d97706' },
+  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], color: '#4f46e5', fontWeight: '700' },
+  { tag: tags.strong, color: '#c2410c', fontWeight: '700' },
+  { tag: tags.emphasis, color: '#0f766e', fontStyle: 'italic' },
+  { tag: [tags.link, tags.url], color: '#0369a1' },
+  { tag: [tags.quote, tags.list], color: '#64748b' },
+  { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], color: '#94a3b8' },
+  { tag: [tags.monospace, tags.literal, tags.string], color: '#0f766e' },
+  { tag: [tags.keyword, tags.operatorKeyword], color: '#c2410c' },
+  { tag: [tags.bool, tags.atom], color: '#b45309' },
+  { tag: tags.number, color: '#0f766e' },
+  { tag: [tags.propertyName, tags.attributeName, tags.labelName], color: '#2563eb' },
   { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
 ]);
 
 const darkMarkdownStyle = HighlightStyle.define([
-  { tag: [tags.heading, tags.strong, tags.emphasis], color: '#d8b4fe' },
-  { tag: [tags.link, tags.url], color: '#67e8f9' },
-  { tag: [tags.quote, tags.list, tags.separator, tags.punctuation], color: '#c084fc' },
-  { tag: [tags.monospace, tags.literal], color: '#bfdbfe' },
-  { tag: [tags.keyword, tags.bool], color: '#fbbf24' },
+  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], color: '#a5b4fc', fontWeight: '700' },
+  { tag: tags.strong, color: '#fdba74', fontWeight: '700' },
+  { tag: tags.emphasis, color: '#5eead4', fontStyle: 'italic' },
+  { tag: [tags.link, tags.url], color: '#7dd3fc' },
+  { tag: [tags.quote, tags.list], color: '#94a3b8' },
+  { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], color: '#64748b' },
+  { tag: [tags.monospace, tags.literal, tags.string], color: '#86efac' },
+  { tag: [tags.keyword, tags.operatorKeyword], color: '#fdba74' },
+  { tag: [tags.bool, tags.atom], color: '#fbbf24' },
+  { tag: tags.number, color: '#5eead4' },
+  { tag: [tags.propertyName, tags.attributeName, tags.labelName], color: '#93c5fd' },
   { tag: tags.comment, color: '#94a3b8', fontStyle: 'italic' },
 ]);
+
+function buildFrontmatterDecorations(view: EditorView): DecorationSet {
+  const { doc } = view.state;
+  if (doc.lines === 0 || doc.line(1).text.trim() !== '---') {
+    return Decoration.none;
+  }
+
+  const builder = new RangeSetBuilder<Decoration>();
+  const frontmatterLine = Decoration.line({ class: 'cm-frontmatter-line' });
+  const frontmatterMark = Decoration.mark({ class: 'cm-frontmatter-mark' });
+  const frontmatterPunctuation = Decoration.mark({ class: 'cm-frontmatter-punctuation' });
+  const frontmatterKey = Decoration.mark({ class: 'cm-frontmatter-key' });
+  const frontmatterComment = Decoration.mark({ class: 'cm-frontmatter-comment' });
+
+  const firstLine = doc.line(1);
+  builder.add(firstLine.from, firstLine.from, frontmatterLine);
+  builder.add(firstLine.from, firstLine.to, frontmatterMark);
+
+  let closingLineNumber: number | null = null;
+  for (let lineNumber = 2; lineNumber <= doc.lines; lineNumber += 1) {
+    if (doc.line(lineNumber).text.trim() === '---') {
+      closingLineNumber = lineNumber;
+      break;
+    }
+  }
+
+  const contentEndLine = closingLineNumber ?? (doc.lines + 1);
+
+  for (let lineNumber = 2; lineNumber < contentEndLine; lineNumber += 1) {
+    const line = doc.line(lineNumber);
+    const text = line.text;
+    builder.add(line.from, line.from, frontmatterLine);
+
+    if (!text.trim()) continue;
+
+    const commentMatch = text.match(/^(\s*)(#.*)$/);
+    if (commentMatch) {
+      const [, indent, comment] = commentMatch;
+      const commentFrom = line.from + indent.length;
+      builder.add(commentFrom, commentFrom + comment.length, frontmatterComment);
+      continue;
+    }
+
+    const listMatch = text.match(/^(\s*)(-)(\s+)(.*)$/);
+    if (listMatch) {
+      const [, indent, marker] = listMatch;
+      const markerFrom = line.from + indent.length;
+      builder.add(markerFrom, markerFrom + marker.length, frontmatterPunctuation);
+      continue;
+    }
+
+    const keyValueMatch = text.match(/^(\s*)([^:#\n][^:\n]*?)(\s*):/);
+    if (!keyValueMatch) continue;
+
+    const [, indent, key, beforeColon] = keyValueMatch;
+    const keyFrom = line.from + indent.length;
+    const keyTo = keyFrom + key.length;
+    const colonFrom = keyTo + beforeColon.length;
+
+    builder.add(keyFrom, keyTo, frontmatterKey);
+    builder.add(colonFrom, colonFrom + 1, frontmatterPunctuation);
+  }
+
+  if (closingLineNumber !== null) {
+    const closingLine = doc.line(closingLineNumber);
+    builder.add(closingLine.from, closingLine.from, frontmatterLine);
+    builder.add(closingLine.from, closingLine.to, frontmatterMark);
+  }
+
+  return builder.finish();
+}
+
+const frontmatterDecorations = ViewPlugin.fromClass(class {
+  decorations: DecorationSet;
+
+  constructor(view: EditorView) {
+    this.decorations = buildFrontmatterDecorations(view);
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged) {
+      this.decorations = buildFrontmatterDecorations(update.view);
+    }
+  }
+}, {
+  decorations: (plugin) => plugin.decorations,
+});
 
 const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
   const changes = state.changeByRange((range) => ({
@@ -122,6 +222,20 @@ function createEditorTheme(
     '.cm-placeholder': {
       color: isDark ? 'rgba(148, 163, 184, 0.72)' : 'rgba(100, 116, 139, 0.72)',
     },
+    '.cm-frontmatter-line, .cm-frontmatter-line span': {
+      color: `${isDark ? '#cbd5e1' : '#475569'} !important`,
+    },
+    '.cm-frontmatter-mark, .cm-frontmatter-punctuation': {
+      color: `${isDark ? '#64748b' : '#94a3b8'} !important`,
+    },
+    '.cm-frontmatter-key': {
+      color: `${isDark ? '#93c5fd' : '#2563eb'} !important`,
+      fontWeight: '600',
+    },
+    '.cm-frontmatter-comment, .cm-frontmatter-comment span': {
+      color: '#94a3b8 !important',
+      fontStyle: 'italic',
+    },
   }, { dark: isDark });
 }
 
@@ -136,7 +250,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   void highlighter;
 
   const content = useAppStore(selectContent);
-  const { setContent, settings, isSaving, activeTabId } = useAppStore();
+  const { setContent, settings, isSaving, activeTabId, viewMode } = useAppStore();
+  const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
 
   const editorRootRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -187,7 +302,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       if (pendingPercentage === null) return;
       onScrollCallback(pendingPercentage);
     });
-  }, []);
+  }, [activeTabId]);
 
   const cancelSyncedScroll = useCallback(() => {
     if (syncAnimationFrameRef.current !== null) {
@@ -196,7 +311,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
     syncTargetScrollTopRef.current = null;
     isSyncingScroll.current = false;
-  }, []);
+  }, [activeTabId]);
 
   const animateSyncedScroll = useCallback((scrollDom: HTMLElement, targetScrollTop: number) => {
     const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
@@ -271,9 +386,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     updateContentRef.current = updateContent;
   }, [updateContent]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const layout = layoutRef.current;
     if (!layout) return;
+
+    const updatePaneWidth = () => {
+      const nextWidth = layout.getBoundingClientRect().width;
+      if (nextWidth > 0) {
+        setPaneWidth(nextWidth);
+      }
+    };
+
+    updatePaneWidth();
 
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -283,7 +407,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
     resizeObserver.observe(layout);
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [activeTabId]);
 
   useEffect(() => {
     if (!activeTabId) {
@@ -307,7 +431,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Tab', run: insertTwoSpaces }]),
           markdown(),
           drawSelection(),
-          themeCompartment.of(createEditorTheme(settings.themeMode, settings.fontFamily, settings.fontSize)),
+          frontmatterDecorations,
+          themeCompartment.of(createEditorTheme(settings.themeMode, fontFamily, settings.fontSize)),
           wrapCompartment.of(settings.wordWrap ? EditorView.lineWrapping : []),
           syntaxCompartment.of(syntaxHighlighting(settings.themeMode === 'dark' ? darkMarkdownStyle : lightMarkdownStyle)),
           placeholderCompartment.of(cmPlaceholder(placeholder)),
@@ -335,9 +460,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
     editorViewRef.current = view;
     registerActiveEditorView(view);
+    const initialMeasureFrame = requestAnimationFrame(() => {
+      view.requestMeasure();
+    });
 
     return () => {
       cancelSyncedScroll();
+      cancelAnimationFrame(initialMeasureFrame);
       view.scrollDOM.removeEventListener('scroll', handleDomScroll);
       view.scrollDOM.removeEventListener('wheel', handleUserScrollIntent);
       view.scrollDOM.removeEventListener('touchstart', handleUserScrollIntent);
@@ -351,7 +480,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   }, [
     activeTabId,
     placeholder,
-    settings.fontFamily,
+    fontFamily,
     settings.fontSize,
     settings.themeMode,
     settings.wordWrap,
@@ -368,9 +497,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     if (!view) return;
 
     view.dispatch({
-      effects: themeCompartment.reconfigure(createEditorTheme(settings.themeMode, settings.fontFamily, settings.fontSize)),
+      effects: themeCompartment.reconfigure(createEditorTheme(settings.themeMode, fontFamily, settings.fontSize)),
     });
-  }, [settings.themeMode, settings.fontFamily, settings.fontSize, themeCompartment]);
+  }, [settings.themeMode, fontFamily, settings.fontSize, themeCompartment]);
 
   useEffect(() => {
     const view = editorViewRef.current;
@@ -416,6 +545,25 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       selection: { anchor, head },
     });
   }, [content]);
+
+  useLayoutEffect(() => {
+    const view = editorViewRef.current;
+    const layout = layoutRef.current;
+    if (!view || !layout) return;
+
+    const syncEditorLayout = () => {
+      const nextWidth = layout.getBoundingClientRect().width;
+      if (nextWidth > 0) {
+        setPaneWidth((prev) => (Math.abs(prev - nextWidth) > 0.5 ? nextWidth : prev));
+      }
+      view.requestMeasure();
+    };
+
+    syncEditorLayout();
+    const rafId = requestAnimationFrame(syncEditorLayout);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [activeTabId, viewMode, paneWidth]);
 
   useEffect(() => {
     if (scrollPercentage === undefined) return;

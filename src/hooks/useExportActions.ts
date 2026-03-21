@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
-import { parseFrontmatter } from '../utils/frontmatter';
+import { generateFrontmatter, parseFrontmatter } from '../utils/frontmatter';
 import { exportToHtml, exportToPdf } from '../utils/export';
 import { type Frontmatter } from '../types';
-import * as yaml from 'js-yaml';
+import { getCompositeFontFamily } from '../utils/fontSettings';
 
 function findFileInTree(nodes: import('../types').FileNode[], id: string): import('../types').FileNode | undefined {
   for (const node of nodes) {
@@ -29,6 +29,7 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
     showNotification,
   } = useAppStore();
   const content = useAppStore(selectContent);
+  const fontFamily = getCompositeFontFamily(settings);
 
   const handleExportToPdf = useCallback(async () => {
     if (!activeTabId || !content) {
@@ -47,7 +48,7 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
         title: activeFile.name.replace('.md', ''),
         theme: 'light',
         includeTOC: false,
-        fontFamily: settings.fontFamily,
+        fontFamily,
         fontSize: settings.fontSize,
         includeProperties: false,
       });
@@ -59,7 +60,7 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
       console.error('Failed to export PDF:', error);
       showNotification('Failed to export PDF', 'error');
     }
-  }, [activeTabId, content, files, settings.fontFamily, settings.fontSize, showNotification]);
+  }, [activeTabId, content, files, fontFamily, settings.fontSize, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
     if (!activeTabId) {
@@ -79,7 +80,7 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
         ...(frontmatter || {}),
         is_publish: true,
       };
-      const nextContent = `---\n${yaml.dump(merged, { skipInvalid: true })}---\n\n${body}`;
+      const nextContent = `${generateFrontmatter(merged)}${body}`;
 
       setContent(nextContent);
       await forceSave();

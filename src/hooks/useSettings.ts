@@ -33,8 +33,12 @@ export function useSettings() {
     updateSettings((state) => ({ wordWrap: !state.settings.wordWrap }));
   }, [updateSettings]);
 
-  const updateFontFamily = useCallback((fontFamily: string) => {
-    updateSettings({ fontFamily });
+  const updateEnglishFontFamily = useCallback((englishFontFamily: string) => {
+    updateSettings({ englishFontFamily });
+  }, [updateSettings]);
+
+  const updateChineseFontFamily = useCallback((chineseFontFamily: string) => {
+    updateSettings({ chineseFontFamily });
   }, [updateSettings]);
 
   const updateGithubRepo = useCallback((githubRepo: string) => {
@@ -83,7 +87,8 @@ export function useSettings() {
     toggleTheme,
     updateFontSize,
     toggleWordWrap,
-    updateFontFamily,
+    updateEnglishFontFamily,
+    updateChineseFontFamily,
     updateGithubRepo,
     updateShortcuts,
     updateMetadataFields,

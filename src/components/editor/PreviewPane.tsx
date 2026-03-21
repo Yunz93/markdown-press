@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useMemo, useEffect, useLayoutEffect, useCallback, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
@@ -7,6 +7,9 @@ import { hydrateCachedPreviewImageSources, warmPreviewImage } from '../../utils/
 import { resolveWikiLinkFile } from '../../utils/wikiLinks';
 import { useFileOperations } from '../../hooks/useFileOperations';
 import { getPaneLayoutMetrics } from './paneLayout';
+import { clearActivePreviewElement, flushPendingPreviewHeadingScroll, registerActivePreviewElement, scrollPreviewToHeading } from '../../utils/previewNavigationBridge';
+import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
+import { getCompositeFontFamily } from '../../utils/fontSettings';
 
 interface PreviewPaneProps {
   highlighter?: any;
@@ -29,6 +32,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 }) => {
   const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
+  const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const previewRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   useMarkdownRenderer(highlighter, settings.themeMode);
@@ -55,9 +59,18 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
   }) as React.CSSProperties, [layoutMetrics]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const layout = layoutRef.current;
     if (!layout) return;
+
+    const updatePaneWidth = () => {
+      const nextWidth = layout.getBoundingClientRect().width;
+      if (nextWidth > 0) {
+        setPaneWidth(nextWidth);
+      }
+    };
+
+    updatePaneWidth();
 
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -67,7 +80,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
     resizeObserver.observe(layout);
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [activeTabId]);
 
   const cancelSyncedScroll = useCallback(() => {
     if (syncAnimationFrameRef.current !== null) {
@@ -195,21 +208,54 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
   const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
-    const link = target?.closest('a[data-wikilink]') as HTMLAnchorElement | null;
-    if (!link) return;
+    const wikilink = target?.closest('a[data-wikilink]') as HTMLAnchorElement | null;
+    if (wikilink) {
+      event.preventDefault();
 
-    event.preventDefault();
+      const wikiTarget = wikilink.getAttribute('data-wikilink');
+      if (!wikiTarget) return;
 
-    const wikiTarget = link.getAttribute('data-wikilink');
-    if (!wikiTarget) return;
+      const matchedFile = resolveWikiLinkFile(files, wikiTarget, rootFolderPath, currentFilePath);
+      if (!matchedFile) {
+        showNotification(`Linked file not found: ${wikiTarget}`, 'error');
+        return;
+      }
 
-    const matchedFile = resolveWikiLinkFile(files, wikiTarget, rootFolderPath, currentFilePath);
-    if (!matchedFile) {
-      showNotification(`Linked file not found: ${wikiTarget}`, 'error');
+      await handleFileSelect(matchedFile);
       return;
     }
 
-    await handleFileSelect(matchedFile);
+    const anchorLink = target?.closest('a[href^="#"]') as HTMLAnchorElement | null;
+    if (!anchorLink) return;
+
+    const rawHash = anchorLink.getAttribute('href');
+    if (!rawHash || rawHash === '#') return;
+
+    const normalizedHash = decodeURIComponent(rawHash.slice(1)).trim();
+    if (!normalizedHash) return;
+
+    event.preventDefault();
+
+    const headingCandidates = Array.from(new Set([
+      normalizedHash,
+      createHeadingSlug(normalizedHash),
+    ]));
+
+    const previewContainer = previewRef.current;
+    const matchedHeading = previewContainer
+      ? Array.from(previewContainer.querySelectorAll<HTMLElement>('article.markdown-body [data-heading-id]')).find((element) => {
+          const headingId = element.dataset.headingId ?? '';
+          const headingSlug = element.dataset.headingSlug ?? '';
+          const headingText = (element.dataset.headingText ?? '').trim();
+          return headingCandidates.includes(headingId)
+            || headingCandidates.includes(headingSlug)
+            || headingCandidates.includes(headingText);
+        })
+      : null;
+
+    if (!matchedHeading) return;
+
+    scrollPreviewToHeading(matchedHeading.dataset.headingId ?? matchedHeading.id, { behavior: 'smooth' });
   }, [files, rootFolderPath, currentFilePath, handleFileSelect, showNotification]);
 
   const parsedContent = useMemo(() => {
@@ -231,6 +277,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
     }
   }, [content, currentFilePath, highlighter, settings.themeMode]);
+
+  const flattenedHeadings = useMemo(() => flattenHeadingNodes(parseHeadings(content)), [content]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -267,6 +315,39 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       cancelled = true;
     };
   }, [parsedContent.bodyHTML, currentFilePath]);
+
+  useLayoutEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+
+    registerActivePreviewElement(container);
+    flushPendingPreviewHeadingScroll();
+    return () => clearActivePreviewElement(container);
+  }, [activeTabId]);
+
+  useLayoutEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+
+    const headingElements = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'));
+
+    headingElements.forEach((element, index) => {
+      const heading = flattenedHeadings[index];
+      if (!heading) {
+        element.removeAttribute('data-heading-id');
+        element.removeAttribute('data-heading-slug');
+        element.removeAttribute('data-heading-text');
+        return;
+      }
+
+      element.id = heading.id;
+      element.dataset.headingId = heading.id;
+      element.dataset.headingSlug = createHeadingSlug(heading.text);
+      element.dataset.headingText = heading.text;
+    });
+
+    flushPendingPreviewHeadingScroll();
+  }, [flattenedHeadings, parsedContent.bodyHTML]);
 
   return (
     <div
@@ -311,7 +392,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           <div className={`editor-pane-sheet preview-pane-sheet w-full ${hasActiveFile ? '' : 'h-full min-h-0'}`}>
             <article
               className={`markdown-body preview-pane-document ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
-              style={{ fontFamily: settings.fontFamily, fontSize: `${settings.fontSize}px` }}
+              style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
               dangerouslySetInnerHTML={{ __html: parsedContent.bodyHTML }}
             />
           </div>

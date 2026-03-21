@@ -22,6 +22,8 @@ import { TabBar } from './components/tabs/TabBar';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
+import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
+import { ensureDynamicFontFaces } from './utils/fontSettings';
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'markdown-press.sidebar-width';
 const OUTLINE_WIDTH_STORAGE_KEY = 'markdown-press.outline-width';
@@ -112,6 +114,10 @@ const App: React.FC = () => {
   useUndoRedo();
 
   useThemeSync(settings.themeMode);
+
+  useEffect(() => {
+    ensureDynamicFontFaces(settings);
+  }, [settings.englishFontFamily, settings.chineseFontFamily]);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave);
@@ -280,8 +286,14 @@ const App: React.FC = () => {
     const lines = content.split('\n');
     const cursorPos = lines.slice(0, lineIndex).reduce((sum, l) => sum + l.length + 1, 0);
 
-    focusEditorRangeByOffset(cursorPos, cursorPos, { alignTopRatio: 0.3 });
-  }, [content, setActiveHeadingId]);
+    if (viewMode !== ViewMode.PREVIEW) {
+      focusEditorRangeByOffset(cursorPos, cursorPos, { alignTopRatio: 0.3 });
+    }
+
+    if (viewMode !== ViewMode.EDITOR) {
+      requestPreviewHeadingScroll(id, { alignTopRatio: 0.18, behavior: 'smooth' });
+    }
+  }, [content, setActiveHeadingId, viewMode]);
 
   const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
@@ -367,7 +379,7 @@ const App: React.FC = () => {
         files={files}
         activeFileId={activeTabId}
         onFileSelect={fileOps.handleFileSelect}
-        onCreateFile={(folder) => fileOps.handleCreateFile(folder)}
+        onCreateFile={(folder, fileName) => fileOps.handleCreateFile(folder, fileName)}
         onNewFolder={(folder, name) => fileOps.handleNewFolder(folder, name)}
         onRename={fileOps.handleRename}
         onDelete={fileOps.handleDelete}

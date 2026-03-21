@@ -14,6 +14,7 @@ export interface TabState {
 export interface TabActions {
   addTab: (fileId: string, content?: string) => void;
   closeTab: (fileId: string) => void;
+  closeOtherTabs: (fileId: string) => void;
   setActiveTab: (fileId: string) => void;
   updateTabContent: (fileId: string, content: string) => void;
   getActiveContent: () => string | undefined;
@@ -80,6 +81,24 @@ export function createTabSlice(
         activeTabId: newActiveTabId,
         fileContents: newFileContents,
         lastSavedContent: newLastSavedContent,
+      };
+    }),
+
+    closeOtherTabs: (fileId) => set((state) => {
+      if (!state.openTabs.includes(fileId)) return state;
+
+      const nextFileContents = state.fileContents[fileId] === undefined
+        ? {}
+        : { [fileId]: state.fileContents[fileId] };
+      const nextLastSavedContent = state.lastSavedContent[fileId] === undefined
+        ? {}
+        : { [fileId]: state.lastSavedContent[fileId] };
+
+      return {
+        openTabs: [fileId],
+        activeTabId: fileId,
+        fileContents: nextFileContents,
+        lastSavedContent: nextLastSavedContent,
       };
     }),
 

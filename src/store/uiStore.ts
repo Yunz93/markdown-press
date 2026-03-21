@@ -1,5 +1,6 @@
 import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
+import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
 
 function getSystemThemeMode() {
   return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -51,7 +52,8 @@ export interface UIActions {
 export const defaultSettings: AppSettings = {
   fontSize: 16,
   wordWrap: true,
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Microsoft YaHei"',
+  englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,
+  chineseFontFamily: DEFAULT_CHINESE_FONT_FAMILY,
   githubRepo: '',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash-exp',

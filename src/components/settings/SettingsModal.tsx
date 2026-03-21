@@ -389,14 +389,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </button>
                     </div>
 
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Font Family</label>
-                      <input
-                        type="text"
-                        value={settings.fontFamily}
-                        onChange={(e) => onUpdateSettings({ ...settings, fontFamily: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">English Font</label>
+                        <input
+                          type="text"
+                          value={settings.englishFontFamily}
+                          onChange={(e) => onUpdateSettings({ ...settings, englishFontFamily: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Used primarily for Latin letters, numbers, and symbols.</p>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Chinese Font</label>
+                        <input
+                          type="text"
+                          value={settings.chineseFontFamily}
+                          onChange={(e) => onUpdateSettings({ ...settings, chineseFontFamily: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Default is Fangzheng XingHei. Chinese characters will prefer this font.</p>
+                      </div>
                     </div>
                   </div>
                 </div>

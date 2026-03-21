@@ -33,6 +33,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onExportPdf
 }) => {
   const isDark = themeMode === 'dark';
+  const displayFileName = fileName.replace(/\.md$/i, '');
 
   return (
     <div className="sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-gray-200/50 bg-white/80 px-4 py-3 transition-colors dark:border-white/5 dark:bg-black/50 md:px-6 md:py-2 backdrop-blur-md">
@@ -54,7 +55,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm md:text-base">
-                  {fileName}
+                  {displayFileName}
                 </span>
                 {isSaving && (
                   <span className="flex items-center gap-1 text-[10px] text-gray-400 font-medium animate-pulse">

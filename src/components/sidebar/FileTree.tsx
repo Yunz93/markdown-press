@@ -94,9 +94,9 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
     >
       <div
         className={`
-          flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm border border-transparent
+          flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm font-medium border border-transparent
           ${isActive
-            ? 'bg-white shadow-sm dark:bg-white/10 text-black dark:text-white font-medium'
+            ? 'bg-white shadow-sm dark:bg-white/10 text-black dark:text-white'
             : 'hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'}
           ${isDragOver ? 'bg-accent-DEFAULT/20 border-accent-DEFAULT dark:bg-accent-DEFAULT/20 dark:border-accent-DEFAULT' : ''}
         `}
