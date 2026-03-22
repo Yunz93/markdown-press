@@ -58,8 +58,12 @@ function isMarkdownFile(name: string): boolean {
   return /\.(md|markdown)$/i.test(name);
 }
 
+function isHtmlFile(name: string): boolean {
+  return /\.html?$/i.test(name);
+}
+
 function isPreviewOnlyFile(name: string): boolean {
-  return isImageFile(name) || isPdfFile(name);
+  return isImageFile(name) || isPdfFile(name) || isHtmlFile(name);
 }
 
 function collectAffectedOpenTabIds(files: FileNode[], openTabs: string[], target: FileNode): string[] {
@@ -114,7 +118,12 @@ export function useFileOperations() {
       setCurrentFilePath(file.path);
 
       if (isPreviewOnlyFile(file.name)) {
-        updateTabContent(file.id, '');
+        if (isHtmlFile(file.name)) {
+          const text = await readFile(file);
+          updateTabContent(file.id, text);
+        } else {
+          updateTabContent(file.id, '');
+        }
         setViewMode(ViewMode.PREVIEW);
         return;
       }

@@ -1,4 +1,5 @@
 import React, { forwardRef, useRef, useMemo, useEffect, useImperativeHandle, useLayoutEffect, useCallback, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
@@ -60,10 +61,15 @@ function isPdfAttachment(fileName: string): boolean {
   return /\.pdf$/i.test(fileName);
 }
 
-function getPreviewFileType(filePath: string | null | undefined): 'markdown' | 'image' | 'pdf' | 'unsupported' {
+function isHtmlDocument(fileName: string): boolean {
+  return /\.html?$/i.test(fileName);
+}
+
+function getPreviewFileType(filePath: string | null | undefined): 'markdown' | 'image' | 'pdf' | 'html' | 'unsupported' {
   if (!filePath) return 'markdown';
   if (isImageAttachment(filePath)) return 'image';
   if (isPdfAttachment(filePath)) return 'pdf';
+  if (isHtmlDocument(filePath)) return 'html';
   if (isMarkdownNote(filePath)) return 'markdown';
   return 'unsupported';
 }
@@ -169,6 +175,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const hasActiveFile = Boolean(activeTabId);
   const previewFileType = useMemo(() => getPreviewFileType(currentFilePath), [currentFilePath]);
   const isMarkdownPreview = previewFileType === 'markdown';
+  const isHtmlPreview = previewFileType === 'html';
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const [enhancedBodyHtml, setEnhancedBodyHtml] = useState('');
   const [paneWidth, setPaneWidth] = useState(0);
@@ -357,18 +364,28 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     () => (isMarkdownPreview ? flattenHeadingNodes(parseHeadings(content)) : []),
     [content, isMarkdownPreview]
   );
+  const sanitizedHtmlPreview = useMemo(() => {
+    if (!isHtmlPreview || !content) {
+      return '';
+    }
+
+    return DOMPurify.sanitize(content, {
+      ADD_TAGS: ['iframe', 'style'],
+      ADD_ATTR: ['allow', 'allowfullscreen', 'class', 'frameborder', 'href', 'id', 'rel', 'scrolling', 'src', 'style', 'target', 'title'],
+    });
+  }, [content, isHtmlPreview]);
   const attachmentResolverContext = useMemo(
     () => createAttachmentResolverContext(files, rootFolderPath, currentFilePath),
     [files, rootFolderPath, currentFilePath]
   );
 
   useEffect(() => {
-    if (!isMarkdownPreview) {
+    if (!isMarkdownPreview && !isHtmlPreview) {
       setEnhancedBodyHtml('');
       return;
     }
 
-    const baseHtml = parsedContent.bodyHTML;
+    const baseHtml = isMarkdownPreview ? parsedContent.bodyHTML : sanitizedHtmlPreview;
     setEnhancedBodyHtml(baseHtml);
 
     if (!baseHtml || typeof DOMParser === 'undefined') {
@@ -379,7 +396,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
     void (async () => {
       const parsed = new DOMParser().parseFromString(baseHtml, 'text/html');
-      const embeds = Array.from(parsed.body.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'));
+      const embeds = isMarkdownPreview
+        ? Array.from(parsed.body.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
+        : [];
       const markdownImages = Array.from(parsed.body.querySelectorAll<HTMLImageElement>('img'));
 
       await Promise.all(markdownImages.map(async (image) => {
@@ -559,16 +578,18 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     currentFilePath,
     fileContents,
     highlighter,
+    isHtmlPreview,
     isMarkdownPreview,
     parsedContent.bodyHTML,
     readFile,
+    sanitizedHtmlPreview,
     settings.themeMode,
   ]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!currentFilePath || previewFileType === 'markdown' || previewFileType === 'unsupported') {
+    if (!currentFilePath || previewFileType === 'markdown' || previewFileType === 'html' || previewFileType === 'unsupported') {
       setAssetPreviewSrc('');
       return;
     }
@@ -939,6 +960,12 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
                 Loading preview...
               </div>
+            ) : previewFileType === 'html' ? (
+              <div
+                className="preview-html-document editor-pane-width-constrained mx-auto w-full"
+                style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
+                dangerouslySetInnerHTML={{ __html: enhancedBodyHtml || sanitizedHtmlPreview }}
+              />
             ) : previewFileType === 'unsupported' ? (
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
                 Preview is not supported for this file type.

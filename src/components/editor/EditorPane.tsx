@@ -12,6 +12,7 @@ import { getCompositeFontFamily } from '../../utils/fontSettings';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { getFileSystem } from '../../types/filesystem';
 import { resolveEditorCodeLanguage } from '../../utils/editorCodeLanguages';
+import type { AttachmentPasteFormat } from '../../types';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -72,6 +73,16 @@ function getImageExtension(mimeType: string): string {
     default:
       return 'png';
   }
+}
+
+function buildPastedImageMarkdown(path: string, format: AttachmentPasteFormat): string {
+  if (format === 'markdown') {
+    const fileName = path.split('/').filter(Boolean).pop() || 'image';
+    const altText = fileName.replace(/\.[^.]+$/, '');
+    return `![${altText}](${path})`;
+  }
+
+  return `![[${path}]]`;
 }
 
 const markdownHighlightStyle = HighlightStyle.define([
@@ -298,7 +309,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       await writeBinaryFile(imagePath, new Uint8Array(arrayBuffer));
       await refreshFileTree();
 
-      const insertText = `![[${imageMarkdownPath}]]`;
+      const insertText = buildPastedImageMarkdown(
+        imageMarkdownPath,
+        settings.attachmentPasteFormat || 'obsidian'
+      );
       const selection = view.state.selection.main;
       view.dispatch({
         changes: { from: selection.from, to: selection.to, insert: insertText },
@@ -310,7 +324,15 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       console.error('Failed to paste image attachment:', error);
       showNotification('Failed to paste image attachment.', 'error');
     }
-  }, [currentFilePath, refreshFileTree, rootFolderPath, settings.resourceFolder, showNotification, writeBinaryFile]);
+  }, [
+    currentFilePath,
+    refreshFileTree,
+    rootFolderPath,
+    settings.attachmentPasteFormat,
+    settings.resourceFolder,
+    showNotification,
+    writeBinaryFile,
+  ]);
 
   const emitScrollPercentage = useCallback((scrollContainer: HTMLElement) => {
     if (isSyncingScroll.current) return;

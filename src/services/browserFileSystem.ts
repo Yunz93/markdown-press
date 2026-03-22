@@ -15,6 +15,7 @@ export class BrowserFileSystem implements IFileSystem {
   private static readonly TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
   private static readonly IMAGE_FILE_REGEX = /\.(png|jpe?g|gif|svg|webp|bmp)$/i;
   private static readonly PDF_FILE_REGEX = /\.pdf$/i;
+  private static readonly HTML_FILE_REGEX = /\.html?$/i;
 
   static getInstance(): BrowserFileSystem {
     if (!BrowserFileSystem.instance) {
@@ -342,6 +343,7 @@ export class BrowserFileSystem implements IFileSystem {
             || name.endsWith('.markdown')
             || BrowserFileSystem.IMAGE_FILE_REGEX.test(name)
             || BrowserFileSystem.PDF_FILE_REGEX.test(name)
+            || BrowserFileSystem.HTML_FILE_REGEX.test(name)
           )
         ) {
           nodes.push({

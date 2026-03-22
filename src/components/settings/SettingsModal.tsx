@@ -488,7 +488,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Clipboard images are saved into this folder inside the current knowledge base, then inserted as <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">![[path/to/image.png]]</code>.
+                        Clipboard images are saved into this folder inside the current knowledge base.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Attachment Paste Format</label>
+                      <select
+                        value={settings.attachmentPasteFormat}
+                        onChange={(e) => onUpdateSettings({ ...settings, attachmentPasteFormat: e.target.value as AppSettings['attachmentPasteFormat'] })}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                      >
+                        <option value="obsidian">Obsidian: ![[path/to/image.png]]</option>
+                        <option value="markdown">Markdown: ![](&lt;path/to/image.png&gt;)</option>
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Choose whether pasted image attachments use Obsidian embeds or standard Markdown image syntax.
                       </p>
                     </div>
                   </div>

@@ -905,6 +905,38 @@ html[data-app-booting="true"] *::after {
   min-width: 0;
 }
 
+.preview-html-document {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
+  color: #0f172a;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.preview-html-document img,
+.preview-html-document svg,
+.preview-html-document video,
+.preview-html-document canvas,
+.preview-html-document iframe {
+  max-width: 100%;
+}
+
+.preview-html-document iframe {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.preview-html-document pre {
+  overflow-x: auto;
+}
+
 .preview-pane-document.markdown-body pre,
 .preview-pane-document.markdown-body table,
 .preview-pane-document.markdown-body blockquote,
@@ -1252,6 +1284,15 @@ html[data-app-booting="true"] *::after {
   border-left-color: rgba(192, 132, 252, 0.32);
   color: #ddd6fe;
   background: rgba(192, 132, 252, 0.06);
+}
+
+.dark .preview-html-document {
+  color: #e2e8f0;
+}
+
+.dark .preview-html-document iframe {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.8);
 }
 
 .dark .preview-pane-document.markdown-body code {

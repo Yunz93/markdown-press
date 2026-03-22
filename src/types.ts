@@ -69,6 +69,7 @@ export interface KnowledgeBaseMeta {
 }
 
 export type ThemeMode = 'light' | 'dark';
+export type AttachmentPasteFormat = 'markdown' | 'obsidian';
 
 export interface AppSettings {
   fontSize: number;
@@ -76,6 +77,7 @@ export interface AppSettings {
   englishFontFamily: string;
   chineseFontFamily: string;
   resourceFolder: string;
+  attachmentPasteFormat: AttachmentPasteFormat;
   githubRepo: string;
   geminiApiKey?: string;
   geminiModel?: string;

@@ -49,6 +49,7 @@ export const defaultSettings: AppSettings = {
   englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,
   chineseFontFamily: DEFAULT_CHINESE_FONT_FAMILY,
   resourceFolder: 'resources',
+  attachmentPasteFormat: 'obsidian',
   githubRepo: '',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash-exp',

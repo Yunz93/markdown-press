@@ -10,6 +10,7 @@ import type { IFileSystem } from '../types/filesystem';
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
 const DOCUMENT_EXTENSIONS = ['.pdf'];
+const HTML_EXTENSIONS = ['.html', '.htm'];
 const CONFIG_EXTENSIONS = ['.json', '.yaml', '.yml', '.toml'];
 const TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
 
@@ -389,6 +390,7 @@ export class TauriFileSystem implements IFileSystem {
             MARKDOWN_EXTENSIONS.some(e => ext.endsWith(e)) ||
             (this.showImages && IMAGE_EXTENSIONS.some(e => ext.endsWith(e))) ||
             DOCUMENT_EXTENSIONS.some(e => ext.endsWith(e)) ||
+            HTML_EXTENSIONS.some(e => ext.endsWith(e)) ||
             (this.showConfigFiles && CONFIG_EXTENSIONS.some(e => ext.endsWith(e)));
 
           if (!shouldIncludeFile) continue;
