@@ -542,6 +542,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { readFile } = useFileSystem();
   const fileContents = useAppStore((state) => state.fileContents);
+  const themeMode = useAppStore((state) => state.settings.themeMode);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [dialogState, setDialogState] = useState<DialogState>({ type: null });
@@ -711,6 +712,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onMoveToRoot(sourceId);
   }, [extractDraggedNodeId, onMoveToRoot]);
 
+  const sidebarSurfaceStyle = useMemo(() => ({
+    '--sidebar-width': `${width}px`,
+    backgroundColor: themeMode === 'dark' ? '#090d15' : 'rgba(248, 250, 252, 0.9)',
+    backdropFilter: themeMode === 'dark' ? 'none' : 'blur(20px)',
+    WebkitBackdropFilter: themeMode === 'dark' ? 'none' : 'blur(20px)',
+    boxShadow: themeMode === 'dark'
+      ? 'inset -1px 0 0 rgba(255, 255, 255, 0.04)'
+      : 'inset -1px 0 0 rgba(255, 255, 255, 0.28)',
+  }) as React.CSSProperties, [themeMode, width]);
+
   const handleSearchResultSelect = useCallback(async (file: FileNode, snippet?: SidebarSearchSnippet) => {
     await onFileSelect(file);
     if (snippet) {
@@ -732,11 +743,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <aside
         ref={sidebarRef}
-        style={{ '--sidebar-width': `${width}px` } as React.CSSProperties}
+        style={sidebarSurfaceStyle}
         className={`
+        sidebar-shell
         fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
         transition-[transform,width,opacity,border-color] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
-        glass border-r border-gray-200/50 dark:border-white/5
+        glass border-r border-gray-200/50 dark:border-white/10
         ${isOpen
           ? 'translate-x-0 md:w-[var(--sidebar-width)] opacity-100'
           : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:border-r-transparent pointer-events-none'
@@ -766,12 +778,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search"
-                className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.04] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white dark:focus:bg-white/[0.06]"
+                className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/70 dark:bg-[#141a25] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white/90 dark:focus:bg-[#181f2c]"
               />
             </label>
             <button
               onClick={() => setDialogState({ type: 'newFile', defaultValue: 'Untitled' })}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/85 dark:bg-white/[0.04] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08] active:scale-95"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"
               title="New Note"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -818,7 +830,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {searchResults.map(({ file, filenameMatched, snippets }) => (
                   <div
                     key={file.id}
-                    className="rounded-2xl border border-gray-200/70 bg-white/90 p-3 shadow-sm transition-colors hover:border-gray-300 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
+                    className="rounded-2xl border border-gray-200/70 bg-white/72 p-3 shadow-sm transition-colors hover:border-gray-300 hover:bg-white/90 dark:border-white/10 dark:bg-[#121923] dark:hover:border-white/20 dark:hover:bg-[#18212e]"
                   >
                     <button
                       onClick={() => void handleSearchResultSelect(file)}
@@ -845,7 +857,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <button
                             key={`${file.id}-${snippet.start}-${index}`}
                             onClick={() => void handleSearchResultSelect(file, snippet)}
-                            className="w-full rounded-xl border border-gray-200/70 bg-gray-50/80 px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/70 dark:border-white/10 dark:bg-black/20 dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10"
+                            className="w-full rounded-xl border border-gray-200/70 bg-white/55 px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/70 dark:border-white/10 dark:bg-[#0f151f] dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10"
                           >
                             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                               Paragraph around line {snippet.line}
@@ -900,7 +912,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div>
             <button
               onClick={() => setShowTrash(!showTrash)}
-              className="flex items-center justify-between w-full px-3 py-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors text-gray-500 dark:text-gray-400 text-xs font-medium"
+              className="flex items-center justify-between w-full px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg transition-colors text-gray-500 dark:text-gray-400 text-xs font-medium"
             >
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -933,7 +945,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={onSwitchKnowledgeBase}
-            className="flex items-center justify-between gap-2 w-full px-3 py-2.5 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.03] hover:bg-gray-100/80 dark:hover:bg-white/[0.06] transition-colors"
+            className="flex items-center justify-between gap-2 w-full px-3 py-2.5 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/60 dark:bg-[#121923] hover:bg-white/90 dark:hover:bg-[#18212e] transition-colors"
             title={currentKnowledgeBasePath || 'Open Knowledge Base'}
           >
             <div className="flex items-center gap-2 min-w-0">

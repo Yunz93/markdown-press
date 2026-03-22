@@ -77,7 +77,7 @@ export const defaultSettings: AppSettings = {
     { key: 'date created', defaultValue: '{now}' },
     { key: 'date modified', defaultValue: '{now}' },
   ],
-  autoSaveInterval: 1000,
+  autoSaveInterval: 60000,
 };
 
 /**

@@ -1,10 +1,14 @@
-# Markdown Press
+# M記
 
 [English](./README.en.md)
 
-Markdown Press 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 编辑器，面向本地知识库写作场景，强调编辑体验、预览一致性和知识库链接能力。
+<p align="center">
+  <img src="./icons/markdown-press-logo-m.svg" alt="M記 logo" width="120" />
+</p>
 
-![Markdown Press preview](docs/assets/markdown-press-preview.png)
+M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 编辑器，面向本地知识库写作场景，强调编辑体验、预览一致性和知识库链接能力。
+
+![M記 preview](docs/assets/markdown-press-preview.png)
 
 ## 功能概览
 
@@ -47,7 +51,7 @@ Markdown Press 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面
 
 ### 主工作区
 
-![Markdown Press workspace](docs/assets/markdown-press-preview.png)
+![M記 workspace](docs/assets/markdown-press-preview.png)
 
 ## 技术栈
 

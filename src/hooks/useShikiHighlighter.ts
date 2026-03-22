@@ -7,6 +7,26 @@ interface ShikiHighlighter {
   loadLanguage?: (...langs: string[]) => Promise<void>;
 }
 
+interface ShikiModule {
+  bundledLanguages?: Record<string, unknown>;
+  createHighlighter?: (options: { themes: string[]; langs: string[] }) => Promise<ShikiHighlighter>;
+}
+
+async function importShikiModule(): Promise<ShikiModule | null> {
+  try {
+    return await import('shiki/bundle/web');
+  } catch (webError) {
+    console.warn('Failed to load shiki web bundle, falling back to default entry.', webError);
+  }
+
+  try {
+    return await import('shiki');
+  } catch (defaultError) {
+    console.error('Failed to import shiki from all known entrypoints.', defaultError);
+    return null;
+  }
+}
+
 /**
  * Lazily loads the Shiki syntax highlighter.
  * Extracted from App.tsx to keep the component clean.
@@ -18,7 +38,9 @@ export function useShikiHighlighter(markdownContent = '') {
 
   useEffect(() => {
     let cancelled = false;
-    import('shiki').then(({ bundledLanguages, createHighlighter }) => {
+    importShikiModule().then((module) => {
+      if (!module) return;
+      const { bundledLanguages, createHighlighter } = module;
       if (typeof createHighlighter !== 'function') return;
       const bundledLanguageIds = new Set(Object.keys(bundledLanguages ?? {}));
       bundledLanguageIdsRef.current = bundledLanguageIds;
@@ -37,7 +59,7 @@ export function useShikiHighlighter(markdownContent = '') {
           }
         })
         .catch((e) => console.error('Failed to load shiki', e));
-    }).catch((e) => console.error('Failed to import shiki', e));
+    });
 
     return () => { cancelled = true; };
   }, []);

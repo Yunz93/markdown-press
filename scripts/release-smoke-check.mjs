@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const distDir = join(projectRoot, 'dist');
 const distAssetsDir = join(distDir, 'assets');
-const appBundlePath = join(projectRoot, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'markdown-press.app');
+const appBundlePath = join(projectRoot, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'M記.app');
 
 const shouldBuildApp = process.argv.includes('--app');
 
@@ -66,6 +66,7 @@ if (shouldBuildApp) {
 const checklist = [
   'Cold launch the packaged app and verify the first opened file has correct editor width.',
   'In Preview mode, open Outline in a non-fullscreen window and confirm the panel renders and headings jump correctly.',
+  'Open a note with fenced code blocks and confirm syntax highlighting still works in the packaged app.',
   'Compare Editor mode styling against dev: caret, frontmatter colors, markdown token colors, and line wrapping.',
   'Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.',
   'Click external links from Preview and confirm the system browser opens.',

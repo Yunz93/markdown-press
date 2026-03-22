@@ -25,7 +25,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
   }
 
   return (
-    <div className="mt-2 max-h-32 overflow-y-auto bg-black/5 dark:bg-white/5 rounded-lg p-1">
+    <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-gray-200/60 bg-white/45 p-1 dark:border-white/10 dark:bg-[#0f151f]">
       <div className="mb-1 flex items-center justify-end px-1">
         <button
           onClick={onEmptyTrash}
@@ -38,7 +38,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
       {trashItems.map(node => (
         <div
           key={node.id}
-          className="flex items-center justify-between px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded group text-gray-600 dark:text-gray-300 text-xs"
+          className="group flex items-center justify-between rounded px-2 py-1.5 text-xs text-gray-600 hover:bg-black/[0.04] dark:text-gray-300 dark:hover:bg-[#161e2a]"
           onContextMenu={(e) => onContextMenu?.(e, node)}
         >
           <span className="truncate flex-1 pr-2">{node.name}</span>

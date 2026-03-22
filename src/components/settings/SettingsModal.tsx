@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import type { AppSettings, MetadataField } from '../../types';
 
+function formatAutoSaveInterval(intervalMs: number): string {
+  if (intervalMs < 60000) {
+    return `${Math.round(intervalMs / 1000)}s`;
+  }
+
+  const minutes = intervalMs / 60000;
+  return Number.isInteger(minutes) ? `${minutes}min` : `${minutes.toFixed(1)}min`;
+}
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -491,20 +500,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-Save Interval</label>
-                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.autoSaveInterval}ms</span>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{formatAutoSaveInterval(settings.autoSaveInterval)}</span>
                       </div>
                       <input
                         type="range"
-                        min="100"
-                        max="5000"
-                        step="100"
+                        min="5000"
+                        max="1800000"
+                        step="5000"
                         value={settings.autoSaveInterval}
                         onChange={(e) => onUpdateSettings({ ...settings, autoSaveInterval: parseInt(e.target.value) })}
                         className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
                       />
                       <div className="flex justify-between mt-1 text-xs text-gray-400">
-                        <span>100ms</span>
                         <span>5s</span>
+                        <span>30min</span>
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">

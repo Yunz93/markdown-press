@@ -164,6 +164,7 @@ const App: React.FC = () => {
   ));
   const autoOpenAttemptedRef = React.useRef(false);
   const mainContentRef = useRef<HTMLElement | null>(null);
+  const [isRestoringKnowledgeBase, setIsRestoringKnowledgeBase] = useState(false);
 
   // Auto-open last knowledge base after hydration
   useEffect(() => {
@@ -171,10 +172,27 @@ const App: React.FC = () => {
     autoOpenAttemptedRef.current = true;
 
     const lastKnowledgeBase = settings.lastKnowledgeBasePath;
-    if (!lastKnowledgeBase || rootFolderPath) return;
+    if (!lastKnowledgeBase || rootFolderPath) {
+      setIsRestoringKnowledgeBase(false);
+      return;
+    }
 
-    void openKnowledgeBase(lastKnowledgeBase, { silentSuccess: true });
+    setIsRestoringKnowledgeBase(true);
+    void openKnowledgeBase(lastKnowledgeBase, { silentSuccess: true })
+      .finally(() => {
+        setIsRestoringKnowledgeBase(false);
+      });
   }, [settingsHydrated, settings.lastKnowledgeBasePath, rootFolderPath, openKnowledgeBase]);
+
+  useEffect(() => {
+    if (!settingsHydrated || typeof document === 'undefined') return;
+
+    const frame = window.requestAnimationFrame(() => {
+      document.documentElement.removeAttribute('data-app-booting');
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [settingsHydrated]);
 
   // Keep the watched/saved path derived from the active tab and current file tree.
   useEffect(() => {
@@ -274,7 +292,7 @@ const App: React.FC = () => {
     async () => {
       if (currentFilePath) {
         await forceSave();
-        showNotification('Saved!', 'success');
+        showNotification('Change saved', 'success');
       }
     },
     handleAIAnalyze,
@@ -337,6 +355,7 @@ const App: React.FC = () => {
     !rootFolderPath &&
     files.length === 0 &&
     !hasKnowledgeBaseHistory;
+  const shouldShowStartupLoading = !settingsHydrated || isRestoringKnowledgeBase;
   const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
   const responsiveOutlineWidth = Math.min(
     outlineWidth,
@@ -353,7 +372,7 @@ const App: React.FC = () => {
   const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - OUTLINE_PANEL_GAP;
   const minimumWorkspaceWidthWithOutline = getMinimumWorkspaceWidthWithOutline(viewMode);
   const canShowOutlinePanel = Boolean(activeTabId) && workspaceWidthWithOutline >= minimumWorkspaceWidthWithOutline;
-  const isOutlineVisible = isOutlineOpen && canShowOutlinePanel;
+  const isOutlineVisible = Boolean(activeTabId) && isOutlineOpen;
   const canShowOutlineToggle = Boolean(activeTabId);
   const contentDensity = (
     viewMode === ViewMode.SPLIT ||
@@ -362,10 +381,35 @@ const App: React.FC = () => {
     isOutlineVisible
   ) ? 'compact' : 'comfortable';
 
-  if (!settingsHydrated) {
+  if (shouldShowStartupLoading) {
     return (
-      <div className="h-screen bg-gray-50 dark:bg-black text-gray-500 dark:text-gray-400 flex items-center justify-center">
-        <div className="text-sm font-medium tracking-wide">Loading workspace...</div>
+      <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
+              M
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold">
+                {isRestoringKnowledgeBase ? 'Restoring Workspace' : 'Loading M記'}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {isRestoringKnowledgeBase
+                  ? 'Opening your last knowledge base and restoring the workspace.'
+                  : 'Preparing your workspace settings.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/90 dark:bg-black/20 px-4 py-3">
+            <svg className="h-5 w-5 animate-spin text-gray-500 dark:text-gray-300" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V1a11 11 0 00-7.78 18.78l2.12-2.12A8 8 0 014 12z" />
+            </svg>
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              {isRestoringKnowledgeBase ? 'Opening knowledge base...' : 'Loading workspace...'}
+            </span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -376,7 +420,7 @@ const App: React.FC = () => {
         <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
-              KB
+              M
             </div>
             <div>
               <h1 className="text-xl font-semibold">Choose Your Knowledge Base</h1>
@@ -451,7 +495,7 @@ const App: React.FC = () => {
           <SplitView
             highlighter={highlighter}
             onContentChange={handleContentChange}
-            isOutlineOpen={isOutlineVisible}
+            isOutlineOpen={isOutlineOpen}
             canShowOutline={canShowOutlinePanel}
             canShowOutlineToggle={canShowOutlineToggle}
             contentDensity={contentDensity}

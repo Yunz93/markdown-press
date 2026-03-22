@@ -44,6 +44,10 @@ function isExternalLink(href: string): boolean {
   return /^(https?:|mailto:|tel:)/i.test(href.trim());
 }
 
+function hasUriScheme(value: string): boolean {
+  return /^[a-z][a-z\d+\-.]*:/i.test(value.trim());
+}
+
 function isImageAttachment(fileName: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
 }
@@ -376,10 +380,31 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     void (async () => {
       const parsed = new DOMParser().parseFromString(baseHtml, 'text/html');
       const embeds = Array.from(parsed.body.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'));
+      const markdownImages = Array.from(parsed.body.querySelectorAll<HTMLImageElement>('img'));
+
+      await Promise.all(markdownImages.map(async (image) => {
+        const originalSrc = image.getAttribute('data-original-src')?.trim() || image.getAttribute('src')?.trim();
+        if (!originalSrc) return;
+
+        const resolvedAttachment = !hasUriScheme(originalSrc)
+          ? await resolveAttachmentTarget(attachmentResolverContext, originalSrc)
+          : null;
+        const previewTarget = resolvedAttachment?.path ?? originalSrc;
+
+        try {
+          const warmedSrc = await warmPreviewImage(previewTarget, currentFilePath || undefined);
+          image.setAttribute('src', warmedSrc);
+        } catch {
+          image.setAttribute('src', previewTarget);
+        }
+
+        image.setAttribute('data-original-src', previewTarget);
+        image.setAttribute('decoding', 'async');
+      }));
 
       if (embeds.length === 0) {
         if (!cancelled) {
-          setEnhancedBodyHtml(baseHtml);
+          setEnhancedBodyHtml(parsed.body.innerHTML);
         }
         return;
       }

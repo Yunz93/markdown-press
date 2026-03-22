@@ -144,7 +144,6 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
     const token = tokens[idx];
     const rawLang = token.info.trim().split(/\s+/)[0] || '';
     const lang = normalizeShikiLanguage(rawLang);
-    const supportedLangs = highlighter?.getLoadedLanguages?.() || [];
 
     if (lang === 'mermaid' || lang === 'mmd') {
       return baseFence
@@ -152,7 +151,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
         : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
     }
 
-    if (highlighter && lang && supportedLangs.includes(lang)) {
+    if (highlighter && lang) {
       try {
         return highlighter.codeToHtml(token.content.trim(), { lang, theme });
       } catch (error) {
@@ -189,7 +188,22 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   // Sanitize HTML to prevent XSS attacks
   return DOMPurify.sanitize(renderedHtml, {
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
-    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'data-wikilink', 'data-wiki-embed', 'data-wiki-target', 'data-wiki-label', 'data-wiki-width', 'data-wiki-height', 'data-block-id'], // iframe attributes
+    // Preserve Shiki token styling while still sanitizing the rest of the HTML.
+    ADD_ATTR: [
+      'allow',
+      'allowfullscreen',
+      'frameborder',
+      'scrolling',
+      'style',
+      'tabindex',
+      'data-wikilink',
+      'data-wiki-embed',
+      'data-wiki-target',
+      'data-wiki-label',
+      'data-wiki-width',
+      'data-wiki-height',
+      'data-block-id',
+    ],
   });
 }
 

@@ -4,9 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/src/app-icon.png" />
-    <title>Markdown Press</title>
+    <title>M記</title>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        root.setAttribute('data-app-booting', 'true');
+
+        try {
+          var persisted = window.localStorage.getItem('markdown-press-settings');
+          if (persisted) {
+            var parsed = JSON.parse(persisted);
+            var settings = (parsed && parsed.state && parsed.state.settings) || (parsed && parsed.settings) || {};
+            if (settings.themeMode === 'dark') {
+              root.classList.add('dark');
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to restore theme before app boot.', error);
+        }
+
+        var isDark = root.classList.contains('dark');
+        var background = isDark ? '#020617' : '#f8fafc';
+        root.style.backgroundColor = background;
+        document.addEventListener('DOMContentLoaded', function () {
+          document.body.style.backgroundColor = background;
+        });
+      })();
+    </script>
     <style>
-      body { margin: 0; background: #f9fafb; }
+      html, body { margin: 0; background: #f8fafc; }
+      html.dark, html.dark body { background: #020617; color-scheme: dark; }
       .loading-container {
         display: flex;
         justify-content: center;
@@ -15,12 +42,15 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: #666;
       }
+      html.dark .loading-container {
+        color: rgba(226, 232, 240, 0.8);
+      }
     </style>
   </head>
   <body class="h-screen overflow-hidden bg-gray-50 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300">
     <div id="root">
       <div class="loading-container">
-        Loading Markdown Press...
+        Loading M記...
       </div>
     </div>
     <script type="module" src="./index.tsx"></script>

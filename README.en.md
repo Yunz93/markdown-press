@@ -1,10 +1,14 @@
-# Markdown Press
+# M記
 
 [中文](./README.md)
 
-Markdown Press is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. It is designed for local knowledge-base writing, with a strong focus on editing ergonomics, preview fidelity, and wiki-style navigation.
+<p align="center">
+  <img src="./icons/markdown-press-logo-m.svg" alt="M記 logo" width="120" />
+</p>
 
-![Markdown Press preview](docs/assets/markdown-press-preview.png)
+M記 is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. It is designed for local knowledge-base writing, with a strong focus on editing ergonomics, preview fidelity, and wiki-style navigation.
+
+![M記 preview](docs/assets/markdown-press-preview.png)
 
 ## Highlights
 
@@ -47,7 +51,7 @@ Markdown Press is a desktop Markdown editor built with Tauri 2, React 19, and Ty
 
 ### Main Workspace
 
-![Markdown Press workspace](docs/assets/markdown-press-preview.png)
+![M記 workspace](docs/assets/markdown-press-preview.png)
 
 ## Tech Stack
 

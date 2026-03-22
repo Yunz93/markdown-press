@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "markdown-press",
+  "productName": "M記",
   "version": "0.1.0",
   "identifier": "com.bxyz.markdown-press",
   "build": {
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https:; font-src 'self' data:;"
+      "csp": "default-src 'self'; connect-src 'self' https: blob: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: asset:; worker-src 'self' blob: asset:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: https:; font-src 'self' data:; frame-src 'self' blob: asset:; object-src 'self' blob: asset:; media-src 'self' blob: asset: https:;"
     }
   },
   "bundle": {

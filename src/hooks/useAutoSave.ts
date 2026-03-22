@@ -41,7 +41,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   } = useAppStore();
 
   // Use configured auto-save interval or override from options
-  const effectiveDebounceMs = debounceMs ?? settings?.autoSaveInterval ?? 1000;
+  const effectiveDebounceMs = debounceMs ?? settings?.autoSaveInterval ?? 60000;
 
   const contentRef = useRef(content);
   const pathRef = useRef(currentFilePath);
