@@ -1,16 +1,1 @@
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Build
-        run: echo 'Building...'
+name: Release\n\non:\n  push:\n    branches:\n      - main\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v2\n      - name: Setup Node.js\n        uses: actions/setup-node@v2\n        with:\n          node-version: '14'\n      - name: Build\n        run: npm install && npm run build\n      - name: Tauri Build\n        uses: tauri-apps/tauri-action@v1\n        with:\n          args: build\n          target: all\n      - name: Create Release\n        uses: softprops/action-gh-release@v1\n        with:\n          tag_name: v1.0.0\n          release_name: Release v1.0.0\n          body: 'Release of version 1.0.0'\n          draft: false\n          prerelease: false\n        env:\n          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
