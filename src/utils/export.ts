@@ -1,6 +1,8 @@
 import { renderMarkdown } from './markdown';
 import { parseFrontmatter } from './frontmatter';
 import { renderMermaidDiagrams } from './markdown-extensions';
+import { createAttachmentResolverContext, resolveAttachmentTarget } from './attachmentResolver';
+import { parseWikiLinkReference } from './wikiLinks';
 import katexCss from 'katex/dist/katex.min.css?inline';
 import githubMarkdownCss from 'github-markdown-css/github-markdown.css?inline';
 import { isTauriEnvironment } from '../types/filesystem';
@@ -12,6 +14,7 @@ export interface ExportOptions {
   fontFamily?: string;
   fontSize?: number;
   includeProperties?: boolean;
+  highlighter?: any | null;
 }
 
 interface SaveExportOptions {
@@ -23,8 +26,6 @@ interface SaveExportOptions {
 }
 
 const PREVIEW_PANEL_WIDTH_PX = 768;
-const PREVIEW_MARKDOWN_PADDING_PX = 45;
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -71,7 +72,7 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
       --text-primary: ${theme === 'dark' ? '#c9d1d9' : '#24292f'};
       --text-secondary: ${theme === 'dark' ? '#8b949e' : '#57606a'};
       --border-color: ${theme === 'dark' ? '#30363d' : '#d0d7de'};
-      --accent-color: #58a6ff;
+      --accent-color: ${theme === 'dark' ? '#67e8f9' : '#0f9aa8'};
       --code-bg: ${theme === 'dark' ? '#161b22' : '#f6f8fa'};
     }
 
@@ -96,10 +97,10 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
     .export-document {
       font-family: ${resolvedFontFamily};
       font-size: ${resolvedFontSize}px;
-      line-height: 1.6;
+      line-height: 1.95;
       background-color: transparent;
       color: var(--text-primary);
-      padding: 32px 32px 96px;
+      padding: 30px 28px 72px;
       max-width: ${PREVIEW_PANEL_WIDTH_PX}px;
       margin: 0 auto;
     }
@@ -109,11 +110,12 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
       min-width: 200px;
       max-width: 980px;
       margin: 0;
-      padding: ${PREVIEW_MARKDOWN_PADDING_PX}px;
+      padding: 52px 56px 72px;
       background: transparent !important;
       color: var(--text-primary);
       font-family: inherit !important;
       font-size: inherit !important;
+      line-height: inherit;
     }
 
     html:not(.dark) .export-document .markdown-body,
@@ -145,9 +147,69 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
       color: var(--text-primary);
     }
 
-    .export-document .markdown-body pre,
+    .export-document .markdown-body h1,
+    .export-document .markdown-body h2,
+    .export-document .markdown-body h3,
+    .export-document .markdown-body h4,
+    .export-document .markdown-body h5,
+    .export-document .markdown-body h6 {
+      color: ${theme === 'dark' ? '#c084fc' : '#7c3aed'};
+    }
+
+    .export-document .markdown-body a {
+      color: var(--accent-color);
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 0.12em;
+    }
+
+    .export-document .markdown-body blockquote {
+      border-left-color: ${theme === 'dark' ? 'rgba(192, 132, 252, 0.32)' : 'rgba(124, 58, 237, 0.28)'};
+      color: ${theme === 'dark' ? '#ddd6fe' : '#5b21b6'};
+      background: ${theme === 'dark' ? 'rgba(192, 132, 252, 0.06)' : 'rgba(124, 58, 237, 0.04)'};
+      border-radius: 0 14px 14px 0;
+      padding: 0.9rem 1rem;
+    }
+
     .export-document .markdown-body code {
-      background-color: var(--code-bg);
+      background: ${theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)'};
+      border-radius: 0.45rem;
+      padding: 0.15rem 0.35rem;
+      font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 0.92em;
+    }
+
+    .export-document .markdown-body pre {
+      background: ${theme === 'dark' ? 'rgba(15, 23, 42, 0.82)' : 'rgba(248, 250, 252, 0.96)'};
+      color: ${theme === 'dark' ? '#e5eef9' : '#1f2937'};
+      border: 1px solid ${theme === 'dark' ? 'rgba(148, 163, 184, 0.16)' : 'rgba(148, 163, 184, 0.2)'};
+      border-radius: 1rem;
+      padding: 0;
+      overflow: hidden;
+      box-shadow: ${theme === 'dark'
+        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+        : 'inset 0 1px 0 rgba(255, 255, 255, 0.55)'};
+    }
+
+    .export-document .markdown-body pre code {
+      display: block;
+      padding: 1rem 1.1rem;
+      background: transparent;
+      border-radius: 0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .export-document .markdown-body pre .shiki {
+      margin: 0;
+      padding: 1rem 1.1rem;
+      overflow-x: auto;
+      border-radius: inherit;
+      background: transparent !important;
+    }
+
+    .export-document .markdown-body pre .shiki code {
+      padding: 0;
+      background: transparent;
     }
 
     .export-document .markdown-body table th,
@@ -308,10 +370,11 @@ export function exportToHtml(
     fontFamily,
     fontSize,
     includeProperties = true,
+    highlighter,
   } = options;
 
   const { frontmatter, body } = parseFrontmatter(content);
-  const htmlContent = renderMarkdown(body);
+  const htmlContent = renderMarkdown(body, { highlighter, themeMode: theme });
 
   // Generate table of contents if requested
   const toc = includeTOC ? generateTOC(body) : '';
@@ -494,9 +557,100 @@ async function waitForNextPaint(frames = 2): Promise<void> {
   }
 }
 
-export async function downloadHtml(htmlContent: string, filename: string): Promise<boolean> {
+function isImageAttachmentName(fileName: string): boolean {
+  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
+}
+
+async function enhanceExportAttachmentEmbeds(container: HTMLElement, sourceFilePath?: string): Promise<void> {
+  if (!sourceFilePath) return;
+
+  const resolverContext = createAttachmentResolverContext([], null, sourceFilePath);
+  const embeds = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-wiki-embed="true"], article.markdown-body a.markdown-embed'));
+
+  for (const embed of embeds) {
+    const target = embed.dataset.wikiTarget?.trim() || embed.dataset.wikilink?.trim();
+    if (!target) continue;
+
+    const resolvedTarget = await resolveAttachmentTarget(resolverContext, target);
+    if (!resolvedTarget || !isImageAttachmentName(resolvedTarget.name)) {
+      continue;
+    }
+
+    const parsedTarget = parseWikiLinkReference(target, { embed: true });
+    const width = embed.dataset.wikiWidth || (parsedTarget.embedSize?.width ? String(parsedTarget.embedSize.width) : '');
+    const height = embed.dataset.wikiHeight || (parsedTarget.embedSize?.height ? String(parsedTarget.embedSize.height) : '');
+    const image = document.createElement('img');
+    image.className = 'preview-attachment-image';
+    image.alt = embed.dataset.wikiLabel?.trim() || resolvedTarget.name;
+    image.setAttribute('data-original-src', resolvedTarget.path);
+    image.setAttribute('src', resolvedTarget.path);
+
+    if (width) {
+      image.style.width = `${width}px`;
+    }
+    if (height) {
+      image.style.height = `${height}px`;
+      image.style.objectFit = 'contain';
+    }
+
+    embed.replaceWith(image);
+  }
+}
+
+async function prepareHtmlForDownload(htmlContent: string, sourceFilePath?: string): Promise<string> {
+  const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
+  const styleContent = Array.from(parsed.head.querySelectorAll('style'))
+    .map((style) => style.textContent || '')
+    .join('\n');
+  const theme = parsed.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const backgroundColor = theme === 'dark' ? '#0d1117' : '#ffffff';
+
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.position = 'fixed';
+  host.style.left = '-10000px';
+  host.style.top = '0';
+  host.style.width = `${PREVIEW_PANEL_WIDTH_PX + 64}px`;
+  host.style.background = backgroundColor;
+  host.style.pointerEvents = 'none';
+  host.style.visibility = 'hidden';
+  host.style.opacity = '0';
+  host.style.overflow = 'visible';
+  host.innerHTML = `<style>${styleContent}</style>${parsed.body.innerHTML}`;
+  document.body.appendChild(host);
+
+  try {
+    const exportRoot = host.querySelector('.export-document') as HTMLElement | null;
+    const renderTarget = exportRoot || host;
+
+    renderTarget.setAttribute('data-theme', theme);
+    await enhanceExportAttachmentEmbeds(renderTarget, sourceFilePath);
+    await prepareExportImages(renderTarget, sourceFilePath);
+    await renderMermaidDiagrams(renderTarget);
+    await waitForImages(renderTarget);
+    if ('fonts' in document) {
+      await document.fonts.ready;
+    }
+    await waitForNextPaint(2);
+
+    const processedBody = host.innerHTML.replace(/^<style>[\s\S]*?<\/style>/, '');
+    return `<!DOCTYPE html>
+<html lang="${parsed.documentElement.lang || 'en'}" data-theme="${theme}">
+<head>
+${parsed.head.innerHTML}
+</head>
+<body>
+${processedBody}
+</body>
+</html>`;
+  } finally {
+    host.remove();
+  }
+}
+
+export async function downloadHtml(htmlContent: string, filename: string, sourceFilePath?: string): Promise<boolean> {
   return saveExportFile({
-    content: htmlContent,
+    content: await prepareHtmlForDownload(htmlContent, sourceFilePath),
     filename,
     defaultExtension: '.html',
     mimeType: 'text/html;charset=utf-8',
@@ -542,7 +696,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-async function inlineRemoteImage(src: string): Promise<string> {
+async function inlineFetchedImage(src: string): Promise<string> {
   const normalizedSrc = normalizeRemoteImageUrl(src);
   const response = await fetch(normalizedSrc, {
     mode: 'cors',
@@ -552,7 +706,7 @@ async function inlineRemoteImage(src: string): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch remote image: ${response.status}`);
+    throw new Error(`Failed to fetch image: ${response.status}`);
   }
 
   return blobToDataUrl(await response.blob());
@@ -610,11 +764,13 @@ async function prepareExportImages(container: HTMLElement, sourceFilePath?: stri
     image.referrerPolicy = 'no-referrer';
 
     let exportSrc = resolvedSrc;
-    if (isRemoteHttpUrl(resolvedSrc)) {
-      try {
-        exportSrc = await inlineRemoteImage(resolvedSrc);
-      } catch (error) {
-        console.warn('Failed to inline remote image for PDF export:', resolvedSrc, error);
+    try {
+      exportSrc = await inlineFetchedImage(resolvedSrc);
+    } catch (error) {
+      if (isRemoteHttpUrl(resolvedSrc)) {
+        console.warn('Failed to inline remote image for HTML export:', resolvedSrc, error);
+      } else {
+        console.warn('Failed to inline local image for HTML export:', resolvedSrc, error);
       }
     }
 

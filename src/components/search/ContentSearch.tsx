@@ -167,13 +167,6 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
       } else {
         goToNextMatch();
       }
-    } else if (e.key === 'F3') {
-      e.preventDefault();
-      if (e.shiftKey) {
-        goToPrevMatch();
-      } else {
-        goToNextMatch();
-      }
     }
   }, [onClose, goToNextMatch, goToPrevMatch]);
 

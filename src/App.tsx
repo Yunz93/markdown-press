@@ -106,6 +106,7 @@ const App: React.FC = () => {
     settings,
     outlineHeadings,
     activeHeadingId,
+    closeTab,
     setContent,
     setCurrentFilePath,
     setSidebarOpen,
@@ -121,7 +122,7 @@ const App: React.FC = () => {
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
-  const { highlighter } = useShikiHighlighter();
+  const { highlighter } = useShikiHighlighter(content);
   const { handleAIAnalyze } = useAIAnalyze();
   const fileOps = useFileOperations();
 
@@ -135,7 +136,7 @@ const App: React.FC = () => {
   }, [settings.englishFontFamily, settings.chineseFontFamily]);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
-  const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave);
+  const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
 
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
@@ -233,19 +234,6 @@ const App: React.FC = () => {
     };
   }, [activeTabId, currentFilePath, readFile, showNotification, watchFile]);
 
-  // Outline toggle shortcut (Ctrl+O)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMod = e.ctrlKey || e.metaKey;
-      if (isMod && e.key.toLowerCase() === 'o') {
-        e.preventDefault();
-        setIsOutlineOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   useEffect(() => {
     const mainEl = mainContentRef.current;
     if (!mainEl) return;
@@ -290,8 +278,21 @@ const App: React.FC = () => {
       }
     },
     handleAIAnalyze,
-    () => setIsSearchBarOpen(true),
-    () => setSettingsOpen(true)
+    {
+      onSearch: () => setIsSearchBarOpen(true),
+      onOpenSettings: () => setSettingsOpen(true),
+      onToggleOutline: () => setIsOutlineOpen((prev) => !prev),
+      onToggleSidebar: () => setSidebarOpen(!isSidebarOpen),
+      onNewNote: () => { void fileOps.handleCreateFile(undefined, 'Untitled'); },
+      onNewFolder: () => { void fileOps.handleNewFolder(undefined, 'Untitled Folder'); },
+      onCloseTab: () => {
+        if (activeTabId) {
+          closeTab(activeTabId);
+        }
+      },
+      onOpenKnowledgeBase: () => { void handleSwitchKnowledgeBase(); },
+      onExportHtml: () => { void handleExportToHtml(); },
+    }
   );
 
   const handleHeadingClick = useCallback((id: string, line: number) => {
@@ -306,7 +307,7 @@ const App: React.FC = () => {
     }
 
     if (viewMode !== ViewMode.EDITOR) {
-      const scrollOptions = { alignTopRatio: 0.18, behavior: 'smooth' as const };
+      const scrollOptions = { alignMode: 'center' as const, behavior: 'smooth' as const };
       requestPreviewHeadingScroll(activeTabId, id, scrollOptions);
     }
   }, [activeTabId, content, setActiveHeadingId, viewMode]);
@@ -441,7 +442,7 @@ const App: React.FC = () => {
           onToggleTheme={toggleTheme}
           themeMode={settings.themeMode}
           onPublishBlog={handlePublishBlog}
-          onExportPdf={handleExportToPdf}
+          onExportHtml={handleExportToHtml}
         />
 
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />

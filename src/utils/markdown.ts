@@ -1,8 +1,10 @@
 import DOMPurify from 'dompurify';
 import { useEffect } from 'react';
 import MarkdownIt from 'markdown-it';
+import type Token from 'markdown-it/lib/token.mjs';
 import taskLists from 'markdown-it-task-lists';
 import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensions';
+import { normalizeShikiLanguage } from './shikiLanguages';
 import { parseWikiLinkReference } from './wikiLinks';
 import type { ThemeMode } from '../types';
 
@@ -19,6 +21,38 @@ const createMarkdownIt = () => {
     typographer: true,
     breaks: true,
   }).use(taskLists);
+
+  md.core.ruler.after('inline', 'obsidian_block_references', (state) => {
+    const nextTokens: Token[] = [];
+    let lastRenderableOpenIndex: number | null = null;
+
+    for (let index = 0; index < state.tokens.length; index += 1) {
+      const token = state.tokens[index];
+      const inlineToken = state.tokens[index + 1];
+      const closeToken = state.tokens[index + 2];
+
+      const blockReferenceMatch = token.type === 'paragraph_open'
+        && inlineToken?.type === 'inline'
+        && closeToken?.type === 'paragraph_close'
+        ? inlineToken.content.trim().match(/^\^([A-Za-z0-9_-]+)$/)
+        : null;
+
+      if (blockReferenceMatch) {
+        if (lastRenderableOpenIndex !== null) {
+          nextTokens[lastRenderableOpenIndex]?.attrSet('data-block-id', blockReferenceMatch[1]);
+        }
+        index += 2;
+        continue;
+      }
+
+      const nextIndex = nextTokens.push(token) - 1;
+      if (token.nesting === 1 && ['paragraph_open', 'heading_open', 'blockquote_open', 'list_item_open', 'table_open'].includes(token.type)) {
+        lastRenderableOpenIndex = nextIndex;
+      }
+    }
+
+    state.tokens = nextTokens;
+  });
 
   const parseWikiSyntax = (state: MarkdownIt.StateInline, silent: boolean, embed: boolean) => {
     const start = state.pos;
@@ -61,10 +95,14 @@ const createMarkdownIt = () => {
 
   md.renderer.rules.wikiembed = (tokens, idx) => {
     const rawContent = tokens[idx].content;
-    const { target, displayText } = parseWikiLinkReference(rawContent);
+    const { target, displayText, embedSize } = parseWikiLinkReference(rawContent, { embed: true });
     const escapedTarget = md.utils.escapeHtml(target);
     const escapedLabel = md.utils.escapeHtml(displayText || target);
-    return `<a class="markdown-link markdown-embed" href="#" data-wikilink="${escapedTarget}" data-wiki-embed="true" data-wiki-target="${escapedTarget}" data-wiki-label="${escapedLabel}">${escapedLabel}</a>`;
+    const sizeAttributes = [
+      embedSize?.width ? ` data-wiki-width="${embedSize.width}"` : '',
+      embedSize?.height ? ` data-wiki-height="${embedSize.height}"` : '',
+    ].join('');
+    return `<a class="markdown-link markdown-embed" href="#" data-wikilink="${escapedTarget}" data-wiki-embed="true" data-wiki-target="${escapedTarget}" data-wiki-label="${escapedLabel}"${sizeAttributes}>${escapedLabel}</a>`;
   };
 
   // Initialize extensions
@@ -104,7 +142,8 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
 
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    const lang = token.info.trim().toLowerCase();
+    const rawLang = token.info.trim().split(/\s+/)[0] || '';
+    const lang = normalizeShikiLanguage(rawLang);
     const supportedLangs = highlighter?.getLoadedLanguages?.() || [];
 
     if (lang === 'mermaid' || lang === 'mmd') {
@@ -150,7 +189,7 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   // Sanitize HTML to prevent XSS attacks
   return DOMPurify.sanitize(renderedHtml, {
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
-    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'data-wikilink', 'data-wiki-embed', 'data-wiki-target', 'data-wiki-label'], // iframe attributes
+    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'data-wikilink', 'data-wiki-embed', 'data-wiki-target', 'data-wiki-label', 'data-wiki-width', 'data-wiki-height', 'data-block-id'], // iframe attributes
   });
 }
 

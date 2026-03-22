@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
 import { generateFrontmatter, parseFrontmatter } from '../utils/frontmatter';
-import { exportToHtml, exportToPdf } from '../utils/export';
+import { downloadHtml, exportToHtml } from '../utils/export';
 import { type Frontmatter } from '../types';
 import { getCompositeFontFamily } from '../utils/fontSettings';
 
@@ -20,7 +20,7 @@ function findFileInTree(nodes: import('../types').FileNode[], id: string): impor
  * Encapsulates PDF export and blog publish actions.
  * Extracted from App.tsx.
  */
-export function useExportActions(forceSave: () => Promise<boolean>) {
+export function useExportActions(forceSave: () => Promise<boolean>, highlighter?: any | null) {
   const {
     files,
     activeTabId,
@@ -31,7 +31,7 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
   const content = useAppStore(selectContent);
   const fontFamily = getCompositeFontFamily(settings);
 
-  const handleExportToPdf = useCallback(async () => {
+  const handleExportToHtml = useCallback(async () => {
     if (!activeTabId || !content) {
       showNotification('No file to export', 'error');
       return;
@@ -46,21 +46,22 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
     try {
       const htmlContent = exportToHtml(content, {
         title: activeFile.name.replace('.md', ''),
-        theme: 'light',
+        theme: settings.themeMode,
         includeTOC: false,
         fontFamily,
         fontSize: settings.fontSize,
         includeProperties: false,
+        highlighter,
       });
-      const saved = await exportToPdf(htmlContent, activeFile.name, activeFile.path);
+      const saved = await downloadHtml(htmlContent, activeFile.name, activeFile.path);
       if (saved) {
-        showNotification('PDF exported', 'success');
+        showNotification('HTML exported', 'success');
       }
     } catch (error) {
-      console.error('Failed to export PDF:', error);
-      showNotification('Failed to export PDF', 'error');
+      console.error('Failed to export HTML:', error);
+      showNotification('Failed to export HTML', 'error');
     }
-  }, [activeTabId, content, files, fontFamily, settings.fontSize, showNotification]);
+  }, [activeTabId, content, files, fontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
     if (!activeTabId) {
@@ -91,5 +92,5 @@ export function useExportActions(forceSave: () => Promise<boolean>) {
     }
   }, [activeTabId, forceSave, setContent, showNotification]);
 
-  return { handleExportToPdf, handlePublishBlog };
+  return { handleExportToHtml, handlePublishBlog };
 }

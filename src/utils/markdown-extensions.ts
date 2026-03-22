@@ -1,5 +1,4 @@
 import katex from 'katex';
-import mermaid from 'mermaid';
 
 // KaTeX options
 const katexOptions: katex.KatexOptions = {
@@ -8,6 +7,29 @@ const katexOptions: katex.KatexOptions = {
   output: 'html',
   trust: false,
 };
+
+let mermaidModulePromise: Promise<typeof import('mermaid')> | null = null;
+let mermaidInitialized = false;
+
+async function getMermaid() {
+  if (!mermaidModulePromise) {
+    mermaidModulePromise = import('mermaid');
+  }
+  const module = await mermaidModulePromise;
+  const mermaid = module.default;
+
+  if (!mermaidInitialized) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'strict',
+      fontFamily: 'inherit',
+    });
+    mermaidInitialized = true;
+  }
+
+  return mermaid;
+}
 
 /**
  * Initialize KaTeX for inline and display math
@@ -102,14 +124,6 @@ export function initKaTeX(md: any) {
  * Initialize Mermaid for diagrams
  */
 export function initMermaid(md: any) {
-  // Configure mermaid
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'default',
-    securityLevel: 'strict',
-    fontFamily: 'inherit',
-  });
-
   // Override fence rule to handle mermaid diagrams
   const defaultFence = md.renderer.rules.fence;
 
@@ -143,6 +157,7 @@ export async function renderMermaidDiagrams(container?: HTMLElement | null) {
   if (elements.length === 0) return;
 
   try {
+    const mermaid = await getMermaid();
     const renderBatchId = Date.now();
 
     for (let i = 0; i < elements.length; i++) {

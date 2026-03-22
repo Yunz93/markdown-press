@@ -6,9 +6,12 @@ import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateC
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
+import { useFileSystem } from '../../hooks/useFileSystem';
+import { getFileSystem } from '../../types/filesystem';
+import { resolveEditorCodeLanguage } from '../../utils/editorCodeLanguages';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -25,6 +28,50 @@ const SYNC_SCROLL_EASING = 0.24;
 const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
 
+function getPathSeparator(path: string): '/' | '\\' {
+  return path.includes('\\') ? '\\' : '/';
+}
+
+function joinFsPath(basePath: string, ...segments: string[]): string {
+  return segments.filter(Boolean).reduce((currentPath, segment) => {
+    const separator = getPathSeparator(currentPath);
+    return currentPath.endsWith(separator)
+      ? `${currentPath}${segment}`
+      : `${currentPath}${separator}${segment}`;
+  }, basePath);
+}
+
+function normalizeSlashes(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+function sanitizeResourceFolder(folder: string): string {
+  return folder
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^\.\//, '');
+}
+
+function getImageExtension(mimeType: string): string {
+  switch (mimeType.toLowerCase()) {
+    case 'image/jpeg':
+      return 'jpg';
+    case 'image/gif':
+      return 'gif';
+    case 'image/webp':
+      return 'webp';
+    case 'image/svg+xml':
+      return 'svg';
+    case 'image/bmp':
+      return 'bmp';
+    case 'image/avif':
+      return 'avif';
+    default:
+      return 'png';
+  }
+}
+
 const markdownHighlightStyle = HighlightStyle.define([
   { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], class: 'tok-heading mp-tok-heading' },
   { tag: tags.strong, class: 'tok-strong mp-tok-strong' },
@@ -33,10 +80,17 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: [tags.quote, tags.list], class: 'mp-tok-muted' },
   { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], class: 'tok-punctuation tok-meta mp-tok-muted-soft' },
   { tag: [tags.monospace, tags.literal, tags.string], class: 'tok-string mp-tok-code' },
+  { tag: [tags.regexp, tags.escape, tags.special(tags.string)], class: 'tok-string tok-regexp mp-tok-code' },
   { tag: [tags.keyword, tags.operatorKeyword], class: 'tok-keyword mp-tok-keyword' },
+  { tag: [tags.controlKeyword, tags.definitionKeyword, tags.moduleKeyword, tags.modifier], class: 'tok-keyword tok-definitionKeyword mp-tok-keyword' },
   { tag: [tags.bool, tags.atom], class: 'tok-bool tok-atom mp-tok-atom' },
   { tag: tags.number, class: 'tok-number mp-tok-number' },
   { tag: [tags.propertyName, tags.attributeName, tags.labelName], class: 'tok-propertyName tok-labelName mp-tok-property' },
+  { tag: [tags.variableName, tags.name, tags.local(tags.variableName)], class: 'tok-variableName mp-tok-variable' },
+  { tag: [tags.definition(tags.variableName), tags.definition(tags.propertyName)], class: 'tok-variableName tok-definition mp-tok-variable' },
+  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], class: 'tok-function mp-tok-function' },
+  { tag: [tags.typeName, tags.className, tags.namespace, tags.macroName], class: 'tok-typeName tok-className mp-tok-type' },
+  { tag: [tags.operator, tags.arithmeticOperator, tags.logicOperator, tags.compareOperator, tags.definitionOperator, tags.updateOperator], class: 'tok-operator mp-tok-operator' },
   { tag: tags.comment, class: 'tok-comment mp-tok-comment' },
 ]);
 
@@ -127,6 +181,53 @@ const frontmatterDecorations = ViewPlugin.fromClass(class {
   decorations: (plugin) => plugin.decorations,
 });
 
+function buildFencedCodeDecorations(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const doc = view.state.doc;
+
+  syntaxTree(view.state).iterate({
+    enter: ({ name, from, to }) => {
+      if (name !== 'FencedCode') return;
+
+      const firstLineNumber = doc.lineAt(from).number;
+      const lastLineNumber = doc.lineAt(Math.max(from, to - 1)).number;
+
+      for (let lineNumber = firstLineNumber; lineNumber <= lastLineNumber; lineNumber += 1) {
+        const line = doc.line(lineNumber);
+        const classNames = ['cm-fenced-code-line'];
+
+        if (lineNumber === firstLineNumber) {
+          classNames.push('cm-fenced-code-line-start', 'cm-fenced-code-line-fence');
+        } else if (lineNumber === lastLineNumber) {
+          classNames.push('cm-fenced-code-line-end', 'cm-fenced-code-line-fence');
+        } else {
+          classNames.push('cm-fenced-code-line-body');
+        }
+
+        builder.add(line.from, line.from, Decoration.line({ class: classNames.join(' ') }));
+      }
+    },
+  });
+
+  return builder.finish();
+}
+
+const fencedCodeDecorations = ViewPlugin.fromClass(class {
+  decorations: DecorationSet;
+
+  constructor(view: EditorView) {
+    this.decorations = buildFencedCodeDecorations(view);
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged) {
+      this.decorations = buildFencedCodeDecorations(update.view);
+    }
+  }
+}, {
+  decorations: (plugin) => plugin.decorations,
+});
+
 const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
   const changes = state.changeByRange((range) => ({
     changes: { from: range.from, to: range.to, insert: '  ' },
@@ -148,8 +249,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   void highlighter;
 
   const content = useAppStore(selectContent);
-  const { setContent, settings, isSaving, activeTabId, viewMode } = useAppStore();
+  const { setContent, settings, isSaving, activeTabId, viewMode, currentFilePath, rootFolderPath, showNotification } = useAppStore();
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
+  const { writeBinaryFile, refreshFileTree } = useFileSystem();
 
   const editorRootRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -173,6 +275,41 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     setContent(nextContent);
   }, [onContentChange, setContent]);
   const updateContentRef = useRef(updateContent);
+
+  const handlePastedImage = useCallback(async (file: File, view: EditorView) => {
+    if (!rootFolderPath) {
+      showNotification('Open a knowledge base before pasting images.', 'error');
+      return;
+    }
+
+    try {
+      const resourceFolder = sanitizeResourceFolder(settings.resourceFolder || 'resources') || 'resources';
+      const targetDir = joinFsPath(rootFolderPath, resourceFolder);
+      const extension = getImageExtension(file.type);
+      const noteBaseName = currentFilePath?.split(/[\\/]/).pop()?.replace(/\.(md|markdown)$/i, '') || 'image';
+      const imageName = `${noteBaseName}-${Date.now()}.${extension}`;
+      const imagePath = joinFsPath(targetDir, imageName);
+      const imageMarkdownPath = normalizeSlashes(joinFsPath(resourceFolder, imageName));
+      const arrayBuffer = await file.arrayBuffer();
+
+      const fileSystem = await getFileSystem();
+      await fileSystem.createDirectory(targetDir);
+      await writeBinaryFile(imagePath, new Uint8Array(arrayBuffer));
+      await refreshFileTree();
+
+      const insertText = `![[${imageMarkdownPath}]]`;
+      const selection = view.state.selection.main;
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: insertText },
+        selection: { anchor: selection.from + insertText.length },
+        scrollIntoView: true,
+      });
+      showNotification(`Image pasted to ${resourceFolder}`, 'success');
+    } catch (error) {
+      console.error('Failed to paste image attachment:', error);
+      showNotification('Failed to paste image attachment.', 'error');
+    }
+  }, [currentFilePath, refreshFileTree, rootFolderPath, settings.resourceFolder, showNotification, writeBinaryFile]);
 
   const emitScrollPercentage = useCallback((scrollContainer: HTMLElement) => {
     if (isSyncingScroll.current) return;
@@ -328,12 +465,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         extensions: [
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Tab', run: insertTwoSpaces }]),
-          markdown(),
+          markdown({ codeLanguages: resolveEditorCodeLanguage }),
           drawSelection(),
           frontmatterDecorations,
+          fencedCodeDecorations,
           wrapCompartment.of(settings.wordWrap ? EditorView.lineWrapping : []),
           syntaxHighlighting(markdownHighlightStyle),
           placeholderCompartment.of(cmPlaceholder(placeholder)),
+          EditorView.domEventHandlers({
+            paste: (event, view) => {
+              const clipboardItems = Array.from(event.clipboardData?.items ?? []);
+              const imageItem = clipboardItems.find((item) => item.type.startsWith('image/'));
+              const imageFile = imageItem?.getAsFile();
+
+              if (!imageFile) {
+                return false;
+              }
+
+              event.preventDefault();
+              void handlePastedImage(imageFile, view);
+              return true;
+            },
+          }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               updateContentRef.current(update.state.doc.toString());
@@ -383,6 +536,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     wrapCompartment,
     emitScrollPercentage,
     cancelSyncedScroll,
+    handlePastedImage,
   ]);
 
   useEffect(() => {

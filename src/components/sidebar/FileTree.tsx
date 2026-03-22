@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import type { FileNode } from '../../types';
 
+const AUTO_EXPAND_ON_DRAG_MS = 420;
+
 interface FileTreeItemProps {
   node: FileNode;
   level: number;
@@ -22,6 +24,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const autoExpandTimerRef = React.useRef<number | null>(null);
 
   const isFolder = node.type === 'folder';
 
@@ -42,9 +46,19 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
 
   const handleDragStart = useCallback((e: React.DragEvent) => {
     e.stopPropagation();
-    e.dataTransfer.setData('application/json', JSON.stringify({ id: node.id }));
+    const payload = JSON.stringify({ id: node.id, type: node.type });
+    e.dataTransfer.setData('application/json', payload);
+    e.dataTransfer.setData('text/plain', node.id);
     e.dataTransfer.effectAllowed = 'move';
-  }, [node.id]);
+    setIsDragging(true);
+  }, [node.id, node.type]);
+
+  const clearAutoExpandTimer = useCallback(() => {
+    if (autoExpandTimerRef.current !== null) {
+      window.clearTimeout(autoExpandTimerRef.current);
+      autoExpandTimerRef.current = null;
+    }
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (!isFolder || node.isTrash) return;
@@ -52,19 +66,27 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setIsDragOver(true);
-  }, [isFolder, node.isTrash]);
+    if (!expanded && autoExpandTimerRef.current === null) {
+      autoExpandTimerRef.current = window.setTimeout(() => {
+        setExpanded(true);
+        autoExpandTimerRef.current = null;
+      }, AUTO_EXPAND_ON_DRAG_MS);
+    }
+  }, [clearAutoExpandTimer, expanded, isFolder, node.isTrash]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-  }, []);
+    clearAutoExpandTimer();
+  }, [clearAutoExpandTimer]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     if (!isFolder) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
+    clearAutoExpandTimer();
 
     const data = e.dataTransfer.getData('application/json');
     if (data) {
@@ -77,30 +99,36 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
         console.error('Drop error', err);
       }
     }
-  }, [isFolder, onMoveNode, node.id]);
+  }, [clearAutoExpandTimer, isFolder, onMoveNode, node.id]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    setIsDragOver(false);
+    clearAutoExpandTimer();
+  }, [clearAutoExpandTimer]);
 
   const isActive = node.id === activeId;
 
   const showChildren = isFolder && (expanded || forceExpanded) && node.children;
 
   return (
-    <div
-      className="select-none"
-      draggable={!node.isTrash}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="select-none">
       <div
         className={`
-          flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm font-medium border border-transparent
+          group flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm font-medium border border-transparent
           ${isActive
             ? 'bg-white shadow-sm dark:bg-white/10 text-black dark:text-white'
             : 'hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'}
           ${isDragOver ? 'bg-accent-DEFAULT/20 border-accent-DEFAULT dark:bg-accent-DEFAULT/20 dark:border-accent-DEFAULT' : ''}
+          ${isDragging ? 'opacity-60' : ''}
         `}
         style={{ paddingLeft: `${Math.max(level * 12 + 12, 12)}px` }}
+        draggable={!node.isTrash}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
         onClick={handleClick}
         onContextMenu={handleRightClick}
       >

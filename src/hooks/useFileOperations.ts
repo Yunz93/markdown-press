@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useFileSystem } from './useFileSystem';
-import type { FileNode } from '../types';
+import { ViewMode, type FileNode } from '../types';
 import { generateFrontmatter } from '../utils/frontmatter';
 
 function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
@@ -46,6 +46,22 @@ function buildMovedPathMap(sourceNode: FileNode, newRootPath: string): Record<st
   return pathMap;
 }
 
+function isImageFile(name: string): boolean {
+  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
+}
+
+function isPdfFile(name: string): boolean {
+  return /\.pdf$/i.test(name);
+}
+
+function isMarkdownFile(name: string): boolean {
+  return /\.(md|markdown)$/i.test(name);
+}
+
+function isPreviewOnlyFile(name: string): boolean {
+  return isImageFile(name) || isPdfFile(name);
+}
+
 function collectAffectedOpenTabIds(files: FileNode[], openTabs: string[], target: FileNode): string[] {
   return openTabs.filter((tabId) => {
     const node = findFileInTree(files, tabId);
@@ -68,6 +84,7 @@ export function useFileOperations() {
     closeTab,
     updateTabContent,
     setCurrentFilePath,
+    setViewMode,
     showNotification,
   } = useAppStore();
 
@@ -88,9 +105,21 @@ export function useFileOperations() {
     if (file.type === 'folder') return;
 
     try {
-      const cachedContent = fileContents[file.id];
+      if (!isMarkdownFile(file.name) && !isPreviewOnlyFile(file.name)) {
+        showNotification(`Preview is not supported for ${file.name}`, 'error');
+        return;
+      }
+
       addTab(file.id);
       setCurrentFilePath(file.path);
+
+      if (isPreviewOnlyFile(file.name)) {
+        updateTabContent(file.id, '');
+        setViewMode(ViewMode.PREVIEW);
+        return;
+      }
+
+      const cachedContent = fileContents[file.id];
 
       if (cachedContent === undefined) {
         const text = await readFile(file);
@@ -100,7 +129,7 @@ export function useFileOperations() {
       console.error('Failed to read file:', file.path, e);
       showNotification(`Failed to read file: ${file.name}`, 'error');
     }
-  }, [readFile, addTab, setCurrentFilePath, updateTabContent, showNotification, fileContents]);
+  }, [readFile, addTab, setCurrentFilePath, setViewMode, updateTabContent, showNotification, fileContents]);
 
   const handleCreateFile = useCallback(async (parentFolder?: FileNode, fileName?: string) => {
     const timestamp = Date.now();

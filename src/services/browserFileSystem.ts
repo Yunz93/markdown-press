@@ -11,6 +11,8 @@ export class BrowserFileSystem implements IFileSystem {
   private fileHandles: Map<string, FileSystemFileHandle> = new Map();
   private rootPath: string = '';
   private static readonly TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
+  private static readonly IMAGE_FILE_REGEX = /\.(png|jpe?g|gif|svg|webp|bmp)$/i;
+  private static readonly PDF_FILE_REGEX = /\.pdf$/i;
 
   static getInstance(): BrowserFileSystem {
     if (!BrowserFileSystem.instance) {
@@ -113,6 +115,28 @@ export class BrowserFileSystem implements IFileSystem {
       await writable.close();
     } catch (error) {
       console.error(`Failed to write file ${path}:`, error);
+      throw error;
+    }
+  }
+
+  async writeBinaryFile(path: string, content: Uint8Array): Promise<void> {
+    try {
+      let fileHandle: FileSystemFileHandle;
+
+      if (path.startsWith('browser-') && this.fileHandles.has(path)) {
+        fileHandle = this.fileHandles.get(path)!;
+      } else if (this.directoryHandle) {
+        const relativePath = this.getRelativePath(path);
+        fileHandle = await this.getFileHandle(this.directoryHandle, relativePath, true);
+      } else {
+        throw new Error('No file handle or directory available');
+      }
+
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    } catch (error) {
+      console.error(`Failed to write binary file ${path}:`, error);
       throw error;
     }
   }
@@ -269,7 +293,16 @@ export class BrowserFileSystem implements IFileSystem {
         const isTrashDirectory = entry.kind === 'directory' && isAtRoot && BrowserFileSystem.TRASH_DIRECTORY_NAMES.has(name);
         const nodeInTrash = inTrash || isTrashDirectory;
 
-        if (entry.kind === 'file' && (nodeInTrash || name.endsWith('.md') || name.endsWith('.markdown'))) {
+        if (
+          entry.kind === 'file'
+          && (
+            nodeInTrash
+            || name.endsWith('.md')
+            || name.endsWith('.markdown')
+            || BrowserFileSystem.IMAGE_FILE_REGEX.test(name)
+            || BrowserFileSystem.PDF_FILE_REGEX.test(name)
+          )
+        ) {
           nodes.push({
             id: fullPath,
             name,

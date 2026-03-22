@@ -64,6 +64,13 @@ const shortcutLabels: Record<string, string> = {
   aiAnalyze: 'AI Enhance',
   search: 'Search',
   settings: 'Open Settings',
+  toggleOutline: 'Toggle Outline',
+  toggleSidebar: 'Toggle Sidebar',
+  newNote: 'New Note',
+  newFolder: 'New Folder',
+  closeTab: 'Close Tab',
+  openKnowledgeBase: 'Open Knowledge Base',
+  exportHtml: 'Export HTML',
 };
 
 type ShortcutGroupId = 'workspace' | 'editing' | 'search' | 'panels';
@@ -108,7 +115,22 @@ const shortcutGroups: ShortcutGroupConfig[] = [
         id: 'toggleOutline',
         label: 'Toggle Outline',
         description: 'Show or hide the document outline panel when available.',
-        shortcuts: ['Ctrl+O'],
+        editable: true,
+        settingKey: 'toggleOutline',
+      },
+      {
+        id: 'toggleSidebar',
+        label: 'Toggle Sidebar',
+        description: 'Show or hide the file sidebar.',
+        editable: true,
+        settingKey: 'toggleSidebar',
+      },
+      {
+        id: 'openKnowledgeBase',
+        label: 'Open Knowledge Base',
+        description: 'Switch to another local knowledge base folder.',
+        editable: true,
+        settingKey: 'openKnowledgeBase',
       },
       {
         id: 'openSettings',
@@ -124,6 +146,27 @@ const shortcutGroups: ShortcutGroupConfig[] = [
     label: 'Editing',
     description: 'Writing and content-editing shortcuts.',
     items: [
+      {
+        id: 'newNote',
+        label: 'New Note',
+        description: 'Create a new note at the vault root.',
+        editable: true,
+        settingKey: 'newNote',
+      },
+      {
+        id: 'newFolder',
+        label: 'New Folder',
+        description: 'Create a new folder at the vault root.',
+        editable: true,
+        settingKey: 'newFolder',
+      },
+      {
+        id: 'closeTab',
+        label: 'Close Tab',
+        description: 'Close the current open tab.',
+        editable: true,
+        settingKey: 'closeTab',
+      },
       {
         id: 'aiAnalyze',
         label: 'AI Enhance',
@@ -141,7 +184,7 @@ const shortcutGroups: ShortcutGroupConfig[] = [
         id: 'redo',
         label: 'Redo',
         description: 'Reapply the last undone change.',
-        shortcuts: ['Ctrl+Shift+Z', 'Ctrl+Y'],
+        shortcuts: ['Ctrl+Shift+Z'],
       },
     ],
   },
@@ -161,13 +204,13 @@ const shortcutGroups: ShortcutGroupConfig[] = [
         id: 'nextMatch',
         label: 'Next Match',
         description: 'Jump to the next search result in the search panel.',
-        shortcuts: ['Enter', 'F3'],
+        shortcuts: ['Enter'],
       },
       {
         id: 'previousMatch',
         label: 'Previous Match',
         description: 'Jump to the previous search result in the search panel.',
-        shortcuts: ['Shift+Enter', 'Shift+F3'],
+        shortcuts: ['Shift+Enter'],
       },
     ],
   },
@@ -181,6 +224,13 @@ const shortcutGroups: ShortcutGroupConfig[] = [
         label: 'Close Active Panel',
         description: 'Close the active search panel, dialog, or context menu.',
         shortcuts: ['Escape'],
+      },
+      {
+        id: 'exportHtml',
+        label: 'Export HTML',
+        description: 'Export the current preview as a standalone HTML document.',
+        editable: true,
+        settingKey: 'exportHtml',
       },
     ],
   },
@@ -220,12 +270,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     }
 
-    if (!key) return 'Ctrl+S'; // Default fallback
+    if (!key) return '';
     return [...modifiers, key].join('+');
   };
 
   const handleShortcutChange = (key: string, value: string) => {
     const normalized = normalizeShortcut(value);
+    if (!normalized) return;
     onUpdateSettings({
       shortcuts: { ...settings.shortcuts, [key]: normalized }
     });
@@ -411,6 +462,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         />
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Default is Fangzheng XingHei. Chinese characters will prefer this font.</p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Attachments</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Resource Folder</label>
+                      <input
+                        type="text"
+                        value={settings.resourceFolder}
+                        onChange={(e) => onUpdateSettings({ ...settings, resourceFolder: e.target.value })}
+                        placeholder="resources"
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Clipboard images are saved into this folder inside the current knowledge base, then inserted as <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">![[path/to/image.png]]</code>.
+                      </p>
                     </div>
                   </div>
                 </div>

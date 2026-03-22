@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
-import { ViewMode } from '../types';
+import { ViewMode, type ShortcutConfig } from '../types';
 
 interface UseKeyboardShortcutsOptions {
   onSave?: () => void;
@@ -8,6 +8,13 @@ interface UseKeyboardShortcutsOptions {
   onAIAnalyze?: () => void;
   onSearch?: () => void;
   onOpenSettings?: () => void;
+  onToggleOutline?: () => void;
+  onToggleSidebar?: () => void;
+  onNewNote?: () => void;
+  onNewFolder?: () => void;
+  onCloseTab?: () => void;
+  onOpenKnowledgeBase?: () => void;
+  onExportHtml?: () => void;
 }
 
 function getNextViewMode(viewMode: ViewMode): ViewMode {
@@ -16,94 +23,126 @@ function getNextViewMode(viewMode: ViewMode): ViewMode {
   return ViewMode.EDITOR;
 }
 
-// Parse shortcut string like "Ctrl+S" into structured format
-const parseShortcut = (shortcut: string) => {
-  const parts = shortcut.toLowerCase().split('+').map(p => p.trim());
+function normalizeKeyName(key: string): string {
+  const normalized = key.trim().toLowerCase();
+  if (normalized === 'cmd' || normalized === 'command' || normalized === 'meta') return 'meta';
+  if (normalized === 'ctrl' || normalized === 'control') return 'ctrl';
+  if (normalized === 'option') return 'alt';
+  if (normalized === 'esc') return 'escape';
+  if (normalized === 'comma') return ',';
+  if (normalized === 'period') return '.';
+  if (normalized === 'slash') return '/';
+  return normalized;
+}
+
+function normalizeCodeName(code: string): string {
+  const normalized = code.trim().toLowerCase();
+  if (normalized === 'comma') return ',';
+  if (normalized === 'period') return '.';
+  if (normalized === 'slash') return '/';
+  if (normalized.startsWith('key') && normalized.length === 4) {
+    return normalized.slice(3);
+  }
+  if (normalized.startsWith('digit') && normalized.length === 6) {
+    return normalized.slice(5);
+  }
+  return normalized;
+}
+
+function parseShortcut(shortcut: string) {
+  const parts = shortcut.split('+').map((part) => normalizeKeyName(part));
+  const key = parts.find((part) => !['ctrl', 'meta', 'shift', 'alt'].includes(part)) ?? '';
+
   return {
-    hasCtrl: parts.includes('ctrl') || parts.includes('meta'),
-    hasShift: parts.includes('shift'),
-    hasAlt: parts.includes('alt'),
-    key: parts.find(p => !['ctrl', 'meta', 'shift', 'alt'].includes(p))
+    key,
+    ctrl: parts.includes('ctrl') || parts.includes('meta'),
+    shift: parts.includes('shift'),
+    alt: parts.includes('alt'),
   };
-};
+}
 
-// Check if current key event matches shortcut
-const matchesShortcut = (event: KeyboardEvent, shortcut: string) => {
-  const shortcutConfig = parseShortcut(shortcut);
+function matchesShortcut(event: KeyboardEvent, shortcut: string): boolean {
+  if (!shortcut.trim()) return false;
 
+  const parsed = parseShortcut(shortcut);
   const isMod = event.ctrlKey || event.metaKey;
-  if (shortcutConfig.hasCtrl && !isMod) return false;
-  if (!shortcutConfig.hasCtrl && isMod) return false;
-  if (shortcutConfig.hasShift && !event.shiftKey) return false;
-  if (shortcutConfig.hasAlt && !event.altKey) return false;
-  if (!shortcutConfig.key) return false;
 
-  return event.key.toLowerCase() === shortcutConfig.key;
-};
+  if (parsed.ctrl !== isMod) return false;
+  if (parsed.shift !== event.shiftKey) return false;
+  if (parsed.alt !== event.altKey) return false;
+  if (!parsed.key) return false;
 
-/**
- * Hook for keyboard shortcuts management
- */
-export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) {
-  const { onSave, onToggleView, onAIAnalyze, onSearch, onOpenSettings } = options;
+  return normalizeKeyName(event.key) === parsed.key || normalizeCodeName(event.code) === parsed.key;
+}
 
-  const {
-    settings,
-    viewMode,
+function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element) return false;
+  const tagName = element.tagName.toLowerCase();
+  return element.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+}
+
+function createShortcutMap(shortcuts: ShortcutConfig, handlers: Record<keyof ShortcutConfig, (() => void) | undefined>) {
+  return (Object.keys(shortcuts) as Array<keyof ShortcutConfig>).map((key) => ({
+    shortcut: shortcuts[key],
+    handler: handlers[key],
+  }));
+}
+
+function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?: (() => void) | null) {
+  const { settings, viewMode, setViewMode } = useAppStore();
+
+  return useCallback((event: KeyboardEvent) => {
+    const shortcutEntries = createShortcutMap(settings.shortcuts, {
+      save: saveHandler ?? options.onSave,
+      toggleView: options.onToggleView ?? (() => setViewMode(getNextViewMode(viewMode))),
+      aiAnalyze: options.onAIAnalyze,
+      search: options.onSearch,
+      settings: options.onOpenSettings,
+      toggleOutline: options.onToggleOutline,
+      toggleSidebar: options.onToggleSidebar,
+      newNote: options.onNewNote,
+      newFolder: options.onNewFolder,
+      closeTab: options.onCloseTab,
+      openKnowledgeBase: options.onOpenKnowledgeBase,
+      exportHtml: options.onExportHtml,
+    });
+
+    for (const entry of shortcutEntries) {
+      if (!entry.handler || !matchesShortcut(event, entry.shortcut)) {
+        continue;
+      }
+
+      if (!entry.shortcut.toLowerCase().includes('ctrl') && !entry.shortcut.toLowerCase().includes('meta') && isEditableTarget(event.target)) {
+        continue;
+      }
+
+      event.preventDefault();
+      entry.handler();
+      return;
+    }
+  }, [
+    options.onAIAnalyze,
+    options.onCloseTab,
+    options.onExportHtml,
+    options.onNewFolder,
+    options.onNewNote,
+    options.onOpenKnowledgeBase,
+    options.onOpenSettings,
+    options.onSave,
+    options.onSearch,
+    options.onToggleOutline,
+    options.onToggleSidebar,
+    options.onToggleView,
+    settings.shortcuts,
     setViewMode,
-    showNotification
-  } = useAppStore();
+    viewMode,
+    saveHandler,
+  ]);
+}
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    const isMod = event.ctrlKey || event.metaKey;
-    if (!isMod) return;
-
-    const shortcuts = settings.shortcuts;
-
-    // Check save shortcut
-    if (matchesShortcut(event, shortcuts.save)) {
-      event.preventDefault();
-      if (onSave) {
-        onSave();
-        showNotification('Saved', 'success');
-      }
-      return;
-    }
-
-    // Check toggle view shortcut
-    if (matchesShortcut(event, shortcuts.toggleView)) {
-      event.preventDefault();
-      if (onToggleView) {
-        onToggleView();
-      } else {
-        setViewMode(getNextViewMode(viewMode));
-      }
-      return;
-    }
-
-    // Check AI analyze shortcut
-    if (matchesShortcut(event, shortcuts.aiAnalyze)) {
-      event.preventDefault();
-      if (onAIAnalyze) {
-        onAIAnalyze();
-      }
-      return;
-    }
-
-    // Check search shortcut
-    if (matchesShortcut(event, shortcuts.search)) {
-      event.preventDefault();
-      onSearch?.();
-      return;
-    }
-
-    // Check open settings shortcut
-    if (matchesShortcut(event, shortcuts.settings)) {
-      event.preventDefault();
-      onOpenSettings?.();
-      return;
-    }
-  }, [settings.shortcuts, onSave, onToggleView, onAIAnalyze, onSearch, onOpenSettings, viewMode, setViewMode, showNotification]);
+export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) {
+  const handleKeyDown = useShortcutListener(options, null);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -111,52 +150,20 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
   }, [handleKeyDown]);
 }
 
-/**
- * Hook for global keyboard shortcuts (for App-level shortcuts)
- */
 export function useGlobalKeyboardShortcuts(
   executeSave: () => Promise<void>,
   handleAIAnalyze: () => Promise<void>,
-  onSearch?: () => void,
-  onOpenSettings?: () => void
+  options: Omit<UseKeyboardShortcutsOptions, 'onSave' | 'onAIAnalyze'> = {}
 ) {
-  const { settings, viewMode, setViewMode, showNotification } = useAppStore();
+  const handleKeyDown = useShortcutListener({
+    ...options,
+    onAIAnalyze: () => { void handleAIAnalyze(); },
+  }, () => {
+    void executeSave();
+  });
 
   useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const isMod = e.ctrlKey || e.metaKey;
-      if (!isMod) return;
-
-      const shortcuts = settings.shortcuts;
-
-      // Save: Ctrl+S
-      if (matchesShortcut(e, shortcuts.save)) {
-        e.preventDefault();
-        executeSave().then(() => showNotification('Saved', 'success'));
-      }
-      // Toggle view: Ctrl+E
-      else if (matchesShortcut(e, shortcuts.toggleView)) {
-        e.preventDefault();
-        setViewMode(getNextViewMode(viewMode));
-      }
-      // AI Analyze: Ctrl+J
-      else if (matchesShortcut(e, shortcuts.aiAnalyze)) {
-        e.preventDefault();
-        handleAIAnalyze();
-      }
-      // Search: Ctrl+F (default)
-      else if (matchesShortcut(e, shortcuts.search)) {
-        e.preventDefault();
-        onSearch?.();
-      }
-      // Open settings: Ctrl+0 (default)
-      else if (matchesShortcut(e, shortcuts.settings)) {
-        e.preventDefault();
-        onOpenSettings?.();
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [executeSave, handleAIAnalyze, onSearch, onOpenSettings, settings.shortcuts, viewMode, setViewMode, showNotification]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 }

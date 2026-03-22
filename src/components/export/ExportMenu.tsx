@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
-import { exportToHtml, downloadHtml, exportToPdf, exportToPlainText, downloadPlainText } from '../../utils/export';
+import { exportToHtml, downloadHtml, exportToPlainText, downloadPlainText } from '../../utils/export';
 import type { FileNode } from '../../types';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 
@@ -8,7 +8,7 @@ interface ExportMenuProps {
   onClose?: () => void;
 }
 
-export type ExportFormat = 'html' | 'pdf' | 'plaintext';
+export type ExportFormat = 'html' | 'plaintext';
 
 function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   for (const node of nodes) {
@@ -47,21 +47,9 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
           fontFamily,
           fontSize: settings.fontSize,
         });
-        const saved = await downloadHtml(html, filename);
+        const saved = await downloadHtml(html, filename, activeFile?.path);
         if (saved) {
           showNotification('HTML exported', 'success');
-        }
-      } else if (exportFormat === 'pdf') {
-        const html = exportToHtml(content, {
-          theme,
-          includeTOC,
-          fontFamily,
-          fontSize: settings.fontSize,
-          includeProperties: false,
-        });
-        const saved = await exportToPdf(html, filename, activeFile?.path);
-        if (saved) {
-          showNotification('PDF exported', 'success');
         }
       } else if (exportFormat === 'plaintext') {
         const text = exportToPlainText(content);
@@ -103,7 +91,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
           <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">
             Format
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleExport('html')}
               disabled={isExporting}
@@ -118,24 +106,6 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
                 <polyline points="8 6 2 12 8 18" />
               </svg>
               <span className="text-xs">HTML</span>
-            </button>
-
-            <button
-              onClick={() => handleExport('pdf')}
-              disabled={isExporting}
-              className={`export-btn flex flex-col items-center gap-1 p-3 rounded-lg border transition-all ${
-                format === 'pdf'
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-gray-200 dark:border-white/10 hover:border-accent/50'
-              } disabled:opacity-50`}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              <span className="text-xs">PDF</span>
             </button>
 
             <button
@@ -158,7 +128,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* HTML/PDF options */}
+        {/* HTML options */}
         <div className="space-y-2">
           <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block">
             Options

@@ -2,6 +2,10 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
+import { useFileSystem } from '../../hooks/useFileSystem';
+import { useAppStore } from '../../store/appStore';
+import { parseFrontmatter } from '../../utils/frontmatter';
+import { focusEditorRangeByOffset } from '../../utils/editorSelectionBridge';
 import type { FileNode } from '../../types';
 
 const MIN_SIDEBAR_WIDTH = 240;
@@ -10,7 +14,7 @@ const MAX_SIDEBAR_WIDTH = 420;
 interface SidebarProps {
   files: FileNode[];
   activeFileId: string | null;
-  onFileSelect: (file: FileNode) => void;
+  onFileSelect: (file: FileNode) => void | Promise<void>;
   onCreateFile: (parentFolder?: FileNode, fileName?: string) => void;
   onNewFolder: (parentFolder?: FileNode, name?: string) => void;
   onRename: (file: FileNode, newName: string) => void;
@@ -42,6 +46,19 @@ interface DialogState {
   type: 'rename' | 'delete' | 'newFolder' | 'newFile' | 'emptyTrash' | null;
   file?: FileNode;
   defaultValue?: string;
+}
+
+interface SidebarSearchSnippet {
+  text: string;
+  start: number;
+  end: number;
+  line: number;
+}
+
+interface SidebarSearchResult {
+  file: FileNode;
+  filenameMatched: boolean;
+  snippets: SidebarSearchSnippet[];
 }
 
 const TRASH_ROOT_NAMES = new Set(['.trash', '_markdown_press_trash']);
@@ -369,6 +386,102 @@ const getTrashItems = (nodes: FileNode[]): FileNode[] => {
 
 const normalizeSearchTarget = (name: string): string => name.replace(/\.md$/i, '').toLowerCase();
 
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const isMarkdownFile = (fileName: string): boolean => /\.(md|markdown)$/i.test(fileName);
+
+const flattenVisibleFiles = (nodes: FileNode[]): FileNode[] => nodes.flatMap((node) => {
+  if (node.isTrash || isTrashRootNode(node)) return [];
+  if (node.type === 'folder') {
+    return flattenVisibleFiles(node.children ?? []);
+  }
+  return [node];
+});
+
+const buildExcerpt = (paragraph: string, matchIndex: number, matchLength: number): string => {
+  const cleaned = paragraph.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+
+  const safeIndex = Math.max(0, Math.min(matchIndex, cleaned.length));
+  const excerptStart = Math.max(0, safeIndex - 72);
+  const excerptEnd = Math.min(cleaned.length, safeIndex + matchLength + 96);
+  const prefix = excerptStart > 0 ? '…' : '';
+  const suffix = excerptEnd < cleaned.length ? '…' : '';
+  return `${prefix}${cleaned.slice(excerptStart, excerptEnd)}${suffix}`;
+};
+
+const collectParagraphMatches = (content: string, query: string, limit = 3): SidebarSearchSnippet[] => {
+  if (!query.trim()) return [];
+
+  const { body } = parseFrontmatter(content);
+  const bodyOffset = content.length - body.length;
+  const normalizedQuery = query.toLowerCase();
+  const lines = body.split(/\r?\n/);
+  const results: SidebarSearchSnippet[] = [];
+  let paragraphLines: string[] = [];
+  let paragraphStartOffset = bodyOffset;
+  let paragraphStartLine = 1;
+  let offset = bodyOffset;
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0 || results.length >= limit) return;
+    const rawParagraph = paragraphLines.join('\n').trim();
+    if (!rawParagraph) {
+      paragraphLines = [];
+      return;
+    }
+
+    const matchIndex = rawParagraph.toLowerCase().indexOf(normalizedQuery);
+    if (matchIndex >= 0) {
+      results.push({
+        text: buildExcerpt(rawParagraph, matchIndex, query.length),
+        start: paragraphStartOffset + matchIndex,
+        end: paragraphStartOffset + matchIndex + query.length,
+        line: paragraphStartLine,
+      });
+    }
+
+    paragraphLines = [];
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const isBlankLine = !line.trim();
+
+    if (isBlankLine) {
+      flushParagraph();
+      offset += line.length + 1;
+      paragraphStartOffset = offset;
+      paragraphStartLine = index + 2;
+      continue;
+    }
+
+    if (paragraphLines.length === 0) {
+      paragraphStartOffset = offset;
+      paragraphStartLine = index + 1;
+    }
+
+    paragraphLines.push(line);
+    offset += line.length + 1;
+  }
+
+  flushParagraph();
+  return results;
+};
+
+const highlightSearchText = (text: string, query: string): React.ReactNode => {
+  if (!query.trim()) return text;
+
+  const normalizedQuery = query.toLowerCase();
+  return text
+    .split(new RegExp(`(${escapeRegExp(query)})`, 'ig'))
+    .map((part, index) => (
+      part.toLowerCase() === normalizedQuery
+        ? <mark key={`${part}-${index}`} className="rounded bg-amber-200/80 px-0.5 text-amber-950 dark:bg-amber-300/80 dark:text-amber-950">{part}</mark>
+        : <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
+    ));
+};
+
 const isTrashRootNode = (node: FileNode): boolean => (
   node.type === 'folder' &&
   TRASH_ROOT_NAMES.has(node.name)
@@ -427,22 +540,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onWidthChange,
   onClose
 }) => {
+  const { readFile } = useFileSystem();
+  const fileContents = useAppStore((state) => state.fileContents);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [dialogState, setDialogState] = useState<DialogState>({ type: null });
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SidebarSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isRootDragOver, setIsRootDragOver] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const contentCacheRef = useRef(new Map<string, string>());
 
   const extractDraggedNodeId = useCallback((event: React.DragEvent): string | null => {
     const rawPayload = event.dataTransfer.getData('application/json');
-    if (!rawPayload) return null;
+    if (!rawPayload) {
+      return event.dataTransfer.getData('text/plain') || null;
+    }
 
     try {
       const parsed = JSON.parse(rawPayload) as { id?: string };
       return parsed.id ?? null;
     } catch {
-      return null;
+      return event.dataTransfer.getData('text/plain') || null;
     }
   }, []);
 
@@ -455,12 +575,95 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const closeContextMenu = () => setContextMenu(null);
 
   const trashItems = getTrashItems(files);
+  const searchableFiles = useMemo(() => flattenVisibleFiles(files), [files]);
   const filteredFiles = useMemo(
     () => filterNodesByFileName(files, searchQuery),
     [files, searchQuery]
   );
   const hasSearchQuery = searchQuery.trim().length > 0;
   const hasVisibleFiles = filteredFiles.length > 0;
+
+  useEffect(() => {
+    Object.entries(fileContents).forEach(([fileId, content]) => {
+      if (content !== undefined) {
+        contentCacheRef.current.set(fileId, content);
+      }
+    });
+  }, [fileContents]);
+
+  useEffect(() => {
+    const liveIds = new Set(searchableFiles.map((file) => file.id));
+    for (const fileId of Array.from(contentCacheRef.current.keys())) {
+      if (!liveIds.has(fileId)) {
+        contentCacheRef.current.delete(fileId);
+      }
+    }
+  }, [searchableFiles]);
+
+  useEffect(() => {
+    const normalizedQuery = searchQuery.trim();
+    if (!normalizedQuery) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setIsSearching(true);
+
+        const nextResults: SidebarSearchResult[] = [];
+        for (const file of searchableFiles) {
+          if (cancelled) return;
+
+          const filenameMatched = normalizeSearchTarget(file.name).includes(normalizedQuery.toLowerCase())
+            || file.name.toLowerCase().includes(normalizedQuery.toLowerCase());
+          let snippets: SidebarSearchSnippet[] = [];
+
+          if (isMarkdownFile(file.name)) {
+            let content = contentCacheRef.current.get(file.id);
+            if (content === undefined) {
+              try {
+                content = await readFile(file);
+                contentCacheRef.current.set(file.id, content);
+              } catch {
+                content = undefined;
+              }
+            }
+
+            if (content !== undefined) {
+              snippets = collectParagraphMatches(content, normalizedQuery);
+            }
+          }
+
+          if (filenameMatched || snippets.length > 0) {
+            nextResults.push({ file, filenameMatched, snippets });
+          }
+        }
+
+        nextResults.sort((left, right) => {
+          if (left.filenameMatched !== right.filenameMatched) {
+            return left.filenameMatched ? -1 : 1;
+          }
+          if (left.snippets.length !== right.snippets.length) {
+            return right.snippets.length - left.snippets.length;
+          }
+          return left.file.name.localeCompare(right.file.name, 'zh-Hans-CN');
+        });
+
+        if (!cancelled) {
+          setSearchResults(nextResults);
+          setIsSearching(false);
+        }
+      })();
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [readFile, searchQuery, searchableFiles]);
 
   const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (window.innerWidth < 768) return;
@@ -508,6 +711,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onMoveToRoot(sourceId);
   }, [extractDraggedNodeId, onMoveToRoot]);
 
+  const handleSearchResultSelect = useCallback(async (file: FileNode, snippet?: SidebarSearchSnippet) => {
+    await onFileSelect(file);
+    if (snippet) {
+      requestAnimationFrame(() => {
+        focusEditorRangeByOffset(snippet.start, snippet.end, { alignTopRatio: 0.3 });
+      });
+    }
+    if (window.innerWidth < 768) onClose();
+  }, [onClose, onFileSelect]);
+
   return (
     <>
       {isOpen && (
@@ -552,7 +765,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search files"
+                placeholder="Search"
                 className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.04] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white dark:focus:bg-white/[0.06]"
               />
             </label>
@@ -584,6 +797,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-xs mb-3">No local files opened.</p>
               <p className="text-xs text-gray-400">Use the knowledge base button below to open a vault.</p>
             </div>
+          ) : hasSearchQuery ? (
+            isSearching ? (
+              <div className="flex h-40 items-center justify-center px-6 text-sm text-gray-500 dark:text-gray-400">
+                Searching notes...
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 px-6 text-center text-gray-400 dark:text-gray-600">
+                <svg className="mb-3 h-8 w-8 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No matching files</p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  Try another keyword or phrase.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 px-3">
+                {searchResults.map(({ file, filenameMatched, snippets }) => (
+                  <div
+                    key={file.id}
+                    className="rounded-2xl border border-gray-200/70 bg-white/90 p-3 shadow-sm transition-colors hover:border-gray-300 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
+                  >
+                    <button
+                      onClick={() => void handleSearchResultSelect(file)}
+                      className="flex w-full items-start justify-between gap-3 text-left"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          {highlightSearchText(file.name.replace(/\.md$/i, ''), searchQuery)}
+                        </div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">
+                          {file.path}
+                        </div>
+                      </div>
+                      {filenameMatched && (
+                        <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                          Filename
+                        </span>
+                      )}
+                    </button>
+
+                    {snippets.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {snippets.map((snippet, index) => (
+                          <button
+                            key={`${file.id}-${snippet.start}-${index}`}
+                            onClick={() => void handleSearchResultSelect(file, snippet)}
+                            className="w-full rounded-xl border border-gray-200/70 bg-gray-50/80 px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/70 dark:border-white/10 dark:bg-black/20 dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10"
+                          >
+                            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                              Paragraph around line {snippet.line}
+                            </div>
+                            <div className="text-sm leading-6 text-gray-700 dark:text-gray-200">
+                              {highlightSearchText(snippet.text, searchQuery)}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
           ) : !hasVisibleFiles ? (
             <div className="flex flex-col items-center justify-center h-40 px-6 text-center text-gray-400 dark:text-gray-600">
               <svg className="mb-3 h-8 w-8 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -605,7 +882,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     key={node.id}
                     node={node}
                     onSelect={(f) => {
-                      onFileSelect(f);
+                      void onFileSelect(f);
                       if (window.innerWidth < 768) onClose();
                     }}
                     activeId={activeFileId}

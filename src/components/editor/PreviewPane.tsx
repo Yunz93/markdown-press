@@ -4,13 +4,15 @@ import { parseFrontmatter } from '../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer } from '../../utils/markdown';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { hydrateCachedPreviewImageSources, warmPreviewImage } from '../../utils/previewImageCache';
-import { resolveWikiLinkFile } from '../../utils/wikiLinks';
+import { buildWikiReferenceTarget, extractWikiNoteFragment, parseWikiLinkReference, resolveWikiLinkFile } from '../../utils/wikiLinks';
 import { useFileOperations } from '../../hooks/useFileOperations';
+import { useFileSystem } from '../../hooks/useFileSystem';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { getPaneLayoutMetrics } from './paneLayout';
-import { flushPendingPreviewHeadingScroll, registerPreviewPane, unregisterPreviewPane } from '../../utils/previewNavigationBridge';
+import { flushPendingPreviewHeadingScroll, registerPreviewPane, requestPreviewHeadingScroll, unregisterPreviewPane } from '../../utils/previewNavigationBridge';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings, type HeadingNode } from '../../utils/outline';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
+import { isTauriEnvironment } from '../../types/filesystem';
 
 interface PreviewPaneProps {
   highlighter?: any;
@@ -28,8 +30,14 @@ const HEADING_SCROLL_RETRY_DELAYS_MS = [48, 140];
 
 interface HeadingScrollOptions {
   alignTopRatio?: number;
+  alignMode?: 'top' | 'center';
   behavior?: ScrollBehavior;
 }
+
+const CENTERED_HEADING_SCROLL_OPTIONS: HeadingScrollOptions = {
+  alignMode: 'center',
+  behavior: 'smooth',
+};
 
 function isExternalLink(href: string): boolean {
   return /^(https?:|mailto:|tel:)/i.test(href.trim());
@@ -37,6 +45,39 @@ function isExternalLink(href: string): boolean {
 
 function isImageAttachment(fileName: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
+}
+
+function isMarkdownNote(fileName: string): boolean {
+  return /\.(md|markdown)$/i.test(fileName);
+}
+
+function isPdfAttachment(fileName: string): boolean {
+  return /\.pdf$/i.test(fileName);
+}
+
+function getPreviewFileType(filePath: string | null | undefined): 'markdown' | 'image' | 'pdf' | 'unsupported' {
+  if (!filePath) return 'markdown';
+  if (isImageAttachment(filePath)) return 'image';
+  if (isPdfAttachment(filePath)) return 'pdf';
+  if (isMarkdownNote(filePath)) return 'markdown';
+  return 'unsupported';
+}
+
+async function resolvePreviewAssetSource(path: string): Promise<string> {
+  if (isTauriEnvironment()) {
+    const { convertFileSrc } = await import('@tauri-apps/api/core');
+    return convertFileSrc(path);
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      return new URL(path, window.location.href).toString();
+    } catch {
+      return path;
+    }
+  }
+
+  return path;
 }
 
 function findHeadingDefinitionByReference(headings: HeadingNode[], rawReference: string): HeadingNode | null {
@@ -73,18 +114,43 @@ function findHeadingElementByReference(container: HTMLElement | null, rawReferen
     return headingCandidates.includes(headingId)
       || headingCandidates.includes(headingSlug)
       || headingCandidates.includes(headingText);
-  }) ?? null;
+  }) ?? Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'))
+    .find((element) => headingCandidates.includes(element.textContent?.trim() || '')) ?? null;
+}
+
+function findBlockElementByReference(container: HTMLElement | null, rawReference: string): HTMLElement | null {
+  if (!container) return null;
+
+  const normalizedReference = rawReference.trim().replace(/^#+/, '').replace(/^\^/, '').trim();
+  if (!normalizedReference) return null;
+
+  return container.querySelector<HTMLElement>(`article.markdown-body [data-block-id="${CSS.escape(normalizedReference)}"]`);
+}
+
+function hasResolvableReference(
+  headings: HeadingNode[],
+  container: HTMLElement | null,
+  rawReference: string
+): boolean {
+  return Boolean(
+    findHeadingDefinitionByReference(headings, rawReference)
+    || findHeadingElementByReference(container, rawReference)
+    || findBlockElementByReference(container, rawReference)
+  );
 }
 
 function scrollContainerToHeading(container: HTMLElement, target: HTMLElement, options?: HeadingScrollOptions): void {
+  const targetRect = target.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const relativeTargetTop = container.scrollTop + targetRect.top - containerRect.top;
+  const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
   const alignTopRatio = Math.min(Math.max(options?.alignTopRatio ?? 0.18, 0, 1), 1);
-  const targetTop = container.scrollTop
-    + target.getBoundingClientRect().top
-    - container.getBoundingClientRect().top
-    - container.clientHeight * alignTopRatio;
+  const targetTop = options?.alignMode === 'center'
+    ? relativeTargetTop + targetRect.height / 2 - container.clientHeight / 2
+    : relativeTargetTop - container.clientHeight * alignTopRatio;
 
   container.scrollTo({
-    top: Math.max(0, targetTop),
+    top: Math.min(Math.max(targetTop, 0), maxScrollTop),
     behavior: options?.behavior ?? 'smooth',
   });
 }
@@ -95,13 +161,14 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   scrollPercentage,
   density = 'comfortable'
 }) => {
-  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
+  const { settings, currentFilePath, rootFolderPath, files, fileContents, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const previewRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   useMarkdownRenderer(highlighter, settings.themeMode);
   const { handleFileSelect, handleRevealInExplorer } = useFileOperations();
+  const { readFile } = useFileSystem();
 
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
@@ -113,6 +180,9 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const headingScrollTimeoutRefs = useRef<number[]>([]);
   const isCompact = density === 'compact';
   const hasActiveFile = Boolean(activeTabId);
+  const previewFileType = useMemo(() => getPreviewFileType(currentFilePath), [currentFilePath]);
+  const isMarkdownPreview = previewFileType === 'markdown';
+  const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const [paneWidth, setPaneWidth] = useState(0);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
   const layoutStyle = useMemo(() => ({
@@ -287,6 +357,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   }, [onScroll]);
 
   const parsedContent = useMemo(() => {
+    if (!isMarkdownPreview) {
+      return { frontmatter: null, bodyHTML: '' };
+    }
+
     if (!content) return { frontmatter: null, bodyHTML: '' };
 
     const { frontmatter, body } = parseFrontmatter(content);
@@ -304,23 +378,59 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       console.error('Markdown rendering error:', error);
       return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
     }
-  }, [content, currentFilePath, highlighter, settings.themeMode]);
+  }, [content, currentFilePath, highlighter, isMarkdownPreview, settings.themeMode]);
 
-  const flattenedHeadings = useMemo(() => flattenHeadingNodes(parseHeadings(content)), [content]);
+  const flattenedHeadings = useMemo(
+    () => (isMarkdownPreview ? flattenHeadingNodes(parseHeadings(content)) : []),
+    [content, isMarkdownPreview]
+  );
   const attachmentResolverContext = useMemo(
     () => createAttachmentResolverContext(files, rootFolderPath, currentFilePath),
     [files, rootFolderPath, currentFilePath]
   );
 
-  const scrollToHeadingWithRetry = useCallback((headingId: string, options?: HeadingScrollOptions): boolean => {
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!currentFilePath || previewFileType === 'markdown' || previewFileType === 'unsupported') {
+      setAssetPreviewSrc('');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const nextSrc = previewFileType === 'image'
+          ? await warmPreviewImage(currentFilePath, currentFilePath)
+          : await resolvePreviewAssetSource(currentFilePath);
+
+        if (!cancelled) {
+          setAssetPreviewSrc(nextSrc);
+        }
+      } catch (error) {
+        console.error('Failed to resolve preview asset source:', error);
+        if (!cancelled) {
+          setAssetPreviewSrc('');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentFilePath, previewFileType]);
+
+  const scrollToReferenceWithRetry = useCallback((referenceId: string, options?: HeadingScrollOptions): boolean => {
+    if (!isMarkdownPreview) return false;
     clearHeadingScrollRetries();
 
     const attemptScroll = (rawReference?: string) => {
       const container = previewRef.current;
       if (!container) return false;
 
-      const target = findHeadingElementByReference(container, headingId)
-        || (rawReference ? findHeadingElementByReference(container, rawReference) : null);
+      const target = findHeadingElementByReference(container, referenceId)
+        || findBlockElementByReference(container, referenceId)
+        || (rawReference ? findHeadingElementByReference(container, rawReference) : null)
+        || (rawReference ? findBlockElementByReference(container, rawReference) : null);
 
       if (target) {
         scrollContainerToHeading(container, target, options);
@@ -330,37 +440,64 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       return false;
     };
 
-    if (attemptScroll(headingId)) {
+    if (attemptScroll(referenceId)) {
       return true;
     }
 
     headingScrollAnimationFrameRef.current = requestAnimationFrame(() => {
       headingScrollAnimationFrameRef.current = null;
-      if (attemptScroll(headingId)) return;
+      if (attemptScroll(referenceId)) return;
 
       headingScrollTimeoutRefs.current = HEADING_SCROLL_RETRY_DELAYS_MS.map((delay) => window.setTimeout(() => {
-        attemptScroll(headingId);
+        attemptScroll(referenceId);
       }, delay));
     });
 
     return false;
-  }, [clearHeadingScrollRetries]);
+  }, [clearHeadingScrollRetries, isMarkdownPreview]);
 
   const navigateToWikilink = useCallback(async (wikiTarget: string): Promise<boolean> => {
+    const parsedReference = parseWikiLinkReference(wikiTarget);
+    const explicitReferenceTarget = buildWikiReferenceTarget(parsedReference);
+
+    if (!parsedReference.subpathType && parsedReference.path.trim()) {
+      const matchedHeading = findHeadingDefinitionByReference(flattenedHeadings, wikiTarget);
+      if (matchedHeading) {
+        scrollToReferenceWithRetry(matchedHeading.id, CENTERED_HEADING_SCROLL_OPTIONS);
+        return true;
+      }
+    }
+
+    if (!parsedReference.path.trim() && explicitReferenceTarget) {
+      const canResolveReference = hasResolvableReference(flattenedHeadings, previewRef.current, explicitReferenceTarget);
+      if (!canResolveReference) {
+        showNotification(`Reference not found: ${wikiTarget}`, 'error');
+        return true;
+      }
+
+      scrollToReferenceWithRetry(explicitReferenceTarget, CENTERED_HEADING_SCROLL_OPTIONS);
+      return true;
+    }
+
     const matchedHeading = findHeadingDefinitionByReference(flattenedHeadings, wikiTarget);
     if (matchedHeading) {
-      scrollToHeadingWithRetry(matchedHeading.id, { behavior: 'smooth' });
+      scrollToReferenceWithRetry(matchedHeading.id, CENTERED_HEADING_SCROLL_OPTIONS);
       return true;
     }
 
     if (wikiTarget.trim().startsWith('#')) {
       const matchedElement = findHeadingElementByReference(previewRef.current, wikiTarget);
+      const matchedBlock = findBlockElementByReference(previewRef.current, wikiTarget);
+      if (matchedBlock) {
+        scrollToReferenceWithRetry(matchedBlock.dataset.blockId ?? wikiTarget, CENTERED_HEADING_SCROLL_OPTIONS);
+        return true;
+      }
       if (!matchedElement) {
         showNotification(`Heading not found: ${wikiTarget}`, 'error');
         return true;
       }
 
-      scrollToHeadingWithRetry(matchedElement.dataset.headingId ?? matchedElement.id, { behavior: 'smooth' });
+      scrollToReferenceWithRetry(matchedElement.dataset.headingId ?? matchedElement.id, CENTERED_HEADING_SCROLL_OPTIONS);
       return true;
     }
 
@@ -371,19 +508,27 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     }
 
     await handleFileSelect(matchedFile);
+    if (explicitReferenceTarget) {
+      requestPreviewHeadingScroll(matchedFile.id, explicitReferenceTarget, CENTERED_HEADING_SCROLL_OPTIONS);
+    }
     return true;
-  }, [flattenedHeadings, files, rootFolderPath, currentFilePath, handleFileSelect, scrollToHeadingWithRetry, showNotification]);
+  }, [flattenedHeadings, files, rootFolderPath, currentFilePath, handleFileSelect, scrollToReferenceWithRetry, showNotification]);
 
   const navigateToHashLink = useCallback((normalizedHash: string): boolean => {
+    const blockElement = findBlockElementByReference(previewRef.current, normalizedHash);
+    if (blockElement) {
+      return scrollToReferenceWithRetry(blockElement.dataset.blockId ?? normalizedHash, CENTERED_HEADING_SCROLL_OPTIONS) || true;
+    }
+
     const matchedHeading = findHeadingDefinitionByReference(flattenedHeadings, normalizedHash);
     if (matchedHeading) {
-      return scrollToHeadingWithRetry(matchedHeading.id, { behavior: 'smooth' }) || true;
+      return scrollToReferenceWithRetry(matchedHeading.id, CENTERED_HEADING_SCROLL_OPTIONS) || true;
     }
 
     if (normalizedHash.trim().startsWith('#')) {
       const fallbackHeading = findHeadingDefinitionByReference(flattenedHeadings, normalizedHash.trim().slice(1));
       if (fallbackHeading) {
-        return scrollToHeadingWithRetry(fallbackHeading.id, { behavior: 'smooth' }) || true;
+        return scrollToReferenceWithRetry(fallbackHeading.id, CENTERED_HEADING_SCROLL_OPTIONS) || true;
       }
     }
 
@@ -392,15 +537,16 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       const fallbackElement = findHeadingElementByReference(previewRef.current, normalizedHash.trim().slice(1));
       if (!fallbackElement) return false;
 
-      return scrollToHeadingWithRetry(fallbackElement.dataset.headingId ?? fallbackElement.id, { behavior: 'smooth' }) || true;
+      return scrollToReferenceWithRetry(fallbackElement.dataset.headingId ?? fallbackElement.id, CENTERED_HEADING_SCROLL_OPTIONS) || true;
     }
 
     if (!matchedElement) return false;
 
-    return scrollToHeadingWithRetry(matchedElement.dataset.headingId ?? matchedElement.id, { behavior: 'smooth' }) || true;
-  }, [flattenedHeadings, scrollToHeadingWithRetry]);
+    return scrollToReferenceWithRetry(matchedElement.dataset.headingId ?? matchedElement.id, CENTERED_HEADING_SCROLL_OPTIONS) || true;
+  }, [flattenedHeadings, scrollToReferenceWithRetry]);
 
   useLayoutEffect(() => {
+    if (!isMarkdownPreview) return;
     const container = previewRef.current;
     if (!container) return;
 
@@ -422,7 +568,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     });
 
     flushPendingPreviewHeadingScroll(activeTabId);
-  }, [activeTabId, flattenedHeadings, parsedContent.bodyHTML]);
+  }, [activeTabId, flattenedHeadings, isMarkdownPreview, parsedContent.bodyHTML]);
 
   const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -509,13 +655,15 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   }, [attachmentResolverContext, handleRevealInExplorer, navigateToHashLink, navigateToWikilink]);
 
   useEffect(() => {
+    if (!isMarkdownPreview) return;
     const timer = window.setTimeout(() => {
       renderMermaidDiagrams(previewRef.current);
     }, 50);
     return () => window.clearTimeout(timer);
-  }, [parsedContent.bodyHTML, settings.themeMode]);
+  }, [isMarkdownPreview, parsedContent.bodyHTML, settings.themeMode]);
 
   useEffect(() => {
+    if (!isMarkdownPreview) return;
     const container = previewRef.current;
     if (!container) return;
 
@@ -530,24 +678,85 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         const label = embed.dataset.wikiLabel?.trim() || embed.textContent?.trim() || '';
         if (!target) continue;
 
-        const file = await resolveAttachmentTarget(attachmentResolverContext, target);
-        if (!file) {
+        const parsedTarget = parseWikiLinkReference(target, { embed: true });
+        const embedWidth = Number(embed.dataset.wikiWidth || parsedTarget.embedSize?.width || 0) || undefined;
+        const embedHeight = Number(embed.dataset.wikiHeight || parsedTarget.embedSize?.height || 0) || undefined;
+        const resolvedTarget = parsedTarget.path
+          ? await resolveAttachmentTarget(attachmentResolverContext, target)
+          : (currentFilePath
+            ? {
+                path: currentFilePath,
+                name: currentFilePath.split(/[\\/]/).pop() || 'Current note',
+              }
+            : null);
+
+        if (!resolvedTarget) {
           embed.className = 'preview-attachment-file preview-attachment-file-missing';
           embed.textContent = `Missing attachment: ${label || target}`;
           continue;
         }
 
-        if (isImageAttachment(file.name)) {
+        if (isMarkdownNote(resolvedTarget.name)) {
+          if (resolvedTarget.path === currentFilePath && !parsedTarget.subpath.trim()) {
+            embed.className = 'preview-attachment-file preview-attachment-file-missing';
+            embed.textContent = 'Cannot embed the entire current note into itself';
+            continue;
+          }
+
+          const sourceContent = resolvedTarget.path === currentFilePath && activeTabId
+            ? fileContents[activeTabId] ?? content
+            : await readFile({
+                id: resolvedTarget.path,
+                name: resolvedTarget.name,
+                type: 'file',
+                path: resolvedTarget.path,
+              });
+          const fragment = extractWikiNoteFragment(sourceContent, target);
+
+          if (!fragment.markdown) {
+            embed.className = 'preview-attachment-file preview-attachment-file-missing';
+            embed.textContent = `Missing reference: ${label || target}`;
+            continue;
+          }
+
+          const noteEmbed = document.createElement('section');
+          noteEmbed.className = 'preview-note-embed';
+          if (embedWidth) {
+            noteEmbed.style.maxWidth = `${embedWidth}px`;
+          }
+          if (embedHeight) {
+            noteEmbed.style.maxHeight = `${embedHeight}px`;
+            noteEmbed.style.overflow = 'auto';
+          }
+          noteEmbed.innerHTML = `
+            <div class="preview-note-embed-title">${label || fragment.title}</div>
+            <article class="markdown-body preview-note-embed-body">${renderMarkdown(fragment.markdown, {
+              highlighter,
+              themeMode: settings.themeMode,
+            })}</article>
+          `;
+          embed.replaceWith(noteEmbed);
+          continue;
+        }
+
+        if (isImageAttachment(resolvedTarget.name)) {
           const image = document.createElement('img');
           image.className = 'preview-attachment-image';
-          image.alt = label || file.name;
-          image.setAttribute('data-original-src', file.path);
-          image.setAttribute('src', file.path);
+          image.alt = label || resolvedTarget.name;
+          image.setAttribute('data-original-src', resolvedTarget.path);
+          image.setAttribute('src', resolvedTarget.path);
+          if (embedWidth) {
+            image.style.width = `${embedWidth}px`;
+          }
+          if (embedHeight) {
+            image.style.height = `${embedHeight}px`;
+            image.style.objectFit = 'contain';
+          }
 
           embed.replaceWith(image);
 
           try {
-            const warmedSrc = await warmPreviewImage(file.path, currentFilePath || undefined);
+            const warmedSrc = await warmPreviewImage(resolvedTarget.path, currentFilePath || undefined);
             if (!cancelled && image.isConnected) {
               image.src = warmedSrc;
             }
@@ -560,10 +769,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         const attachment = document.createElement('a');
         attachment.className = 'preview-attachment-file';
         attachment.setAttribute('href', '#');
-        attachment.dataset.attachmentPath = file.path;
-        attachment.dataset.attachmentName = file.name;
-        attachment.title = `Double-click to reveal ${file.name}`;
-        attachment.innerHTML = `<span class="preview-attachment-file-name">${label || file.name}</span><span class="preview-attachment-file-hint">Double-click to reveal in Finder</span>`;
+        attachment.dataset.attachmentPath = resolvedTarget.path;
+        attachment.dataset.attachmentName = resolvedTarget.name;
+        attachment.title = `Double-click to reveal ${resolvedTarget.name}`;
+        attachment.innerHTML = `<span class="preview-attachment-file-name">${label || resolvedTarget.name}</span><span class="preview-attachment-file-hint">Double-click to reveal in Finder</span>`;
         embed.replaceWith(attachment);
       }
     };
@@ -573,9 +782,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [attachmentResolverContext, currentFilePath, parsedContent.bodyHTML]);
+  }, [activeTabId, attachmentResolverContext, content, currentFilePath, fileContents, highlighter, isMarkdownPreview, parsedContent.bodyHTML, readFile, settings.themeMode]);
 
   useEffect(() => {
+    if (!isMarkdownPreview) return;
     const container = previewRef.current;
     if (!container) return;
 
@@ -602,7 +812,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [parsedContent.bodyHTML, currentFilePath]);
+  }, [currentFilePath, isMarkdownPreview, parsedContent.bodyHTML]);
 
   useLayoutEffect(() => {
     const container = previewRef.current;
@@ -627,7 +837,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     >
       <div className={`editor-pane-backdrop min-h-full ${hasActiveFile ? '' : 'h-full'}`}>
         <div className={`editor-pane-frame w-full ${hasActiveFile ? '' : 'h-full'}`}>
-        {parsedContent.frontmatter && (
+        {isMarkdownPreview && parsedContent.frontmatter && (
           <div
             className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden glass animate-fade-in group/metadata"
             style={{ fontSize: `${settings.fontSize * 0.7}px` }}
@@ -655,11 +865,37 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           </div>
         )}
           <div className={`editor-pane-sheet preview-pane-sheet w-full ${hasActiveFile ? '' : 'h-full min-h-0'}`}>
-            <article
-              className={`markdown-body preview-pane-document ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
-              style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
-              dangerouslySetInnerHTML={{ __html: parsedContent.bodyHTML }}
-            />
+            {previewFileType === 'image' && assetPreviewSrc ? (
+              <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-6">
+                <img
+                  src={assetPreviewSrc}
+                  alt={currentFilePath?.split(/[\\/]/).pop() || 'Preview image'}
+                  className="preview-attachment-image max-h-[75vh] w-auto"
+                />
+              </div>
+            ) : previewFileType === 'pdf' && assetPreviewSrc ? (
+              <div className="editor-pane-width-constrained mx-auto w-full py-3">
+                <iframe
+                  src={`${assetPreviewSrc}#toolbar=0&navpanes=0&scrollbar=1`}
+                  title={currentFilePath?.split(/[\\/]/).pop() || 'PDF preview'}
+                  className="h-[78vh] w-full rounded-2xl border border-gray-200/70 bg-white shadow-sm dark:border-white/10 dark:bg-black/30"
+                />
+              </div>
+            ) : previewFileType === 'image' || previewFileType === 'pdf' ? (
+              <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
+                Loading preview...
+              </div>
+            ) : previewFileType === 'unsupported' ? (
+              <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
+                Preview is not supported for this file type.
+              </div>
+            ) : (
+              <article
+                className={`markdown-body preview-pane-document ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
+                style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
+                dangerouslySetInnerHTML={{ __html: parsedContent.bodyHTML }}
+              />
+            )}
           </div>
         </div>
       </div>

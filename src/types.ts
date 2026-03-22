@@ -48,6 +48,13 @@ export interface ShortcutConfig {
   aiAnalyze: string;
   search: string;
   settings: string;
+  toggleOutline: string;
+  toggleSidebar: string;
+  newNote: string;
+  newFolder: string;
+  closeTab: string;
+  openKnowledgeBase: string;
+  exportHtml: string;
 }
 
 export interface MetadataField {
@@ -68,6 +75,7 @@ export interface AppSettings {
   wordWrap: boolean;
   englishFontFamily: string;
   chineseFontFamily: string;
+  resourceFolder: string;
   githubRepo: string;
   geminiApiKey?: string;
   geminiModel?: string;

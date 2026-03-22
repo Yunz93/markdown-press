@@ -23,8 +23,46 @@ export default defineConfig(({ mode }) => {
         target: 'esnext',
         outDir: 'dist',
         emptyOutDir: true,
-        // Shiki + Mermaid bundle many offline language assets; keep warning signal practical.
         chunkSizeWarningLimit: 1600,
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (!id.includes('node_modules')) {
+                return undefined;
+              }
+
+              if (
+                id.includes('/@codemirror/')
+                || id.includes('/@lezer/')
+              ) {
+                return 'editor-vendor';
+              }
+
+              if (
+                id.includes('/markdown-it')
+                || id.includes('/katex/')
+                || id.includes('/dompurify/')
+                || id.includes('/github-markdown-css/')
+              ) {
+                return 'markdown-vendor';
+              }
+
+              if (id.includes('/@tauri-apps/')) {
+                return 'tauri-vendor';
+              }
+
+              if (
+                id.includes('/react/')
+                || id.includes('/react-dom/')
+                || id.includes('/scheduler/')
+              ) {
+                return 'react-vendor';
+              }
+
+              return undefined;
+            }
+          }
+        }
       },
       // 基础路径配置为相对路径
       base: './',

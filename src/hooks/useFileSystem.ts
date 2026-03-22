@@ -111,12 +111,23 @@ async function ensureTrashRootDirectory(fs: Awaited<ReturnType<typeof getFileSys
   trashDirName: string;
   trashRootPath: string;
 }> {
-  const trashRootPath = joinPath(rootPath, PRIMARY_TRASH_DIR_NAME);
-  await fs.createDirectory(trashRootPath);
-  return {
-    trashDirName: PRIMARY_TRASH_DIR_NAME,
-    trashRootPath
-  };
+  let lastError: unknown = null;
+
+  for (const trashDirName of TRASH_DIR_NAMES) {
+    const trashRootPath = joinPath(rootPath, trashDirName);
+
+    try {
+      await fs.createDirectory(trashRootPath);
+      return {
+        trashDirName,
+        trashRootPath
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Unable to prepare trash directory');
 }
 
 /**
@@ -268,6 +279,22 @@ export function useFileSystem() {
         await fs.writeFile(path, content);
       },
       'Failed to write file'
+    );
+  }, []);
+
+  const writeBinaryFile = useCallback(async (path: string, content: Uint8Array): Promise<void> => {
+    await withErrorHandling(
+      async () => {
+        const fs = await getFileSystem();
+        if (typeof fs.writeBinaryFile === 'function') {
+          await fs.writeBinaryFile(path, content);
+          return;
+        }
+
+        const decoded = new TextDecoder().decode(content);
+        await fs.writeFile(path, decoded);
+      },
+      'Failed to write binary file'
     );
   }, []);
 
@@ -612,6 +639,7 @@ export function useFileSystem() {
     openKnowledgeBase,
     readFile,
     writeFile,
+    writeBinaryFile,
     saveFile,
     createFile,
     createFolder,

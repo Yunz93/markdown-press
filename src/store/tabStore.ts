@@ -40,17 +40,19 @@ export function createTabSlice(
   set: (fn: (state: TabState) => Partial<TabState>) => void,
   get: () => TabState & TabActions
 ): TabState & TabActions {
+  const moveTabToFront = (tabs: string[], fileId: string): string[] => [
+    fileId,
+    ...tabs.filter((id) => id !== fileId),
+  ];
+
   return {
     ...initialTabState,
 
     addTab: (fileId, content) => set((state) => {
       const existingTabs = state.openTabs;
-      if (existingTabs.includes(fileId)) {
-        // Already open, just activate
-        return { activeTabId: fileId };
-      }
+      const nextTabs = moveTabToFront(existingTabs, fileId);
       return {
-        openTabs: [...existingTabs, fileId],
+        openTabs: nextTabs,
         activeTabId: fileId,
         fileContents: content !== undefined
           ? { ...state.fileContents, [fileId]: content }
@@ -102,7 +104,10 @@ export function createTabSlice(
       };
     }),
 
-    setActiveTab: (fileId) => set(() => ({ activeTabId: fileId })),
+    setActiveTab: (fileId) => set((state) => ({
+      activeTabId: fileId,
+      openTabs: moveTabToFront(state.openTabs, fileId),
+    })),
 
     updateTabContent: (fileId, content) => set((state) => ({
       fileContents: { ...state.fileContents, [fileId]: content },

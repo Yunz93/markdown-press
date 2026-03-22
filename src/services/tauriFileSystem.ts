@@ -1,5 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile, exists, mkdir, readDir, rename, remove } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, writeFile, exists, mkdir, readDir, rename, remove } from '@tauri-apps/plugin-fs';
 import { basename, dirname, join } from '@tauri-apps/api/path';
 import type { FileNode } from '../types';
 import type { IFileSystem } from '../types/filesystem';
@@ -9,6 +9,7 @@ import type { IFileSystem } from '../types/filesystem';
  */
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
+const DOCUMENT_EXTENSIONS = ['.pdf'];
 const CONFIG_EXTENSIONS = ['.json', '.yaml', '.yml', '.toml'];
 const TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
 
@@ -151,6 +152,15 @@ export class TauriFileSystem implements IFileSystem {
       this.captureFileFormat(path, prepared);
     } catch (error) {
       console.error(`Failed to write file ${path}:`, error);
+      throw error;
+    }
+  }
+
+  async writeBinaryFile(path: string, content: Uint8Array): Promise<void> {
+    try {
+      await writeFile(path, content);
+    } catch (error) {
+      console.error(`Failed to write binary file ${path}:`, error);
       throw error;
     }
   }
@@ -335,6 +345,7 @@ export class TauriFileSystem implements IFileSystem {
             nodeInTrash ||
             MARKDOWN_EXTENSIONS.some(e => ext.endsWith(e)) ||
             (this.showImages && IMAGE_EXTENSIONS.some(e => ext.endsWith(e))) ||
+            DOCUMENT_EXTENSIONS.some(e => ext.endsWith(e)) ||
             (this.showConfigFiles && CONFIG_EXTENSIONS.some(e => ext.endsWith(e)));
 
           if (!shouldIncludeFile) continue;
