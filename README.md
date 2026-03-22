@@ -38,7 +38,7 @@ M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 
 ### 写作体验
 - 编辑区 frontmatter 属性高亮优化，key 与 value 分离渲染
 - 编辑区与预览区版式、边距、卡片风格保持一致
-- 支持中英文字体分别配置，中文默认方正行黑
+- 支持中英文字体分别配置，中文默认内置霞鹜文楷并随版本打包分发
 - 默认暗色主题，支持亮色/暗色切换
 - 支持常用快捷键，并可在设置页调整核心快捷键
 
@@ -199,6 +199,7 @@ markdown-press/
 - `.trash` 为应用内部回收站目录，不应手动编辑
 - 预览层支持 wiki link、heading link 与附件解析
 - 设置页支持分别配置英文和中文字体
+- 内置中文默认字体为霞鹜文楷，许可证见 `src/assets/fonts/LXGWWenKai-OFL.txt`
 
 ## 贡献
 
@@ -211,7 +212,7 @@ npm run smoke:release
 
 ## 许可证
 
-本项目基于 [MIT License](./LICENSE) 开源。
+本项目代码基于 [MIT License](./LICENSE) 开源；随应用分发的 `LXGWWenKai-Regular.ttf` 字体基于 [SIL Open Font License 1.1](./src/assets/fonts/LXGWWenKai-OFL.txt) 授权。
 
 ## 致谢
 

@@ -78,8 +78,8 @@ function getImageExtension(mimeType: string): string {
 function buildPastedImageMarkdown(path: string, format: AttachmentPasteFormat): string {
   if (format === 'markdown') {
     const fileName = path.split('/').filter(Boolean).pop() || 'image';
-    const altText = fileName.replace(/\.[^.]+$/, '');
-    return `![${altText}](${path})`;
+    const altText = fileName.replace(/\.[^.]+$/, '').replace(/[[\]]/g, '\\$&');
+    return `![${altText}](<${path}>)`;
   }
 
   return `![[${path}]]`;

@@ -6,7 +6,11 @@ import { createEditorSlice, type EditorState, type EditorActions, initialEditorS
 import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings, normalizeThemeMode } from './uiStore';
 import { ViewMode, type FileNode, type AppSettings, type Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
-import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
+import {
+  DEFAULT_CHINESE_FONT_FAMILY,
+  DEFAULT_ENGLISH_FONT_FAMILY,
+  isLegacyDefaultChineseFontFamily,
+} from '../utils/fontSettings';
 
 // Re-export types from slice stores
 export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
@@ -41,6 +45,9 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({ settings: (state as any).settings }),
       merge: (persistedState, currentState) => {
         const persistedSettings = (persistedState as any)?.settings ?? {};
+        const persistedChineseFontFamily = typeof persistedSettings.chineseFontFamily === 'string'
+          ? persistedSettings.chineseFontFamily.trim()
+          : '';
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
@@ -49,8 +56,8 @@ export const useAppStore = create<AppState>()(
             : (typeof persistedSettings.fontFamily === 'string' && persistedSettings.fontFamily.trim()
               ? persistedSettings.fontFamily
               : DEFAULT_ENGLISH_FONT_FAMILY),
-          chineseFontFamily: typeof persistedSettings.chineseFontFamily === 'string' && persistedSettings.chineseFontFamily.trim()
-            ? persistedSettings.chineseFontFamily
+          chineseFontFamily: persistedChineseFontFamily && !isLegacyDefaultChineseFontFamily(persistedChineseFontFamily)
+            ? persistedChineseFontFamily
             : DEFAULT_CHINESE_FONT_FAMILY,
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
           shortcuts: {

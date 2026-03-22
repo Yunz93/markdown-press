@@ -38,7 +38,7 @@ M記 is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. 
 ### Writing Experience
 - Improved frontmatter highlighting with colored keys and neutral values
 - Consistent layout rhythm between editor and preview panes
-- Independent English and Chinese font configuration
+- Independent English and Chinese font configuration, with bundled LXGW WenKai as the default Chinese font
 - Dark mode as the default theme
 - Configurable core keyboard shortcuts in settings
 
@@ -199,6 +199,7 @@ markdown-press/
 - `.trash` is an internal application directory and should not be edited manually
 - The preview pipeline supports wiki links, heading jumps, and attachment resolution
 - Settings allow separate English and Chinese font configuration
+- The bundled default Chinese font is LXGW WenKai; see `src/assets/fonts/LXGWWenKai-OFL.txt` for its license
 
 ## Contributing
 
@@ -211,7 +212,7 @@ npm run smoke:release
 
 ## License
 
-Licensed under the [MIT License](./LICENSE).
+The application code is licensed under the [MIT License](./LICENSE). The bundled `LXGWWenKai-Regular.ttf` font is distributed under the [SIL Open Font License 1.1](./src/assets/fonts/LXGWWenKai-OFL.txt).
 
 ## Acknowledgements
 

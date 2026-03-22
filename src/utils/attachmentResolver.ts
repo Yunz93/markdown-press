@@ -17,6 +17,23 @@ interface AttachmentResolverContext {
 const resolvedAttachmentCache = new Map<string, Promise<ResolvedAttachmentTarget | null>>();
 const fileExistenceCache = new Map<string, Promise<boolean>>();
 
+function hasUriScheme(value: string): boolean {
+  return /^[a-z][a-z\d+\-.]*:/i.test(value) || value.startsWith('//');
+}
+
+function decodeLocalAttachmentTarget(rawTarget: string): string {
+  const trimmedTarget = rawTarget.trim();
+  if (!trimmedTarget || hasUriScheme(trimmedTarget)) {
+    return trimmedTarget;
+  }
+
+  try {
+    return decodeURIComponent(trimmedTarget);
+  } catch {
+    return trimmedTarget;
+  }
+}
+
 function buildCacheKey(context: AttachmentResolverContext, rawTarget: string): string {
   return `${context.cacheNamespace}::${rawTarget.trim()}`;
 }
@@ -70,7 +87,7 @@ export async function resolveAttachmentTarget(
   context: AttachmentResolverContext,
   rawTarget: string
 ): Promise<ResolvedAttachmentTarget | null> {
-  const normalizedTarget = rawTarget.trim();
+  const normalizedTarget = decodeLocalAttachmentTarget(rawTarget);
   if (!normalizedTarget) return null;
 
   const cacheKey = buildCacheKey(context, normalizedTarget);

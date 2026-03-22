@@ -16,7 +16,7 @@ interface MarkdownRenderOptions {
 // Create markdown-it instance with configuration
 const createMarkdownIt = () => {
   const md = new MarkdownIt({
-    html: false, // Disable raw HTML for security
+    html: true, // Allow raw HTML; sanitize rendered output below with DOMPurify
     linkify: true,
     typographer: true,
     breaks: true,
@@ -190,12 +190,15 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
     // Preserve Shiki token styling while still sanitizing the rest of the HTML.
     ADD_ATTR: [
+      'align',
       'allow',
       'allowfullscreen',
       'frameborder',
+      'height',
       'scrolling',
       'style',
       'tabindex',
+      'width',
       'data-wikilink',
       'data-wiki-embed',
       'data-wiki-target',

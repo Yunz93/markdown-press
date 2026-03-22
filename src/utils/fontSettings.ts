@@ -1,8 +1,10 @@
 import type { AppSettings } from '../types';
+import bundledChineseFontUrl from '../assets/fonts/LXGWWenKai-Regular.ttf?url';
 
 const DYNAMIC_FONT_STYLE_ID = 'markdown-press-dynamic-font-faces';
 const LATIN_FONT_ALIAS = 'MarkdownPressLatin';
 const CJK_FONT_ALIAS = 'MarkdownPressCJK';
+const BUNDLED_CHINESE_FONT_NAMES = ['LXGW WenKai', '霞鹜文楷'];
 
 const GENERIC_FONT_FAMILIES = new Set([
   'serif',
@@ -20,7 +22,8 @@ const GENERIC_FONT_FAMILIES = new Set([
 ]);
 
 export const DEFAULT_ENGLISH_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-export const DEFAULT_CHINESE_FONT_FAMILY = '"FZ XingHeiS-R-GB", "方正行黑简体", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
+export const LEGACY_DEFAULT_CHINESE_FONT_FAMILY = '"FZ XingHeiS-R-GB", "方正行黑简体", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
+export const DEFAULT_CHINESE_FONT_FAMILY = '"LXGW WenKai", "霞鹜文楷", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
 
 function parseLocalFontNames(fontFamily: string): string[] {
   return fontFamily
@@ -40,6 +43,60 @@ function buildLocalFontSource(fontFamily: string): string {
   }
 
   return localNames.map((name) => `local("${escapeFontName(name)}")`).join(', ');
+}
+
+function normalizeFontFamily(fontFamily: string): string {
+  return fontFamily
+    .split(',')
+    .map((item) => item.trim().replace(/^['"]|['"]$/g, '').toLowerCase())
+    .filter(Boolean)
+    .join(',');
+}
+
+function fontFamilyMentionsBundledChineseFont(fontFamily: string): boolean {
+  const normalizedFontNames = new Set(
+    fontFamily
+      .split(',')
+      .map((item) => item.trim().replace(/^['"]|['"]$/g, '').toLowerCase())
+      .filter(Boolean)
+  );
+
+  return BUNDLED_CHINESE_FONT_NAMES.some((name) => normalizedFontNames.has(name.toLowerCase()));
+}
+
+function buildBundledChineseFontSource(fontFamily: string): string {
+  const bundledLocalSource = BUNDLED_CHINESE_FONT_NAMES
+    .map((name) => `local("${escapeFontName(name)}")`)
+    .join(', ');
+
+  return `${bundledLocalSource}, url("${bundledChineseFontUrl}") format("truetype"), ${buildLocalFontSource(fontFamily)}`;
+}
+
+function buildBundledChineseFontFaces(): string {
+  const bundledSource = `${BUNDLED_CHINESE_FONT_NAMES
+    .map((name) => `local("${escapeFontName(name)}")`)
+    .join(', ')}, url("${bundledChineseFontUrl}") format("truetype")`;
+
+  return BUNDLED_CHINESE_FONT_NAMES.map((fontName) => `
+@font-face {
+  font-family: "${escapeFontName(fontName)}";
+  src: ${bundledSource};
+  unicode-range:
+    U+2E80-2EFF,
+    U+2F00-2FDF,
+    U+3000-303F,
+    U+31C0-31EF,
+    U+3400-4DBF,
+    U+4E00-9FFF,
+    U+F900-FAFF,
+    U+FF00-FFEF;
+  font-display: swap;
+}
+`.trim()).join('\n\n');
+}
+
+export function isLegacyDefaultChineseFontFamily(fontFamily: string): boolean {
+  return normalizeFontFamily(fontFamily) === normalizeFontFamily(LEGACY_DEFAULT_CHINESE_FONT_FAMILY);
 }
 
 export function getResolvedEnglishFontFamily(settings: Pick<AppSettings, 'englishFontFamily'>): string {
@@ -66,7 +123,13 @@ export function ensureDynamicFontFaces(
 
   const englishFontFamily = getResolvedEnglishFontFamily(settings);
   const chineseFontFamily = getResolvedChineseFontFamily(settings);
+  const shouldUseBundledChineseFont = fontFamilyMentionsBundledChineseFont(chineseFontFamily);
+  const chineseFontSource = shouldUseBundledChineseFont
+    ? buildBundledChineseFontSource(chineseFontFamily)
+    : buildLocalFontSource(chineseFontFamily);
   const css = `
+${buildBundledChineseFontFaces()}
+
 @font-face {
   font-family: "${LATIN_FONT_ALIAS}";
   src: ${buildLocalFontSource(englishFontFamily)};
@@ -81,7 +144,7 @@ export function ensureDynamicFontFaces(
 
 @font-face {
   font-family: "${CJK_FONT_ALIAS}";
-  src: ${buildLocalFontSource(chineseFontFamily)};
+  src: ${chineseFontSource};
   unicode-range:
     U+2E80-2EFF,
     U+2F00-2FDF,

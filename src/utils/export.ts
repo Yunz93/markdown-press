@@ -687,6 +687,18 @@ function normalizeRemoteImageUrl(value: string): string {
   return value;
 }
 
+function decodeLocalImageSource(value: string): string {
+  if (!value || hasUrlScheme(value) || value.startsWith('//')) {
+    return value;
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 async function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -713,7 +725,7 @@ async function inlineFetchedImage(src: string): Promise<string> {
 }
 
 async function resolveImageSource(src: string, sourceFilePath?: string): Promise<string> {
-  const trimmedSrc = src.trim();
+  const trimmedSrc = decodeLocalImageSource(src.trim());
   if (!trimmedSrc || trimmedSrc.startsWith('data:') || trimmedSrc.startsWith('blob:')) {
     return trimmedSrc;
   }

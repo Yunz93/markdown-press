@@ -469,7 +469,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onChange={(e) => onUpdateSettings({ ...settings, chineseFontFamily: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Default is Fangzheng XingHei. Chinese characters will prefer this font.</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Default is the bundled LXGW WenKai font, shipped with the app for consistent Chinese rendering.</p>
                       </div>
                     </div>
                   </div>
