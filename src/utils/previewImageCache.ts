@@ -1,4 +1,4 @@
-import { isTauriEnvironment } from '../types/filesystem';
+import { getFileSystem, isTauriEnvironment } from '../types/filesystem';
 
 const resolvedPreviewImageCache = new Map<string, string>();
 const previewImageLoadCache = new Map<string, Promise<string>>();
@@ -19,6 +19,10 @@ function isAbsoluteFilePath(value: string): boolean {
   return /^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(value);
 }
 
+function isBrowserVirtualPath(value: string): boolean {
+  return /^browser(?:-dir)?-\d+(?:\/|$)/.test(value) || /^browser-\d+-/.test(value);
+}
+
 function decodeFileUrlPath(fileUrl: string): string {
   try {
     const url = new URL(fileUrl);
@@ -36,6 +40,70 @@ function normalizeRemoteImageUrl(value: string): string {
   return value;
 }
 
+function splitPathRoot(path: string): { root: string; segments: string[] } {
+  const normalized = path.replace(/\\/g, '/');
+
+  if (isBrowserVirtualPath(normalized)) {
+    const [root, ...rest] = normalized.split('/');
+    return { root, segments: rest };
+  }
+
+  const windowsMatch = normalized.match(/^([a-zA-Z]:)(?:\/(.*))?$/);
+  if (windowsMatch) {
+    return {
+      root: windowsMatch[1],
+      segments: (windowsMatch[2] ?? '').split('/').filter(Boolean),
+    };
+  }
+
+  if (normalized.startsWith('/')) {
+    return {
+      root: '/',
+      segments: normalized.slice(1).split('/').filter(Boolean),
+    };
+  }
+
+  return {
+    root: '',
+    segments: normalized.split('/').filter(Boolean),
+  };
+}
+
+function joinNormalizedPath(root: string, segments: string[]): string {
+  if (root === '/') {
+    return `/${segments.join('/')}`;
+  }
+
+  if (!root) {
+    return segments.join('/');
+  }
+
+  return segments.length > 0 ? `${root}/${segments.join('/')}` : root;
+}
+
+function resolveRelativeLocalPath(sourceFilePath: string, targetPath: string): string {
+  const source = splitPathRoot(sourceFilePath);
+  const target = targetPath.replace(/\\/g, '/');
+  const isAbsoluteTarget = target.startsWith('/') || /^[a-zA-Z]:\//.test(target) || isBrowserVirtualPath(target);
+  const baseSegments = isAbsoluteTarget ? [] : source.segments.slice(0, -1);
+  const { root: targetRoot, segments: targetSegments } = splitPathRoot(target);
+  const root = targetRoot || source.root;
+  const segments = isAbsoluteTarget ? [] : baseSegments;
+
+  for (const segment of targetSegments) {
+    if (!segment || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length > 0) {
+        segments.pop();
+      }
+      continue;
+    }
+    segments.push(segment);
+  }
+
+  return joinNormalizedPath(root, segments);
+}
+
 function registerUnloadCleanup() {
   if (unloadCleanupRegistered || typeof window === 'undefined') {
     return;
@@ -49,10 +117,33 @@ function registerUnloadCleanup() {
   unloadCleanupRegistered = true;
 }
 
-async function resolveImageSource(src: string, sourceFilePath?: string): Promise<string> {
+export async function resolvePreviewSource(src: string, sourceFilePath?: string): Promise<string> {
   const trimmedSrc = src.trim();
   if (!trimmedSrc || trimmedSrc.startsWith('data:') || trimmedSrc.startsWith('blob:')) {
     return trimmedSrc;
+  }
+
+  const localSourceCandidate = trimmedSrc.startsWith('file://')
+    ? decodeFileUrlPath(trimmedSrc)
+    : (
+      isAbsoluteFilePath(trimmedSrc)
+      || isBrowserVirtualPath(trimmedSrc)
+      || (!hasUrlScheme(trimmedSrc) && sourceFilePath)
+        ? (sourceFilePath && !hasUrlScheme(trimmedSrc) && !isAbsoluteFilePath(trimmedSrc) && !isBrowserVirtualPath(trimmedSrc)
+          ? resolveRelativeLocalPath(sourceFilePath, trimmedSrc)
+          : trimmedSrc)
+        : ''
+    );
+
+  if (localSourceCandidate) {
+    try {
+      const fs = await getFileSystem();
+      if (typeof fs.getFileObjectUrl === 'function') {
+        return await fs.getFileObjectUrl(localSourceCandidate);
+      }
+    } catch {
+      // Fall through to environment-specific URL resolution.
+    }
   }
 
   if (isTauriEnvironment()) {
@@ -166,7 +257,8 @@ export async function warmPreviewImage(src: string, sourceFilePath?: string): Pr
   }
 
   pending = (async () => {
-    const resolvedSrc = await resolveImageSource(src, sourceFilePath);
+    const resolvedSrc = await resolvePreviewSource(src, sourceFilePath);
+
     if (!resolvedSrc) {
       return src;
     }

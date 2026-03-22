@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { ViewMode } from '../../types';
-import { EditorPane } from './EditorPane';
-import { PreviewPane } from './PreviewPane';
+import { EditorPane, type EditorPaneHandle } from './EditorPane';
+import { PreviewPane, type PreviewPaneHandle } from './PreviewPane';
 import { WritingStatsDisplay } from '../stats/WritingStatsDisplay';
 
 interface SplitViewProps {
@@ -29,19 +29,19 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
-  const [scrollPercentage, setScrollPercentage] = useState(0);
-  const [activeSide, setActiveSide] = useState<'editor' | 'preview' | null>(null);
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorPaneRef = useRef<EditorPaneHandle | null>(null);
+  const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
 
   const handleEditorScroll = useCallback((p: number) => {
-    setActiveSide('editor');
-    setScrollPercentage(p);
-  }, []);
+    if (viewMode !== ViewMode.SPLIT) return;
+    previewPaneRef.current?.syncScrollTo(p);
+  }, [viewMode]);
 
   const handlePreviewScroll = useCallback((p: number) => {
-    setActiveSide('preview');
-    setScrollPercentage(p);
-  }, []);
+    if (viewMode !== ViewMode.SPLIT) return;
+    editorPaneRef.current?.syncScrollTo(p);
+  }, [viewMode]);
 
   const handleMouseDown = useCallback(() => {
     setIsResizing(true);
@@ -94,6 +94,12 @@ export const SplitView: React.FC<SplitViewProps> = ({
     return () => resizeObserver.disconnect();
   }, [viewMode]);
 
+  useEffect(() => {
+    if (viewMode === ViewMode.SPLIT) return;
+    editorPaneRef.current?.cancelScrollSync();
+    previewPaneRef.current?.cancelScrollSync();
+  }, [viewMode]);
+
   const showEditor = viewMode === ViewMode.EDITOR || viewMode === ViewMode.SPLIT;
   const showPreview = viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT;
 
@@ -113,11 +119,11 @@ export const SplitView: React.FC<SplitViewProps> = ({
             }}
           >
             <EditorPane
+              ref={editorPaneRef}
               highlighter={highlighter}
               density={contentDensity}
               onContentChange={onContentChange}
               onScroll={handleEditorScroll}
-              scrollPercentage={activeSide === 'preview' ? scrollPercentage : undefined}
             />
           </div>
         )}
@@ -142,10 +148,10 @@ export const SplitView: React.FC<SplitViewProps> = ({
             }}
           >
             <PreviewPane
+              ref={previewPaneRef}
               highlighter={highlighter}
               density={contentDensity}
               onScroll={handlePreviewScroll}
-              scrollPercentage={activeSide === 'editor' ? scrollPercentage : undefined}
             />
           </div>
         )}

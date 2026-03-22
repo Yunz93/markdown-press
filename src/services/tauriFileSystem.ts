@@ -1,5 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile, writeFile, exists, mkdir, readDir, rename, remove } from '@tauri-apps/plugin-fs';
+import { readTextFile, readFile as readBinaryFile, writeTextFile, writeFile, exists, mkdir, readDir, rename, remove } from '@tauri-apps/plugin-fs';
 import { basename, dirname, join } from '@tauri-apps/api/path';
 import type { FileNode } from '../types';
 import type { IFileSystem } from '../types/filesystem';
@@ -31,6 +31,28 @@ export class TauriFileSystem implements IFileSystem {
   private showImages: boolean = true;
   private showConfigFiles: boolean = false;
   private fileFormatStates: Map<string, FileFormatState> = new Map();
+  private objectUrls: Map<string, string> = new Map();
+
+  private getMimeType(path: string): string {
+    const normalized = path.toLowerCase();
+    if (normalized.endsWith('.png')) return 'image/png';
+    if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
+    if (normalized.endsWith('.gif')) return 'image/gif';
+    if (normalized.endsWith('.webp')) return 'image/webp';
+    if (normalized.endsWith('.svg')) return 'image/svg+xml';
+    if (normalized.endsWith('.bmp')) return 'image/bmp';
+    if (normalized.endsWith('.avif')) return 'image/avif';
+    if (normalized.endsWith('.pdf')) return 'application/pdf';
+    return 'application/octet-stream';
+  }
+
+  private invalidateObjectUrl(path: string): void {
+    const cached = this.objectUrls.get(path);
+    if (cached) {
+      URL.revokeObjectURL(cached);
+      this.objectUrls.delete(path);
+    }
+  }
 
   private async isDirectory(path: string): Promise<boolean> {
     try {
@@ -150,6 +172,7 @@ export class TauriFileSystem implements IFileSystem {
       const prepared = this.prepareContentForWrite(path, content);
       await writeTextFile(path, prepared);
       this.captureFileFormat(path, prepared);
+      this.invalidateObjectUrl(path);
     } catch (error) {
       console.error(`Failed to write file ${path}:`, error);
       throw error;
@@ -159,6 +182,7 @@ export class TauriFileSystem implements IFileSystem {
   async writeBinaryFile(path: string, content: Uint8Array): Promise<void> {
     try {
       await writeFile(path, content);
+      this.invalidateObjectUrl(path);
     } catch (error) {
       console.error(`Failed to write binary file ${path}:`, error);
       throw error;
@@ -178,6 +202,7 @@ export class TauriFileSystem implements IFileSystem {
           const prepared = this.prepareContentForWrite(savePath, content);
           await writeTextFile(savePath, prepared);
           this.captureFileFormat(savePath, prepared);
+          this.invalidateObjectUrl(savePath);
           return savePath;
         }
         return null;
@@ -185,6 +210,7 @@ export class TauriFileSystem implements IFileSystem {
       const prepared = this.prepareContentForWrite(path, content);
       await writeTextFile(path, prepared);
       this.captureFileFormat(path, prepared);
+      this.invalidateObjectUrl(path);
       return path;
     } catch (error) {
       console.error('Failed to save file:', error);
@@ -206,6 +232,8 @@ export class TauriFileSystem implements IFileSystem {
         this.fileFormatStates.set(newPath, format);
         this.fileFormatStates.delete(oldPath);
       }
+      this.invalidateObjectUrl(oldPath);
+      this.invalidateObjectUrl(newPath);
       return newPath;
     } catch (error) {
       console.error('Failed to rename file:', error);
@@ -242,6 +270,8 @@ export class TauriFileSystem implements IFileSystem {
         this.fileFormatStates.set(destPath, format);
         this.fileFormatStates.delete(sourcePath);
       }
+      this.invalidateObjectUrl(sourcePath);
+      this.invalidateObjectUrl(destPath);
       return destPath;
     } catch (error) {
       console.error('Failed to move file:', error);
@@ -256,6 +286,7 @@ export class TauriFileSystem implements IFileSystem {
     try {
       await remove(path, { recursive: true });
       this.fileFormatStates.delete(path);
+      this.invalidateObjectUrl(path);
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw error;
@@ -307,6 +338,18 @@ export class TauriFileSystem implements IFileSystem {
       console.error(`Failed to check if file exists ${path}:`, error);
       return false;
     }
+  }
+
+  async getFileObjectUrl(path: string): Promise<string> {
+    const cached = this.objectUrls.get(path);
+    if (cached) {
+      return cached;
+    }
+
+    const bytes = await readBinaryFile(path);
+    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: this.getMimeType(path) }));
+    this.objectUrls.set(path, objectUrl);
+    return objectUrl;
   }
 
   /**

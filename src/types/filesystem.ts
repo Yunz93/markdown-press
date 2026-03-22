@@ -10,6 +10,7 @@ export interface IFileSystem {
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   writeBinaryFile?(path: string, content: Uint8Array): Promise<void>;
+  getFileObjectUrl?(path: string): Promise<string>;
   saveFile(path: string | null, content: string): Promise<string | null>;
   renameFile(oldPath: string, newName: string): Promise<string>;
   renameEntry?(oldPath: string, newName: string, isDirectory: boolean): Promise<string>;

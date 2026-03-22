@@ -9,6 +9,8 @@ export class BrowserFileSystem implements IFileSystem {
   private static instance: BrowserFileSystem;
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private fileHandles: Map<string, FileSystemFileHandle> = new Map();
+  private objectUrlPromises: Map<string, Promise<string>> = new Map();
+  private objectUrls: Map<string, string> = new Map();
   private rootPath: string = '';
   private static readonly TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
   private static readonly IMAGE_FILE_REGEX = /\.(png|jpe?g|gif|svg|webp|bmp)$/i;
@@ -19,6 +21,39 @@ export class BrowserFileSystem implements IFileSystem {
       BrowserFileSystem.instance = new BrowserFileSystem();
     }
     return BrowserFileSystem.instance;
+  }
+
+  private registerObjectUrlCleanup(): void {
+    if (typeof window === 'undefined' || (window as any).__markdownPressObjectUrlCleanupRegistered) {
+      return;
+    }
+
+    window.addEventListener('beforeunload', () => {
+      for (const url of this.objectUrls.values()) {
+        URL.revokeObjectURL(url);
+      }
+      this.objectUrls.clear();
+      this.objectUrlPromises.clear();
+    }, { once: true });
+
+    (window as any).__markdownPressObjectUrlCleanupRegistered = true;
+  }
+
+  private invalidateObjectUrl(path: string, recursive = false): void {
+    const normalizedPath = path.replace(/\\/g, '/');
+
+    for (const [cachedPath, url] of this.objectUrls.entries()) {
+      const normalizedCachedPath = cachedPath.replace(/\\/g, '/');
+      const matches = recursive
+        ? normalizedCachedPath === normalizedPath || normalizedCachedPath.startsWith(`${normalizedPath}/`)
+        : normalizedCachedPath === normalizedPath;
+
+      if (!matches) continue;
+
+      URL.revokeObjectURL(url);
+      this.objectUrls.delete(cachedPath);
+      this.objectUrlPromises.delete(cachedPath);
+    }
   }
 
   /**
@@ -113,6 +148,7 @@ export class BrowserFileSystem implements IFileSystem {
       const writable = await fileHandle.createWritable();
       await writable.write(content);
       await writable.close();
+      this.invalidateObjectUrl(path);
     } catch (error) {
       console.error(`Failed to write file ${path}:`, error);
       throw error;
@@ -135,6 +171,7 @@ export class BrowserFileSystem implements IFileSystem {
       const writable = await fileHandle.createWritable();
       await writable.write(content);
       await writable.close();
+      this.invalidateObjectUrl(path);
     } catch (error) {
       console.error(`Failed to write binary file ${path}:`, error);
       throw error;
@@ -161,6 +198,7 @@ export class BrowserFileSystem implements IFileSystem {
 
           const id = `browser-${Date.now()}-${fileHandle.name}`;
           this.fileHandles.set(id, fileHandle);
+          this.invalidateObjectUrl(id);
           return id;
         }
         return null;
@@ -199,6 +237,8 @@ export class BrowserFileSystem implements IFileSystem {
 
         const newPath = this.rootPath ? `${this.rootPath}/${newRelativePath}` : newRelativePath;
         this.fileHandles.set(newPath, newHandle);
+        this.invalidateObjectUrl(oldPath);
+        this.invalidateObjectUrl(newPath);
         return newPath;
       }
 
@@ -247,6 +287,7 @@ export class BrowserFileSystem implements IFileSystem {
       }
 
       this.fileHandles.delete(path);
+      this.invalidateObjectUrl(path, true);
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw error;
@@ -344,6 +385,7 @@ export class BrowserFileSystem implements IFileSystem {
         const writable = await fileHandle.createWritable();
         await writable.write(content);
         await writable.close();
+        this.invalidateObjectUrl(path);
 
         return path;
       }
@@ -413,15 +455,20 @@ export class BrowserFileSystem implements IFileSystem {
     const destinationRelativePath = targetRelativeDir ? `${targetRelativeDir}/${entryName}` : entryName;
 
     if (kind === 'file') {
-      const content = await this.readFile(sourcePath);
+      const sourceHandle = sourcePath.startsWith('browser-') && this.fileHandles.has(sourcePath)
+        ? this.fileHandles.get(sourcePath)!
+        : await this.getFileHandle(this.directoryHandle, sourceRelativePath);
+      const file = await sourceHandle.getFile();
       const targetHandle = await this.getFileHandle(this.directoryHandle, destinationRelativePath, true);
       const writable = await targetHandle.createWritable();
-      await writable.write(content);
+      await writable.write(await file.arrayBuffer());
       await writable.close();
       await this.deleteFile(sourcePath);
 
       const nextPath = `${this.rootPath}/${destinationRelativePath}`;
       this.fileHandles.set(nextPath, targetHandle);
+      this.invalidateObjectUrl(sourcePath);
+      this.invalidateObjectUrl(nextPath);
       return nextPath;
     }
 
@@ -429,7 +476,45 @@ export class BrowserFileSystem implements IFileSystem {
     const targetHandle = await this.getDirectoryHandle(this.directoryHandle, destinationRelativePath, true);
     await this.copyDirectoryContents(sourceHandle, targetHandle);
     await this.deleteFile(sourcePath);
+    this.invalidateObjectUrl(sourcePath, true);
     return `${this.rootPath}/${destinationRelativePath}`;
+  }
+
+  async getFileObjectUrl(path: string): Promise<string> {
+    const normalizedPath = path.replace(/\\/g, '/');
+    const cachedUrl = this.objectUrls.get(normalizedPath);
+    if (cachedUrl) {
+      return cachedUrl;
+    }
+
+    const pendingUrl = this.objectUrlPromises.get(normalizedPath);
+    if (pendingUrl) {
+      return pendingUrl;
+    }
+
+    const pending = (async () => {
+      this.registerObjectUrlCleanup();
+
+      let file: File;
+      if (normalizedPath.startsWith('browser-') && this.fileHandles.has(normalizedPath)) {
+        file = await this.fileHandles.get(normalizedPath)!.getFile();
+      } else if (this.directoryHandle) {
+        const relativePath = this.getRelativePath(normalizedPath);
+        const fileHandle = await this.getFileHandle(this.directoryHandle, relativePath);
+        file = await fileHandle.getFile();
+      } else {
+        throw new Error(`Cannot resolve local file object URL: ${normalizedPath}`);
+      }
+
+      const objectUrl = URL.createObjectURL(file);
+      this.objectUrls.set(normalizedPath, objectUrl);
+      return objectUrl;
+    })().finally(() => {
+      this.objectUrlPromises.delete(normalizedPath);
+    });
+
+    this.objectUrlPromises.set(normalizedPath, pending);
+    return pending;
   }
 
   private async copyDirectoryContents(
@@ -441,7 +526,7 @@ export class BrowserFileSystem implements IFileSystem {
         const file = await (entry as FileSystemFileHandle).getFile();
         const writableHandle = await targetHandle.getFileHandle(name, { create: true });
         const writable = await writableHandle.createWritable();
-        await writable.write(await file.text());
+        await writable.write(await file.arrayBuffer());
         await writable.close();
       } else {
         const nextTarget = await targetHandle.getDirectoryHandle(name, { create: true });

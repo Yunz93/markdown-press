@@ -897,6 +897,16 @@ body {
   min-width: 0;
 }
 
+.preview-pane-document.markdown-body pre,
+.preview-pane-document.markdown-body table,
+.preview-pane-document.markdown-body blockquote,
+.preview-pane-document.markdown-body .preview-note-embed,
+.preview-pane-document.markdown-body img,
+.preview-pane-document.markdown-body iframe {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 240px;
+}
+
 .preview-pane-document.markdown-body p,
 .preview-pane-document.markdown-body li,
 .preview-pane-document.markdown-body blockquote,
@@ -920,6 +930,17 @@ body {
   max-width: 100%;
   margin: 1rem 0;
   border-radius: 1rem;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.preview-pane-document.markdown-body .preview-attachment-pdf {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  margin: 1rem 0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
@@ -1191,6 +1212,12 @@ body {
 }
 
 .dark .preview-pane-document.markdown-body .preview-attachment-image {
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
+}
+
+.dark .preview-pane-document.markdown-body .preview-attachment-pdf {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.82);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
 }
 

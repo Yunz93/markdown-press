@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
@@ -17,15 +17,17 @@ interface EditorPaneProps {
   placeholder?: string;
   onContentChange?: (content: string) => void;
   onScroll?: (percentage: number) => void;
-  scrollPercentage?: number;
   highlighter?: any;
   density?: 'comfortable' | 'compact';
 }
 
+export interface EditorPaneHandle {
+  cancelScrollSync: () => void;
+  syncScrollTo: (percentage: number) => void;
+}
+
 const SCROLL_THRESHOLD = 5;
 const SCROLL_EMIT_THRESHOLD = 0.001;
-const SYNC_SCROLL_EASING = 0.24;
-const SYNC_SCROLL_STOP_PX = 0.8;
 const EDITOR_LINE_HEIGHT = 1.95;
 
 function getPathSeparator(path: string): '/' | '\\' {
@@ -238,14 +240,13 @@ const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
   return true;
 };
 
-export const EditorPane: React.FC<EditorPaneProps> = ({
+export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   placeholder = 'Type here...',
   onContentChange,
   onScroll,
-  scrollPercentage,
   highlighter,
   density = 'comfortable'
-}) => {
+}, ref) => {
   void highlighter;
 
   const content = useAppStore(selectContent);
@@ -355,36 +356,23 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
     isSyncingScroll.current = true;
 
-    const step = () => {
+    syncAnimationFrameRef.current = requestAnimationFrame(() => {
+      syncAnimationFrameRef.current = null;
       const currentView = editorViewRef.current;
-      if (!currentView || currentView.scrollDOM !== scrollDom) {
-        syncAnimationFrameRef.current = null;
-        syncTargetScrollTopRef.current = null;
-        isSyncingScroll.current = false;
-        return;
-      }
-
       const target = syncTargetScrollTopRef.current;
-      if (target === null) {
-        syncAnimationFrameRef.current = null;
-        isSyncingScroll.current = false;
-        return;
-      }
 
-      const delta = target - scrollDom.scrollTop;
-      if (Math.abs(delta) <= SYNC_SCROLL_STOP_PX) {
-        scrollDom.scrollTop = target;
-        syncAnimationFrameRef.current = null;
+      if (!currentView || currentView.scrollDOM !== scrollDom || target === null) {
         syncTargetScrollTopRef.current = null;
         isSyncingScroll.current = false;
         return;
       }
 
-      scrollDom.scrollTop += delta * SYNC_SCROLL_EASING;
-      syncAnimationFrameRef.current = requestAnimationFrame(step);
-    };
-
-    syncAnimationFrameRef.current = requestAnimationFrame(step);
+      scrollDom.scrollTop = target;
+      syncTargetScrollTopRef.current = null;
+      requestAnimationFrame(() => {
+        isSyncingScroll.current = false;
+      });
+    });
   }, []);
 
   const [paneWidth, setPaneWidth] = useState(0);
@@ -421,6 +409,22 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   useEffect(() => {
     updateContentRef.current = updateContent;
   }, [updateContent]);
+
+  useImperativeHandle(ref, () => ({
+    cancelScrollSync: cancelSyncedScroll,
+    syncScrollTo: (percentage: number) => {
+      const view = editorViewRef.current;
+      if (!view) return;
+
+      const scrollDom = view.scrollDOM;
+      const maxScrollTop = scrollDom.scrollHeight - scrollDom.clientHeight;
+      if (maxScrollTop <= 0) return;
+
+      const targetScrollTop = maxScrollTop * percentage;
+      if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= SCROLL_THRESHOLD) return;
+      animateSyncedScroll(scrollDom, targetScrollTop);
+    },
+  }), [animateSyncedScroll, cancelSyncedScroll]);
 
   useLayoutEffect(() => {
     const layout = layoutRef.current;
@@ -592,21 +596,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     return () => cancelAnimationFrame(rafId);
   }, [activeTabId, viewMode, paneWidth]);
 
-  useEffect(() => {
-    if (scrollPercentage === undefined) return;
-
-    const view = editorViewRef.current;
-    if (!view) return;
-
-    const scrollDom = view.scrollDOM;
-    const maxScrollTop = scrollDom.scrollHeight - scrollDom.clientHeight;
-    if (maxScrollTop <= 0) return;
-
-    const targetScrollTop = maxScrollTop * scrollPercentage;
-    if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= SCROLL_THRESHOLD) return;
-    animateSyncedScroll(scrollDom, targetScrollTop);
-  }, [scrollPercentage, animateSyncedScroll]);
-
   if (!activeTabId) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50/30 dark:bg-black/20 select-none">
@@ -646,4 +635,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       </div>
     </div>
   );
-};
+});
+
+EditorPane.displayName = 'EditorPane';
