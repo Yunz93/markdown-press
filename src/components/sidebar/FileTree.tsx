@@ -28,6 +28,21 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   const autoExpandTimerRef = React.useRef<number | null>(null);
 
   const isFolder = node.type === 'folder';
+  const isDropTarget = !node.isTrash;
+
+  const extractDraggedNodeId = useCallback((event: React.DragEvent): string | null => {
+    const rawPayload = event.dataTransfer.getData('application/json');
+    if (!rawPayload) {
+      return event.dataTransfer.getData('text/plain') || null;
+    }
+
+    try {
+      const parsed = JSON.parse(rawPayload) as { id?: string };
+      return parsed.id ?? null;
+    } catch {
+      return event.dataTransfer.getData('text/plain') || null;
+    }
+  }, []);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,18 +76,18 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (!isFolder || node.isTrash) return;
+    if (!isDropTarget) return;
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setIsDragOver(true);
-    if (!expanded && autoExpandTimerRef.current === null) {
+    if (isFolder && !expanded && autoExpandTimerRef.current === null) {
       autoExpandTimerRef.current = window.setTimeout(() => {
         setExpanded(true);
         autoExpandTimerRef.current = null;
       }, AUTO_EXPAND_ON_DRAG_MS);
     }
-  }, [clearAutoExpandTimer, expanded, isFolder, node.isTrash]);
+  }, [expanded, isDropTarget, isFolder]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -82,24 +97,19 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   }, [clearAutoExpandTimer]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    if (!isFolder) return;
+    if (!isDropTarget) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
     clearAutoExpandTimer();
 
-    const data = e.dataTransfer.getData('application/json');
-    if (data) {
-      try {
-        const { id: sourceId } = JSON.parse(data);
-        if (sourceId !== node.id) {
-          onMoveNode(sourceId, node.id);
-        }
-      } catch (err) {
-        console.error('Drop error', err);
-      }
+    const sourceId = extractDraggedNodeId(e);
+    if (!sourceId) return;
+
+    if (sourceId !== node.id) {
+      onMoveNode(sourceId, node.id);
     }
-  }, [clearAutoExpandTimer, isFolder, onMoveNode, node.id]);
+  }, [clearAutoExpandTimer, extractDraggedNodeId, isDropTarget, onMoveNode, node.id]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);

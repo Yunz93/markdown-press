@@ -19,6 +19,7 @@ import { SplitView } from './components/editor/SplitView';
 import { OutlinePanel } from './components/outline/OutlinePanel';
 import { ContentSearch } from './components/search/ContentSearch';
 import { TabBar } from './components/tabs/TabBar';
+import { PromptDialog } from './components/ui/Dialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
@@ -140,6 +141,7 @@ const App: React.FC = () => {
 
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
+  const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
   const [mainContentWidth, setMainContentWidth] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth : 0
   ));
@@ -301,7 +303,7 @@ const App: React.FC = () => {
       onOpenSettings: () => setSettingsOpen(true),
       onToggleOutline: () => setIsOutlineOpen((prev) => !prev),
       onToggleSidebar: () => setSidebarOpen(!isSidebarOpen),
-      onNewNote: () => { void fileOps.handleCreateFile(undefined, 'Untitled'); },
+      onNewNote: () => setIsNewNoteDialogOpen(true),
       onNewFolder: () => { void fileOps.handleNewFolder(undefined, 'Untitled Folder'); },
       onCloseTab: () => {
         if (activeTabId) {
@@ -337,6 +339,14 @@ const App: React.FC = () => {
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
     setSidebarWidth(clampPanelWidth(nextWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH));
   }, []);
+
+  const handleSubmitNewNote = useCallback((value: string) => {
+    const fileName = value.trim();
+    if (!fileName) return;
+
+    void fileOps.handleCreateFile(undefined, fileName);
+    setIsNewNoteDialogOpen(false);
+  }, [fileOps]);
 
   const handleOutlineWidthChange = useCallback((nextWidth: number) => {
     setOutlineWidth(clampPanelWidth(nextWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH));
@@ -521,6 +531,16 @@ const App: React.FC = () => {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={updateSettings}
+      />
+
+      <PromptDialog
+        isOpen={isNewNoteDialogOpen}
+        onClose={() => setIsNewNoteDialogOpen(false)}
+        onSubmit={handleSubmitNewNote}
+        title="New File"
+        label="File name:"
+        defaultValue="Untitled"
+        submitText="Create"
       />
 
       {notification && (

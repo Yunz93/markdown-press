@@ -298,18 +298,29 @@ export function useFileOperations() {
   const handleMoveNode = useCallback(async (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
     const sourceNode = findFileInTree(files, sourceId);
-    const targetFolder = findFileInTree(files, targetId);
+    const targetNode = findFileInTree(files, targetId);
 
-    if (!sourceNode || !targetFolder || targetFolder.type !== 'folder') {
-      showNotification('Can only move items to folders', 'error');
+    if (!sourceNode || !targetNode) {
+      showNotification('Move target not found', 'error');
       return;
     }
-    if (targetFolder.isTrash) {
+
+    if (targetNode.isTrash) {
       showNotification('Cannot move items into trash directly', 'error');
       return;
     }
-    await moveNodeToTargetPath(sourceNode, targetFolder.path);
-  }, [files, moveNodeToTargetPath, showNotification]);
+
+    const targetPath = targetNode.type === 'folder'
+      ? targetNode.path
+      : (getParentPath(targetNode.path) || rootFolderPath);
+
+    if (!targetPath) {
+      showNotification('Target folder not found', 'error');
+      return;
+    }
+
+    await moveNodeToTargetPath(sourceNode, targetPath);
+  }, [files, moveNodeToTargetPath, rootFolderPath, showNotification]);
 
   const handleMoveToRoot = useCallback(async (sourceId: string) => {
     if (!rootFolderPath) {

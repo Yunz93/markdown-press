@@ -143,7 +143,7 @@ html[data-app-booting="true"] *::after {
   letter-spacing: 0.01em;
   tab-size: 2;
   color: #1f2937;
-  caret-color: #7c3aed;
+  caret-color: transparent;
 }
 
 .editor-pane-layout .cm-content[contenteditable="true"] {
@@ -449,7 +449,7 @@ html[data-app-booting="true"] *::after {
 }
 
 .dark .editor-pane-layout .cm-content {
-  caret-color: #c084fc;
+  caret-color: transparent;
 }
 
 .dark .editor-pane-layout .cm-selectionLayer .cm-selectionBackground,
