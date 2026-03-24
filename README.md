@@ -145,6 +145,17 @@ npm run tauri:build
 
 构建产物默认位于 `src-tauri/target/release/bundle/`。
 
+### GitHub Tag 自动构建
+
+仓库已配置 GitHub Actions 发布流程，推送 `v` 前缀标签后会自动构建并上传各平台安装包。
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
+
 ## Release 校验
 
 项目已提供 release 冒烟检查脚本：

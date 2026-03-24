@@ -10,6 +10,7 @@
     "tauri:build": "tauri build",
     "build": "vite build",
     "preview": "vite preview",
+    "release:sync-version": "node scripts/sync-version-from-tag.mjs",
     "smoke:release": "node scripts/release-smoke-check.mjs --app"
   },
   "dependencies": {
