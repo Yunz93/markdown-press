@@ -138,6 +138,7 @@ const App: React.FC = () => {
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
+  const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
 
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
@@ -300,6 +301,10 @@ const App: React.FC = () => {
     handleAIAnalyze,
     {
       onSearch: () => setIsSearchBarOpen(true),
+      onSidebarSearch: () => {
+        setSidebarOpen(true);
+        setSidebarSearchRequestKey((prev) => prev + 1);
+      },
       onOpenSettings: () => setSettingsOpen(true),
       onToggleOutline: () => setIsOutlineOpen((prev) => !prev),
       onToggleSidebar: () => setSidebarOpen(!isSidebarOpen),
@@ -475,6 +480,7 @@ const App: React.FC = () => {
         currentKnowledgeBasePath={rootFolderPath}
         onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
         isOpen={isSidebarOpen}
+        searchFocusRequestKey={sidebarSearchRequestKey}
         width={responsiveSidebarWidth}
         onWidthChange={handleSidebarWidthChange}
         onClose={() => setSidebarOpen(false)}

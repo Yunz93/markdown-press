@@ -31,6 +31,7 @@ interface SidebarProps {
   currentKnowledgeBasePath?: string | null;
   onSwitchKnowledgeBase: () => void;
   isOpen: boolean;
+  searchFocusRequestKey?: number;
   width: number;
   onWidthChange: (width: number) => void;
   onClose: () => void;
@@ -536,6 +537,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentKnowledgeBasePath,
   onSwitchKnowledgeBase,
   isOpen,
+  searchFocusRequestKey = 0,
   width,
   onWidthChange,
   onClose
@@ -551,7 +553,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isRootDragOver, setIsRootDragOver] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const contentCacheRef = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (searchFocusRequestKey === 0) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isOpen, searchFocusRequestKey]);
 
   const extractDraggedNodeId = useCallback((event: React.DragEvent): string | null => {
     const rawPayload = event.dataTransfer.getData('application/json');
@@ -774,6 +789,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </svg>
               </span>
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

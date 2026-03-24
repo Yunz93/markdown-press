@@ -72,6 +72,7 @@ const shortcutLabels: Record<string, string> = {
   toggleView: 'Toggle View Mode',
   aiAnalyze: 'AI Enhance',
   search: 'Search',
+  sidebarSearch: 'Sidebar Search',
   settings: 'Open Settings',
   toggleOutline: 'Toggle Outline',
   toggleSidebar: 'Toggle Sidebar',
@@ -208,6 +209,13 @@ const shortcutGroups: ShortcutGroupConfig[] = [
         description: 'Open the in-note search panel.',
         editable: true,
         settingKey: 'search',
+      },
+      {
+        id: 'sidebarSearch',
+        label: 'Sidebar Search',
+        description: 'Open the sidebar and focus the file search field.',
+        editable: true,
+        settingKey: 'sidebarSearch',
       },
       {
         id: 'nextMatch',

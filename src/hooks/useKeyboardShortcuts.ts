@@ -7,6 +7,7 @@ interface UseKeyboardShortcutsOptions {
   onToggleView?: () => void;
   onAIAnalyze?: () => void;
   onSearch?: () => void;
+  onSidebarSearch?: () => void;
   onOpenSettings?: () => void;
   onToggleOutline?: () => void;
   onToggleSidebar?: () => void;
@@ -98,6 +99,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
       toggleView: options.onToggleView ?? (() => setViewMode(getNextViewMode(viewMode))),
       aiAnalyze: options.onAIAnalyze,
       search: options.onSearch,
+      sidebarSearch: options.onSidebarSearch,
       settings: options.onOpenSettings,
       toggleOutline: options.onToggleOutline,
       toggleSidebar: options.onToggleSidebar,
@@ -131,6 +133,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
     options.onOpenSettings,
     options.onSave,
     options.onSearch,
+    options.onSidebarSearch,
     options.onToggleOutline,
     options.onToggleSidebar,
     options.onToggleView,

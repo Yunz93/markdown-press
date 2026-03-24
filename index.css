@@ -1406,6 +1406,16 @@ html[data-app-booting="true"] *::after {
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.28);
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .dark .sidebar-shell {
   background: #090d15;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);

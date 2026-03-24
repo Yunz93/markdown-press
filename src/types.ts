@@ -47,6 +47,7 @@ export interface ShortcutConfig {
   toggleView: string;
   aiAnalyze: string;
   search: string;
+  sidebarSearch: string;
   settings: string;
   toggleOutline: string;
   toggleSidebar: string;

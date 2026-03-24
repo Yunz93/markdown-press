@@ -58,6 +58,7 @@ export const defaultSettings: AppSettings = {
     toggleView: 'Ctrl+E',
     aiAnalyze: 'Ctrl+J',
     search: 'Ctrl+F',
+    sidebarSearch: 'Ctrl+Shift+F',
     settings: 'Ctrl+,',
     toggleOutline: 'Ctrl+O',
     toggleSidebar: 'Ctrl+B',
