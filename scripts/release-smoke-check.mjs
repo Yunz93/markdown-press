@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const distDir = join(projectRoot, 'dist');
 const distAssetsDir = join(distDir, 'assets');
-const appBundlePath = join(projectRoot, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'M記.app');
+const appBundlePath = join(projectRoot, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'MarkdownPress.app');
 
 const shouldBuildApp = process.argv.includes('--app');
 
