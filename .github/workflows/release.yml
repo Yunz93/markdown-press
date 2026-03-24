@@ -52,7 +52,9 @@ jobs:
 
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')
-        run: npm run release:sync-version -- "${GITHUB_REF_NAME}"
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: npm run release:sync-version
 
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
