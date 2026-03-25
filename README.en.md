@@ -67,6 +67,8 @@ M記 is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. 
 
 ## Requirements
 
+This project currently supports macOS only. Windows and Linux build/file-operation support has been removed for now.
+
 ### Common
 
 - Node.js 18+
@@ -79,25 +81,6 @@ M記 is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. 
 
 ```bash
 xcode-select --install
-```
-
-#### Windows
-
-- Install Visual Studio C++ Build Tools
-- Install or enable WebView2
-
-#### Linux
-
-```bash
-# Debian / Ubuntu
-sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
-# Arch Linux
-sudo pacman -S webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg
-
-# Fedora
-sudo dnf install webkit2gtk4.1-devel gtk3-devel libayatana-appindicator-gtk3-devel librsvg2-devel
 ```
 
 ## Getting Started
@@ -144,6 +127,10 @@ npm run tauri:build
 ```
 
 Artifacts are generated under `src-tauri/target/release/bundle/`.
+
+### GitHub Tag Auto Build
+
+The repository is configured with a GitHub Actions release workflow. Push a `v`-prefixed tag to automatically build and upload macOS installers.
 
 ## Release Smoke Test
 

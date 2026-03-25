@@ -67,6 +67,8 @@ M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 
 
 ## 安装要求
 
+当前仅支持 macOS。Windows / Linux 构建与文件操作支持已暂时移除。
+
 ### 通用要求
 
 - Node.js 18+
@@ -79,25 +81,6 @@ M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 
 
 ```bash
 xcode-select --install
-```
-
-#### Windows
-
-- 安装 Visual Studio C++ Build Tools
-- 安装或启用 WebView2
-
-#### Linux
-
-```bash
-# Debian / Ubuntu
-sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
-# Arch Linux
-sudo pacman -S webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg
-
-# Fedora
-sudo dnf install webkit2gtk4.1-devel gtk3-devel libayatana-appindicator-gtk3-devel librsvg2-devel
 ```
 
 ## 快速开始
@@ -147,7 +130,7 @@ npm run tauri:build
 
 ### GitHub Tag 自动构建
 
-仓库已配置 GitHub Actions 发布流程，推送 `v` 前缀标签后会自动构建并上传各平台安装包。
+仓库已配置 GitHub Actions 发布流程，推送 `v` 前缀标签后会自动构建并上传 macOS 安装包。
 
 ```bash
 git tag v0.1.1

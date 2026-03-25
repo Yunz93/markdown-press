@@ -6,21 +6,10 @@ on:
       - "v*"
 
 jobs:
-  build-tauri:
+  build-macos:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: ubuntu-22.04
-            args: --bundles deb,appimage
-          - platform: windows-latest
-            args: --bundles nsis
-          - platform: macos-latest
-            args: --bundles app,dmg
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,12 +30,6 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       - name: Install frontend dependencies
         run: npm ci
 
@@ -66,4 +49,5 @@ jobs:
           releaseBody: See the assets to download this version and install.
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          releaseAssetNamePattern: MarkdownPress_[version]_[arch][ext]
+          args: --bundles app,dmg

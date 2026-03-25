@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "MarkdownPress",
+  "productName": "M記",
   "version": "0.1.0",
   "identifier": "com.bxyz.markdown-press",
   "build": {
@@ -30,9 +30,6 @@
   "bundle": {
     "active": true,
     "targets": [
-      "deb",
-      "appimage",
-      "nsis",
       "app",
       "dmg"
     ],
