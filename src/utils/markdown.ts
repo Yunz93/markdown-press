@@ -13,6 +13,10 @@ interface MarkdownRenderOptions {
   themeMode?: ThemeMode;
 }
 
+interface MarkdownRenderEnv {
+  shikiBlocks?: string[];
+}
+
 // Create markdown-it instance with configuration
 const createMarkdownIt = () => {
   const md = new MarkdownIt({
@@ -140,7 +144,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
   const baseFence = baseFenceRenderer || md.renderer.rules.fence;
   const theme = themeMode === 'dark' ? 'github-dark' : 'github-light';
 
-  md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  md.renderer.rules.fence = (tokens, idx, options, env: MarkdownRenderEnv, self) => {
     const token = tokens[idx];
     const rawLang = token.info.trim().split(/\s+/)[0] || '';
     const lang = normalizeShikiLanguage(rawLang);
@@ -153,7 +157,10 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
 
     if (highlighter && lang) {
       try {
-        return highlighter.codeToHtml(token.content.trim(), { lang, theme });
+        const shikiHtml = highlighter.codeToHtml(token.content.trim(), { lang, theme });
+        const shikiBlocks = env.shikiBlocks ?? (env.shikiBlocks = []);
+        const blockIndex = shikiBlocks.push(shikiHtml) - 1;
+        return `<div data-shiki-block="${blockIndex}"></div>`;
       } catch (error) {
         console.warn(`Shiki failed for ${lang}:`, error);
       }
@@ -183,10 +190,11 @@ export function useMarkdownRenderer(highlighter: any | null, themeMode: ThemeMod
 export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
   const md = getMarkdownIt();
   configureFenceRenderer(md, options.highlighter ?? null, options.themeMode ?? 'light');
-  const renderedHtml = md.render(markdown);
+  const env: MarkdownRenderEnv = {};
+  const renderedHtml = md.render(markdown, env);
 
   // Sanitize HTML to prevent XSS attacks
-  return DOMPurify.sanitize(renderedHtml, {
+  const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
     // Preserve Shiki token styling while still sanitizing the rest of the HTML.
     ADD_ATTR: [
@@ -206,8 +214,18 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
       'data-wiki-width',
       'data-wiki-height',
       'data-block-id',
+      'data-shiki-block',
     ],
   });
+
+  if (!env.shikiBlocks?.length) {
+    return sanitizedHtml;
+  }
+
+  return sanitizedHtml.replace(
+    /<div data-shiki-block="(\d+)"><\/div>/g,
+    (_match, blockIndex: string) => env.shikiBlocks?.[Number(blockIndex)] ?? ''
+  );
 }
 
 /**

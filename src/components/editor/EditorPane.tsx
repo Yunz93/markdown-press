@@ -4,9 +4,9 @@ import { getPaneLayoutMetrics } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
 import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateCommand } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
-import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
+import { HighlightStyle, indentUnit, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 import { useFileSystem } from '../../hooks/useFileSystem';
@@ -251,6 +251,15 @@ const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
   return true;
 };
 
+const indentSelectionOrInsertSpaces: StateCommand = ({ state, dispatch }) => {
+  const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
+  if (hasExpandedSelection) {
+    return indentMore({ state, dispatch });
+  }
+
+  return insertTwoSpaces({ state, dispatch });
+};
+
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   placeholder = 'Type here...',
   onContentChange,
@@ -490,7 +499,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
         doc: content,
         extensions: [
           history(),
-          keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Tab', run: insertTwoSpaces }]),
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            { key: 'Shift-Tab', run: indentLess },
+            { key: 'Tab', run: indentSelectionOrInsertSpaces },
+          ]),
+          indentUnit.of('  '),
           markdown({ codeLanguages: resolveEditorCodeLanguage }),
           drawSelection(),
           frontmatterDecorations,

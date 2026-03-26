@@ -1060,7 +1060,7 @@ html[data-app-booting="true"] *::after {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
-.preview-pane-document.markdown-body pre code {
+.preview-pane-document.markdown-body pre:not(.shiki) code {
   display: block;
   padding: 1rem 1.1rem;
   color: inherit;
@@ -1070,21 +1070,23 @@ html[data-app-booting="true"] *::after {
   overflow-x: auto;
 }
 
-.preview-pane-document.markdown-body pre .shiki,
-.preview-pane-document.markdown-body pre .shiki code {
-  background: transparent !important;
-  color: inherit;
-}
-
-.preview-pane-document.markdown-body pre .shiki {
+.preview-pane-document.markdown-body pre.shiki {
   margin: 0;
   padding: 1rem 1.1rem;
   overflow-x: auto;
   border-radius: inherit;
+  background: transparent !important;
 }
 
-.preview-pane-document.markdown-body pre .shiki code {
+.preview-pane-document.markdown-body pre.shiki code {
+  display: block;
   padding: 0;
+  color: inherit;
+  background: transparent !important;
+}
+
+.preview-pane-document.markdown-body pre.shiki .line {
+  display: block;
 }
 
 .preview-pane-document.markdown-body .preview-note-embed {
@@ -1306,13 +1308,13 @@ html[data-app-booting="true"] *::after {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-.dark .preview-pane-document.markdown-body pre code {
+.dark .preview-pane-document.markdown-body pre:not(.shiki) code {
   color: inherit;
   background: transparent;
 }
 
-.dark .preview-pane-document.markdown-body pre .shiki,
-.dark .preview-pane-document.markdown-body pre .shiki code {
+.dark .preview-pane-document.markdown-body pre.shiki,
+.dark .preview-pane-document.markdown-body pre.shiki code {
   background: transparent !important;
   color: inherit;
 }

@@ -358,7 +358,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       console.error('Markdown rendering error:', error);
       return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
     }
-  }, [content, currentFilePath, highlighter, isMarkdownPreview, settings.themeMode]);
+  }, [content, currentFilePath, highlighter?.__revision, isMarkdownPreview, settings.themeMode]);
 
   const flattenedHeadings = useMemo(
     () => (isMarkdownPreview ? flattenHeadingNodes(parseHeadings(content)) : []),

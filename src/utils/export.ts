@@ -190,7 +190,7 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
         : 'inset 0 1px 0 rgba(255, 255, 255, 0.55)'};
     }
 
-    .export-document .markdown-body pre code {
+    .export-document .markdown-body pre:not(.shiki) code {
       display: block;
       padding: 1rem 1.1rem;
       background: transparent;
@@ -199,7 +199,7 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
       white-space: pre;
     }
 
-    .export-document .markdown-body pre .shiki {
+    .export-document .markdown-body pre.shiki {
       margin: 0;
       padding: 1rem 1.1rem;
       overflow-x: auto;
@@ -207,9 +207,15 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
       background: transparent !important;
     }
 
-    .export-document .markdown-body pre .shiki code {
+    .export-document .markdown-body pre.shiki code {
+      display: block;
       padding: 0;
+      color: inherit;
       background: transparent;
+    }
+
+    .export-document .markdown-body pre.shiki .line {
+      display: block;
     }
 
     .export-document .markdown-body table th,
