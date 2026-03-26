@@ -56,16 +56,19 @@ export function useUndoRedo() {
 }
 
 /**
- * Hook for tracking content history stats
+ * Hook for tracking content history stats per file
  */
 export function useHistoryStats() {
-  const history = useAppStore((state) => state.history);
+  const activeTabId = useAppStore((state) => state.activeTabId);
+  const fileHistories = useAppStore((state) => state.fileHistories);
   const content = useAppStore(selectContent);
 
+  const history = activeTabId ? fileHistories[activeTabId] : undefined;
+
   return {
-    pastLength: history.past.length,
-    futureLength: history.future.length,
-    maxHistory: history.maxHistory,
+    pastLength: history?.past.length ?? 0,
+    futureLength: history?.future.length ?? 0,
+    maxHistory: history?.maxHistory ?? 100,
     currentContentLength: content.length,
   };
 }

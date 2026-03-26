@@ -146,12 +146,12 @@ export function useFileOperations() {
     const finalFileName = `${normalizedName}.md`;
     const documentTitle = normalizedName;
     const now = new Date().toISOString().split('T')[0];
-    const meta: Record<string, unknown> = {};
+    const meta: Record<string, string | string[] | number | boolean> = {};
 
-    const parseDefaultValue = (val: string): unknown => {
+    const parseDefaultValue = (val: string): string | string[] | number | boolean => {
       if (val === '{now}') return now;
       if (val === '[]') return [];
-      if (val === '{}') return {};
+      if (val === '{}') return ''; // Return empty string instead of empty object
       if (val.toLowerCase() === 'true') return true;
       if (val.toLowerCase() === 'false') return false;
       const num = Number(val);
@@ -209,7 +209,7 @@ export function useFileOperations() {
 
   const handleEmptyTrash = useCallback(async (trashItems: FileNode[]) => {
     if (trashItems.length === 0) {
-      showNotification('Trash is already empty.', 'info');
+      showNotification('Trash is already empty.', 'success');
       return;
     }
 

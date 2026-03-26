@@ -25,56 +25,12 @@ import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
+import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
+import { throttle } from './utils/throttle';
+import type { PaneDensity } from './components/editor/paneLayout';
 
-const SIDEBAR_WIDTH_STORAGE_KEY = 'markdown-press.sidebar-width';
-const OUTLINE_WIDTH_STORAGE_KEY = 'markdown-press.outline-width';
-const DEFAULT_SIDEBAR_WIDTH = 288;
-const DEFAULT_OUTLINE_WIDTH = 240;
-const MIN_SIDEBAR_WIDTH = 240;
-const MAX_SIDEBAR_WIDTH = 420;
-const MIN_OUTLINE_WIDTH = 180;
-const MAX_OUTLINE_WIDTH = 360;
-const MIN_RESPONSIVE_SIDEBAR_WIDTH = 160;
-const MIN_SINGLE_VIEW_WORKSPACE_WIDTH = 760;
-const MIN_EDITOR_WORKSPACE_WIDTH_WITH_OUTLINE = 620;
-const MIN_SPLIT_WORKSPACE_WIDTH = 920;
-const MIN_PREVIEW_WORKSPACE_WIDTH_WITH_OUTLINE = 620;
-const MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE = 720;
-const OUTLINE_PANEL_GAP = 32;
-const SHELL_EDGE_GAP = 24;
-
-function getMinimumWorkspaceWidth(viewMode: ViewMode): number {
-  return viewMode === ViewMode.SPLIT ? MIN_SPLIT_WORKSPACE_WIDTH : MIN_SINGLE_VIEW_WORKSPACE_WIDTH;
-}
-
-function getMinimumWorkspaceWidthWithOutline(viewMode: ViewMode): number {
-  if (viewMode === ViewMode.SPLIT) {
-    return MIN_SPLIT_WORKSPACE_WIDTH_WITH_OUTLINE;
-  }
-
-  if (viewMode === ViewMode.PREVIEW) {
-    return MIN_PREVIEW_WORKSPACE_WIDTH_WITH_OUTLINE;
-  }
-
-  return MIN_EDITOR_WORKSPACE_WIDTH_WITH_OUTLINE;
-}
-
-function clampPanelWidth(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getStoredPanelWidth(storageKey: string, fallback: number, min: number, max: number): number {
-  if (typeof window === 'undefined') return fallback;
-
-  const rawValue = window.localStorage.getItem(storageKey);
-  const parsedValue = rawValue ? Number(rawValue) : Number.NaN;
-
-  if (!Number.isFinite(parsedValue)) {
-    return fallback;
-  }
-
-  return clampPanelWidth(parsedValue, min, max);
-}
+// Layout constants moved to src/config/layout.ts
+// Using centralized configuration for better maintainability
 
 function getPathBasename(path: string | null | undefined): string {
   if (!path) return '';
@@ -151,18 +107,18 @@ const App: React.FC = () => {
   ));
   const [sidebarWidth, setSidebarWidth] = useState(() => (
     getStoredPanelWidth(
-      SIDEBAR_WIDTH_STORAGE_KEY,
-      DEFAULT_SIDEBAR_WIDTH,
-      MIN_SIDEBAR_WIDTH,
-      MAX_SIDEBAR_WIDTH
+      LAYOUT.STORAGE_KEYS.SIDEBAR_WIDTH,
+      LAYOUT.SIDEBAR.DEFAULT_WIDTH,
+      LAYOUT.SIDEBAR.MIN_WIDTH,
+      LAYOUT.SIDEBAR.MAX_WIDTH
     )
   ));
   const [outlineWidth, setOutlineWidth] = useState(() => (
     getStoredPanelWidth(
-      OUTLINE_WIDTH_STORAGE_KEY,
-      DEFAULT_OUTLINE_WIDTH,
-      MIN_OUTLINE_WIDTH,
-      MAX_OUTLINE_WIDTH
+      LAYOUT.STORAGE_KEYS.OUTLINE_WIDTH,
+      LAYOUT.OUTLINE.DEFAULT_WIDTH,
+      LAYOUT.OUTLINE.MIN_WIDTH,
+      LAYOUT.OUTLINE.MAX_WIDTH
     )
   ));
   const autoOpenAttemptedRef = React.useRef(false);
@@ -213,6 +169,12 @@ const App: React.FC = () => {
     let unwatch: (() => void) | null = null;
 
     const setupWatcher = async () => {
+      // Cleanup previous watcher before setting up new one to prevent race conditions
+      if (unwatch) {
+        unwatch();
+        unwatch = null;
+      }
+      
       unwatch = await watchFile(currentFilePath, async (event) => {
         if (disposed) return;
         if (event?.type === 'deleted') {
@@ -241,7 +203,8 @@ const App: React.FC = () => {
 
           useAppStore.getState().updateTabContent(activeTabId, latestContent);
           showNotification('File reloaded from disk.', 'success');
-        } catch {
+        } catch (error) {
+          console.error('Failed to reload file from disk:', error);
           showNotification('Failed to reload file changed on disk.', 'error');
         }
       });
@@ -251,7 +214,10 @@ const App: React.FC = () => {
 
     return () => {
       disposed = true;
-      if (unwatch) unwatch();
+      if (unwatch) {
+        unwatch();
+        unwatch = null;
+      }
     };
   }, [activeTabId, currentFilePath, readFile, showNotification, watchFile]);
 
@@ -259,10 +225,13 @@ const App: React.FC = () => {
     const mainEl = mainContentRef.current;
     if (!mainEl) return;
 
+    // Throttle resize updates to 16ms (60fps) for better performance
+    const throttledSetMainContentWidth = throttle(setMainContentWidth, 16);
+
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setMainContentWidth(entry.contentRect.width);
+      throttledSetMainContentWidth(entry.contentRect.width);
     });
 
     resizeObserver.observe(mainEl);
@@ -282,12 +251,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+    window.localStorage.setItem(LAYOUT.STORAGE_KEYS.SIDEBAR_WIDTH, String(sidebarWidth));
   }, [sidebarWidth]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(OUTLINE_WIDTH_STORAGE_KEY, String(outlineWidth));
+    window.localStorage.setItem(LAYOUT.STORAGE_KEYS.OUTLINE_WIDTH, String(outlineWidth));
   }, [outlineWidth]);
 
   // Global keyboard shortcuts
@@ -342,7 +311,7 @@ const App: React.FC = () => {
   }, [setContent]);
 
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
-    setSidebarWidth(clampPanelWidth(nextWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH));
+    setSidebarWidth(clamp(nextWidth, LAYOUT.SIDEBAR.MIN_WIDTH, LAYOUT.SIDEBAR.MAX_WIDTH));
   }, []);
 
   const handleSubmitNewNote = useCallback((value: string) => {
@@ -354,7 +323,7 @@ const App: React.FC = () => {
   }, [fileOps]);
 
   const handleOutlineWidthChange = useCallback((nextWidth: number) => {
-    setOutlineWidth(clampPanelWidth(nextWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH));
+    setOutlineWidth(clamp(nextWidth, LAYOUT.OUTLINE.MIN_WIDTH, LAYOUT.OUTLINE.MAX_WIDTH));
   }, []);
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
@@ -374,22 +343,22 @@ const App: React.FC = () => {
   const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
   const responsiveOutlineWidth = Math.min(
     outlineWidth,
-    Math.max(MIN_OUTLINE_WIDTH, Math.floor(mainContentWidth * 0.22))
+    Math.max(LAYOUT.OUTLINE.MIN_WIDTH, Math.floor(mainContentWidth * 0.22))
   );
-  const outlineReservationWidth = isOutlineOpen ? responsiveOutlineWidth + OUTLINE_PANEL_GAP : 0;
+  const outlineReservationWidth = isOutlineOpen ? responsiveOutlineWidth + LAYOUT.GAP.OUTLINE_PANEL : 0;
   const maxSidebarWidthForViewport = Math.max(
-    MIN_RESPONSIVE_SIDEBAR_WIDTH,
-    viewportWidth - minimumWorkspaceWidth - outlineReservationWidth - SHELL_EDGE_GAP
+    LAYOUT.SIDEBAR.RESPONSIVE_MIN_WIDTH,
+    viewportWidth - minimumWorkspaceWidth - outlineReservationWidth - LAYOUT.GAP.SHELL_EDGE
   );
   const responsiveSidebarWidth = isSidebarOpen
     ? Math.min(sidebarWidth, maxSidebarWidthForViewport)
     : sidebarWidth;
-  const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - OUTLINE_PANEL_GAP;
+  const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - LAYOUT.GAP.OUTLINE_PANEL;
   const minimumWorkspaceWidthWithOutline = getMinimumWorkspaceWidthWithOutline(viewMode);
   const canShowOutlinePanel = Boolean(activeTabId) && workspaceWidthWithOutline >= minimumWorkspaceWidthWithOutline;
   const isOutlineVisible = Boolean(activeTabId) && isOutlineOpen;
   const canShowOutlineToggle = Boolean(activeTabId);
-  const contentDensity = (
+  const contentDensity: PaneDensity = (
     viewMode === ViewMode.SPLIT ||
     mainContentWidth < 1360 ||
     (isSidebarOpen && mainContentWidth < 1500) ||

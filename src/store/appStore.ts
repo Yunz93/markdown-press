@@ -107,6 +107,7 @@ export function useTabStore(): TabState & TabActions {
     lastSavedContent: state.lastSavedContent,
     addTab: state.addTab,
     closeTab: state.closeTab,
+    closeOtherTabs: state.closeOtherTabs,
     setActiveTab: state.setActiveTab,
     updateTabContent: state.updateTabContent,
     getActiveContent: state.getActiveContent,
@@ -120,7 +121,7 @@ export function useEditorStore(): EditorState & EditorActions {
   return useAppStore((state) => ({
     ...initialEditorState,
     viewMode: state.viewMode,
-    history: state.history,
+    fileHistories: state.fileHistories,
     setContent: state.setContent,
     setViewMode: state.setViewMode,
     undo: state.undo,

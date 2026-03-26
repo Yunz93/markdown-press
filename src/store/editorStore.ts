@@ -1,6 +1,6 @@
 import { ViewMode } from '../types';
 
-// History state for undo/redo
+// History state for undo/redo per file
 export interface HistoryState {
   past: string[];
   future: string[];
@@ -11,10 +11,13 @@ export interface HistoryState {
  * Editor store state interface
  * Note: `content` is NOT stored here. It is derived from
  * `fileContents[activeTabId]` via the `selectContent` selector.
+ * 
+ * History is now per-file (keyed by fileId) to prevent cross-tab contamination
+ * when switching between tabs during editing.
  */
 export interface EditorState {
   viewMode: ViewMode;
-  history: HistoryState;
+  fileHistories: Record<string, HistoryState>; // Per-file history
 }
 
 /**
@@ -35,11 +38,7 @@ export interface EditorActions {
  */
 export const initialEditorState: EditorState = {
   viewMode: ViewMode.SPLIT,
-  history: {
-    past: [],
-    future: [],
-    maxHistory: 100,
-  },
+  fileHistories: {}, // Initialize as empty object, histories created per file
 };
 
 // Combined type needed by the slice to access fileContents + activeTabId
@@ -68,7 +67,7 @@ export function createEditorSlice(
     ...initialEditorState,
 
     setContent: (content, skipHistory = false) => set((state) => {
-      const { activeTabId, fileContents, history } = state;
+      const { activeTabId, fileContents } = state;
       if (!activeTabId) return {};
 
       const current = fileContents[activeTabId] ?? '';
@@ -82,17 +81,22 @@ export function createEditorSlice(
       // Don't add to history if content is the same
       if (current === content) return {};
 
-      const newPast = [...history.past, current];
-      const trimmedPast = newPast.length > history.maxHistory
-        ? newPast.slice(-history.maxHistory)
+      // Get or create history for this file
+      const existingHistory = state.fileHistories[activeTabId] || { past: [], future: [], maxHistory: 100 };
+      const newPast = [...existingHistory.past, current];
+      const trimmedPast = newPast.length > existingHistory.maxHistory
+        ? newPast.slice(-existingHistory.maxHistory)
         : newPast;
 
       return {
         fileContents: { ...fileContents, [activeTabId]: content },
-        history: {
-          ...history,
-          past: trimmedPast,
-          future: [],
+        fileHistories: {
+          ...state.fileHistories,
+          [activeTabId]: {
+            ...existingHistory,
+            past: trimmedPast,
+            future: [],
+          },
         },
       };
     }),
@@ -100,50 +104,69 @@ export function createEditorSlice(
     setViewMode: (mode) => set(() => ({ viewMode: mode })),
 
     undo: () => set((state) => {
-      const { activeTabId, fileContents, history } = state;
+      const { activeTabId, fileContents, fileHistories } = state;
       if (!activeTabId) return {};
+      
+      const history = fileHistories[activeTabId];
+      if (!history || history.past.length === 0) return {};
+      
       const { past, future, maxHistory } = history;
-      if (past.length === 0) return {};
-
       const current = fileContents[activeTabId] ?? '';
       const previous = past[past.length - 1];
       const newPast = past.slice(0, -1);
 
       return {
         fileContents: { ...fileContents, [activeTabId]: previous },
-        history: {
-          past: newPast,
-          future: [current, ...future],
-          maxHistory,
+        fileHistories: {
+          ...fileHistories,
+          [activeTabId]: {
+            past: newPast,
+            future: [current, ...future],
+            maxHistory,
+          },
         },
       };
     }),
 
     redo: () => set((state) => {
-      const { activeTabId, fileContents, history } = state;
+      const { activeTabId, fileContents, fileHistories } = state;
       if (!activeTabId) return {};
+      
+      const history = fileHistories[activeTabId];
+      if (!history || history.future.length === 0) return {};
+      
       const { past, future, maxHistory } = history;
-      if (future.length === 0) return {};
-
       const current = fileContents[activeTabId] ?? '';
       const next = future[0];
       const newFuture = future.slice(1);
 
       return {
         fileContents: { ...fileContents, [activeTabId]: next },
-        history: {
-          past: [...past, current],
-          future: newFuture,
-          maxHistory,
+        fileHistories: {
+          ...fileHistories,
+          [activeTabId]: {
+            past: [...past, current],
+            future: newFuture,
+            maxHistory,
+          },
         },
       };
     }),
 
-    canUndo: () => get().history.past.length > 0,
-    canRedo: () => get().history.future.length > 0,
+    canUndo: () => {
+      const state = get();
+      const history = state.fileHistories[state.activeTabId || ''];
+      return Boolean(history && history.past.length > 0);
+    },
+    
+    canRedo: () => {
+      const state = get();
+      const history = state.fileHistories[state.activeTabId || ''];
+      return Boolean(history && history.future.length > 0);
+    },
 
     clearHistory: () => set((state) => ({
-      history: { past: [], future: [], maxHistory: state.history.maxHistory },
+      fileHistories: {}, // Clear all file histories
     })),
   };
 }

@@ -4,6 +4,8 @@ import { ViewMode } from '../../types';
 import { EditorPane, type EditorPaneHandle } from './EditorPane';
 import { PreviewPane, type PreviewPaneHandle } from './PreviewPane';
 import { WritingStatsDisplay } from '../stats/WritingStatsDisplay';
+import { throttle } from '../../utils/throttle';
+import type { PaneDensity } from './paneLayout';
 
 interface SplitViewProps {
   highlighter?: any;
@@ -11,7 +13,7 @@ interface SplitViewProps {
   isOutlineOpen: boolean;
   canShowOutline: boolean;
   canShowOutlineToggle: boolean;
-  contentDensity: 'comfortable' | 'compact';
+  contentDensity: PaneDensity;
   onToggleOutline: () => void;
 }
 
@@ -80,14 +82,19 @@ export const SplitView: React.FC<SplitViewProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const minRatio = entry.contentRect.width > 0 ? (MIN_SPLIT_PANE_WIDTH / entry.contentRect.width) * 100 : 20;
+    // Throttle resize updates to 16ms (60fps) for better performance
+    const throttledSetSplitRatio = throttle((width: number) => {
+      const minRatio = width > 0 ? (MIN_SPLIT_PANE_WIDTH / width) * 100 : 20;
       const maxRatio = 100 - minRatio;
       if (viewMode === ViewMode.SPLIT && minRatio < maxRatio) {
         setSplitRatio((prev) => Math.min(Math.max(prev, minRatio), maxRatio));
       }
+    }, 16);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      throttledSetSplitRatio(entry.contentRect.width);
     });
 
     resizeObserver.observe(container);

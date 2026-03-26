@@ -9,15 +9,16 @@ import { buildWikiReferenceTarget, extractWikiNoteFragment, parseWikiLinkReferen
 import { useFileOperations } from '../../hooks/useFileOperations';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
-import { getPaneLayoutMetrics } from './paneLayout';
+import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { flushPendingPreviewHeadingScroll, registerPreviewPane, requestPreviewHeadingScroll, unregisterPreviewPane } from '../../utils/previewNavigationBridge';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings, type HeadingNode } from '../../utils/outline';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
+import { throttle } from '../../utils/throttle';
 
 interface PreviewPaneProps {
   highlighter?: any;
   onScroll?: (percentage: number) => void;
-  density?: 'comfortable' | 'compact';
+  density?: PaneDensity;
 }
 
 export interface PreviewPaneHandle {
@@ -43,6 +44,19 @@ const CENTERED_HEADING_SCROLL_OPTIONS: HeadingScrollOptions = {
 
 function isExternalLink(href: string): boolean {
   return /^(https?:|mailto:|tel:)/i.test(href.trim());
+}
+
+/**
+ * Validate external URL to prevent opening dangerous protocols
+ * Only allows http:// and https:// URLs
+ */
+function isValidExternalUrl(href: string): boolean {
+  try {
+    const url = new URL(href);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 function hasUriScheme(value: string): boolean {
@@ -152,7 +166,7 @@ function scrollContainerToHeading(container: HTMLElement, target: HTMLElement, o
 export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   highlighter,
   onScroll,
-  density = 'comfortable'
+  density = 'comfortable' as PaneDensity
 }, ref) => {
   const { settings, currentFilePath, rootFolderPath, files, fileContents, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
@@ -195,10 +209,13 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const layout = layoutRef.current;
     if (!layout) return;
 
+    // Throttle pane width updates to 16ms (60fps) for better performance
+    const throttledSetPaneWidth = throttle(setPaneWidth, 16);
+
     const updatePaneWidth = () => {
       const nextWidth = layout.getBoundingClientRect().width;
       if (nextWidth > 0) {
-        setPaneWidth(nextWidth);
+        throttledSetPaneWidth(nextWidth);
       }
     };
 
@@ -207,7 +224,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setPaneWidth(entry.contentRect.width);
+      throttledSetPaneWidth(entry.contentRect.width);
     });
 
     resizeObserver.observe(layout);
@@ -752,16 +769,16 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     headingElements.forEach((element, index) => {
       const heading = flattenedHeadings[index];
       if (!heading) {
-        element.removeAttribute('data-heading-id');
-        element.removeAttribute('data-heading-slug');
-        element.removeAttribute('data-heading-text');
+        (element as HTMLElement).removeAttribute('data-heading-id');
+        (element as HTMLElement).removeAttribute('data-heading-slug');
+        (element as HTMLElement).removeAttribute('data-heading-text');
         return;
       }
 
-      element.id = heading.id;
-      element.dataset.headingId = heading.id;
-      element.dataset.headingSlug = createHeadingSlug(heading.text);
-      element.dataset.headingText = heading.text;
+      (element as HTMLElement).id = heading.id;
+      (element as HTMLElement).dataset.headingId = heading.id;
+      (element as HTMLElement).dataset.headingSlug = createHeadingSlug(heading.text);
+      (element as HTMLElement).dataset.headingText = heading.text;
     });
 
     flushPendingPreviewHeadingScroll(activeTabId);
@@ -787,7 +804,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
     const externalLink = target?.closest('a[href]') as HTMLAnchorElement | null;
     const href = externalLink?.getAttribute('href')?.trim() ?? '';
-    if (externalLink && href && !href.startsWith('#') && isExternalLink(href)) {
+    if (externalLink && href && !href.startsWith('#') && isExternalLink(href) && isValidExternalUrl(href)) {
       event.preventDefault();
 
       try {
@@ -867,20 +884,21 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     let cancelled = false;
     const images = Array.from(container.querySelectorAll('article.markdown-body img'));
 
-    void Promise.all(images.map(async (image) => {
-      const originalSrc = image.getAttribute('data-original-src') || image.getAttribute('src');
+    void Promise.all(images.map(async (image: Element) => {
+      const imgElement = image as HTMLImageElement;
+      const originalSrc = imgElement.getAttribute('data-original-src') || imgElement.getAttribute('src');
       if (!originalSrc) return;
 
       const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
-      if (cancelled || !image.isConnected || !cachedSrc) return;
+      if (cancelled || !imgElement.isConnected || !cachedSrc) return;
 
-      if (image.getAttribute('data-original-src') !== originalSrc) {
-        image.setAttribute('data-original-src', originalSrc);
+      if (imgElement.getAttribute('data-original-src') !== originalSrc) {
+        imgElement.setAttribute('data-original-src', originalSrc);
       }
 
-      if (image.getAttribute('src') !== cachedSrc) {
-        image.setAttribute('src', cachedSrc);
-        image.src = cachedSrc;
+      if (imgElement.getAttribute('src') !== cachedSrc) {
+        imgElement.setAttribute('src', cachedSrc);
+        imgElement.src = cachedSrc;
       }
     }));
 
@@ -952,6 +970,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               <div className="editor-pane-width-constrained mx-auto w-full py-3">
                 <iframe
                   src={`${assetPreviewSrc}#toolbar=0&navpanes=0&scrollbar=1`}
+                  sandbox="allow-scripts allow-same-origin"
                   title={currentFilePath?.split(/[\\/]/).pop() || 'PDF preview'}
                   className="h-[78vh] w-full rounded-2xl border border-gray-200/70 bg-white shadow-sm dark:border-white/10 dark:bg-black/30"
                 />

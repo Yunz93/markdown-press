@@ -1,6 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
-import { getPaneLayoutMetrics } from './paneLayout';
+import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
 import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateCommand } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
@@ -13,13 +13,14 @@ import { useFileSystem } from '../../hooks/useFileSystem';
 import { getFileSystem } from '../../types/filesystem';
 import { resolveEditorCodeLanguage } from '../../utils/editorCodeLanguages';
 import type { AttachmentPasteFormat } from '../../types';
+import { throttle } from '../../utils/throttle';
 
 interface EditorPaneProps {
   placeholder?: string;
   onContentChange?: (content: string) => void;
   onScroll?: (percentage: number) => void;
   highlighter?: any;
-  density?: 'comfortable' | 'compact';
+  density?: PaneDensity;
 }
 
 export interface EditorPaneHandle {
@@ -265,7 +266,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   onContentChange,
   onScroll,
   highlighter,
-  density = 'comfortable'
+  density = 'comfortable' as PaneDensity
 }, ref) => {
   void highlighter;
 
@@ -461,10 +462,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     const layout = layoutRef.current;
     if (!layout) return;
 
+    // Throttle pane width updates to 16ms (60fps) for better performance
+    const throttledSetPaneWidth = throttle(setPaneWidth, 16);
+
     const updatePaneWidth = () => {
       const nextWidth = layout.getBoundingClientRect().width;
       if (nextWidth > 0) {
-        setPaneWidth(nextWidth);
+        throttledSetPaneWidth(nextWidth);
       }
     };
 
@@ -473,7 +477,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setPaneWidth(entry.contentRect.width);
+      throttledSetPaneWidth(entry.contentRect.width);
     });
 
     resizeObserver.observe(layout);

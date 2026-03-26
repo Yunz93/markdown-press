@@ -9,7 +9,7 @@ export interface PaneLayoutMetrics {
   sheetRadius: number;
 }
 
-type PaneDensity = 'comfortable' | 'compact';
+export type PaneDensity = 'comfortable' | 'compact';
 
 function scale(value: number, multiplier: number): number {
   return Math.round(value * multiplier);
