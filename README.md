@@ -6,46 +6,43 @@
   <img src="./icons/markdown-press-logo-m.svg" alt="M記 logo" width="120" />
 </p>
 
-M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 编辑器，面向本地知识库写作场景，强调编辑体验、预览一致性和知识库链接能力。
+M記 是一个简单易用的 Markdown 编辑器，面向本地知识库写作场景，强调编辑体验、预览一致性和知识库链接能力，基于 Tauri 2、React 19 和 TypeScript 构建。
+
+>初衷就是开发一个比Typora更好用，比Obsidian更易用的Markdown编辑器。
 
 ![M記 preview](docs/assets/markdown-press-preview.png)
 
 ## 功能概览
 
 ### 编辑与预览
-- 三种视图模式：编辑、预览、分屏
-- 分屏模式支持编辑区与预览区关联滚动
-- 预览区支持 KaTeX 数学公式、Mermaid 图表、任务列表、表格、代码高亮
-- Outline 目录支持章节导航
-- 预览区外链可直接调用系统浏览器打开
+- 三种视图模式便捷切换：编辑、分屏、预览（尝试实现Typora的实时编辑预览功能，折腾了一个周末搞不定稳定性问题，遂作罢）
+- 支持 KaTeX 数学公式、Mermaid 图表、任务列表、表格、代码高亮预览渲染（有问题，待完善）
+- 支持章节导航
 
 ### Markdown 与知识库能力
 - 支持 YAML frontmatter，并可自定义新建文件的属性模板
-- 新建文件时自动生成与文件名同步的一级标题
-- 支持 `[[文件]]` 跨文件 wiki link
-- 支持 `[[#章节]]`、`[[章节]]` 文内章节跳转
-- 支持 `![[附件路径]]` 本地附件访问
-- 图片附件可在预览区直接渲染，其他附件可在系统文件浏览器中定位
+- 支持完整Markdown语法
+- 支持Obsidian知识库内联语法
 
 ### 文件与侧边栏
-- 基于本地文件夹的知识库管理
-- 多标签页编辑
-- 侧边栏文件树支持新建、重命名、拖拽移动
-- 内置 Trash 软删除、恢复、批量永久删除
-- 回收站目录统一为 `.trash`，并默认隐藏，不在主文件树显示
-- 标签页支持右键关闭其他标签
+- 支持基于本地文件夹的知识库管理，支持文件/文件夹常用操作
+- 支持多标签页编辑
+- 内置 Trash，支持软删除
 
 ### 写作体验
-- 编辑区 frontmatter 属性高亮优化，key 与 value 分离渲染
-- 编辑区与预览区版式、边距、卡片风格保持一致
-- 支持中英文字体分别配置，中文默认内置霞鹜文楷并随版本打包分发
-- 默认暗色主题，支持亮色/暗色切换
+- 支持中英文字体配置
+- 默认暗色主题，支持亮色/暗色主题切换
 - 支持常用快捷键，并可在设置页调整核心快捷键
 
-### AI 与导出
-- 集成 Google Gemini，可用于内容增强与元数据生成
-- 支持 PDF 导出
-- 支持将文章标记为 `is_publish: true` 并保存
+### AI 与导出（待完善）
+- 集成 Google Gemini
+- 支持 HTML 导出
+- 支持博客一键发布
+
+### 多端支持（待完善）
+- MacOS
+- Linux
+- Windows
 
 ## 截图
 
@@ -67,7 +64,7 @@ M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 
 
 ## 安装要求
 
-当前仅支持 macOS。Windows / Linux 构建与文件操作支持已暂时移除。
+当前仅支持 macOS。Windows / Linux 未测试，已暂时移除。
 
 ### 通用要求
 
@@ -149,14 +146,6 @@ npm run smoke:release
 
 配套检查清单见 [docs/RELEASE_SMOKE_TEST.md](./docs/RELEASE_SMOKE_TEST.md)。
 
-建议重点检查以下行为是否与开发模式一致：
-
-- 冷启动后首次打开文件的编辑区宽度
-- 纯预览模式下 outline 目录展开与跳转
-- 分屏模式下编辑区与预览区联动滚动
-- `[[文件]]`、`[[#章节]]`、`![[附件]]` 解析与跳转
-- 预览区外链、图片附件和 PDF 导出
-
 ## 常用快捷键
 
 | 快捷键 | 动作 |
@@ -167,25 +156,9 @@ npm run smoke:release
 | `Ctrl/Cmd + F` | 打开搜索 |
 | `Ctrl/Cmd + 0` | 打开设置 |
 | `Ctrl/Cmd + O` | 切换 Outline |
+| `Ctrl/Cmd + B` | 切换侧边栏 |
 | `Ctrl/Cmd + Z` | 撤销 |
 | `Ctrl/Cmd + Shift + Z` / `Ctrl/Cmd + Y` | 重做 |
-
-## 项目结构
-
-```text
-markdown-press/
-├── src/
-│   ├── components/        # 编辑器、预览、侧边栏、设置等 UI
-│   ├── hooks/             # 文件操作、快捷键、导出、AI 等逻辑
-│   ├── services/          # 文件系统、Gemini 等服务
-│   ├── store/             # Zustand 状态管理
-│   ├── utils/             # Markdown、frontmatter、outline、附件解析等工具
-│   └── types.ts           # 应用类型定义
-├── src-tauri/             # Tauri 配置与打包入口
-├── docs/                  # 项目文档与截图
-├── scripts/               # 发布校验脚本等
-└── README.en.md           # 英文版 README
-```
 
 ## 开发说明
 
