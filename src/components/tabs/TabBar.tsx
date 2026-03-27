@@ -87,11 +87,11 @@ const TabContextMenu: React.FC<{
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[120] min-w-[180px] rounded-xl border border-gray-200/60 bg-white/95 p-1 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-gray-800/95"
+      className="fixed z-[120] min-w-[180px] rounded-xl bg-white/95 p-1 shadow-2xl backdrop-blur-xl dark:bg-gray-800/95"
       style={{ top: position.y, left: position.x }}
     >
       <button
-        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-gray-700/80"
         onClick={() => {
           onCloseOtherTabs();
           onClose();

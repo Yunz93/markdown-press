@@ -50,6 +50,10 @@ function performScroll(container: HTMLElement, id: string, options?: PreviewScro
   const target = findPreviewHeading(container, id);
   if (!target) return false;
 
+  // Force layout recalculation for accurate measurements
+  void container.offsetHeight;
+  void target.offsetHeight;
+
   const targetRect = target.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
   const relativeTargetTop = container.scrollTop + targetRect.top - containerRect.top;
@@ -58,9 +62,14 @@ function performScroll(container: HTMLElement, id: string, options?: PreviewScro
     ? relativeTargetTop + targetRect.height / 2 - container.clientHeight / 2
     : relativeTargetTop - container.clientHeight * clamp(options?.alignTopRatio ?? 0.18, 0, 1);
 
-  container.scrollTo({
-    top: clamp(targetTop, 0, maxScrollTop),
-    behavior: options?.behavior ?? 'smooth',
+  // Use double RAF for more reliable scrolling after DOM updates
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      container.scrollTo({
+        top: clamp(targetTop, 0, maxScrollTop),
+        behavior: options?.behavior ?? 'smooth',
+      });
+    });
   });
 
   return true;

@@ -51,6 +51,7 @@ export interface ShortcutConfig {
   settings: string;
   toggleOutline: string;
   toggleSidebar: string;
+  toggleTheme: string;
   newNote: string;
   newFolder: string;
   closeTab: string;

@@ -122,7 +122,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             className="h-full min-w-0 flex flex-col relative"
             style={{
               width: viewMode === ViewMode.SPLIT ? `${splitRatio}%` : '100%',
-              borderRight: viewMode === ViewMode.SPLIT ? '1px solid rgba(128,128,128,0.1)' : 'none',
+              // Modern flat UI - no borders
             }}
           >
             <EditorPane
@@ -149,7 +149,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
         {showPreview && (
           <div
-            className="h-full min-w-0 overflow-hidden bg-gray-50/50 dark:bg-black/50 transition-colors"
+            className="h-full min-w-0 overflow-hidden transition-colors"
             style={{
               width: viewMode === ViewMode.SPLIT ? `${100 - splitRatio}%` : '100%',
             }}
@@ -165,14 +165,14 @@ export const SplitView: React.FC<SplitViewProps> = ({
       </div>
 
       {activeTabId && (
-        <div className="shrink-0 border-t border-gray-200/50 dark:border-white/10 bg-white/70 dark:bg-gray-900/45 backdrop-blur-xl">
+        <div className="shrink-0 bg-transparent">
           <div className="mx-auto flex w-full max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:px-5">
             <WritingStatsDisplay className="min-w-0 flex-1 border-t-0 px-0 py-0" showBorder={false} />
             {canShowOutlineToggle && (
               <div className="ml-auto shrink-0">
                 <button
                   onClick={onToggleOutline}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200/80 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-white/10 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-gray-200/50 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/20 transition-colors"
                   title="Toggle Outline (Ctrl+O)"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

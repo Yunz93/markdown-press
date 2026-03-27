@@ -57,7 +57,7 @@ html[data-app-booting="true"] *::after {
   --pane-backdrop-py: 30px;
   --pane-frame-max-width: 1240px;
   --pane-sheet-max-width: 1080px;
-  --pane-sheet-radius: 28px;
+  --pane-sheet-radius: 0;
   --pane-content-px: 56px;
   --pane-content-top: 52px;
   --pane-content-bottom: 72px;
@@ -75,7 +75,8 @@ html[data-app-booting="true"] *::after {
   --editor-code-comment: #6a737d;
   --editor-code-operator: #d73a49;
   --editor-code-fence: #6a737d;
-  background: rgba(248, 250, 252, 0.96);
+  /* Unified flat background with sidebar */
+  background: #f8fafc;
 }
 
 .dark .editor-pane-layout {
@@ -93,7 +94,7 @@ html[data-app-booting="true"] *::after {
   --editor-code-comment: #6a737d;
   --editor-code-operator: #f97583;
   --editor-code-fence: #8b949e;
-  background: rgba(10, 14, 22, 0.98);
+  background: #000000;
 }
 
 .editor-pane-layout .cm-editor {
@@ -580,25 +581,20 @@ html[data-app-booting="true"] *::after {
   max-width: 100%;
   margin-inline: auto;
   overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: var(--pane-sheet-radius);
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow:
-    0 24px 60px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  transition:
-    width 220ms ease,
-    border-radius 220ms ease;
+  /* Modern flat UI - no borders, no shadows */
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: width 220ms ease;
 }
 
 .dark .editor-pane-sheet {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(10, 14, 22, 0.72);
-  box-shadow:
-    0 28px 70px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor-pane {
@@ -1449,7 +1445,7 @@ html:not(.dark) .markdown-body {
   --color-canvas-default: transparent;
 }
 
-/* Outline Panel Styles */
+/* Outline Panel Styles - Modern Flat Design */
 .outline-panel {
   width: clamp(200px, 18vw, 250px);
   height: 100%;
@@ -1459,21 +1455,13 @@ html:not(.dark) .markdown-body {
   min-width: 0;
   overflow: hidden;
   color: #475569;
-  background: rgba(248, 250, 252, 0.88);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-left: 1px solid rgba(203, 213, 225, 0.72);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.32);
+  background: transparent;
   font-size: 13px;
 }
 
 .dark .outline-panel {
   color: #cbd5e1;
-  background: #090d15;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.03);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: transparent;
 }
 
 .outline-panel.empty {
@@ -1495,14 +1483,12 @@ html:not(.dark) .markdown-body {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(203, 213, 225, 0.65);
   font-weight: 600;
   font-size: 14px;
   color: #334155;
 }
 
 .dark .outline-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #e2e8f0;
 }
 
@@ -1823,73 +1809,42 @@ html:not(.dark) .markdown-body {
   flex-shrink: 0;
 }
 
-/* Tab Bar Styles */
+/* Tab Bar Styles - Modern Flat Design */
 .tab-bar {
-  --tab-bar-surface: linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(241, 245, 249, 0.98) 100%);
-  --tab-bar-bottom-border: rgba(203, 213, 225, 0.88);
-  --tab-bar-top-highlight: rgba(255, 255, 255, 0.72);
-  --tab-active-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.99) 100%);
-  --tab-active-border: rgba(203, 213, 225, 0.92);
-  --tab-active-topline: rgba(255, 255, 255, 0.96);
-  --tab-active-shadow:
-    0 14px 24px -24px rgba(15, 23, 42, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.96);
-  --tab-idle-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.44) 0%, rgba(255, 255, 255, 0.18) 100%);
-  --tab-idle-hover-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.36) 100%);
-  --tab-idle-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  --tab-bar-surface: transparent;
+  --tab-active-bg: rgba(0, 0, 0, 0.06);
+  --tab-idle-bg: transparent;
+  --tab-idle-hover-bg: rgba(0, 0, 0, 0.03);
   --tab-active-color: #111827;
   --tab-idle-color: #64748b;
   --tab-hover-color: #334155;
-  --tab-separator: rgba(148, 163, 184, 0.28);
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none; /* Firefox */
   background: var(--tab-bar-surface);
-  box-shadow:
-    inset 0 1px 0 var(--tab-bar-top-highlight),
-    inset 0 -1px 0 var(--tab-bar-bottom-border);
 }
 
 .dark .tab-bar {
-  --tab-bar-surface: linear-gradient(180deg, rgba(14, 19, 29, 0.94) 0%, rgba(8, 12, 20, 0.98) 100%);
-  --tab-bar-bottom-border: rgba(71, 85, 105, 0.42);
-  --tab-bar-top-highlight: rgba(255, 255, 255, 0.03);
-  --tab-active-bg: linear-gradient(180deg, rgba(28, 36, 49, 0.98) 0%, rgba(13, 18, 28, 1) 100%);
-  --tab-active-border: rgba(100, 116, 139, 0.28);
-  --tab-active-topline: rgba(255, 255, 255, 0.08);
-  --tab-active-shadow:
-    0 16px 26px -24px rgba(0, 0, 0, 0.86),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --tab-idle-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 100%);
-  --tab-idle-hover-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.095) 0%, rgba(255, 255, 255, 0.03) 100%);
-  --tab-idle-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --tab-bar-surface: transparent;
+  --tab-active-bg: rgba(255, 255, 255, 0.1);
+  --tab-idle-bg: transparent;
+  --tab-idle-hover-bg: rgba(255, 255, 255, 0.05);
   --tab-active-color: #f8fafc;
   --tab-idle-color: #94a3b8;
   --tab-hover-color: #e2e8f0;
-  --tab-separator: rgba(148, 163, 184, 0.14);
 }
 
 .tab-bar::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
 }
 
-.tab-bar::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-bottom: 1px solid var(--tab-bar-bottom-border);
-  pointer-events: none;
-}
-
 .tab-strip {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.25rem;
   min-width: max-content;
-  padding: 0.5rem 0.6rem 0;
+  padding: 0.35rem 0.5rem;
 }
 
 .tab {
@@ -1907,30 +1862,14 @@ html:not(.dark) .markdown-body {
   align-items: center;
   column-gap: 0.5rem;
   min-width: 0;
-  padding: 0.68rem 0.95rem 0.6rem;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 1rem 1rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 0.5rem;
   background: var(--tab-idle-bg);
-  box-shadow: var(--tab-idle-shadow);
   transition:
     background 0.18s ease,
-    border-color 0.18s ease,
     color 0.18s ease,
-    box-shadow 0.18s ease,
     transform 0.18s ease;
-}
-
-.tab-surface::before {
-  content: '';
-  position: absolute;
-  left: 0.75rem;
-  right: 0.75rem;
-  top: 0;
-  height: 1px;
-  border-radius: 999px;
-  background: transparent;
-  pointer-events: none;
 }
 
 .tab-side-spacer {
@@ -1957,16 +1896,8 @@ html:not(.dark) .markdown-body {
 }
 
 .browser-tab.is-active .tab-surface {
-  margin-bottom: -1px;
   background: var(--tab-active-bg);
-  border-color: var(--tab-active-border);
-  box-shadow: var(--tab-active-shadow);
   color: var(--tab-active-color);
-  transform: translateY(1px);
-}
-
-.browser-tab.is-active .tab-surface::before {
-  background: var(--tab-active-topline);
 }
 
 .browser-tab.is-inactive {
@@ -1983,15 +1914,7 @@ html:not(.dark) .markdown-body {
   transform: translateY(-1px);
 }
 
-.browser-tab.is-inactive + .browser-tab.is-inactive::before {
-  content: '';
-  position: absolute;
-  left: -0.125rem;
-  top: 0.78rem;
-  bottom: 0.82rem;
-  width: 1px;
-  background: linear-gradient(180deg, transparent 0%, var(--tab-separator) 18%, var(--tab-separator) 82%, transparent 100%);
-}
+/* Tab separator removed for modern flat UI */
 
 .tab .close-tab {
   opacity: 0;

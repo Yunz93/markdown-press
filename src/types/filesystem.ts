@@ -44,6 +44,34 @@ export function isTauriEnvironment(): boolean {
 }
 
 /**
+ * Wait for Tauri environment to be ready
+ * Use this when you need to ensure Tauri APIs are available
+ * This is useful in build mode where Tauri injection might be delayed
+ */
+export function waitForTauri(maxWaitMs: number = 5000): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (isTauriEnvironment()) {
+      resolve(true);
+      return;
+    }
+
+    const startTime = Date.now();
+    const checkInterval = setInterval(() => {
+      if (isTauriEnvironment()) {
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+
+      if (Date.now() - startTime > maxWaitMs) {
+        clearInterval(checkInterval);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
+/**
  * Check if File System Access API is supported
  */
 export function isFileSystemAccessSupported(): boolean {

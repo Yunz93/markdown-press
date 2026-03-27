@@ -62,6 +62,7 @@ export const defaultSettings: AppSettings = {
     settings: 'Ctrl+,',
     toggleOutline: 'Ctrl+O',
     toggleSidebar: 'Ctrl+B',
+    toggleTheme: 'Ctrl+T',
     newNote: 'Ctrl+N',
     newFolder: 'Ctrl+Shift+N',
     closeTab: 'Ctrl+W',

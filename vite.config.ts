@@ -4,6 +4,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    // Detect Tauri build environment
+    const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+    
     return {
       server: {
         port: 3000,
@@ -11,7 +14,10 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+        // Expose build mode to application
+        __DEV__: mode === 'development',
+        __PROD__: mode === 'production',
       },
       resolve: {
         alias: {
@@ -24,6 +30,10 @@ export default defineConfig(({ mode }) => {
         outDir: 'dist',
         emptyOutDir: true,
         chunkSizeWarningLimit: 1600,
+        // Use absolute path for Tauri, relative for web
+        base: isTauri ? '/' : './',
+        // Generate source maps for debugging
+        sourcemap: mode === 'development',
         rollupOptions: {
           output: {
             manualChunks(id) {
@@ -64,7 +74,7 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      // 基础路径配置为相对路径
-      base: './',
+      // Base path: absolute for Tauri (asset:// protocol), relative for web
+      base: isTauri ? '/' : './',
     };
 });

@@ -140,7 +140,15 @@ export function getMarkdownIt(): MarkdownIt {
   return mdInstance;
 }
 
+// Store highlighter reference for the current render
+let currentHighlighter: any | null = null;
+let currentTheme: ThemeMode = 'light';
+
 function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMode: ThemeMode = 'light') {
+  // Update current highlighter reference
+  currentHighlighter = highlighter;
+  currentTheme = themeMode;
+  
   const baseFence = baseFenceRenderer || md.renderer.rules.fence;
   const theme = themeMode === 'dark' ? 'github-dark' : 'github-light';
 
@@ -155,9 +163,13 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
         : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
     }
 
-    if (highlighter && lang) {
+    // Use the most recent highlighter reference
+    const activeHighlighter = currentHighlighter || highlighter;
+    
+    if (activeHighlighter && lang) {
       try {
-        const shikiHtml = highlighter.codeToHtml(token.content.trim(), { lang, theme });
+        const activeTheme = currentTheme === 'dark' ? 'github-dark' : 'github-light';
+        const shikiHtml = activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme });
         const shikiBlocks = env.shikiBlocks ?? (env.shikiBlocks = []);
         const blockIndex = shikiBlocks.push(shikiHtml) - 1;
         return `<div data-shiki-block="${blockIndex}"></div>`;

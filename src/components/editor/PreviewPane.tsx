@@ -115,15 +115,33 @@ function findHeadingElementByReference(container: HTMLElement | null, rawReferen
     createHeadingSlug(normalizedReference),
   ]));
 
-  return Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-heading-id]')).find((element) => {
+  // First try: find by data attributes (most reliable)
+  const byDataAttr = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-heading-id]')).find((element) => {
     const headingId = element.dataset.headingId ?? '';
     const headingSlug = element.dataset.headingSlug ?? '';
     const headingText = (element.dataset.headingText ?? '').trim();
     return headingCandidates.includes(headingId)
       || headingCandidates.includes(headingSlug)
       || headingCandidates.includes(headingText);
-  }) ?? Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'))
-    .find((element) => headingCandidates.includes(element.textContent?.trim() || '')) ?? null;
+  });
+  
+  if (byDataAttr) return byDataAttr;
+  
+  // Second try: find by id attribute directly
+  const byId = container.querySelector<HTMLElement>(`article.markdown-body [id="${CSS.escape(normalizedReference)}"]`);
+  if (byId) return byId;
+  
+  // Third try: find by slugified id
+  const bySlugId = container.querySelector<HTMLElement>(`article.markdown-body [id="${CSS.escape(createHeadingSlug(normalizedReference))}"]`);
+  if (bySlugId) return bySlugId;
+  
+  // Final try: find by text content
+  return Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'))
+    .find((element) => {
+      const text = element.textContent?.trim() || '';
+      const textSlug = createHeadingSlug(text);
+      return headingCandidates.includes(text) || headingCandidates.includes(textSlug);
+    }) ?? null;
 }
 
 function findBlockElementByReference(container: HTMLElement | null, rawReference: string): HTMLElement | null {
@@ -148,18 +166,36 @@ function hasResolvableReference(
 }
 
 function scrollContainerToHeading(container: HTMLElement, target: HTMLElement, options?: HeadingScrollOptions): void {
+  // Force layout recalculation to ensure accurate measurements
+  void container.offsetHeight;
+  void target.offsetHeight;
+  
   const targetRect = target.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
   const relativeTargetTop = container.scrollTop + targetRect.top - containerRect.top;
   const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-  const alignTopRatio = Math.min(Math.max(options?.alignTopRatio ?? 0.18, 0, 1), 1);
-  const targetTop = options?.alignMode === 'center'
-    ? relativeTargetTop + targetRect.height / 2 - container.clientHeight / 2
-    : relativeTargetTop - container.clientHeight * alignTopRatio;
+  
+  // Calculate target position with better precision
+  let targetTop: number;
+  if (options?.alignMode === 'center') {
+    targetTop = relativeTargetTop + targetRect.height / 2 - container.clientHeight / 2;
+  } else {
+    // Use a consistent offset for better visibility (12% from top for better UX)
+    const alignTopRatio = Math.min(Math.max(options?.alignTopRatio ?? 0.12, 0, 1), 1);
+    targetTop = relativeTargetTop - container.clientHeight * alignTopRatio;
+  }
+  
+  // Ensure we don't scroll past the bounds
+  targetTop = Math.min(Math.max(targetTop, 0), maxScrollTop);
 
-  container.scrollTo({
-    top: Math.min(Math.max(targetTop, 0), maxScrollTop),
-    behavior: options?.behavior ?? 'smooth',
+  // Use double RAF for more reliable scrolling after DOM updates
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      container.scrollTo({
+        top: targetTop,
+        behavior: options?.behavior ?? 'smooth',
+      });
+    });
   });
 }
 
@@ -637,14 +673,24 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     if (!isMarkdownPreview) return false;
     clearHeadingScrollRetries();
 
-    const attemptScroll = (rawReference?: string) => {
+    const attemptScroll = (rawReference?: string): boolean => {
       const container = previewRef.current;
       if (!container) return false;
 
-      const target = findHeadingElementByReference(container, referenceId)
-        || findBlockElementByReference(container, referenceId)
-        || (rawReference ? findHeadingElementByReference(container, rawReference) : null)
-        || (rawReference ? findBlockElementByReference(container, rawReference) : null);
+      // Try to find target by multiple strategies
+      let target = findHeadingElementByReference(container, referenceId)
+        || findBlockElementByReference(container, referenceId);
+      
+      // Fallback to raw reference if provided
+      if (!target && rawReference) {
+        target = findHeadingElementByReference(container, rawReference)
+          || findBlockElementByReference(container, rawReference);
+      }
+      
+      // Final fallback: try to find by ID directly
+      if (!target) {
+        target = container.querySelector(`[id="${CSS.escape(referenceId)}"]`) as HTMLElement | null;
+      }
 
       if (target) {
         scrollContainerToHeading(container, target, options);
@@ -654,14 +700,17 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       return false;
     };
 
+    // Immediate attempt
     if (attemptScroll(referenceId)) {
       return true;
     }
 
+    // Retry with RAF for DOM ready state
     headingScrollAnimationFrameRef.current = requestAnimationFrame(() => {
       headingScrollAnimationFrameRef.current = null;
       if (attemptScroll(referenceId)) return;
 
+      // Final retry with delays for async content rendering
       headingScrollTimeoutRefs.current = HEADING_SCROLL_RETRY_DELAYS_MS.map((delay) => window.setTimeout(() => {
         attemptScroll(referenceId);
       }, delay));
@@ -932,10 +981,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
         <div className={`editor-pane-frame w-full ${hasActiveFile ? '' : 'h-full'}`}>
         {isMarkdownPreview && parsedContent.frontmatter && (
           <div
-            className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden glass animate-fade-in group/metadata"
+            className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata"
             style={{ fontSize: `${settings.fontSize * 0.7}px` }}
           >
-            <div className="preview-pane-properties-header px-4 py-2 border-b border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
+            <div className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
               <span>Properties</span>
             </div>
             <div className="p-2 table w-full">
@@ -972,7 +1021,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                   src={`${assetPreviewSrc}#toolbar=0&navpanes=0&scrollbar=1`}
                   sandbox="allow-scripts allow-same-origin"
                   title={currentFilePath?.split(/[\\/]/).pop() || 'PDF preview'}
-                  className="h-[78vh] w-full rounded-2xl border border-gray-200/70 bg-white shadow-sm dark:border-white/10 dark:bg-black/30"
+                  className="h-[78vh] w-full rounded-2xl bg-white dark:bg-black/30"
                 />
               </div>
             ) : previewFileType === 'image' || previewFileType === 'pdf' ? (

@@ -118,7 +118,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
     return (
       <div
         ref={panelRef}
-        className="outline-panel empty relative"
+        className="outline-panel empty relative bg-transparent"
         style={{ width: `${width}px` }}
       >
         <div className="outline-header">
@@ -126,11 +126,11 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
         </div>
         <p className="empty-message">No headings found</p>
         <div
-          className="absolute inset-y-0 left-0 hidden w-4 cursor-col-resize md:block"
+          className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
           onMouseDown={handleResizeStart}
           aria-hidden
         >
-          <div className="absolute left-0 top-0 h-full w-px bg-gray-200/70 dark:bg-white/10" />
+          <div className="absolute left-0 top-0 h-full w-px bg-gray-300/50 dark:bg-white/10" />
         </div>
       </div>
     );
@@ -139,7 +139,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
   return (
     <div
       ref={panelRef}
-      className={`outline-panel relative ${isCollapsed ? 'collapsed' : ''}`}
+      className={`outline-panel relative bg-transparent ${isCollapsed ? 'collapsed' : ''}`}
       style={{ width: `${width}px` }}
     >
       <div className="outline-header">
@@ -177,11 +177,11 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
         </div>
       )}
       <div
-        className="absolute inset-y-0 left-0 hidden w-4 cursor-col-resize md:block"
+        className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
         onMouseDown={handleResizeStart}
         aria-hidden
       >
-        <div className="absolute left-0 top-0 h-full w-px bg-gray-200/70 dark:bg-white/10" />
+        <div className="absolute left-0 top-0 h-full w-px bg-gray-300/50 dark:bg-white/10" />
       </div>
     </div>
   );
