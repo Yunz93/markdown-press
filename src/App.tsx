@@ -27,6 +27,7 @@ import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
+import { logEnvironment } from './utils/environment';
 import type { PaneDensity } from './components/editor/paneLayout';
 
 // Layout constants moved to src/config/layout.ts
@@ -47,6 +48,11 @@ function findFileInTree(nodes: import('./types').FileNode[], id: string): import
     }
   }
   return undefined;
+}
+
+// Log environment info on app initialization for debugging
+if (typeof window !== 'undefined') {
+  logEnvironment();
 }
 
 const App: React.FC = () => {
@@ -277,6 +283,7 @@ const App: React.FC = () => {
       onOpenSettings: () => setSettingsOpen(true),
       onToggleOutline: () => setIsOutlineOpen((prev) => !prev),
       onToggleSidebar: () => setSidebarOpen(!isSidebarOpen),
+      onToggleTheme: toggleTheme,
       onNewNote: () => setIsNewNoteDialogOpen(true),
       onNewFolder: () => { void fileOps.handleNewFolder(undefined, 'Untitled Folder'); },
       onCloseTab: () => {

@@ -261,6 +261,190 @@ const indentSelectionOrInsertSpaces: StateCommand = ({ state, dispatch }) => {
   return insertTwoSpaces({ state, dispatch });
 };
 
+// Markdown editing helper functions
+const wrapSelection = (state: EditorState, dispatch: (transaction: any) => void, before: string, after: string) => {
+  const changes = state.changeByRange((range) => ({
+    changes: [
+      { from: range.from, insert: before },
+      { from: range.to, insert: after },
+    ],
+    range: EditorSelection.range(range.from + before.length, range.to + before.length),
+  }));
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+const toggleBold: StateCommand = ({ state, dispatch }) => {
+  const hasSelection = state.selection.ranges.some((range) => !range.empty);
+  if (!hasSelection) {
+    // Insert empty bold markers and place cursor in between
+    const changes = state.changeByRange((range) => ({
+      changes: { from: range.from, insert: '****' },
+      range: EditorSelection.cursor(range.from + 2),
+    }));
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+    return true;
+  }
+  return wrapSelection(state, dispatch, '**', '**');
+};
+
+const toggleItalic: StateCommand = ({ state, dispatch }) => {
+  const hasSelection = state.selection.ranges.some((range) => !range.empty);
+  if (!hasSelection) {
+    // Insert empty italic markers and place cursor in between
+    const changes = state.changeByRange((range) => ({
+      changes: { from: range.from, insert: '**' },
+      range: EditorSelection.cursor(range.from + 1),
+    }));
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+    return true;
+  }
+  return wrapSelection(state, dispatch, '*', '*');
+};
+
+const insertLink: StateCommand = ({ state, dispatch }) => {
+  const hasSelection = state.selection.ranges.some((range) => !range.empty);
+  if (hasSelection) {
+    // Wrap selection: [selection](url)
+    return wrapSelection(state, dispatch, '[', '](url)');
+  }
+  // Insert empty link template
+  const changes = state.changeByRange((range) => ({
+    changes: { from: range.from, insert: '[](url)' },
+    range: EditorSelection.cursor(range.from + 1),
+  }));
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+const insertCodeBlock: StateCommand = ({ state, dispatch }) => {
+  const changes = state.changeByRange((range) => ({
+    changes: { from: range.from, insert: '\n```\n\n```\n' },
+    range: EditorSelection.cursor(range.from + 5),
+  }));
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+const insertInlineCode: StateCommand = ({ state, dispatch }) => {
+  const hasSelection = state.selection.ranges.some((range) => !range.empty);
+  if (!hasSelection) {
+    // Insert empty code markers and place cursor in between
+    const changes = state.changeByRange((range) => ({
+      changes: { from: range.from, insert: '``' },
+      range: EditorSelection.cursor(range.from + 1),
+    }));
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+    return true;
+  }
+  return wrapSelection(state, dispatch, '`', '`');
+};
+
+const insertUnorderedList: StateCommand = ({ state, dispatch }) => {
+  const changes = state.changeByRange((range) => {
+    const line = state.doc.lineAt(range.from);
+    const lineStart = line.from;
+    const hasDash = state.doc.sliceString(lineStart, lineStart + 2) === '- ';
+    
+    if (hasDash) {
+      // Remove existing dash
+      return {
+        changes: { from: lineStart, to: lineStart + 2, insert: '' },
+        range: EditorSelection.cursor(range.from - 2),
+      };
+    }
+    
+    // Add dash at line start
+    return {
+      changes: { from: lineStart, insert: '- ' },
+      range: EditorSelection.cursor(range.from + 2),
+    };
+  });
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+const insertOrderedList: StateCommand = ({ state, dispatch }) => {
+  const changes = state.changeByRange((range) => {
+    const line = state.doc.lineAt(range.from);
+    const lineStart = line.from;
+    const match = state.doc.sliceString(lineStart, lineStart + 3).match(/^(\d+)\. /);
+    
+    if (match) {
+      // Remove existing number
+      return {
+        changes: { from: lineStart, to: lineStart + match[0].length, insert: '' },
+        range: EditorSelection.cursor(range.from - match[0].length),
+      };
+    }
+    
+    // Add "1. " at line start
+    return {
+      changes: { from: lineStart, insert: '1. ' },
+      range: EditorSelection.cursor(range.from + 3),
+    };
+  });
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+const insertBlockquote: StateCommand = ({ state, dispatch }) => {
+  const changes = state.changeByRange((range) => {
+    const line = state.doc.lineAt(range.from);
+    const lineStart = line.from;
+    const hasQuote = state.doc.sliceString(lineStart, lineStart + 2) === '> ';
+    
+    if (hasQuote) {
+      // Remove existing quote marker
+      return {
+        changes: { from: lineStart, to: lineStart + 2, insert: '' },
+        range: EditorSelection.cursor(range.from - 2),
+      };
+    }
+    
+    // Add "> " at line start
+    return {
+      changes: { from: lineStart, insert: '> ' },
+      range: EditorSelection.cursor(range.from + 2),
+    };
+  });
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
+const insertHeading: StateCommand = ({ state, dispatch }) => {
+  const changes = state.changeByRange((range) => {
+    const line = state.doc.lineAt(range.from);
+    const lineStart = line.from;
+    const lineText = state.doc.sliceString(lineStart, line.to);
+    const match = lineText.match(/^(#{1,6})\s*/);
+    
+    if (match) {
+      const currentLevel = match[1].length;
+      if (currentLevel >= 6) {
+        // Remove heading
+        return {
+          changes: { from: lineStart, to: lineStart + match[0].length, insert: '' },
+          range: EditorSelection.cursor(range.from - match[0].length),
+        };
+      }
+      // Increase heading level
+      return {
+        changes: { from: lineStart, to: lineStart + match[0].length, insert: '#'.repeat(currentLevel + 1) + ' ' },
+        range: EditorSelection.cursor(range.from + 1),
+      };
+    }
+    
+    // Add H1
+    return {
+      changes: { from: lineStart, insert: '# ' },
+      range: EditorSelection.cursor(range.from + 2),
+    };
+  });
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
+
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   placeholder = 'Type here...',
   onContentChange,
@@ -508,6 +692,16 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             ...historyKeymap,
             { key: 'Shift-Tab', run: indentLess },
             { key: 'Tab', run: indentSelectionOrInsertSpaces },
+            // Markdown formatting shortcuts
+            { key: 'Mod-b', run: toggleBold },
+            { key: 'Mod-i', run: toggleItalic },
+            { key: 'Mod-k', run: insertLink },
+            { key: 'Mod-Shift-k', run: insertCodeBlock },
+            { key: 'Mod-`', run: insertInlineCode },
+            { key: 'Mod-Shift-l', run: insertUnorderedList },
+            { key: 'Mod-Shift-o', run: insertOrderedList },
+            { key: 'Mod-Shift-.', run: insertBlockquote },
+            { key: 'Mod-Shift-h', run: insertHeading },
           ]),
           indentUnit.of('  '),
           markdown({ codeLanguages: resolveEditorCodeLanguage }),

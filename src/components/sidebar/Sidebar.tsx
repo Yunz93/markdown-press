@@ -729,12 +729,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const sidebarSurfaceStyle = useMemo(() => ({
     '--sidebar-width': `${width}px`,
-    backgroundColor: themeMode === 'dark' ? '#090d15' : 'rgba(248, 250, 252, 0.9)',
-    backdropFilter: themeMode === 'dark' ? 'none' : 'blur(20px)',
-    WebkitBackdropFilter: themeMode === 'dark' ? 'none' : 'blur(20px)',
-    boxShadow: themeMode === 'dark'
-      ? 'inset -1px 0 0 rgba(255, 255, 255, 0.04)'
-      : 'inset -1px 0 0 rgba(255, 255, 255, 0.28)',
+    // Unified background with main editing area for modern flat UI
+    backgroundColor: themeMode === 'dark' ? '#000000' : '#f8fafc',
   }) as React.CSSProperties, [themeMode, width]);
 
   const handleSearchResultSelect = useCallback(async (file: FileNode, snippet?: SidebarSearchSnippet) => {
@@ -762,11 +758,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`
         sidebar-shell
         fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
-        transition-[transform,width,opacity,border-color] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
-        glass border-r border-gray-200/50 dark:border-white/10
+        transition-[transform,width,opacity] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
         ${isOpen
           ? 'translate-x-0 md:w-[var(--sidebar-width)] opacity-100'
-          : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:border-r-transparent pointer-events-none'
+          : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 pointer-events-none'
         }
       `}
       >
@@ -924,7 +919,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        <div className="p-3 border-t border-gray-200/50 dark:border-white/5 space-y-2">
+        <div className="p-3 space-y-2">
           <div>
             <button
               onClick={() => setShowTrash(!showTrash)}
@@ -982,11 +977,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {isOpen && (
           <div
-            className="absolute inset-y-0 right-0 hidden w-4 cursor-col-resize md:block"
+            className="absolute inset-y-0 right-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
             onMouseDown={handleResizeStart}
             aria-hidden
           >
-            <div className="absolute right-0 top-0 h-full w-px bg-gray-200/70 dark:bg-white/10" />
+            <div className="absolute right-0 top-0 h-full w-px bg-gray-300/50 dark:bg-white/10" />
           </div>
         )}
       </aside>

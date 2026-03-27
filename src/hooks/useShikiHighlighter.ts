@@ -12,36 +12,64 @@ interface ShikiModule {
   createHighlighter?: (options: { themes: string[]; langs: string[] }) => Promise<ShikiHighlighter>;
 }
 
-async function importShikiModule(): Promise<ShikiModule | null> {
-  try {
-    return await import('shiki/bundle/web');
-  } catch (webError) {
-    console.warn('Failed to load shiki web bundle, falling back to default entry.', webError);
-  }
+// Cache for Shiki highlighter to avoid re-creating in build mode
+let cachedHighlighter: ShikiHighlighter | null = null;
 
-  try {
-    return await import('shiki');
-  } catch (defaultError) {
-    console.error('Failed to import shiki from all known entrypoints.', defaultError);
-    return null;
+async function importShikiModule(): Promise<ShikiModule | null> {
+  // Try multiple import paths for better compatibility in dev/build modes
+  const importPaths = [
+    'shiki/bundle/web',
+    'shiki/dist/bundle/web',
+    'shiki',
+  ];
+  
+  for (const path of importPaths) {
+    try {
+      const module = await import(/* @vite-ignore */ path);
+      // Handle both ESM default export and direct exports
+      return module.default || module;
+    } catch (err) {
+      console.debug(`Failed to import shiki from ${path}:`, err);
+    }
   }
+  
+  console.error('Failed to import shiki from all known entrypoints.');
+  return null;
 }
 
 /**
  * Lazily loads the Shiki syntax highlighter.
  * Extracted from App.tsx to keep the component clean.
+ * Uses singleton pattern to avoid re-creating in build mode.
  */
 export function useShikiHighlighter(markdownContent = '') {
-  const [highlighterInstance, setHighlighterInstance] = useState<ShikiHighlighter | null>(null);
+  const [highlighterInstance, setHighlighterInstance] = useState<ShikiHighlighter | null>(cachedHighlighter);
   const [highlighterRevision, setHighlighterRevision] = useState(0);
   const bundledLanguageIdsRef = useRef<Set<string>>(new Set());
+  const isInitializedRef = useRef(false);
 
   useEffect(() => {
+    // Use cached instance if available
+    if (cachedHighlighter && !isInitializedRef.current) {
+      isInitializedRef.current = true;
+      setHighlighterInstance(cachedHighlighter);
+      setHighlighterRevision((prev) => prev + 1);
+      return;
+    }
+    
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
+    
     let cancelled = false;
     importShikiModule().then((module) => {
-      if (!module) return;
+      if (!module || cancelled) return;
+      
       const { bundledLanguages, createHighlighter } = module;
-      if (typeof createHighlighter !== 'function') return;
+      if (typeof createHighlighter !== 'function') {
+        console.error('Shiki module does not export createHighlighter');
+        return;
+      }
+      
       const bundledLanguageIds = new Set(Object.keys(bundledLanguages ?? {}));
       bundledLanguageIdsRef.current = bundledLanguageIds;
       const supportedLangs = SHIKI_CORE_LANGS.filter((lang) => bundledLanguageIds.has(lang));
@@ -54,11 +82,12 @@ export function useShikiHighlighter(markdownContent = '') {
       createHighlighter({ themes: ['github-light', 'github-dark'], langs: supportedLangs })
         .then((h) => {
           if (!cancelled) {
+            cachedHighlighter = h; // Cache for future use
             setHighlighterInstance(h);
             setHighlighterRevision((prev) => prev + 1);
           }
         })
-        .catch((e) => console.error('Failed to load shiki', e));
+        .catch((e) => console.error('Failed to load shiki:', e));
     });
 
     return () => { cancelled = true; };

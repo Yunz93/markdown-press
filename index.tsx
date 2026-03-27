@@ -8,7 +8,11 @@ import './index.css';
 // Ensure process.env exists for some libraries
 if (typeof window !== 'undefined' && !window.process) {
   // @ts-ignore
-  window.process = { env: { NODE_ENV: 'production' } };
+  window.process = { 
+    env: { 
+      NODE_ENV: import.meta.env.MODE || 'production'
+    } 
+  };
 }
 
 const rootElement = document.getElementById('root');

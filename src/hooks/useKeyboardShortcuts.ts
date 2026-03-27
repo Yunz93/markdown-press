@@ -11,6 +11,7 @@ interface UseKeyboardShortcutsOptions {
   onOpenSettings?: () => void;
   onToggleOutline?: () => void;
   onToggleSidebar?: () => void;
+  onToggleTheme?: () => void;
   onNewNote?: () => void;
   onNewFolder?: () => void;
   onCloseTab?: () => void;
@@ -103,6 +104,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
       settings: options.onOpenSettings,
       toggleOutline: options.onToggleOutline,
       toggleSidebar: options.onToggleSidebar,
+      toggleTheme: options.onToggleTheme,
       newNote: options.onNewNote,
       newFolder: options.onNewFolder,
       closeTab: options.onCloseTab,
@@ -136,6 +138,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
     options.onSidebarSearch,
     options.onToggleOutline,
     options.onToggleSidebar,
+    options.onToggleTheme,
     options.onToggleView,
     settings.shortcuts,
     setViewMode,
