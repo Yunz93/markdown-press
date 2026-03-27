@@ -19,6 +19,15 @@ interface UseKeyboardShortcutsOptions {
   onExportHtml?: () => void;
 }
 
+const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
+  'save',
+  'toggleView',
+  'aiAnalyze',
+  'search',
+  'sidebarSearch',
+  'closeTab',
+]);
+
 function getNextViewMode(viewMode: ViewMode): ViewMode {
   if (viewMode === ViewMode.EDITOR) return ViewMode.SPLIT;
   if (viewMode === ViewMode.SPLIT) return ViewMode.PREVIEW;
@@ -86,8 +95,10 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 function createShortcutMap(shortcuts: ShortcutConfig, handlers: Record<keyof ShortcutConfig, (() => void) | undefined>) {
   return (Object.keys(shortcuts) as Array<keyof ShortcutConfig>).map((key) => ({
+    action: key,
     shortcut: shortcuts[key],
     handler: handlers[key],
+    allowInEditable: EDITABLE_SAFE_SHORTCUTS.has(key),
   }));
 }
 
@@ -119,7 +130,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
 
       // Skip global shortcuts when typing in editable elements (editor, input, etc.)
       // This prevents conflicts with editor shortcuts (Ctrl+B for bold, Ctrl+I for italic, etc.)
-      if (isEditableTarget(event.target)) {
+      if (isEditableTarget(event.target) && !entry.allowInEditable) {
         continue;
       }
 

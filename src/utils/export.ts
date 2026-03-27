@@ -804,6 +804,14 @@ async function prepareExportImages(container: HTMLElement, sourceFilePath?: stri
  */
 export async function exportToPdf(htmlContent: string, filename: string, sourceFilePath?: string): Promise<boolean> {
   const { default: html2pdf } = await import('html2pdf.js');
+  type Html2PdfWorker = InstanceType<typeof html2pdf.Worker>;
+  type Html2PdfSetOptions = Parameters<Html2PdfWorker['set']>[0];
+  type Html2PdfPagebreakOptions = {
+    pagebreak?: {
+      mode?: Array<'avoid-all' | 'css' | 'legacy'>;
+      avoid?: string[];
+    };
+  };
   const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
   const styleContent = Array.from(parsed.head.querySelectorAll('style'))
     .map((style) => style.textContent || '')
@@ -840,30 +848,32 @@ export async function exportToPdf(htmlContent: string, filename: string, sourceF
     }
     await waitForNextPaint(3);
 
+    const pdfOptions: Html2PdfSetOptions & Html2PdfPagebreakOptions = {
+      margin: [12, 12, 12, 12],
+      filename: filename.endsWith('.pdf') ? filename : `${filename}.pdf`,
+      image: { type: 'jpeg', quality: 1 },
+      enableLinks: true,
+      html2canvas: {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor,
+        windowWidth: renderTarget.scrollWidth,
+        scrollX: 0,
+        scrollY: 0
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait'
+      },
+      pagebreak: {
+        mode: ['css', 'legacy'],
+        avoid: ['pre', 'blockquote', 'table', 'img', '.export-properties']
+      }
+    };
+
     const worker = html2pdf()
-      .set({
-        margin: [12, 12, 12, 12],
-        filename: filename.endsWith('.pdf') ? filename : `${filename}.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        enableLinks: true,
-        html2canvas: {
-          scale: 2.5,
-          useCORS: true,
-          backgroundColor,
-          windowWidth: renderTarget.scrollWidth,
-          scrollX: 0,
-          scrollY: 0
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait'
-        },
-        pagebreak: {
-          mode: ['css', 'legacy'],
-          avoid: ['pre', 'blockquote', 'table', 'img', '.export-properties']
-        } as unknown
-      })
+      .set(pdfOptions as Html2PdfSetOptions)
       .from(renderTarget)
       .toPdf();
 

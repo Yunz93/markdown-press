@@ -2,6 +2,8 @@ import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
 
+let notificationTimer: ReturnType<typeof setTimeout> | null = null;
+
 function normalizeThemeMode(themeMode: unknown): AppSettings['themeMode'] {
   return themeMode === 'dark' ? 'dark' : 'light';
 }
@@ -140,11 +142,25 @@ export function createUISlice(
     }),
 
     showNotification: (msg, type) => {
+      if (notificationTimer) {
+        clearTimeout(notificationTimer);
+      }
+
       set(() => ({ notification: { msg, type } }));
-      setTimeout(() => set(() => ({ notification: null })), 3000);
+      notificationTimer = setTimeout(() => {
+        notificationTimer = null;
+        set(() => ({ notification: null }));
+      }, 3000);
     },
 
-    clearNotification: () => set(() => ({ notification: null })),
+    clearNotification: () => {
+      if (notificationTimer) {
+        clearTimeout(notificationTimer);
+        notificationTimer = null;
+      }
+
+      set(() => ({ notification: null }));
+    },
 
     setOutlineHeadings: (headings) => set(() => ({ outlineHeadings: headings })),
 
