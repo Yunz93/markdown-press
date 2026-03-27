@@ -46,6 +46,16 @@ function buildMovedPathMap(sourceNode: FileNode, newRootPath: string): Record<st
   return pathMap;
 }
 
+function remapRecordKeys<T>(record: Record<string, T>, remapPath: (path: string) => string): Record<string, T> {
+  const nextRecord: Record<string, T> = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    nextRecord[remapPath(key)] = value;
+  }
+
+  return nextRecord;
+}
+
 function isImageFile(name: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
 }
@@ -79,7 +89,6 @@ function collectAffectedOpenTabIds(files: FileNode[], openTabs: string[], target
 export function useFileOperations() {
   const {
     files,
-    activeTabId,
     rootFolderPath,
     fileContents,
     openTabs,
@@ -173,17 +182,6 @@ export function useFileOperations() {
     }
   }, [settings.metadataFields, createFile, addTab, setCurrentFilePath]);
 
-  const handleRename = useCallback(async (file: FileNode, newName: string) => {
-    try {
-      const newPath = await renameFile(file, newName);
-      if (newPath && activeTabId === file.id) {
-        setCurrentFilePath(newPath);
-      }
-    } catch {
-      showNotification('Rename failed', 'error');
-    }
-  }, [renameFile, activeTabId, setCurrentFilePath, showNotification]);
-
   const handleMoveToTrash = useCallback(async (file: FileNode) => {
     const movedPath = await moveToTrash(file);
     if (!movedPath) return;
@@ -233,13 +231,6 @@ export function useFileOperations() {
   const remapPathReferencesAfterMove = useCallback((pathMap: Record<string, string>) => {
     useAppStore.setState((state) => {
       const remapPath = (path: string): string => pathMap[path] ?? path;
-      const remapRecord = (record: Record<string, string>): Record<string, string> => {
-        const nextRecord: Record<string, string> = {};
-        for (const [key, value] of Object.entries(record)) {
-          nextRecord[remapPath(key)] = value;
-        }
-        return nextRecord;
-      };
 
       const remappedOpenTabs = state.openTabs.map(remapPath);
       const nextOpenTabs = remappedOpenTabs.filter((tabId, index) => remappedOpenTabs.indexOf(tabId) === index);
@@ -252,11 +243,23 @@ export function useFileOperations() {
         openTabs: nextOpenTabs,
         activeTabId: validatedActiveTabId,
         currentFilePath: state.currentFilePath ? remapPath(state.currentFilePath) : null,
-        fileContents: remapRecord(state.fileContents),
-        lastSavedContent: remapRecord(state.lastSavedContent),
+        fileContents: remapRecordKeys(state.fileContents, remapPath),
+        lastSavedContent: remapRecordKeys(state.lastSavedContent, remapPath),
+        fileHistories: remapRecordKeys(state.fileHistories, remapPath),
       };
     });
   }, []);
+
+  const handleRename = useCallback(async (file: FileNode, newName: string) => {
+    try {
+      const newPath = await renameFile(file, newName);
+      if (!newPath || newPath === file.path) return;
+
+      remapPathReferencesAfterMove(buildMovedPathMap(file, newPath));
+    } catch {
+      showNotification('Rename failed', 'error');
+    }
+  }, [renameFile, remapPathReferencesAfterMove, showNotification]);
 
   const moveNodeToTargetPath = useCallback(async (sourceNode: FileNode, targetPath: string) => {
     const normalizedTargetPath = normalizePath(targetPath);
@@ -285,8 +288,7 @@ export function useFileOperations() {
       const newPath = await moveFile(sourceNode, targetPath);
       if (!newPath) return;
 
-      const pathMap = buildMovedPathMap(sourceNode, newPath);
-      remapPathReferencesAfterMove(pathMap);
+      remapPathReferencesAfterMove(buildMovedPathMap(sourceNode, newPath));
       await refreshFileTree();
       showNotification(sourceNode.type === 'folder' ? 'Folder moved' : 'File moved', 'success');
     } catch (e) {

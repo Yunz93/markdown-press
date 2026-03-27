@@ -8,8 +8,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "build": "vite build",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "release:sync-version": "node scripts/sync-version-from-tag.mjs",
     "smoke:release": "node scripts/release-smoke-check.mjs --app"
   },
