@@ -32,7 +32,7 @@ const HeadingItem: React.FC<HeadingItemProps> = ({
     <div className="outline-item">
       <div
         className={`outline-node ${activeId === node.id ? 'active' : ''}`}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        style={{ paddingLeft: `${depth * 8 + 8}px` }}
       >
         {hasChildren ? (
           <button

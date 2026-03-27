@@ -117,7 +117,9 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
         continue;
       }
 
-      if (!entry.shortcut.toLowerCase().includes('ctrl') && !entry.shortcut.toLowerCase().includes('meta') && isEditableTarget(event.target)) {
+      // Skip global shortcuts when typing in editable elements (editor, input, etc.)
+      // This prevents conflicts with editor shortcuts (Ctrl+B for bold, Ctrl+I for italic, etc.)
+      if (isEditableTarget(event.target)) {
         continue;
       }
 

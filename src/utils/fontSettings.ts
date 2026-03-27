@@ -118,8 +118,8 @@ export function getCompositeFontFamily(
 
 export function ensureDynamicFontFaces(
   settings: Pick<AppSettings, 'englishFontFamily' | 'chineseFontFamily'>
-): void {
-  if (typeof document === 'undefined') return;
+): Promise<void> {
+  if (typeof document === 'undefined') return Promise.resolve();
 
   const englishFontFamily = getResolvedEnglishFontFamily(settings);
   const chineseFontFamily = getResolvedChineseFontFamily(settings);
@@ -159,13 +159,25 @@ ${buildBundledChineseFontFaces()}
 `.trim();
 
   let styleElement = document.getElementById(DYNAMIC_FONT_STYLE_ID) as HTMLStyleElement | null;
+  const cssChanged = !styleElement || styleElement.textContent !== css;
+  
   if (!styleElement) {
     styleElement = document.createElement('style');
     styleElement.id = DYNAMIC_FONT_STYLE_ID;
     document.head.appendChild(styleElement);
   }
 
-  if (styleElement.textContent !== css) {
+  if (cssChanged) {
     styleElement.textContent = css;
   }
+
+  // Wait for fonts to load if CSS changed or fonts not yet loaded
+  if (cssChanged && typeof document !== 'undefined' && 'fonts' in document) {
+    return Promise.all([
+      document.fonts.load(`1em "${LATIN_FONT_ALIAS}"`),
+      document.fonts.load(`1em "${CJK_FONT_ALIAS}"`),
+    ]).then(() => undefined);
+  }
+  
+  return Promise.resolve();
 }

@@ -382,7 +382,7 @@ const getTrashItems = (nodes: FileNode[]): FileNode[] => {
   };
 
   collect(nodes);
-  return trash;
+  return trash.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 };
 
 const normalizeSearchTarget = (name: string): string => name.replace(/\.md$/i, '').toLowerCase();
@@ -490,7 +490,9 @@ const isTrashRootNode = (node: FileNode): boolean => (
 
 const filterNodesByFileName = (nodes: FileNode[], query: string): FileNode[] => {
   if (!query.trim()) {
-    return nodes.filter((node) => !node.isTrash && !isTrashRootNode(node));
+    return nodes
+      .filter((node) => !node.isTrash && !isTrashRootNode(node))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   }
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -514,7 +516,7 @@ const filterNodesByFileName = (nodes: FileNode[], query: string): FileNode[] => 
     }
 
     return acc;
-  }, []);
+  }, []).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -593,7 +595,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const trashItems = getTrashItems(files);
   const searchableFiles = useMemo(() => flattenVisibleFiles(files), [files]);
   const filteredFiles = useMemo(
-    () => filterNodesByFileName(files, searchQuery),
+    () => filterNodesByFileName(files, searchQuery)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     [files, searchQuery]
   );
   const hasSearchQuery = searchQuery.trim().length > 0;

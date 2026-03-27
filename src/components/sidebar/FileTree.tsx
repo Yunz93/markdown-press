@@ -132,7 +132,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
           ${isDragOver ? 'bg-accent-DEFAULT/20 border-accent-DEFAULT dark:bg-accent-DEFAULT/20 dark:border-accent-DEFAULT' : ''}
           ${isDragging ? 'opacity-60' : ''}
         `}
-        style={{ paddingLeft: `${Math.max(level * 12 + 12, 12)}px` }}
+        style={{ paddingLeft: `${level * 8 + 12}px` }}
         draggable={!node.isTrash}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -182,6 +182,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
         <div className="ml-0 mt-0.5 space-y-0.5">
           {node.children
             .filter(child => !child.isTrash)
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
             .map(child => (
               <FileTreeItem
                 key={child.id}

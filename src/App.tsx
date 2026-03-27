@@ -95,7 +95,12 @@ const App: React.FC = () => {
   useThemeSync(settings.themeMode);
 
   useEffect(() => {
-    ensureDynamicFontFaces(settings);
+    ensureDynamicFontFaces(settings).then(() => {
+      // After fonts are loaded, notify editor to refresh
+      if (typeof document !== 'undefined') {
+        document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
+      }
+    });
   }, [settings.englishFontFamily, settings.chineseFontFamily]);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
