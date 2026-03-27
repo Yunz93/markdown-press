@@ -1145,8 +1145,15 @@ html[data-app-booting="true"] *::after {
 
 .preview-pane-document.markdown-body ul,
 .preview-pane-document.markdown-body ol {
-  margin: 1rem 0;
-  padding-left: 1.6rem;
+  margin: 0.5rem 0;
+  padding-left: 2rem;
+}
+
+.preview-pane-document.markdown-body li > ul,
+.preview-pane-document.markdown-body li > ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  padding-left: 1.5rem;
 }
 
 .preview-pane-document.markdown-body ul {
@@ -1171,12 +1178,6 @@ html[data-app-booting="true"] *::after {
 
 .preview-pane-document.markdown-body ol ol ol {
   list-style: lower-roman;
-}
-
-.preview-pane-document.markdown-body li > ul,
-.preview-pane-document.markdown-body li > ol {
-  margin-top: 0.35rem;
-  margin-bottom: 0.35rem;
 }
 
 .preview-pane-document.markdown-body .task-list-item {

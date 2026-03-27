@@ -242,23 +242,153 @@ const fencedCodeDecorations = ViewPlugin.fromClass(class {
   decorations: (plugin) => plugin.decorations,
 });
 
-const insertTwoSpaces: StateCommand = ({ state, dispatch }) => {
-  const changes = state.changeByRange((range) => ({
-    changes: { from: range.from, to: range.to, insert: '  ' },
-    range: EditorSelection.cursor(range.from + 2),
-  }));
+// ==================== Markdown Editor Behavior ====================
+// Standard Markdown editing behavior specification
 
+// List item regex patterns
+const UNORDERED_LIST_REGEX = /^(\s*)([-*+])\s+(.*)$/;
+const ORDERED_LIST_REGEX = /^(\s*)(\d+)\.\s+(.*)$/;
+const EMPTY_LIST_ITEM_REGEX = /^(\s*)([-*+]|\d+\.)\s*$/;
+
+interface ListItemInfo {
+  indent: string;
+  marker: string;
+  content: string;
+  isOrdered: boolean;
+  number?: number;
+}
+
+function parseListItem(lineText: string): ListItemInfo | null {
+  const unorderedMatch = lineText.match(UNORDERED_LIST_REGEX);
+  if (unorderedMatch) {
+    return {
+      indent: unorderedMatch[1],
+      marker: unorderedMatch[2],
+      content: unorderedMatch[3],
+      isOrdered: false,
+    };
+  }
+  
+  const orderedMatch = lineText.match(ORDERED_LIST_REGEX);
+  if (orderedMatch) {
+    return {
+      indent: orderedMatch[1],
+      marker: orderedMatch[2] + '.',
+      content: orderedMatch[3],
+      isOrdered: true,
+      number: parseInt(orderedMatch[2], 10),
+    };
+  }
+  
+  return null;
+}
+
+function isEmptyListItem(lineText: string): boolean {
+  return EMPTY_LIST_ITEM_REGEX.test(lineText);
+}
+
+// Smart Enter key handler for Markdown lists
+const handleMarkdownEnter: StateCommand = ({ state, dispatch }) => {
+  const range = state.selection.main;
+  const line = state.doc.lineAt(range.from);
+  const lineText = line.text;
+  
+  // Check if current line is a list item
+  const listItem = parseListItem(lineText);
+  
+  if (!listItem) {
+    // Not in a list, use default newline behavior
+    return false;
+  }
+  
+  // Check if this is an empty list item
+  if (isEmptyListItem(lineText)) {
+    // Exit the list: remove the list marker and clear the line
+    const match = lineText.match(EMPTY_LIST_ITEM_REGEX);
+    if (match) {
+      const [, indent] = match;
+      const changes = {
+        changes: { from: line.from, to: line.to, insert: indent.trimEnd() },
+        range: EditorSelection.cursor(line.from + indent.trimEnd().length),
+      };
+      dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+      return true;
+    }
+  }
+  
+  // Continue the list with proper marker
+  const newMarker = listItem.isOrdered 
+    ? `${(listItem.number || 1) + 1}. `
+    : `${listItem.marker} `;
+  
+  const insertText = `\n${listItem.indent}${newMarker}`;
+  
+  const changes = {
+    changes: { from: range.from, to: range.to, insert: insertText },
+    range: EditorSelection.cursor(range.from + insertText.length),
+  };
+  
   dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
   return true;
 };
 
+// Smart Tab handler: increase list indent or insert spaces
 const indentSelectionOrInsertSpaces: StateCommand = ({ state, dispatch }) => {
   const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
+  
   if (hasExpandedSelection) {
     return indentMore({ state, dispatch });
   }
+  
+  const line = state.doc.lineAt(state.selection.main.from);
+  const lineText = line.text;
+  const cursorPos = state.selection.main.from - line.from;
+  
+  // Check if we're in a list item
+  const listItem = parseListItem(lineText);
+  if (listItem && cursorPos <= lineText.indexOf(listItem.marker) + listItem.marker.length + 1) {
+    // In list context before/at content: add indent to the whole line
+    const newLine = '  ' + lineText;
+    const changes = {
+      changes: { from: line.from, to: line.to, insert: newLine },
+      range: EditorSelection.cursor(state.selection.main.from + 2),
+    };
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+    return true;
+  }
+  
+  // Default: insert 2 spaces at cursor
+  const changes = state.changeByRange((range) => ({
+    changes: { from: range.from, to: range.to, insert: '  ' },
+    range: EditorSelection.cursor(range.from + 2),
+  }));
+  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+  return true;
+};
 
-  return insertTwoSpaces({ state, dispatch });
+// Smart Shift-Tab handler: decrease list indent
+const dedentListOrSelection: StateCommand = ({ state, dispatch }) => {
+  const line = state.doc.lineAt(state.selection.main.from);
+  const lineText = line.text;
+  
+  // Check if line starts with indentation
+  const leadingSpaces = lineText.match(/^(\s*)/)?.[1] || '';
+  
+  // Check if we're in a list item
+  const listItem = parseListItem(lineText);
+  if (listItem && leadingSpaces.length >= 2) {
+    // Remove 2 spaces of indent
+    const newLine = lineText.slice(2);
+    const changes = {
+      changes: { from: line.from, to: line.to, insert: newLine },
+      range: EditorSelection.cursor(Math.max(line.from, state.selection.main.from - 2)),
+    };
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+    return true;
+  }
+  
+  // Not a list or no indent to remove, use default indentLess
+  return indentLess({ state, dispatch });
 };
 
 // Markdown editing helper functions
@@ -688,10 +818,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
         extensions: [
           history(),
           keymap.of([
+            // Markdown-specific Enter handling (before default)
+            { key: 'Enter', run: handleMarkdownEnter },
+            { key: 'Shift-Tab', run: dedentListOrSelection },
+            { key: 'Tab', run: indentSelectionOrInsertSpaces },
+            // Default keymaps
             ...defaultKeymap,
             ...historyKeymap,
-            { key: 'Shift-Tab', run: indentLess },
-            { key: 'Tab', run: indentSelectionOrInsertSpaces },
             // Markdown formatting shortcuts
             { key: 'Mod-b', run: toggleBold },
             { key: 'Mod-i', run: toggleItalic },
@@ -811,6 +944,28 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       selection: { anchor, head },
     });
   }, [content]);
+
+  // Refresh editor when fonts are loaded
+  useEffect(() => {
+    const handleFontsLoaded = () => {
+      const view = editorViewRef.current;
+      if (!view) return;
+      // Force CodeMirror to re-measure and redraw
+      view.requestMeasure();
+    };
+
+    // Listen for font load events
+    document.fonts?.addEventListener?.('loadingdone', handleFontsLoaded);
+    
+    // Also check if fonts are already loaded
+    if (document.fonts?.status === 'loaded') {
+      handleFontsLoaded();
+    }
+
+    return () => {
+      document.fonts?.removeEventListener?.('loadingdone', handleFontsLoaded);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const view = editorViewRef.current;
