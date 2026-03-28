@@ -691,7 +691,6 @@ html[data-app-booting="true"] *::after {
 .editor-pane-backdrop {
   position: relative;
   padding: var(--pane-backdrop-py) var(--pane-backdrop-px);
-  transition: padding 110ms ease-out;
 }
 
 .editor-pane-frame {
@@ -730,7 +729,6 @@ html[data-app-booting="true"] *::after {
   padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
   letter-spacing: 0.01em;
   tab-size: 2;
-  transition: padding 110ms ease-out;
 }
 
 .editor-pane::selection {
@@ -1014,7 +1012,6 @@ html[data-app-booting="true"] *::after {
   line-height: 1.95;
   overflow-wrap: anywhere;
   word-break: break-word;
-  transition: padding 110ms ease-out;
 }
 
 .preview-pane-document-compact.markdown-body {
