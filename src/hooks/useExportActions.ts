@@ -44,11 +44,12 @@ export function useExportActions(forceSave: () => Promise<boolean>, highlighter?
     }
 
     try {
-      const htmlContent = exportToHtml(content, {
+      const htmlContent = await exportToHtml(content, {
         title: activeFile.name.replace('.md', ''),
         theme: settings.themeMode,
         includeTOC: false,
         fontFamily,
+        fontSettings: settings,
         fontSize: settings.fontSize,
         includeProperties: false,
         highlighter,

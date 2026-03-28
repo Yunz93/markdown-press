@@ -41,10 +41,11 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
       const filename = activeFile?.name?.replace('.md', '') || 'export';
 
       if (exportFormat === 'html') {
-        const html = exportToHtml(content, {
+        const html = await exportToHtml(content, {
           theme,
           includeTOC,
           fontFamily,
+          fontSettings: settings,
           fontSize: settings.fontSize,
         });
         const saved = await downloadHtml(html, filename, activeFile?.path);
