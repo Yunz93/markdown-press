@@ -29,7 +29,7 @@ function normalizeSlashes(value: string): string {
 }
 
 function stripMarkdownExtension(value: string): string {
-  return value.replace(/\.md$/i, '');
+  return value.replace(/\.(md|markdown)$/i, '');
 }
 
 function parseEmbedSize(rawAlias: string): ParsedWikiLinkReference['embedSize'] {

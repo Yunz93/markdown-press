@@ -5,6 +5,7 @@ import type Token from 'markdown-it/lib/token.mjs';
 import taskLists from 'markdown-it-task-lists';
 import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensions';
 import { normalizeShikiLanguage } from './shikiLanguages';
+import { getMarkdownPressShikiTheme } from './shikiTheme';
 import { parseWikiLinkReference } from './wikiLinks';
 import type { ThemeMode } from '../types';
 
@@ -150,7 +151,6 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
   currentTheme = themeMode;
   
   const baseFence = baseFenceRenderer || md.renderer.rules.fence;
-  const theme = themeMode === 'dark' ? 'github-dark' : 'github-light';
 
   md.renderer.rules.fence = (tokens, idx, options, env: MarkdownRenderEnv, self) => {
     const token = tokens[idx];
@@ -168,7 +168,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
     
     if (activeHighlighter && lang) {
       try {
-        const activeTheme = currentTheme === 'dark' ? 'github-dark' : 'github-light';
+        const activeTheme = getMarkdownPressShikiTheme(currentTheme);
         const shikiHtml = activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme });
         const shikiBlocks = env.shikiBlocks ?? (env.shikiBlocks = []);
         const blockIndex = shikiBlocks.push(shikiHtml) - 1;

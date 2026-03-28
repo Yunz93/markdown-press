@@ -3,6 +3,7 @@ import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
 import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateCommand } from '@codemirror/state';
+import { autocompletion, completionKeymap, startCompletion, type Completion, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
@@ -14,6 +15,9 @@ import { getFileSystem } from '../../types/filesystem';
 import { resolveEditorCodeLanguage } from '../../utils/editorCodeLanguages';
 import type { AttachmentPasteFormat } from '../../types';
 import { throttle } from '../../utils/throttle';
+import { renderMarkdown } from '../../utils/markdown';
+import { extractWikiNoteFragment, parseWikiLinkReference, resolveWikiLinkFile } from '../../utils/wikiLinks';
+import { findHeadingByReference, findOpenWikiLinkAt, findWikiLinkAt, flattenMarkdownFiles, getWikiHeadingCandidates, getWikiLinkDisplayPath, getWikiLinkInsertPath } from '../../utils/wikiLinkEditor';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -575,6 +579,72 @@ const insertHeading: StateCommand = ({ state, dispatch }) => {
   return true;
 };
 
+interface WikiLinkPreviewData {
+  title: string;
+  subtitle?: string;
+  html: string;
+}
+
+interface HoverPreviewState {
+  preview: WikiLinkPreviewData;
+  x: number;
+  y: number;
+  target: string;
+}
+
+function stripMarkdownExtension(value: string): string {
+  return value.replace(/\.(md|markdown)$/i, '');
+}
+
+function isMacPlatform(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+}
+
+function isPreviewModifierPressed(event: Pick<KeyboardEvent | MouseEvent, 'metaKey' | 'ctrlKey'>): boolean {
+  return isMacPlatform() ? event.metaKey : event.ctrlKey;
+}
+
+function buildWikiPreviewMarkup(preview: WikiLinkPreviewData): HTMLElement {
+  const container = document.createElement('div');
+  container.className = 'wiki-link-hover-preview';
+
+  const header = document.createElement('div');
+  header.className = 'wiki-link-hover-preview-header';
+
+  const title = document.createElement('div');
+  title.className = 'wiki-link-hover-preview-title';
+  title.textContent = preview.title;
+  header.appendChild(title);
+
+  if (preview.subtitle) {
+    const subtitle = document.createElement('div');
+    subtitle.className = 'wiki-link-hover-preview-subtitle';
+    subtitle.textContent = preview.subtitle;
+    header.appendChild(subtitle);
+  }
+
+  const body = document.createElement('article');
+  body.className = 'markdown-body wiki-link-hover-preview-body';
+  body.innerHTML = preview.html;
+
+  container.append(header, body);
+  return container;
+}
+
+function findWikiLinkNearPosition(text: string, pos: number) {
+  const offsets = [0, -1, 1, -2, 2];
+
+  for (const offset of offsets) {
+    const match = findWikiLinkAt(text, pos + offset);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   placeholder = 'Type here...',
   onContentChange,
@@ -585,13 +655,31 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   void highlighter;
 
   const content = useAppStore(selectContent);
-  const { setContent, settings, isSaving, activeTabId, viewMode, currentFilePath, rootFolderPath, showNotification } = useAppStore();
+  const {
+    setContent,
+    settings,
+    isSaving,
+    activeTabId,
+    viewMode,
+    currentFilePath,
+    rootFolderPath,
+    showNotification,
+    files,
+    fileContents,
+  } = useAppStore();
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
-  const { writeBinaryFile, refreshFileTree } = useFileSystem();
+  const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
 
   const editorRootRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
+  const previewModifierPressedRef = useRef(false);
+  const keyboardModifierPressedRef = useRef(false);
+  const hoveredLinkCacheRef = useRef(new Map<string, Promise<string>>());
+  const completionStartFrameRef = useRef<number | null>(null);
+  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const hoverPreviewRequestRef = useRef(0);
+  const hoverPreviewTargetRef = useRef<string | null>(null);
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
   const onScrollRef = useRef(onScroll);
@@ -602,6 +690,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
 
   const wrapCompartment = useRef(new Compartment()).current;
   const placeholderCompartment = useRef(new Compartment()).current;
+  const completionSourceRef = useRef<CompletionSource>(() => null);
+  const previewResolverRef = useRef<(rawTarget: string) => Promise<WikiLinkPreviewData | null>>(async () => null);
 
   const updateContent = useCallback((nextContent: string) => {
     if (onContentChange) {
@@ -611,6 +701,22 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     setContent(nextContent);
   }, [onContentChange, setContent]);
   const updateContentRef = useRef(updateContent);
+  const markdownFiles = useMemo(() => flattenMarkdownFiles(files), [files]);
+  const currentHeadings = useMemo(() => getWikiHeadingCandidates(content), [content]);
+  const fileCompletionOptions = useMemo<Completion[]>(() => markdownFiles.map((file) => {
+    const insertPath = getWikiLinkInsertPath(file, rootFolderPath);
+    const displayPath = getWikiLinkDisplayPath(file, rootFolderPath);
+    const fileLabel = stripMarkdownExtension(file.name);
+
+    return {
+      label: fileLabel,
+      displayLabel: fileLabel,
+      type: 'file',
+      detail: displayPath === fileLabel ? 'Knowledge base note' : displayPath,
+      apply: insertPath,
+      boost: insertPath.includes('/') ? 0 : 1,
+    };
+  }), [markdownFiles, rootFolderPath]);
 
   const handlePastedImage = useCallback(async (file: File, view: EditorView) => {
     if (!rootFolderPath) {
@@ -657,6 +763,138 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     showNotification,
     writeBinaryFile,
   ]);
+
+  const readWikiTargetContent = useCallback(async (fileId: string, filePath: string, fileName: string): Promise<string> => {
+    if ((activeTabId && fileId === activeTabId) || (currentFilePath && filePath === currentFilePath)) {
+      return content;
+    }
+
+    const cachedContent = fileContents[fileId];
+    if (cachedContent !== undefined) {
+      return cachedContent;
+    }
+
+    const cachedPromise = hoveredLinkCacheRef.current.get(filePath);
+    if (cachedPromise) {
+      return cachedPromise;
+    }
+
+    const pending = readFile({
+      id: fileId,
+      name: fileName,
+      type: 'file',
+      path: filePath,
+    }).catch((error) => {
+      hoveredLinkCacheRef.current.delete(filePath);
+      throw error;
+    });
+
+    hoveredLinkCacheRef.current.set(filePath, pending);
+    return pending;
+  }, [activeTabId, content, currentFilePath, fileContents, readFile]);
+
+  const buildWikiLinkPreview = useCallback(async (rawTarget: string): Promise<WikiLinkPreviewData | null> => {
+    const parsedReference = parseWikiLinkReference(rawTarget);
+
+    if (!parsedReference.subpathType && parsedReference.path.trim()) {
+      const matchedHeading = findHeadingByReference(currentHeadings, rawTarget);
+      if (matchedHeading) {
+        const fragment = extractWikiNoteFragment(content, `#${matchedHeading.text}`);
+        if (!fragment.markdown) return null;
+
+        return {
+          title: matchedHeading.text,
+          subtitle: 'Current note',
+          html: renderMarkdown(fragment.markdown, {
+            highlighter,
+            themeMode: settings.themeMode,
+          }),
+        };
+      }
+    }
+
+    if (!parsedReference.path.trim()) {
+      const fragment = extractWikiNoteFragment(content, rawTarget);
+      if (!fragment.markdown) return null;
+
+      return {
+        title: fragment.title,
+        subtitle: 'Current note',
+        html: renderMarkdown(fragment.markdown, {
+          highlighter,
+          themeMode: settings.themeMode,
+        }),
+      };
+    }
+
+    const matchedFile = resolveWikiLinkFile(files, rawTarget, rootFolderPath, currentFilePath);
+    if (!matchedFile) return null;
+
+    const sourceContent = await readWikiTargetContent(matchedFile.id, matchedFile.path, matchedFile.name);
+    const fragment = extractWikiNoteFragment(sourceContent, rawTarget);
+    if (!fragment.markdown) return null;
+
+    return {
+      title: fragment.title,
+      subtitle: getWikiLinkDisplayPath(matchedFile, rootFolderPath),
+      html: renderMarkdown(fragment.markdown, {
+        highlighter,
+        themeMode: settings.themeMode,
+      }),
+    };
+  }, [
+    content,
+    currentFilePath,
+    currentHeadings,
+    files,
+    highlighter,
+    readWikiTargetContent,
+    rootFolderPath,
+    settings.themeMode,
+  ]);
+
+  const wikiLinkCompletionSource = useCallback<CompletionSource>(async (context: CompletionContext) => {
+    const match = findOpenWikiLinkAt(context.state.doc.toString(), context.pos);
+    if (!match) return null;
+
+    if (!match.hasHash) {
+      return {
+        from: match.from,
+        to: match.to,
+        options: fileCompletionOptions,
+        validFor: /^[^#|\]\n]*$/,
+      };
+    }
+
+    const noteTarget = match.pathQuery.trim();
+    const targetFile = noteTarget
+      ? resolveWikiLinkFile(files, noteTarget, rootFolderPath, currentFilePath)
+      : null;
+
+    let headingSourceContent = content;
+    if (targetFile) {
+      headingSourceContent = await readWikiTargetContent(targetFile.id, targetFile.path, targetFile.name);
+    } else if (noteTarget) {
+      return null;
+    }
+
+    const headingOptions: Completion[] = getWikiHeadingCandidates(headingSourceContent).map((heading) => ({
+      label: heading.text,
+      displayLabel: heading.text,
+      type: 'property',
+      detail: targetFile
+        ? `${stripMarkdownExtension(targetFile.name)} · H${heading.level}`
+        : `Current note · H${heading.level}`,
+      apply: heading.text,
+    }));
+
+    return {
+      from: match.from,
+      to: match.to,
+      options: headingOptions,
+      validFor: /^[^|\]\n]*$/,
+    };
+  }, [content, currentFilePath, fileCompletionOptions, files, readWikiTargetContent, rootFolderPath]);
 
   const emitScrollPercentage = useCallback((scrollContainer: HTMLElement) => {
     if (isSyncingScroll.current) return;
@@ -723,6 +961,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
 
   const [paneWidth, setPaneWidth] = useState(0);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
+  const [hoverPreview, setHoverPreview] = useState<HoverPreviewState | null>(null);
   const layoutStyle = useMemo(() => ({
     '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
     '--pane-backdrop-py': `${layoutMetrics.backdropPaddingY}px`,
@@ -743,6 +982,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
 
   useEffect(() => {
     return () => {
+      if (completionStartFrameRef.current !== null) {
+        cancelAnimationFrame(completionStartFrameRef.current);
+        completionStartFrameRef.current = null;
+      }
       if (emitAnimationFrameRef.current !== null) {
         cancelAnimationFrame(emitAnimationFrameRef.current);
         emitAnimationFrameRef.current = null;
@@ -755,6 +998,140 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   useEffect(() => {
     updateContentRef.current = updateContent;
   }, [updateContent]);
+
+  useEffect(() => {
+    completionSourceRef.current = wikiLinkCompletionSource;
+  }, [wikiLinkCompletionSource]);
+
+  useEffect(() => {
+    previewResolverRef.current = buildWikiLinkPreview;
+  }, [buildWikiLinkPreview]);
+
+  useEffect(() => {
+    hoveredLinkCacheRef.current.clear();
+  }, [files, rootFolderPath]);
+
+  const hideHoverPreview = useCallback(() => {
+    hoverPreviewRequestRef.current += 1;
+    hoverPreviewTargetRef.current = null;
+    setHoverPreview(null);
+  }, []);
+
+  const updateHoverPreviewAtPointer = useCallback(async (clientX: number, clientY: number) => {
+    const view = editorViewRef.current;
+    if (!view || !previewModifierPressedRef.current) {
+      hideHoverPreview();
+      return;
+    }
+
+    const pos = view.posAtCoords({ x: clientX, y: clientY });
+    if (pos == null) {
+      hideHoverPreview();
+      return;
+    }
+
+    const match = findWikiLinkNearPosition(view.state.doc.toString(), pos);
+    if (!match) {
+      hideHoverPreview();
+      return;
+    }
+
+    const activeTarget = match.raw;
+    hoverPreviewTargetRef.current = activeTarget;
+
+    if (hoverPreview?.target === activeTarget) {
+      setHoverPreview((current) => current ? { ...current, x: clientX, y: clientY } : current);
+      return;
+    }
+
+    const requestId = hoverPreviewRequestRef.current + 1;
+    hoverPreviewRequestRef.current = requestId;
+    const preview = await previewResolverRef.current(activeTarget);
+
+    if (
+      hoverPreviewRequestRef.current !== requestId
+      || hoverPreviewTargetRef.current !== activeTarget
+      || !previewModifierPressedRef.current
+    ) {
+      return;
+    }
+
+    if (!preview) {
+      hideHoverPreview();
+      return;
+    }
+
+    setHoverPreview({
+      preview,
+      x: clientX,
+      y: clientY,
+      target: activeTarget,
+    });
+  }, [hideHoverPreview, hoverPreview?.target]);
+
+  useEffect(() => {
+    const syncModifierState = (active: boolean) => {
+      keyboardModifierPressedRef.current = active;
+      previewModifierPressedRef.current = active;
+
+      if (!active) {
+        hideHoverPreview();
+        return;
+      }
+
+      if (lastPointerRef.current) {
+        void updateHoverPreviewAtPointer(lastPointerRef.current.clientX, lastPointerRef.current.clientY);
+      }
+    };
+
+    const updateModifierFromKeyboard = (event: KeyboardEvent) => {
+      syncModifierState(isPreviewModifierPressed(event));
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Meta' || event.key === 'Control') {
+        updateModifierFromKeyboard(event);
+        return;
+      }
+
+      if (previewModifierPressedRef.current) {
+        updateModifierFromKeyboard(event);
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Meta' || event.key === 'Control' || previewModifierPressedRef.current) {
+        updateModifierFromKeyboard(event);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (!previewModifierPressedRef.current) return;
+      syncModifierState(false);
+    };
+
+    const handleBlur = () => {
+      syncModifierState(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [hideHoverPreview, updateHoverPreviewAtPointer]);
+
+  const wikiLinkAutocompleteExtension = useMemo(() => autocompletion({
+    activateOnTyping: true,
+    override: [(context) => completionSourceRef.current(context)],
+    maxRenderedOptions: 40,
+  }), []);
 
   useImperativeHandle(ref, () => ({
     cancelScrollSync: cancelSyncedScroll,
@@ -818,6 +1195,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
         extensions: [
           history(),
           keymap.of([
+            ...completionKeymap,
             // Markdown-specific Enter handling (before default)
             { key: 'Enter', run: handleMarkdownEnter },
             { key: 'Shift-Tab', run: dedentListOrSelection },
@@ -836,6 +1214,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             { key: 'Mod-Shift-.', run: insertBlockquote },
             { key: 'Mod-Shift-h', run: insertHeading },
           ]),
+          wikiLinkAutocompleteExtension,
           indentUnit.of('  '),
           markdown({ codeLanguages: resolveEditorCodeLanguage }),
           drawSelection(),
@@ -845,6 +1224,29 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
           syntaxHighlighting(markdownHighlightStyle),
           placeholderCompartment.of(cmPlaceholder(placeholder)),
           EditorView.domEventHandlers({
+            mousemove: (event) => {
+              lastPointerRef.current = {
+                clientX: event.clientX,
+                clientY: event.clientY,
+              };
+              previewModifierPressedRef.current = keyboardModifierPressedRef.current || isPreviewModifierPressed(event);
+              if (!previewModifierPressedRef.current) {
+                hideHoverPreview();
+                return false;
+              }
+              void updateHoverPreviewAtPointer(event.clientX, event.clientY);
+              return false;
+            },
+            mouseleave: () => {
+              lastPointerRef.current = null;
+              previewModifierPressedRef.current = false;
+              hideHoverPreview();
+              return false;
+            },
+            scroll: () => {
+              hideHoverPreview();
+              return false;
+            },
             paste: (event, view) => {
               const clipboardItems = Array.from(event.clipboardData?.items ?? []);
               const imageItem = clipboardItems.find((item) => item.type.startsWith('image/'));
@@ -862,6 +1264,28 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               updateContentRef.current(update.state.doc.toString());
+
+              const selection = update.state.selection.main;
+              if (selection.empty) {
+                const cursor = selection.from;
+                const prevTwoChars = update.state.doc.sliceString(Math.max(0, cursor - 2), cursor);
+                const prevOneChar = update.state.doc.sliceString(Math.max(0, cursor - 1), cursor);
+                if (prevTwoChars === '[[' || prevOneChar === '#') {
+                  const openMatch = findOpenWikiLinkAt(update.state.doc.toString(), cursor);
+                  if (openMatch) {
+                    if (completionStartFrameRef.current !== null) {
+                      cancelAnimationFrame(completionStartFrameRef.current);
+                    }
+                    completionStartFrameRef.current = requestAnimationFrame(() => {
+                      completionStartFrameRef.current = null;
+                      const currentView = editorViewRef.current;
+                      if (currentView) {
+                        startCompletion(currentView);
+                      }
+                    });
+                  }
+                }
+              }
             }
           }),
         ],
@@ -870,6 +1294,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     });
 
     const handleDomScroll = () => {
+      hideHoverPreview();
       emitScrollPercentage(view.scrollDOM);
     };
     const handleUserScrollIntent = () => {
@@ -909,6 +1334,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     emitScrollPercentage,
     cancelSyncedScroll,
     handlePastedImage,
+    hideHoverPreview,
+    wikiLinkAutocompleteExtension,
+    updateHoverPreviewAtPointer,
   ]);
 
   useEffect(() => {
@@ -1023,6 +1451,29 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
           </div>
         </div>
       </div>
+
+      {hoverPreview && (
+        <div
+          className={`wiki-link-hover-overlay ${hoverPreview.y > ((typeof window !== 'undefined' ? window.innerHeight : 900) * 0.58) ? 'is-above' : ''}`}
+          style={{
+            left: Math.max(16, Math.min(
+              hoverPreview.x + 18,
+              (typeof window !== 'undefined' ? window.innerWidth : hoverPreview.x + 18) - 440
+            )),
+            top: hoverPreview.y + 18,
+          }}
+        >
+          {(() => {
+            const markup = buildWikiPreviewMarkup(hoverPreview.preview);
+            return (
+              <div
+                dangerouslySetInnerHTML={{ __html: markup.innerHTML }}
+                className={markup.className}
+              />
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 });
