@@ -276,6 +276,103 @@ html[data-app-booting="true"] *::after {
   color: rgba(100, 116, 139, 0.72);
 }
 
+.editor-pane-layout .cm-tooltip {
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.editor-pane-layout .cm-tooltip-autocomplete {
+  padding: 0.3rem;
+  min-width: 18rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+}
+
+.editor-pane-layout .cm-tooltip-autocomplete > ul {
+  font-family: var(--editor-font-family);
+  font-size: 0.92rem;
+}
+
+.editor-pane-layout .cm-tooltip-autocomplete ul li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem;
+}
+
+.editor-pane-layout .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.editor-pane-layout .cm-completionIcon {
+  opacity: 0.58;
+}
+
+.editor-pane-layout .cm-completionDetail {
+  color: #64748b;
+  font-size: 0.82em;
+}
+
+.editor-pane-layout .wiki-link-hover-overlay {
+  position: fixed;
+  z-index: 80;
+  width: min(26rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.editor-pane-layout .wiki-link-hover-overlay.is-above {
+  transform: translateY(calc(-100% - 32px));
+}
+
+.editor-pane-layout .wiki-link-hover-preview {
+  width: 100%;
+  max-height: min(26rem, calc(100vh - 6rem));
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
+
+.editor-pane-layout .wiki-link-hover-preview-header {
+  padding: 0.85rem 0.95rem 0.7rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.editor-pane-layout .wiki-link-hover-preview-title {
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.editor-pane-layout .wiki-link-hover-preview-subtitle {
+  color: #64748b;
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+}
+
+.editor-pane-layout .wiki-link-hover-preview-body {
+  max-height: min(20rem, calc(100vh - 10rem));
+  overflow: auto;
+  padding: 0.85rem 0.95rem 0.95rem;
+  font-family: var(--editor-font-family);
+}
+
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body {
+  background: transparent;
+}
+
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
 .editor-pane-layout .cm-frontmatter-line,
 .editor-pane-layout .cm-frontmatter-line span {
   color: #475569 !important;
@@ -465,6 +562,36 @@ html[data-app-booting="true"] *::after {
 
 .dark .editor-pane-layout .cm-placeholder {
   color: rgba(148, 163, 184, 0.72);
+}
+
+.dark .editor-pane-layout .cm-tooltip {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #111827;
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.28);
+}
+
+.dark .editor-pane-layout .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+}
+
+.dark .editor-pane-layout .cm-completionDetail,
+.dark .editor-pane-layout .wiki-link-hover-preview-subtitle {
+  color: #94a3b8;
+}
+
+.dark .editor-pane-layout .wiki-link-hover-preview {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #111827;
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.28);
+}
+
+.dark .editor-pane-layout .wiki-link-hover-preview-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .editor-pane-layout .wiki-link-hover-preview-title {
+  color: #e2e8f0;
 }
 
 .dark .editor-pane-layout .cm-frontmatter-line,
@@ -1794,12 +1921,12 @@ html:not(.dark) .markdown-body {
 
 /* Writing Stats Styles */
 .writing-stats {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .dark .writing-stats {
-  background: rgba(0, 0, 0, 0.3);
+  background: transparent;
 }
 
 .writing-stats .stat-item {
@@ -1812,7 +1939,7 @@ html:not(.dark) .markdown-body {
 
 /* Tab Bar Styles - Modern Flat Design */
 .tab-bar {
-  --tab-bar-surface: transparent;
+  --tab-bar-surface: #f8fafc;
   --tab-active-bg: rgba(0, 0, 0, 0.06);
   --tab-idle-bg: transparent;
   --tab-idle-hover-bg: rgba(0, 0, 0, 0.03);
@@ -1827,7 +1954,7 @@ html:not(.dark) .markdown-body {
 }
 
 .dark .tab-bar {
-  --tab-bar-surface: transparent;
+  --tab-bar-surface: #000000;
   --tab-active-bg: rgba(255, 255, 255, 0.1);
   --tab-idle-bg: transparent;
   --tab-idle-hover-bg: rgba(255, 255, 255, 0.05);

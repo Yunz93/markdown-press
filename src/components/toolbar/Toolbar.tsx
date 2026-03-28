@@ -36,7 +36,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const displayFileName = fileName.replace(/\.md$/i, '');
 
   return (
-    <div className="sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-gray-200/50 bg-white/80 px-4 py-3 transition-colors dark:border-white/5 dark:bg-black/50 md:px-6 md:py-2 backdrop-blur-md">
+    <div className="sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-transparent bg-gray-50 dark:bg-black px-4 py-3 transition-colors md:px-6 md:py-2">
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden md:gap-4">
         <button
           onClick={onMenuClick}

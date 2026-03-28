@@ -50,6 +50,8 @@ export default defineConfig(({ mode }) => {
 
               if (
                 id.includes('/markdown-it')
+                || id.includes('/shiki/')
+                || id.includes('/@shikijs/')
                 || id.includes('/katex/')
                 || id.includes('/dompurify/')
                 || id.includes('/github-markdown-css/')

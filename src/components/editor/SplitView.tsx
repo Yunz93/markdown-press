@@ -111,7 +111,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const showPreview = viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT;
 
   return (
-    <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden relative flex flex-row"
@@ -165,7 +165,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
       </div>
 
       {activeTabId && (
-        <div className="shrink-0 bg-transparent">
+        <div className="shrink-0 border-t border-gray-200/50 bg-[#f8fafc] dark:border-white/5 dark:bg-black">
           <div className="mx-auto flex w-full max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:px-5">
             <WritingStatsDisplay className="min-w-0 flex-1 border-t-0 px-0 py-0" showBorder={false} />
             {canShowOutlineToggle && (
