@@ -5,6 +5,7 @@ const DYNAMIC_FONT_STYLE_ID = 'markdown-press-dynamic-font-faces';
 const LATIN_FONT_ALIAS = 'MarkdownPressLatin';
 const CJK_FONT_ALIAS = 'MarkdownPressCJK';
 const BUNDLED_CHINESE_FONT_NAMES = ['LXGW WenKai', '霞鹜文楷'];
+export type FontSettings = Pick<AppSettings, 'englishFontFamily' | 'chineseFontFamily'>;
 
 const GENERIC_FONT_FAMILIES = new Set([
   'serif',
@@ -64,18 +65,18 @@ function fontFamilyMentionsBundledChineseFont(fontFamily: string): boolean {
   return BUNDLED_CHINESE_FONT_NAMES.some((name) => normalizedFontNames.has(name.toLowerCase()));
 }
 
-function buildBundledChineseFontSource(fontFamily: string): string {
+function buildBundledChineseFontSource(fontFamily: string, bundledFontSrc: string): string {
   const bundledLocalSource = BUNDLED_CHINESE_FONT_NAMES
     .map((name) => `local("${escapeFontName(name)}")`)
     .join(', ');
 
-  return `${bundledLocalSource}, url("${bundledChineseFontUrl}") format("truetype"), ${buildLocalFontSource(fontFamily)}`;
+  return `${bundledLocalSource}, url("${bundledFontSrc}") format("truetype"), ${buildLocalFontSource(fontFamily)}`;
 }
 
-function buildBundledChineseFontFaces(): string {
+function buildBundledChineseFontFaces(bundledFontSrc: string): string {
   const bundledSource = `${BUNDLED_CHINESE_FONT_NAMES
     .map((name) => `local("${escapeFontName(name)}")`)
-    .join(', ')}, url("${bundledChineseFontUrl}") format("truetype")`;
+    .join(', ')}, url("${bundledFontSrc}") format("truetype")`;
 
   return BUNDLED_CHINESE_FONT_NAMES.map((fontName) => `
 @font-face {
@@ -108,7 +109,7 @@ export function getResolvedChineseFontFamily(settings: Pick<AppSettings, 'chines
 }
 
 export function getCompositeFontFamily(
-  settings: Pick<AppSettings, 'englishFontFamily' | 'chineseFontFamily'>
+  settings: FontSettings
 ): string {
   const englishFontFamily = getResolvedEnglishFontFamily(settings);
   const chineseFontFamily = getResolvedChineseFontFamily(settings);
@@ -116,19 +117,30 @@ export function getCompositeFontFamily(
   return `"${LATIN_FONT_ALIAS}", "${CJK_FONT_ALIAS}", ${englishFontFamily}, ${chineseFontFamily}, sans-serif`;
 }
 
-export function ensureDynamicFontFaces(
-  settings: Pick<AppSettings, 'englishFontFamily' | 'chineseFontFamily'>
-): Promise<void> {
-  if (typeof document === 'undefined') return Promise.resolve();
+export function usesBundledChineseFont(settings: Pick<AppSettings, 'chineseFontFamily'>): boolean {
+  return fontFamilyMentionsBundledChineseFont(getResolvedChineseFontFamily(settings));
+}
 
+export function getBundledChineseFontAssetUrl(): string {
+  return bundledChineseFontUrl;
+}
+
+export function buildDynamicFontFaceCss(
+  settings: FontSettings,
+  options: {
+    bundledChineseFontSrc?: string;
+  } = {}
+): string {
   const englishFontFamily = getResolvedEnglishFontFamily(settings);
   const chineseFontFamily = getResolvedChineseFontFamily(settings);
+  const bundledChineseFontSrc = options.bundledChineseFontSrc || bundledChineseFontUrl;
   const shouldUseBundledChineseFont = fontFamilyMentionsBundledChineseFont(chineseFontFamily);
   const chineseFontSource = shouldUseBundledChineseFont
-    ? buildBundledChineseFontSource(chineseFontFamily)
+    ? buildBundledChineseFontSource(chineseFontFamily, bundledChineseFontSrc)
     : buildLocalFontSource(chineseFontFamily);
-  const css = `
-${buildBundledChineseFontFaces()}
+
+  return `
+${buildBundledChineseFontFaces(bundledChineseFontSrc)}
 
 @font-face {
   font-family: "${LATIN_FONT_ALIAS}";
@@ -157,6 +169,14 @@ ${buildBundledChineseFontFaces()}
   font-display: swap;
 }
 `.trim();
+}
+
+export function ensureDynamicFontFaces(
+  settings: FontSettings
+): Promise<void> {
+  if (typeof document === 'undefined') return Promise.resolve();
+
+  const css = buildDynamicFontFaceCss(settings);
 
   let styleElement = document.getElementById(DYNAMIC_FONT_STYLE_ID) as HTMLStyleElement | null;
   const cssChanged = !styleElement || styleElement.textContent !== css;

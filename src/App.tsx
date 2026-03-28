@@ -351,7 +351,7 @@ const App: React.FC = () => {
     !rootFolderPath &&
     files.length === 0 &&
     !hasKnowledgeBaseHistory;
-  const shouldShowStartupLoading = !settingsHydrated || isRestoringKnowledgeBase;
+  const shouldShowStartupLoading = isRestoringKnowledgeBase;
   const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
   const responsiveOutlineWidth = Math.min(
     outlineWidth,
@@ -386,13 +386,9 @@ const App: React.FC = () => {
               M
             </div>
             <div>
-              <h1 className="text-xl font-semibold">
-                {isRestoringKnowledgeBase ? 'Restoring Workspace' : 'Loading M記'}
-              </h1>
+              <h1 className="text-xl font-semibold">Restoring Workspace</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isRestoringKnowledgeBase
-                  ? 'Opening your last knowledge base and restoring the workspace.'
-                  : 'Preparing your workspace settings.'}
+                Opening your last knowledge base and restoring the workspace.
               </p>
             </div>
           </div>
@@ -401,9 +397,7 @@ const App: React.FC = () => {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V1a11 11 0 00-7.78 18.78l2.12-2.12A8 8 0 014 12z" />
             </svg>
-            <span className="text-sm text-gray-600 dark:text-gray-300">
-              {isRestoringKnowledgeBase ? 'Opening knowledge base...' : 'Loading workspace...'}
-            </span>
+            <span className="text-sm text-gray-600 dark:text-gray-300">Opening knowledge base...</span>
           </div>
         </div>
       </div>

@@ -691,7 +691,7 @@ html[data-app-booting="true"] *::after {
 .editor-pane-backdrop {
   position: relative;
   padding: var(--pane-backdrop-py) var(--pane-backdrop-px);
-  transition: padding 220ms ease;
+  transition: padding 110ms ease-out;
 }
 
 .editor-pane-frame {
@@ -699,7 +699,6 @@ html[data-app-booting="true"] *::after {
   width: min(100%, var(--pane-frame-max-width));
   max-width: 100%;
   margin-inline: auto;
-  transition: width 220ms ease;
 }
 
 .editor-pane-sheet {
@@ -715,7 +714,6 @@ html[data-app-booting="true"] *::after {
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  transition: width 220ms ease;
 }
 
 .dark .editor-pane-sheet {
@@ -732,7 +730,7 @@ html[data-app-booting="true"] *::after {
   padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
   letter-spacing: 0.01em;
   tab-size: 2;
-  transition: padding 220ms ease;
+  transition: padding 110ms ease-out;
 }
 
 .editor-pane::selection {
@@ -1016,7 +1014,7 @@ html[data-app-booting="true"] *::after {
   line-height: 1.95;
   overflow-wrap: anywhere;
   word-break: break-word;
-  transition: padding 220ms ease;
+  transition: padding 110ms ease-out;
 }
 
 .preview-pane-document-compact.markdown-body {

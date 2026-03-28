@@ -5,8 +5,8 @@ import { clearActiveEditorView, registerActiveEditorView } from '../../utils/edi
 import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateCommand } from '@codemirror/state';
 import { autocompletion, completionKeymap, startCompletion, type Completion, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
+import { defaultKeymap, history, historyKeymap, indentLess } from '@codemirror/commands';
+import { deleteMarkupBackward, insertNewlineContinueMarkup, markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, indentUnit, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
@@ -249,149 +249,121 @@ const fencedCodeDecorations = ViewPlugin.fromClass(class {
 // ==================== Markdown Editor Behavior ====================
 // Standard Markdown editing behavior specification
 
-// List item regex patterns
-const UNORDERED_LIST_REGEX = /^(\s*)([-*+])\s+(.*)$/;
-const ORDERED_LIST_REGEX = /^(\s*)(\d+)\.\s+(.*)$/;
-const EMPTY_LIST_ITEM_REGEX = /^(\s*)([-*+]|\d+\.)\s*$/;
+const LIST_INDENT_UNIT = '  ';
+const UNORDERED_LIST_REGEX = /^([ \t]*)([-+*])( {1,4}\[[ xX]\])?( +)(.*)$/;
+const ORDERED_LIST_REGEX = /^([ \t]*)(\d+)([.)])( +)(.*)$/;
 
-interface ListItemInfo {
-  indent: string;
-  marker: string;
-  content: string;
-  isOrdered: boolean;
-  number?: number;
+function isMarkdownListLine(lineText: string): boolean {
+  return UNORDERED_LIST_REGEX.test(lineText) || ORDERED_LIST_REGEX.test(lineText);
 }
 
-function parseListItem(lineText: string): ListItemInfo | null {
-  const unorderedMatch = lineText.match(UNORDERED_LIST_REGEX);
-  if (unorderedMatch) {
-    return {
-      indent: unorderedMatch[1],
-      marker: unorderedMatch[2],
-      content: unorderedMatch[3],
-      isOrdered: false,
-    };
-  }
-  
-  const orderedMatch = lineText.match(ORDERED_LIST_REGEX);
-  if (orderedMatch) {
-    return {
-      indent: orderedMatch[1],
-      marker: orderedMatch[2] + '.',
-      content: orderedMatch[3],
-      isOrdered: true,
-      number: parseInt(orderedMatch[2], 10),
-    };
-  }
-  
-  return null;
-}
+function getSelectedLineNumbers(state: EditorState): number[] {
+  const lineNumbers = new Set<number>();
 
-function isEmptyListItem(lineText: string): boolean {
-  return EMPTY_LIST_ITEM_REGEX.test(lineText);
-}
+  for (const range of state.selection.ranges) {
+    const startLine = state.doc.lineAt(range.from).number;
+    const endPosition = range.empty ? range.to : Math.max(range.from, range.to - 1);
+    const endLine = state.doc.lineAt(endPosition).number;
 
-// Smart Enter key handler for Markdown lists
-const handleMarkdownEnter: StateCommand = ({ state, dispatch }) => {
-  const range = state.selection.main;
-  const line = state.doc.lineAt(range.from);
-  const lineText = line.text;
-  
-  // Check if current line is a list item
-  const listItem = parseListItem(lineText);
-  
-  if (!listItem) {
-    // Not in a list, use default newline behavior
-    return false;
-  }
-  
-  // Check if this is an empty list item
-  if (isEmptyListItem(lineText)) {
-    // Exit the list: remove the list marker and clear the line
-    const match = lineText.match(EMPTY_LIST_ITEM_REGEX);
-    if (match) {
-      const [, indent] = match;
-      const changes = {
-        changes: { from: line.from, to: line.to, insert: indent.trimEnd() },
-        range: EditorSelection.cursor(line.from + indent.trimEnd().length),
-      };
-      dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-      return true;
+    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+      lineNumbers.add(lineNumber);
     }
   }
-  
-  // Continue the list with proper marker
-  const newMarker = listItem.isOrdered 
-    ? `${(listItem.number || 1) + 1}. `
-    : `${listItem.marker} `;
-  
-  const insertText = `\n${listItem.indent}${newMarker}`;
-  
-  const changes = {
-    changes: { from: range.from, to: range.to, insert: insertText },
-    range: EditorSelection.cursor(range.from + insertText.length),
-  };
-  
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
 
-// Smart Tab handler: increase list indent or insert spaces
+  return Array.from(lineNumbers).sort((a, b) => a - b);
+}
+
+function updateSelectedLines(
+  state: EditorState,
+  dispatch: (transaction: any) => void,
+  transformLine: (lineText: string) => string,
+): boolean {
+  const changes = getSelectedLineNumbers(state)
+    .map((lineNumber) => {
+      const line = state.doc.line(lineNumber);
+      const nextText = transformLine(line.text);
+
+      if (nextText === line.text) {
+        return null;
+      }
+
+      return { from: line.from, to: line.to, insert: nextText };
+    })
+    .filter((change): change is { from: number; to: number; insert: string } => change !== null);
+
+  if (!changes.length) {
+    return false;
+  }
+
+  const changeSet = state.changes(changes);
+  dispatch(state.update({
+    changes,
+    selection: state.selection.map(changeSet),
+    scrollIntoView: true,
+    userEvent: 'input',
+  }));
+  return true;
+}
+
+function dedentLine(lineText: string): string {
+  if (lineText.startsWith(LIST_INDENT_UNIT)) {
+    return lineText.slice(LIST_INDENT_UNIT.length);
+  }
+
+  if (lineText.startsWith('\t')) {
+    return lineText.slice(1);
+  }
+
+  const leadingSpaces = lineText.match(/^ +/)?.[0].length ?? 0;
+  if (leadingSpaces > 0) {
+    return lineText.slice(Math.min(LIST_INDENT_UNIT.length, leadingSpaces));
+  }
+
+  return lineText;
+}
+
+const handleMarkdownEnter: StateCommand = ({ state, dispatch }) => (
+  insertNewlineContinueMarkup({ state, dispatch })
+);
+
+const handleMarkdownBackspace: StateCommand = ({ state, dispatch }) => (
+  deleteMarkupBackward({ state, dispatch })
+);
+
+// Smart Tab handler: indent selected lines or nest the current list item.
 const indentSelectionOrInsertSpaces: StateCommand = ({ state, dispatch }) => {
   const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
-  
+
   if (hasExpandedSelection) {
-    return indentMore({ state, dispatch });
+    return updateSelectedLines(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
   }
-  
+
   const line = state.doc.lineAt(state.selection.main.from);
-  const lineText = line.text;
-  const cursorPos = state.selection.main.from - line.from;
-  
-  // Check if we're in a list item
-  const listItem = parseListItem(lineText);
-  if (listItem && cursorPos <= lineText.indexOf(listItem.marker) + listItem.marker.length + 1) {
-    // In list context before/at content: add indent to the whole line
-    const newLine = '  ' + lineText;
-    const changes = {
-      changes: { from: line.from, to: line.to, insert: newLine },
-      range: EditorSelection.cursor(state.selection.main.from + 2),
-    };
-    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-    return true;
+  if (isMarkdownListLine(line.text)) {
+    return updateSelectedLines(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
   }
-  
-  // Default: insert 2 spaces at cursor
+
   const changes = state.changeByRange((range) => ({
-    changes: { from: range.from, to: range.to, insert: '  ' },
-    range: EditorSelection.cursor(range.from + 2),
+    changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
+    range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
   }));
   dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
   return true;
 };
 
-// Smart Shift-Tab handler: decrease list indent
+// Smart Shift-Tab handler: outdent selected lines or the current list item.
 const dedentListOrSelection: StateCommand = ({ state, dispatch }) => {
-  const line = state.doc.lineAt(state.selection.main.from);
-  const lineText = line.text;
-  
-  // Check if line starts with indentation
-  const leadingSpaces = lineText.match(/^(\s*)/)?.[1] || '';
-  
-  // Check if we're in a list item
-  const listItem = parseListItem(lineText);
-  if (listItem && leadingSpaces.length >= 2) {
-    // Remove 2 spaces of indent
-    const newLine = lineText.slice(2);
-    const changes = {
-      changes: { from: line.from, to: line.to, insert: newLine },
-      range: EditorSelection.cursor(Math.max(line.from, state.selection.main.from - 2)),
-    };
-    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-    return true;
+  const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
+
+  if (hasExpandedSelection) {
+    return updateSelectedLines(state, dispatch, dedentLine) || indentLess({ state, dispatch });
   }
-  
-  // Not a list or no indent to remove, use default indentLess
+
+  const line = state.doc.lineAt(state.selection.main.from);
+  if (isMarkdownListLine(line.text) || /^[ \t]+/.test(line.text)) {
+    return updateSelectedLines(state, dispatch, dedentLine) || indentLess({ state, dispatch });
+  }
+
   return indentLess({ state, dispatch });
 };
 
@@ -603,6 +575,10 @@ function isMacPlatform(): boolean {
 
 function isPreviewModifierPressed(event: Pick<KeyboardEvent | MouseEvent, 'metaKey' | 'ctrlKey'>): boolean {
   return isMacPlatform() ? event.metaKey : event.ctrlKey;
+}
+
+function isPreviewModifierKey(key: string): boolean {
+  return key === 'Meta' || key === 'Control';
 }
 
 function buildWikiPreviewMarkup(preview: WikiLinkPreviewData): HTMLElement {
@@ -1084,24 +1060,42 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       }
     };
 
-    const updateModifierFromKeyboard = (event: KeyboardEvent) => {
-      syncModifierState(isPreviewModifierPressed(event));
-    };
+    const updatePointer = (clientX: number, clientY: number) => {
+      lastPointerRef.current = { clientX, clientY };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Meta' || event.key === 'Control') {
-        updateModifierFromKeyboard(event);
+      const view = editorViewRef.current;
+      if (!view || !previewModifierPressedRef.current) {
         return;
       }
 
-      if (previewModifierPressedRef.current) {
-        updateModifierFromKeyboard(event);
+      const element = document.elementFromPoint(clientX, clientY);
+      if (!element || !view.dom.contains(element)) {
+        hideHoverPreview();
+        return;
+      }
+
+      void updateHoverPreviewAtPointer(clientX, clientY);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isPreviewModifierKey(event.key)) {
+        syncModifierState(true);
+        return;
+      }
+
+      if (keyboardModifierPressedRef.current || isPreviewModifierPressed(event)) {
+        syncModifierState(true);
       }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Meta' || event.key === 'Control' || previewModifierPressedRef.current) {
-        updateModifierFromKeyboard(event);
+      if (isPreviewModifierKey(event.key)) {
+        syncModifierState(false);
+        return;
+      }
+
+      if (!event.metaKey && !event.ctrlKey && previewModifierPressedRef.current) {
+        syncModifierState(false);
       }
     };
 
@@ -1114,15 +1108,27 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       syncModifierState(false);
     };
 
+    const handleMouseMove = (event: MouseEvent) => {
+      previewModifierPressedRef.current = keyboardModifierPressedRef.current || isPreviewModifierPressed(event);
+
+      if (!previewModifierPressedRef.current) {
+        return;
+      }
+
+      updatePointer(event.clientX, event.clientY);
+    };
+
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp, true);
     window.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
     window.addEventListener('blur', handleBlur);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
       window.removeEventListener('blur', handleBlur);
     };
   }, [hideHoverPreview, updateHoverPreviewAtPointer]);
@@ -1198,6 +1204,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             ...completionKeymap,
             // Markdown-specific Enter handling (before default)
             { key: 'Enter', run: handleMarkdownEnter },
+            { key: 'Backspace', run: handleMarkdownBackspace },
             { key: 'Shift-Tab', run: dedentListOrSelection },
             { key: 'Tab', run: indentSelectionOrInsertSpaces },
             // Default keymaps
@@ -1215,7 +1222,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             { key: 'Mod-Shift-h', run: insertHeading },
           ]),
           wikiLinkAutocompleteExtension,
-          indentUnit.of('  '),
+          indentUnit.of(LIST_INDENT_UNIT),
           markdown({ codeLanguages: resolveEditorCodeLanguage }),
           drawSelection(),
           frontmatterDecorations,

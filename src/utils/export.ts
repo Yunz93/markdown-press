@@ -6,12 +6,20 @@ import { parseWikiLinkReference } from './wikiLinks';
 import katexCss from 'katex/dist/katex.min.css?inline';
 import githubMarkdownCss from 'github-markdown-css/github-markdown.css?inline';
 import { isTauriEnvironment } from '../types/filesystem';
+import {
+  buildDynamicFontFaceCss,
+  getBundledChineseFontAssetUrl,
+  getCompositeFontFamily,
+  type FontSettings,
+  usesBundledChineseFont,
+} from './fontSettings';
 
 export interface ExportOptions {
   title?: string;
   theme?: 'light' | 'dark';
   includeTOC?: boolean;
   fontFamily?: string;
+  fontSettings?: FontSettings;
   fontSize?: number;
   includeProperties?: boolean;
   highlighter?: any | null;
@@ -26,6 +34,8 @@ interface SaveExportOptions {
 }
 
 const PREVIEW_PANEL_WIDTH_PX = 768;
+const inlinedAssetDataUrlCache = new Map<string, Promise<string>>();
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -58,11 +68,17 @@ function renderProperties(frontmatter: Record<string, unknown> | null): string {
   `;
 }
 
-function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSize?: number): string {
+function buildExportStyles(
+  theme: 'light' | 'dark',
+  fontFamily?: string,
+  fontSize?: number,
+  fontFaceCss = ''
+): string {
   const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
   const resolvedFontSize = fontSize ?? 16;
 
   return `
+    ${fontFaceCss}
     ${githubMarkdownCss}
     ${katexCss}
 
@@ -351,6 +367,49 @@ function buildExportStyles(theme: 'light' | 'dark', fontFamily?: string, fontSiz
   `;
 }
 
+function resolveAssetUrl(assetUrl: string): string {
+  if (typeof window === 'undefined') {
+    return assetUrl;
+  }
+
+  return new URL(assetUrl, window.location.href).href;
+}
+
+async function inlineAssetAsDataUrl(assetUrl: string): Promise<string> {
+  const resolvedUrl = resolveAssetUrl(assetUrl);
+  const cached = inlinedAssetDataUrlCache.get(resolvedUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = fetch(resolvedUrl)
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch asset: ${response.status} ${response.statusText}`);
+      }
+
+      return blobToDataUrl(await response.blob());
+    });
+
+  inlinedAssetDataUrlCache.set(resolvedUrl, promise);
+  return promise;
+}
+
+async function buildExportFontFaceCss(fontSettings?: FontSettings): Promise<string> {
+  if (!fontSettings) {
+    return '';
+  }
+
+  const bundledChineseFontSrc = usesBundledChineseFont(fontSettings)
+    ? await inlineAssetAsDataUrl(getBundledChineseFontAssetUrl())
+    : undefined;
+
+  return buildDynamicFontFaceCss(
+    fontSettings,
+    bundledChineseFontSrc ? { bundledChineseFontSrc } : undefined
+  );
+}
+
 function buildExportDocument(contentHtml: string, toc: string): string {
   return `
     <div class="export-stage">
@@ -365,15 +424,16 @@ function buildExportDocument(contentHtml: string, toc: string): string {
 /**
  * Export markdown content to HTML
  */
-export function exportToHtml(
+export async function exportToHtml(
   content: string,
   options: ExportOptions = {}
-): string {
+): Promise<string> {
   const {
     title = 'Exported Document',
     theme = 'light',
     includeTOC = false,
     fontFamily,
+    fontSettings,
     fontSize,
     includeProperties = true,
     highlighter,
@@ -384,7 +444,9 @@ export function exportToHtml(
 
   // Generate table of contents if requested
   const toc = includeTOC ? generateTOC(body) : '';
-  const styles = buildExportStyles(theme, fontFamily, fontSize);
+  const resolvedFontFamily = fontFamily || (fontSettings ? getCompositeFontFamily(fontSettings) : undefined);
+  const fontFaceCss = await buildExportFontFaceCss(fontSettings);
+  const styles = buildExportStyles(theme, resolvedFontFamily, fontSize, fontFaceCss);
   const propertiesHtml = includeProperties ? renderProperties(frontmatter) : '';
   const documentMarkup = buildExportDocument(`${propertiesHtml}<article class="markdown-body">${htmlContent}</article>`, toc);
 
