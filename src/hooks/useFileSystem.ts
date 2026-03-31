@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { getFileSystem } from '../types/filesystem';
 import { useAppStore } from '../store/appStore';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
+import { ViewMode } from '../types';
 import type { FileNode } from '../types';
 
 const PRIMARY_TRASH_DIR_NAME = '.trash';
@@ -28,6 +29,56 @@ function joinPath(basePath: string, segment: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function isMarkdownFile(name: string): boolean {
+  return /\.(md|markdown)$/i.test(name);
+}
+
+function isPreviewOnlyFile(name: string): boolean {
+  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp|pdf|html?)$/i.test(name);
+}
+
+function isOpenableFile(node: FileNode): boolean {
+  return node.type === 'file' && (isMarkdownFile(node.name) || isPreviewOnlyFile(node.name));
+}
+
+function findFirstMatchingFile(
+  nodes: FileNode[],
+  predicate: (node: FileNode) => boolean
+): FileNode | null {
+  for (const node of nodes) {
+    if (predicate(node)) {
+      return node;
+    }
+    if (node.children) {
+      const found = findFirstMatchingFile(node.children, predicate);
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findFirstOpenableFile(nodes: FileNode[]): FileNode | null {
+  return (
+    findFirstMatchingFile(nodes, (node) => node.type === 'file' && isMarkdownFile(node.name)) ??
+    findFirstMatchingFile(nodes, isOpenableFile)
+  );
+}
+
+function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.children) {
+      const found = findFileInTree(node.children, id);
+      if (found) return found;
+    }
+  }
+
+  return undefined;
 }
 
 function joinPathSegments(basePath: string, ...segments: string[]): string {
@@ -143,6 +194,7 @@ export function useFileSystem() {
     clearAllCache,
     showNotification,
     addTab,
+    setViewMode,
   } = useAppStore();
 
   const updateKnowledgeBaseMetadata = useCallback((path: string) => {
@@ -233,10 +285,32 @@ export function useFileSystem() {
           () => fs.readDirectory(dirPath),
           'Failed to read knowledge base'
         );
+        const lastOpenedFilePath = useAppStore.getState().settings.lastOpenedFilePath;
+        const preferredInitialFile = lastOpenedFilePath ? findFileInTree(fileNodes, lastOpenedFilePath) : undefined;
         clearAllCache();
         setCurrentFilePath(null);
         setFiles(fileNodes);
         setRootFolderPath(dirPath);
+
+        const initialFile = preferredInitialFile ?? findFirstOpenableFile(fileNodes);
+        if (initialFile) {
+          try {
+            const initialContent = await withErrorHandling(
+              () => fs.readFile(initialFile.path),
+              `Failed to read file: ${initialFile.name}`
+            );
+
+            addTab(initialFile.id, initialContent);
+            setCurrentFilePath(initialFile.path);
+
+            if (isPreviewOnlyFile(initialFile.name) && !isMarkdownFile(initialFile.name)) {
+              setViewMode(ViewMode.PREVIEW);
+            }
+          } catch (error) {
+            handleFileSystemError(error, 'Failed to open initial file');
+          }
+        }
+
         updateKnowledgeBaseMetadata(dirPath);
         if (!options?.silentSuccess) {
           showNotification('Knowledge base opened successfully', 'success');
@@ -247,7 +321,7 @@ export function useFileSystem() {
       handleFileSystemError(error, 'Failed to open knowledge base');
       return null;
     }
-  }, [clearAllCache, setCurrentFilePath, setFiles, setRootFolderPath, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata]);
+  }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata]);
 
   /**
    * Backward-compatible alias used by existing UI call sites.

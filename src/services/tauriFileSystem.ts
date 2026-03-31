@@ -369,6 +369,7 @@ export class TauriFileSystem implements IFileSystem {
         const isTrashDirectory = entry.isDirectory && isAtRoot && TRASH_DIRECTORY_NAMES.has(entry.name);
         const nodeInTrash = inTrash || isTrashDirectory;
         if (!this.showHiddenFiles && entry.name.startsWith('.') && !isTrashDirectory && !inTrash) continue;
+        if (isTrashDirectory && !inTrash) continue;
 
         const fullPath = await join(dirPath, entry.name);
         const ext = entry.name.toLowerCase();

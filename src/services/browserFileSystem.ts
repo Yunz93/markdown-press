@@ -335,6 +335,10 @@ export class BrowserFileSystem implements IFileSystem {
         const isTrashDirectory = entry.kind === 'directory' && isAtRoot && BrowserFileSystem.TRASH_DIRECTORY_NAMES.has(name);
         const nodeInTrash = inTrash || isTrashDirectory;
 
+        if (isTrashDirectory && !inTrash) {
+          continue;
+        }
+
         if (
           entry.kind === 'file'
           && (

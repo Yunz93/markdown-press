@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { bundledLanguages, createHighlighter } from 'shiki/bundle/web';
 import { extractMarkdownFenceLanguages, SHIKI_CORE_LANGS } from '../utils/shikiLanguages';
 import { MARKDOWN_PRESS_SHIKI_THEMES } from '../utils/shikiTheme';
 
@@ -7,21 +6,41 @@ interface ShikiHighlighter {
   codeToHtml: (code: string, options: { lang: string; theme: string }) => string;
   getLoadedLanguages?: () => string[];
   loadLanguage?: (...langs: any[]) => Promise<void>;
+  supportsLanguage?: (lang: string) => boolean;
 }
 
-const bundledLanguageIds = new Set(Object.keys(bundledLanguages ?? {}));
 let cachedHighlighter: ShikiHighlighter | null = null;
 let cachedHighlighterPromise: Promise<ShikiHighlighter | null> | null = null;
 
-function getSupportedLanguages(): string[] {
-  const supportedLangs = SHIKI_CORE_LANGS.filter((lang) => bundledLanguageIds.has(lang));
+async function createShikiHighlighter(): Promise<ShikiHighlighter | null> {
+  try {
+    // Dynamic import to handle potential failures gracefully
+    const shiki = await import('shiki/bundle/web');
+    const { bundledLanguages, createHighlighter } = shiki;
+    
+    const bundledLanguageIds = new Set(Object.keys(bundledLanguages ?? {}));
+    const supportedLangs = SHIKI_CORE_LANGS.filter((lang) => bundledLanguageIds.has(lang));
 
-  if (supportedLangs.length !== SHIKI_CORE_LANGS.length) {
-    const unsupportedLangs = SHIKI_CORE_LANGS.filter((lang) => !bundledLanguageIds.has(lang));
-    console.warn('Skipping unsupported Shiki bundle languages:', unsupportedLangs);
+    if (supportedLangs.length !== SHIKI_CORE_LANGS.length) {
+      const unsupportedLangs = SHIKI_CORE_LANGS.filter((lang) => !bundledLanguageIds.has(lang));
+      console.warn('Skipping unsupported Shiki bundle languages:', unsupportedLangs);
+    }
+
+    const highlighter = await createHighlighter({
+      themes: MARKDOWN_PRESS_SHIKI_THEMES,
+      langs: supportedLangs,
+    });
+    
+    return {
+      codeToHtml: highlighter.codeToHtml.bind(highlighter),
+      getLoadedLanguages: highlighter.getLoadedLanguages?.bind(highlighter),
+      loadLanguage: highlighter.loadLanguage?.bind(highlighter),
+      supportsLanguage: (lang: string) => bundledLanguageIds.has(lang),
+    };
+  } catch (error) {
+    console.error('Failed to initialize Shiki highlighter:', error);
+    return null;
   }
-
-  return supportedLangs;
 }
 
 function ensureHighlighter(): Promise<ShikiHighlighter | null> {
@@ -30,10 +49,7 @@ function ensureHighlighter(): Promise<ShikiHighlighter | null> {
   }
 
   if (!cachedHighlighterPromise) {
-    cachedHighlighterPromise = createHighlighter({
-      themes: MARKDOWN_PRESS_SHIKI_THEMES,
-      langs: getSupportedLanguages(),
-    })
+    cachedHighlighterPromise = createShikiHighlighter()
       .then((highlighter) => {
         cachedHighlighter = highlighter;
         return highlighter;
@@ -71,10 +87,16 @@ export function useShikiHighlighter(markdownContent = '') {
   useEffect(() => {
     if (!highlighterInstance?.loadLanguage || !markdownContent) return;
 
+    const supportsLanguage = highlighterInstance.supportsLanguage ?? (() => true);
     const loadedLanguages = new Set(highlighterInstance.getLoadedLanguages?.() ?? []);
     const missingLanguages = extractMarkdownFenceLanguages(markdownContent)
-      .filter((lang) => bundledLanguageIds.has(lang))
-      .filter((lang) => !loadedLanguages.has(lang));
+      .filter((lang) => !loadedLanguages.has(lang) && supportsLanguage(lang));
+    const unsupportedLanguages = extractMarkdownFenceLanguages(markdownContent)
+      .filter((lang) => !supportsLanguage(lang));
+
+    if (unsupportedLanguages.length > 0) {
+      console.warn('Skipping Shiki languages not available in this bundle:', unsupportedLanguages);
+    }
 
     if (missingLanguages.length === 0) return;
 

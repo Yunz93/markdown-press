@@ -1,7 +1,7 @@
 import React from 'react';
 import type { FileNode } from '../../types';
 
-interface TrashViewProps {
+export interface TrashViewProps {
   trashItems: FileNode[];
   onRestore: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;

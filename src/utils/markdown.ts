@@ -145,6 +145,19 @@ export function getMarkdownIt(): MarkdownIt {
 let currentHighlighter: any | null = null;
 let currentTheme: ThemeMode = 'light';
 
+function canUseShikiLanguage(highlighter: any | null, lang: string): boolean {
+  if (!highlighter || !lang) return false;
+
+  const loadedLanguages = new Set<string>(highlighter.getLoadedLanguages?.() ?? []);
+  if (loadedLanguages.has(lang)) return true;
+
+  if (typeof highlighter.supportsLanguage === 'function') {
+    return Boolean(highlighter.supportsLanguage(lang));
+  }
+
+  return false;
+}
+
 function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMode: ThemeMode = 'light') {
   // Update current highlighter reference
   currentHighlighter = highlighter;
@@ -166,7 +179,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
     // Use the most recent highlighter reference
     const activeHighlighter = currentHighlighter || highlighter;
     
-    if (activeHighlighter && lang) {
+    if (activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
       try {
         const activeTheme = getMarkdownPressShikiTheme(currentTheme);
         const shikiHtml = activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme });
