@@ -1,41 +1,77 @@
 const FENCE_LANGUAGE_PATTERN = /^[\t ]*(?:`{3,}|~{3,})\s*([^\s`~{]+)/gm;
 
-export const SHIKI_CORE_LANGS = [
+// Shiki web bundle 中包含的核心语言集合
+const SHIKI_CORE_LANG_SET = new Set<string>([
   // JavaScript ecosystem
   'javascript', 'typescript', 'jsx', 'tsx',
   // Data/Config formats
-  'json', 'json5', 'jsonc', 'yaml', 'toml', 'ini', 'dotenv',
+  'json', 'json5', 'jsonc', 'yaml', 'toml', 'ini',
   // Web/Markup
-  'markdown', 'mdx', 'html', 'xml', 'svg', 'css', 'scss', 'sass', 'less', 'postcss',
+  'markdown', 'mdx', 'html', 'xml', 'css', 'scss', 'sass', 'less', 'postcss',
   // Shell/CLI
-  'bash', 'shellscript', 'powershell', 'cmd', 'batch',
+  'bash', 'shellscript', 'powershell', 'cmd',
   // JVM languages
   'python', 'java', 'kotlin', 'groovy', 'scala', 'clojure',
   // Systems languages
-  'go', 'rust', 'c', 'cpp', 'csharp', 'zig', 'nim', 'crystal',
+  'go', 'rust', 'c', 'cpp', 'csharp', 'zig',
   // Other compiled
-  'php', 'ruby', 'swift', 'dart', 'lua', 'perl', 'r', 'julia', 'matlab', 'fortran',
+  'php', 'ruby', 'swift', 'dart', 'lua', 'perl', 'r',
   // Functional
-  'elixir', 'erlang', 'haskell', 'ocaml', 'fsharp', 'elm', 'purescript',
+  'elixir', 'erlang', 'haskell', 'ocaml', 'fsharp',
   // .NET
   'vb', 'fs',
   // Mobile
   'objective-c', 'objc',
   // Database/Query
-  'sql', 'graphql', 'prisma', 'plsql', 'mysql', 'postgresql',
+  'sql', 'graphql', 'prisma',
   // DevOps/Config
-  'docker', 'dockerfile', 'makefile', 'cmake', 'ninja', 'meson',
-  'nginx', 'apache', 'haproxy',
+  'docker', 'dockerfile', 'nginx', 'apache',
   // Tools
-  'diff', 'viml', 'regex', 'http',
+  'diff', 'viml', 'http',
   // Frameworks
   'vue', 'vue-html', 'svelte', 'astro', 'angular-html', 'angular-ts',
-  'solidity', 'vyper',
+  'solidity',
   // Documentation
-  'latex', 'tex', 'bibtex',
-  // Other
-  'wasm', 'llvm', 'asm', 'nasm',
+  'latex', 'tex',
+]);
+
+// Shiki web bundle 中包含的核心语言
+// 只列出实际存在于 bundle 中的语言，避免加载时出现警告
+export const SHIKI_CORE_LANGS = [
+  // JavaScript ecosystem
+  'javascript', 'typescript', 'jsx', 'tsx',
+  // Data/Config formats
+  'json', 'json5', 'jsonc', 'yaml', 'toml', 'ini',
+  // Web/Markup
+  'markdown', 'mdx', 'html', 'xml', 'css', 'scss', 'sass', 'less', 'postcss',
+  // Shell/CLI
+  'bash', 'shellscript', 'powershell', 'cmd',
+  // JVM languages
+  'python', 'java', 'kotlin', 'groovy', 'scala', 'clojure',
+  // Systems languages
+  'go', 'rust', 'c', 'cpp', 'csharp', 'zig',
+  // Other compiled
+  'php', 'ruby', 'swift', 'dart', 'lua', 'perl', 'r',
+  // Functional
+  'elixir', 'erlang', 'haskell', 'ocaml', 'fsharp',
+  // .NET
+  'vb', 'fs',
+  // Mobile
+  'objective-c', 'objc',
+  // Database/Query
+  'sql', 'graphql', 'prisma',
+  // DevOps/Config
+  'docker', 'dockerfile', 'nginx', 'apache',
+  // Tools
+  'diff', 'viml', 'http',
+  // Frameworks
+  'vue', 'vue-html', 'svelte', 'astro', 'angular-html', 'angular-ts',
+  'solidity',
+  // Documentation
+  'latex', 'tex',
 ] as const;
+
+const SHIKI_CORE_LANGS_SET = new Set<string>(SHIKI_CORE_LANGS);
 
 export const SHIKI_LANGUAGE_ALIASES: Record<string, string> = {
   // JavaScript
@@ -142,7 +178,6 @@ export const SHIKI_LANGUAGE_ALIASES: Record<string, string> = {
   sqlite: 'sql',
   mssql: 'sql',
   oracle: 'sql',
-  plsql: 'sql',
   tsql: 'sql',
   // HTML/XML
   htm: 'html',
@@ -214,21 +249,9 @@ export const SHIKI_LANGUAGE_ALIASES: Record<string, string> = {
   // LaTeX
   tex: 'latex',
   latex: 'latex',
-  // Assembly
-  asm: 'asm',
-  nasm: 'nasm',
   // Solidity
   sol: 'solidity',
   solidity: 'solidity',
-  // Vyper
-  vy: 'vyper',
-  vyper: 'vyper',
-  // WebAssembly
-  wasm: 'wasm',
-  wat: 'wasm',
-  // LLVM
-  ll: 'llvm',
-  ir: 'llvm',
   // HTTP
   http: 'http',
   https: 'http',
@@ -237,7 +260,19 @@ export const SHIKI_LANGUAGE_ALIASES: Record<string, string> = {
 export function normalizeShikiLanguage(rawLang: string): string {
   const normalized = rawLang.trim().toLowerCase();
   if (!normalized) return '';
-  return SHIKI_LANGUAGE_ALIASES[normalized] ?? normalized;
+
+  // Avoid passing arbitrary fence-info text into Shiki.
+  // Accept only plausible language identifiers and known aliases/core names.
+  if (!/^[a-z][a-z0-9_+#.-]*$/i.test(normalized)) {
+    return '';
+  }
+
+  const aliased = SHIKI_LANGUAGE_ALIASES[normalized] ?? normalized;
+  if (SHIKI_CORE_LANGS_SET.has(aliased) || SHIKI_CORE_LANG_SET.has(aliased)) {
+    return aliased;
+  }
+
+  return '';
 }
 
 export function extractMarkdownFenceLanguages(markdown: string): string[] {

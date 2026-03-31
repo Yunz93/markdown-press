@@ -1,17 +1,36 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { useAppStore } from '../../store/appStore';
-import { parseFrontmatter } from '../../utils/frontmatter';
+
 import { focusEditorRangeByOffset } from '../../utils/editorSelectionBridge';
+
 import type { FileNode } from '../../types';
 
-const MIN_SIDEBAR_WIDTH = 240;
-const MAX_SIDEBAR_WIDTH = 420;
+import {
+  useSidebarResize,
+  useSidebarSearch,
+  useSidebarDialogs,
+  useSidebarDragAndDrop,
+  useSidebarContextMenu,
+  MIN_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+} from './hooks';
 
-interface SidebarProps {
+import {
+  PromptDialog,
+  ConfirmDialog,
+  ContextMenu,
+} from './components';
+
+import {
+  getTrashItems,
+  filterNodesByFileName,
+  highlightSearchText,
+} from './utils';
+
+export interface SidebarProps {
   files: FileNode[];
   activeFileId: string | null;
   onFileSelect: (file: FileNode) => void | Promise<void>;
@@ -28,7 +47,7 @@ interface SidebarProps {
   onMoveNode: (sourceId: string, targetId: string) => void;
   onMoveToRoot: (sourceId: string) => void;
   currentKnowledgeBaseName?: string;
-  currentKnowledgeBasePath?: string | null;
+  currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
   isOpen: boolean;
   searchFocusRequestKey?: number;
@@ -36,488 +55,6 @@ interface SidebarProps {
   onWidthChange: (width: number) => void;
   onClose: () => void;
 }
-
-interface ContextMenuState {
-  x: number;
-  y: number;
-  node: FileNode;
-}
-
-interface DialogState {
-  type: 'rename' | 'delete' | 'newFolder' | 'newFile' | 'emptyTrash' | null;
-  file?: FileNode;
-  defaultValue?: string;
-}
-
-interface SidebarSearchSnippet {
-  text: string;
-  start: number;
-  end: number;
-  line: number;
-}
-
-interface SidebarSearchResult {
-  file: FileNode;
-  filenameMatched: boolean;
-  snippets: SidebarSearchSnippet[];
-}
-
-const TRASH_ROOT_NAMES = new Set(['.trash', '_markdown_press_trash']);
-
-// Custom Context Menu component with Portal
-const ContextMenu: React.FC<{
-  x: number;
-  y: number;
-  node: FileNode;
-  onClose: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-  onReveal: () => void;
-  onOpenInBrowser?: () => void;
-  onCreateFile: () => void;
-  onCreateFolder: () => void;
-  onMoveToTrash: () => void;
-  onRestoreFromTrash: () => void;
-  onDeleteForever: () => void;
-}> = ({ x, y, node, onClose, onRename, onDelete, onReveal, onOpenInBrowser, onCreateFile, onCreateFolder, onMoveToTrash, onRestoreFromTrash, onDeleteForever }) => {
-  const menuRef = React.useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ x, y });
-
-  // Adjust position if menu would overflow viewport
-  useEffect(() => {
-    if (menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect();
-      const newX = x + rect.width > window.innerWidth ? window.innerWidth - rect.width - 10 : x;
-      const newY = y + rect.height > window.innerHeight ? window.innerHeight - rect.height - 10 : y;
-      setPosition({ x: Math.max(10, newX), y: Math.max(10, newY) });
-    }
-  }, [x, y]);
-
-  // Close on click outside
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [onClose]);
-
-  const menu = (
-    <div
-      ref={menuRef}
-      className="fixed bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 shadow-2xl rounded-xl z-[100] p-1 min-w-[180px] animate-scale-in origin-top-left flex flex-col gap-0.5"
-      style={{ top: position.y, left: position.x }}
-    >
-      <div className="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wider font-bold border-b border-gray-100 dark:border-white/5 mb-1 mx-1">
-        {node.isTrash
-          ? 'Trash Actions'
-          : node.type === 'folder'
-            ? 'Folder Actions'
-            : 'File Actions'}
-      </div>
-
-      {/* Trash item actions */}
-      {node.isTrash && (
-        <>
-          <button
-            onClick={() => { onRestoreFromTrash(); onClose(); }}
-            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-700 dark:hover:text-green-300 rounded-lg flex items-center gap-2.5 transition-colors group"
-          >
-            <svg className="w-4 h-4 text-gray-400 group-hover:text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
-            Restore
-          </button>
-          <button
-            onClick={() => { onDeleteForever(); onClose(); }}
-            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg flex items-center gap-2.5 transition-colors group"
-          >
-            <svg className="w-4 h-4 text-red-400 group-hover:text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            Delete Permanently
-          </button>
-        </>
-      )}
-
-      {/* Normal file/folder actions */}
-      {!node.isTrash && (
-        <>
-          {node.type === 'folder' && (
-            <>
-              <button
-                onClick={() => { onCreateFile(); onClose(); }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group"
-              >
-                <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" />
-                </svg>
-                New File
-              </button>
-              <button
-                onClick={() => { onCreateFolder(); onClose(); }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group"
-              >
-                <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
-                </svg>
-                New Folder
-              </button>
-              <div className="h-px bg-gray-100 dark:bg-white/5 my-1 mx-2" />
-            </>
-          )}
-
-          <button
-            onClick={() => { onRename(); onClose(); }}
-            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group"
-          >
-            <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            Rename
-          </button>
-
-          <button
-            onClick={() => { onReveal(); onClose(); }}
-            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group"
-          >
-            <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-            Reveal in Finder
-          </button>
-
-          <div className="h-px bg-gray-100 dark:bg-white/5 my-1 mx-2" />
-
-          <button
-            onClick={() => { onMoveToTrash(); onClose(); }}
-            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg flex items-center gap-2.5 transition-colors group"
-          >
-            <svg className="w-4 h-4 text-red-400 group-hover:text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-            Delete
-          </button>
-        </>
-      )}
-    </div>
-  );
-
-  return createPortal(menu, document.body);
-};
-
-// Prompt Dialog component
-const PromptDialog: React.FC<{
-  isOpen: boolean;
-  title: string;
-  label: string;
-  defaultValue: string;
-  onConfirm: (value: string) => void;
-  onCancel: () => void;
-}> = ({ isOpen, title, label, defaultValue, onConfirm, onCancel }) => {
-  const [value, setValue] = useState(defaultValue);
-  const inputRef = React.useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setValue(defaultValue);
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      });
-    }
-  }, [isOpen, defaultValue]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (value.trim()) {
-      onConfirm(value.trim());
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div
-        className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-200 dark:border-gray-700 animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <form onSubmit={handleSubmit}>
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
-          </div>
-          <div className="px-6 py-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{label}</label>
-            <input
-              ref={inputRef}
-              type="text"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            />
-          </div>
-          <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Confirm
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-// Confirm Dialog component
-const ConfirmDialog: React.FC<{
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmText: string;
-  variant: 'danger' | 'warning' | 'info';
-  onConfirm: () => void;
-  onCancel: () => void;
-}> = ({ isOpen, title, message, confirmText, variant, onConfirm, onCancel }) => {
-  if (!isOpen) return null;
-
-  const variantStyles = {
-    danger: 'bg-red-500 hover:bg-red-600 text-white',
-    warning: 'bg-yellow-500 hover:bg-yellow-600 text-white',
-    info: 'bg-black hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-black'
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div
-        className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-200 dark:border-gray-700 animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
-        </div>
-        <div className="px-6 py-4">
-          <p className="text-gray-600 dark:text-gray-400">{message}</p>
-        </div>
-        <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onCancel}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${variantStyles[variant]}`}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            {confirmText}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-const getTrashItems = (nodes: FileNode[]): FileNode[] => {
-  const getTrashDepth = (path: string): number => {
-    const segments = path.split(/[\\/]+/).filter(Boolean);
-    const trashIndex = Math.max(
-      segments.lastIndexOf('.trash'),
-      segments.lastIndexOf('_markdown_press_trash')
-    );
-    if (trashIndex < 0) return -1;
-    return segments.length - trashIndex - 1;
-  };
-
-  const trash: FileNode[] = [];
-  const collect = (items: FileNode[]) => {
-    for (const node of items) {
-      if (node.isTrash && getTrashDepth(node.path) === 2) {
-        trash.push(node);
-      }
-      if (node.children) {
-        collect(node.children);
-      }
-    }
-  };
-
-  collect(nodes);
-  return trash.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-};
-
-const normalizeSearchTarget = (name: string): string => name.replace(/\.md$/i, '').toLowerCase();
-
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const isMarkdownFile = (fileName: string): boolean => /\.(md|markdown)$/i.test(fileName);
-
-const flattenVisibleFiles = (nodes: FileNode[]): FileNode[] => nodes.flatMap((node) => {
-  if (node.isTrash || isTrashRootNode(node)) return [];
-  if (node.type === 'folder') {
-    return flattenVisibleFiles(node.children ?? []);
-  }
-  return [node];
-});
-
-const buildExcerpt = (paragraph: string, matchIndex: number, matchLength: number): string => {
-  const cleaned = paragraph.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return '';
-
-  const safeIndex = Math.max(0, Math.min(matchIndex, cleaned.length));
-  const excerptStart = Math.max(0, safeIndex - 72);
-  const excerptEnd = Math.min(cleaned.length, safeIndex + matchLength + 96);
-  const prefix = excerptStart > 0 ? '…' : '';
-  const suffix = excerptEnd < cleaned.length ? '…' : '';
-  return `${prefix}${cleaned.slice(excerptStart, excerptEnd)}${suffix}`;
-};
-
-const collectParagraphMatches = (content: string, query: string, limit = 3): SidebarSearchSnippet[] => {
-  if (!query.trim()) return [];
-
-  const { body } = parseFrontmatter(content);
-  const bodyOffset = content.length - body.length;
-  const normalizedQuery = query.toLowerCase();
-  const lines = body.split(/\r?\n/);
-  const results: SidebarSearchSnippet[] = [];
-  let paragraphLines: string[] = [];
-  let paragraphStartOffset = bodyOffset;
-  let paragraphStartLine = 1;
-  let offset = bodyOffset;
-
-  const flushParagraph = () => {
-    if (paragraphLines.length === 0 || results.length >= limit) return;
-    const rawParagraph = paragraphLines.join('\n').trim();
-    if (!rawParagraph) {
-      paragraphLines = [];
-      return;
-    }
-
-    const matchIndex = rawParagraph.toLowerCase().indexOf(normalizedQuery);
-    if (matchIndex >= 0) {
-      results.push({
-        text: buildExcerpt(rawParagraph, matchIndex, query.length),
-        start: paragraphStartOffset + matchIndex,
-        end: paragraphStartOffset + matchIndex + query.length,
-        line: paragraphStartLine,
-      });
-    }
-
-    paragraphLines = [];
-  };
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const isBlankLine = !line.trim();
-
-    if (isBlankLine) {
-      flushParagraph();
-      offset += line.length + 1;
-      paragraphStartOffset = offset;
-      paragraphStartLine = index + 2;
-      continue;
-    }
-
-    if (paragraphLines.length === 0) {
-      paragraphStartOffset = offset;
-      paragraphStartLine = index + 1;
-    }
-
-    paragraphLines.push(line);
-    offset += line.length + 1;
-  }
-
-  flushParagraph();
-  return results;
-};
-
-const highlightSearchText = (text: string, query: string): React.ReactNode => {
-  if (!query.trim()) return text;
-
-  const normalizedQuery = query.toLowerCase();
-  return text
-    .split(new RegExp(`(${escapeRegExp(query)})`, 'ig'))
-    .map((part, index) => (
-      part.toLowerCase() === normalizedQuery
-        ? <mark key={`${part}-${index}`} className="rounded bg-amber-200/80 px-0.5 text-amber-950 dark:bg-amber-300/80 dark:text-amber-950">{part}</mark>
-        : <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
-    ));
-};
-
-const isTrashRootNode = (node: FileNode): boolean => (
-  node.type === 'folder' &&
-  TRASH_ROOT_NAMES.has(node.name)
-);
-
-const filterNodesByFileName = (nodes: FileNode[], query: string): FileNode[] => {
-  if (!query.trim()) {
-    return nodes
-      .filter((node) => !node.isTrash && !isTrashRootNode(node))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  }
-
-  const normalizedQuery = query.trim().toLowerCase();
-
-  return nodes.reduce<FileNode[]>((acc, node) => {
-    if (node.isTrash || isTrashRootNode(node)) return acc;
-
-    if (node.type === 'folder') {
-      const filteredChildren = filterNodesByFileName(node.children ?? [], normalizedQuery);
-      if (filteredChildren.length > 0) {
-        acc.push({
-          ...node,
-          children: filteredChildren,
-        });
-      }
-      return acc;
-    }
-
-    if (normalizeSearchTarget(node.name).includes(normalizedQuery) || node.name.toLowerCase().includes(normalizedQuery)) {
-      acc.push(node);
-    }
-
-    return acc;
-  }, []).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-};
 
 export const Sidebar: React.FC<SidebarProps> = ({
   files,
@@ -542,209 +79,103 @@ export const Sidebar: React.FC<SidebarProps> = ({
   searchFocusRequestKey = 0,
   width,
   onWidthChange,
-  onClose
+  onClose,
 }) => {
   const { readFile } = useFileSystem();
   const fileContents = useAppStore((state) => state.fileContents);
   const themeMode = useAppStore((state) => state.settings.themeMode);
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const sidebarRef = useRef<HTMLElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showTrash, setShowTrash] = useState(false);
-  const [dialogState, setDialogState] = useState<DialogState>({ type: null });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SidebarSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isRootDragOver, setIsRootDragOver] = useState(false);
-  const sidebarRef = useRef<HTMLElement | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const contentCacheRef = useRef(new Map<string, string>());
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (searchFocusRequestKey === 0) return;
+  const trashItems = useMemo(() => getTrashItems(files), [files]);
 
-    const frameId = window.requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    });
+  // Hooks
+  const { handleResizeStart } = useSidebarResize({ onWidthChange });
+  const { contextMenu, openContextMenu, closeContextMenu } = useSidebarContextMenu();
+  const { isRootDragOver, setIsRootDragOver, handleRootDragOver, handleRootDragLeave, handleRootDrop } =
+    useSidebarDragAndDrop();
 
-    return () => window.cancelAnimationFrame(frameId);
-  }, [isOpen, searchFocusRequestKey]);
-
-  const extractDraggedNodeId = useCallback((event: React.DragEvent): string | null => {
-    const rawPayload = event.dataTransfer.getData('application/json');
-    if (!rawPayload) {
-      return event.dataTransfer.getData('text/plain') || null;
-    }
-
-    try {
-      const parsed = JSON.parse(rawPayload) as { id?: string };
-      return parsed.id ?? null;
-    } catch {
-      return event.dataTransfer.getData('text/plain') || null;
-    }
-  }, []);
-
-  const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY, node });
-  };
-
-  const closeContextMenu = () => setContextMenu(null);
-
-  const trashItems = getTrashItems(files);
-  const searchableFiles = useMemo(() => flattenVisibleFiles(files), [files]);
-  const filteredFiles = useMemo(
-    () => filterNodesByFileName(files, searchQuery)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
-    [files, searchQuery]
+  const searchDeps = useMemo(
+    () => ({
+      onFileSelect,
+      onClose,
+      focusEditorRangeByOffset,
+    }),
+    [onFileSelect, onClose]
   );
-  const hasSearchQuery = searchQuery.trim().length > 0;
-  const hasVisibleFiles = filteredFiles.length > 0;
 
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    isSearching,
+    filteredFiles,
+    hasSearchQuery,
+    hasVisibleFiles,
+    handleSearchResultSelect,
+  } = useSidebarSearch(
+    {
+      files,
+      fileContents,
+      readFile,
+    },
+    searchDeps
+  );
+
+  const dialogOptions = useMemo(
+    () => ({
+      onCreateFile,
+      onRename,
+      onNewFolder,
+      onDelete,
+      onEmptyTrash,
+    }),
+    [onCreateFile, onRename, onNewFolder, onDelete, onEmptyTrash]
+  );
+
+  const {
+    dialogState,
+    openNewFileDialog,
+    openRenameDialog,
+    openNewFolderDialog,
+    openDeleteDialog,
+    openEmptyTrashDialog,
+    closeDialog,
+    handleNewFileConfirm,
+    handleRenameConfirm,
+    handleNewFolderConfirm,
+    handleDeleteConfirm,
+    handleEmptyTrashConfirm,
+  } = useSidebarDialogs(dialogOptions);
+
+  // Focus search input when requested
   useEffect(() => {
-    Object.entries(fileContents).forEach(([fileId, content]) => {
-      if (content !== undefined) {
-        contentCacheRef.current.set(fileId, content);
+    if (searchFocusRequestKey > 0) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchFocusRequestKey]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
       }
-    });
-  }, [fileContents]);
-
-  useEffect(() => {
-    const liveIds = new Set(searchableFiles.map((file) => file.id));
-    for (const fileId of Array.from(contentCacheRef.current.keys())) {
-      if (!liveIds.has(fileId)) {
-        contentCacheRef.current.delete(fileId);
-      }
-    }
-  }, [searchableFiles]);
-
-  useEffect(() => {
-    const normalizedQuery = searchQuery.trim();
-    if (!normalizedQuery) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        setIsSearching(true);
-
-        const nextResults: SidebarSearchResult[] = [];
-        for (const file of searchableFiles) {
-          if (cancelled) return;
-
-          const filenameMatched = normalizeSearchTarget(file.name).includes(normalizedQuery.toLowerCase())
-            || file.name.toLowerCase().includes(normalizedQuery.toLowerCase());
-          let snippets: SidebarSearchSnippet[] = [];
-
-          if (isMarkdownFile(file.name)) {
-            let content = contentCacheRef.current.get(file.id);
-            if (content === undefined) {
-              try {
-                content = await readFile(file);
-                contentCacheRef.current.set(file.id, content);
-              } catch {
-                content = undefined;
-              }
-            }
-
-            if (content !== undefined) {
-              snippets = collectParagraphMatches(content, normalizedQuery);
-            }
-          }
-
-          if (filenameMatched || snippets.length > 0) {
-            nextResults.push({ file, filenameMatched, snippets });
-          }
-        }
-
-        nextResults.sort((left, right) => {
-          if (left.filenameMatched !== right.filenameMatched) {
-            return left.filenameMatched ? -1 : 1;
-          }
-          if (left.snippets.length !== right.snippets.length) {
-            return right.snippets.length - left.snippets.length;
-          }
-          return left.file.name.localeCompare(right.file.name, 'zh-Hans-CN');
-        });
-
-        if (!cancelled) {
-          setSearchResults(nextResults);
-          setIsSearching(false);
-        }
-      })();
-    }, 150);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, [readFile, searchQuery, searchableFiles]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
-  const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (window.innerWidth < 768) return;
-
-    event.preventDefault();
-
-    const handlePointerMove = (moveEvent: MouseEvent) => {
-      const sidebarRect = sidebarRef.current?.getBoundingClientRect();
-      const nextWidth = moveEvent.clientX - (sidebarRect?.left ?? 0);
-      onWidthChange(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, nextWidth)));
-    };
-
-    const handlePointerUp = () => {
-      document.removeEventListener('mousemove', handlePointerMove);
-      document.removeEventListener('mouseup', handlePointerUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', handlePointerMove);
-    document.addEventListener('mouseup', handlePointerUp);
-  }, [onWidthChange]);
-
-  const handleRootDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    const sourceId = extractDraggedNodeId(event);
-    if (!sourceId) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    setIsRootDragOver(true);
-  }, [extractDraggedNodeId]);
-
-  const handleRootDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget as Node | null;
-    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
-    setIsRootDragOver(false);
-  }, []);
-
-  const handleRootDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const sourceId = extractDraggedNodeId(event);
-    setIsRootDragOver(false);
-    if (!sourceId) return;
-    onMoveToRoot(sourceId);
-  }, [extractDraggedNodeId, onMoveToRoot]);
-
-  const sidebarSurfaceStyle = useMemo(() => ({
-    '--sidebar-width': `${width}px`,
-    // Unified background with main editing area for modern flat UI
-    backgroundColor: themeMode === 'dark' ? '#000000' : '#f8fafc',
-  }) as React.CSSProperties, [themeMode, width]);
-
-  const handleSearchResultSelect = useCallback(async (file: FileNode, snippet?: SidebarSearchSnippet) => {
-    await onFileSelect(file);
-    if (snippet) {
-      requestAnimationFrame(() => {
-        focusEditorRangeByOffset(snippet.start, snippet.end, { alignTopRatio: 0.3 });
-      });
-    }
-    if (window.innerWidth < 768) onClose();
-  }, [onClose, onFileSelect]);
+  const sidebarSurfaceStyle = useMemo(
+    () =>
+      ({
+        '--sidebar-width': `${width}px`,
+        backgroundColor: themeMode === 'dark' ? '#000000' : '#f8fafc',
+      }) as React.CSSProperties,
+    [themeMode, width]
+  );
 
   return (
     <>
@@ -759,19 +190,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ref={sidebarRef}
         style={sidebarSurfaceStyle}
         className={`
-        sidebar-shell
-        fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
-        transition-[transform,width,opacity] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
-        ${isOpen
-          ? 'translate-x-0 md:w-[var(--sidebar-width)] opacity-100'
-          : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 pointer-events-none'
-        }
-      `}
+          sidebar-shell
+          fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
+          transition-[transform,width,opacity] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
+          ${
+            isOpen
+              ? 'translate-x-0 md:w-[var(--sidebar-width)] opacity-100'
+              : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 pointer-events-none'
+          }
+        `}
       >
         <div className="px-4 pt-3 pb-4 flex flex-col gap-3">
           <div className="flex justify-end items-center px-2 md:hidden">
-            <button onClick={onClose} className="md:hidden p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors">
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <button
+              onClick={onClose}
+              className="md:hidden p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
+            >
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -796,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               />
             </label>
             <button
-              onClick={() => setDialogState({ type: 'newFile', defaultValue: 'Untitled' })}
+              onClick={() => openNewFileDialog(undefined, 'Untitled')}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"
               title="New Note"
             >
@@ -809,15 +250,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div
-          className={`flex-1 overflow-y-auto py-2 scrollbar-hide transition-colors ${isRootDragOver ? 'bg-accent-DEFAULT/10 dark:bg-accent-DEFAULT/10' : ''}`}
+          className={`flex-1 overflow-y-auto py-2 scrollbar-hide transition-colors ${
+            isRootDragOver ? 'bg-accent-DEFAULT/10 dark:bg-accent-DEFAULT/10' : ''
+          }`}
           onDragOver={handleRootDragOver}
           onDragLeave={handleRootDragLeave}
-          onDrop={handleRootDrop}
+          onDrop={(e) => handleRootDrop(e, onMoveToRoot)}
           onDragEnd={() => setIsRootDragOver(false)}
         >
           {files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600 px-6 text-center">
-              <svg className="w-8 h-8 mb-3 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                className="w-8 h-8 mb-3 opacity-20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               <p className="text-xs mb-3">No local files opened.</p>
@@ -830,7 +279,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             ) : searchResults.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 px-6 text-center text-gray-400 dark:text-gray-600">
-                <svg className="mb-3 h-8 w-8 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="mb-3 h-8 w-8 opacity-20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <circle cx="11" cy="11" r="7" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
@@ -854,9 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
                           {highlightSearchText(file.name.replace(/\.md$/i, ''), searchQuery)}
                         </div>
-                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">
-                          {file.path}
-                        </div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{file.path}</div>
                       </div>
                       {filenameMatched && (
                         <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
@@ -889,35 +342,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )
           ) : !hasVisibleFiles ? (
             <div className="flex flex-col items-center justify-center h-40 px-6 text-center text-gray-400 dark:text-gray-600">
-              <svg className="mb-3 h-8 w-8 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                className="mb-3 h-8 w-8 opacity-20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="7" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No matching files</p>
               {hasSearchQuery && (
-                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Try another filename keyword.
-                </p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Try another filename keyword.</p>
               )}
             </div>
           ) : (
             <div className="space-y-0.5">
-              {filteredFiles
-                .map(node => (
-                  <FileTreeItem
-                    key={node.id}
-                    node={node}
-                    onSelect={(f) => {
-                      void onFileSelect(f);
-                      if (window.innerWidth < 768) onClose();
-                    }}
-                    activeId={activeFileId}
-                    level={0}
-                    onContextMenu={handleContextMenu}
-                    onMoveNode={onMoveNode}
-                    forceExpanded={hasSearchQuery}
-                  />
-                ))}
+              {filteredFiles.map((node) => (
+                <FileTreeItem
+                  key={node.id}
+                  node={node}
+                  onSelect={(f) => {
+                    void onFileSelect(f);
+                    if (window.innerWidth < 768) onClose();
+                  }}
+                  activeId={activeFileId}
+                  level={0}
+                  onContextMenu={openContextMenu}
+                  onMoveNode={onMoveNode}
+                  forceExpanded={hasSearchQuery}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -929,18 +385,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="flex items-center justify-between w-full px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg transition-colors text-gray-500 dark:text-gray-400 text-xs font-medium"
             >
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
                 <span>Trash ({trashItems.length})</span>
               </div>
               {showTrash ? (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               ) : (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               )}
@@ -951,8 +425,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 trashItems={trashItems}
                 onRestore={onRestoreFromTrash}
                 onDeleteForever={onDeleteForever}
-                onEmptyTrash={() => setDialogState({ type: 'emptyTrash' })}
-                onContextMenu={handleContextMenu}
+                onEmptyTrash={() => openEmptyTrashDialog()}
+                onContextMenu={openContextMenu}
               />
             )}
           </div>
@@ -963,14 +437,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={currentKnowledgeBasePath || 'Open Knowledge Base'}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                className="w-4 h-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
               </svg>
               <p className="text-sm font-semibold truncate min-w-0">
                 {currentKnowledgeBaseName || 'Open Knowledge Base'}
               </p>
             </div>
-            <svg className="w-4 h-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              className="w-4 h-4 shrink-0 text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
               <polyline points="9 13 12 10 15 13" />
               <line x1="12" y1="10" x2="12" y2="16" />
@@ -996,19 +482,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           y={contextMenu.y}
           node={contextMenu.node}
           onClose={closeContextMenu}
-          onRename={() => setDialogState({ type: 'rename', file: contextMenu.node, defaultValue: contextMenu.node.name.replace(/\.md$/, '') })}
-          onDelete={() => setDialogState({ type: 'delete', file: contextMenu.node })}
+          onRename={() =>
+            openRenameDialog(
+              contextMenu.node,
+              contextMenu.node.name.replace(/\.md$/, '')
+            )
+          }
+          onDelete={() => openDeleteDialog(contextMenu.node)}
           onReveal={() => onReveal(contextMenu.node.path)}
-          onOpenInBrowser={onOpenInBrowser ? () => onOpenInBrowser(contextMenu.node) : undefined}
-          onCreateFile={() => setDialogState({
-            type: 'newFile',
-            file: contextMenu.node.type === 'folder' ? contextMenu.node : undefined,
-            defaultValue: 'Untitled',
-          })}
-          onCreateFolder={() => setDialogState({ type: 'newFolder', file: contextMenu.node })}
+          onOpenInBrowser={
+            onOpenInBrowser ? () => onOpenInBrowser(contextMenu.node) : undefined
+          }
+          onCreateFile={() =>
+            openNewFileDialog(
+              contextMenu.node.type === 'folder' ? contextMenu.node : undefined,
+              'Untitled'
+            )
+          }
+          onCreateFolder={() => openNewFolderDialog(contextMenu.node)}
           onMoveToTrash={() => onMoveToTrash(contextMenu.node)}
           onRestoreFromTrash={() => onRestoreFromTrash(contextMenu.node)}
-          onDeleteForever={() => setDialogState({ type: 'delete', file: contextMenu.node })}
+          onDeleteForever={() => openDeleteDialog(contextMenu.node)}
         />
       )}
 
@@ -1018,11 +512,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         title="New File"
         label="File name:"
         defaultValue={dialogState.defaultValue || 'Untitled'}
-        onConfirm={(value) => {
-          onCreateFile(dialogState.file?.type === 'folder' ? dialogState.file : undefined, value);
-          setDialogState({ type: null });
-        }}
-        onCancel={() => setDialogState({ type: null })}
+        onConfirm={(value) =>
+          handleNewFileConfirm(
+            dialogState.file?.type === 'folder' ? dialogState.file : undefined,
+            value
+          )
+        }
+        onCancel={closeDialog}
       />
 
       {/* Rename Dialog */}
@@ -1031,13 +527,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         title="Rename"
         label="New name:"
         defaultValue={dialogState.defaultValue || ''}
-        onConfirm={(value) => {
-          if (dialogState.file) {
-            onRename(dialogState.file, value);
-          }
-          setDialogState({ type: null });
-        }}
-        onCancel={() => setDialogState({ type: null })}
+        onConfirm={(value) => handleRenameConfirm(dialogState.file, value)}
+        onCancel={closeDialog}
       />
 
       {/* New Folder Dialog */}
@@ -1046,11 +537,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         title="New Folder"
         label="Folder name:"
         defaultValue=""
-        onConfirm={(value) => {
-          onNewFolder(dialogState.file?.type === 'folder' ? dialogState.file : undefined, value);
-          setDialogState({ type: null });
-        }}
-        onCancel={() => setDialogState({ type: null })}
+        onConfirm={(value) =>
+          handleNewFolderConfirm(
+            dialogState.file?.type === 'folder' ? dialogState.file : undefined,
+            value
+          )
+        }
+        onCancel={closeDialog}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -1060,26 +553,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         message={`Are you sure you want to delete "${dialogState.file?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         variant="danger"
-        onConfirm={() => {
-          if (dialogState.file) {
-            onDelete(dialogState.file);
-          }
-          setDialogState({ type: null });
-        }}
-        onCancel={() => setDialogState({ type: null })}
+        onConfirm={() => handleDeleteConfirm(dialogState.file)}
+        onCancel={closeDialog}
       />
 
       <ConfirmDialog
         isOpen={dialogState.type === 'emptyTrash'}
         title="Empty Trash"
-        message={`Permanently delete all ${trashItems.length} item${trashItems.length === 1 ? '' : 's'} in trash? This action cannot be undone.`}
+        message={`Permanently delete all ${trashItems.length} item${
+          trashItems.length === 1 ? '' : 's'
+        } in trash? This action cannot be undone.`}
         confirmText="Empty Trash"
         variant="danger"
-        onConfirm={() => {
-          onEmptyTrash(trashItems);
-          setDialogState({ type: null });
-        }}
-        onCancel={() => setDialogState({ type: null })}
+        onConfirm={() => handleEmptyTrashConfirm(trashItems)}
+        onCancel={closeDialog}
       />
     </>
   );

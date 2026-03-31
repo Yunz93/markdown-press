@@ -518,6 +518,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Lists</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Ordered List Numbering</label>
+                      <select
+                        value={settings.orderedListMode}
+                        onChange={(e) => onUpdateSettings({ ...settings, orderedListMode: e.target.value as AppSettings['orderedListMode'] })}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                      >
+                        <option value="strict">Strict (Typora): renumber lists automatically</option>
+                        <option value="loose">Loose (Obsidian): preserve existing numbers</option>
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Controls whether indent/outdent and ordered-list commands automatically normalize numbering.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Auto-Save</h3>
                   <div className="space-y-4">
                     <div>

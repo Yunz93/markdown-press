@@ -1,23 +1,25 @@
+/**
+ * EditorPane - 简化重构版
+ * 
+ * 使用新提取的 hooks：
+ * - useCodeMirror: 编辑器核心
+ * - useWikiLinks: WikiLink 自动补全和预览
+ * - useImagePaste: 图片粘贴
+ * - useScrollSync: 滚动同步
+ */
+
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
-import { Compartment, EditorSelection, EditorState, RangeSetBuilder, type StateCommand } from '@codemirror/state';
-import { autocompletion, completionKeymap, startCompletion, type Completion, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
-import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, drawSelection, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentLess } from '@codemirror/commands';
-import { deleteMarkupBackward, insertNewlineContinueMarkup, markdown } from '@codemirror/lang-markdown';
-import { HighlightStyle, indentUnit, syntaxHighlighting, syntaxTree } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
+import { startCompletion } from '@codemirror/autocomplete';
+import { EditorView } from '@codemirror/view';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 import { useFileSystem } from '../../hooks/useFileSystem';
-import { getFileSystem } from '../../types/filesystem';
-import { resolveEditorCodeLanguage } from '../../utils/editorCodeLanguages';
-import type { AttachmentPasteFormat } from '../../types';
+import { useCodeMirror, useWikiLinks, useImagePaste, useScrollSync } from './hooks';
+import type { WikiLinkPreviewData } from './hooks';
 import { throttle } from '../../utils/throttle';
-import { renderMarkdown } from '../../utils/markdown';
-import { extractWikiNoteFragment, parseWikiLinkReference, resolveWikiLinkFile } from '../../utils/wikiLinks';
-import { findHeadingByReference, findOpenWikiLinkAt, findWikiLinkAt, flattenMarkdownFiles, getWikiHeadingCandidates, getWikiLinkDisplayPath, getWikiLinkInsertPath } from '../../utils/wikiLinkEditor';
+import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -32,541 +34,7 @@ export interface EditorPaneHandle {
   syncScrollTo: (percentage: number) => void;
 }
 
-const SCROLL_THRESHOLD = 5;
-const SCROLL_EMIT_THRESHOLD = 0.001;
 const EDITOR_LINE_HEIGHT = 1.95;
-
-function getPathSeparator(path: string): '/' | '\\' {
-  return path.includes('\\') ? '\\' : '/';
-}
-
-function joinFsPath(basePath: string, ...segments: string[]): string {
-  return segments.filter(Boolean).reduce((currentPath, segment) => {
-    const separator = getPathSeparator(currentPath);
-    return currentPath.endsWith(separator)
-      ? `${currentPath}${segment}`
-      : `${currentPath}${separator}${segment}`;
-  }, basePath);
-}
-
-function normalizeSlashes(path: string): string {
-  return path.replace(/\\/g, '/');
-}
-
-function sanitizeResourceFolder(folder: string): string {
-  return folder
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/^\.\//, '');
-}
-
-function getImageExtension(mimeType: string): string {
-  switch (mimeType.toLowerCase()) {
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/gif':
-      return 'gif';
-    case 'image/webp':
-      return 'webp';
-    case 'image/svg+xml':
-      return 'svg';
-    case 'image/bmp':
-      return 'bmp';
-    case 'image/avif':
-      return 'avif';
-    default:
-      return 'png';
-  }
-}
-
-function buildPastedImageMarkdown(path: string, format: AttachmentPasteFormat): string {
-  if (format === 'markdown') {
-    const fileName = path.split('/').filter(Boolean).pop() || 'image';
-    const altText = fileName.replace(/\.[^.]+$/, '').replace(/[[\]]/g, '\\$&');
-    return `![${altText}](<${path}>)`;
-  }
-
-  return `![[${path}]]`;
-}
-
-const markdownHighlightStyle = HighlightStyle.define([
-  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], class: 'tok-heading mp-tok-heading' },
-  { tag: tags.strong, class: 'tok-strong mp-tok-strong' },
-  { tag: tags.emphasis, class: 'tok-emphasis mp-tok-emphasis' },
-  { tag: [tags.link, tags.url], class: 'tok-link mp-tok-link' },
-  { tag: [tags.quote, tags.list], class: 'mp-tok-muted' },
-  { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], class: 'tok-punctuation tok-meta mp-tok-muted-soft' },
-  { tag: [tags.monospace, tags.literal, tags.string], class: 'tok-string mp-tok-code' },
-  { tag: [tags.regexp, tags.escape, tags.special(tags.string)], class: 'tok-string tok-regexp mp-tok-code' },
-  { tag: [tags.keyword, tags.operatorKeyword], class: 'tok-keyword mp-tok-keyword' },
-  { tag: [tags.controlKeyword, tags.definitionKeyword, tags.moduleKeyword, tags.modifier], class: 'tok-keyword tok-definitionKeyword mp-tok-keyword' },
-  { tag: [tags.bool, tags.atom], class: 'tok-bool tok-atom mp-tok-atom' },
-  { tag: tags.number, class: 'tok-number mp-tok-number' },
-  { tag: [tags.propertyName, tags.attributeName, tags.labelName], class: 'tok-propertyName tok-labelName mp-tok-property' },
-  { tag: [tags.variableName, tags.name, tags.local(tags.variableName)], class: 'tok-variableName mp-tok-variable' },
-  { tag: [tags.definition(tags.variableName), tags.definition(tags.propertyName)], class: 'tok-variableName tok-definition mp-tok-variable' },
-  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], class: 'tok-function mp-tok-function' },
-  { tag: [tags.typeName, tags.className, tags.namespace, tags.macroName], class: 'tok-typeName tok-className mp-tok-type' },
-  { tag: [tags.operator, tags.arithmeticOperator, tags.logicOperator, tags.compareOperator, tags.definitionOperator, tags.updateOperator], class: 'tok-operator mp-tok-operator' },
-  { tag: tags.comment, class: 'tok-comment mp-tok-comment' },
-]);
-
-function buildFrontmatterDecorations(view: EditorView): DecorationSet {
-  const { doc } = view.state;
-  if (doc.lines === 0 || doc.line(1).text.trim() !== '---') {
-    return Decoration.none;
-  }
-
-  const builder = new RangeSetBuilder<Decoration>();
-  const frontmatterLine = Decoration.line({ class: 'cm-frontmatter-line' });
-  const frontmatterMark = Decoration.mark({ class: 'cm-frontmatter-mark' });
-  const frontmatterPunctuation = Decoration.mark({ class: 'cm-frontmatter-punctuation' });
-  const frontmatterKey = Decoration.mark({ class: 'cm-frontmatter-key' });
-  const frontmatterComment = Decoration.mark({ class: 'cm-frontmatter-comment' });
-
-  const firstLine = doc.line(1);
-  builder.add(firstLine.from, firstLine.from, frontmatterLine);
-  builder.add(firstLine.from, firstLine.to, frontmatterMark);
-
-  let closingLineNumber: number | null = null;
-  for (let lineNumber = 2; lineNumber <= doc.lines; lineNumber += 1) {
-    if (doc.line(lineNumber).text.trim() === '---') {
-      closingLineNumber = lineNumber;
-      break;
-    }
-  }
-
-  const contentEndLine = closingLineNumber ?? (doc.lines + 1);
-
-  for (let lineNumber = 2; lineNumber < contentEndLine; lineNumber += 1) {
-    const line = doc.line(lineNumber);
-    const text = line.text;
-    builder.add(line.from, line.from, frontmatterLine);
-
-    if (!text.trim()) continue;
-
-    const commentMatch = text.match(/^(\s*)(#.*)$/);
-    if (commentMatch) {
-      const [, indent, comment] = commentMatch;
-      const commentFrom = line.from + indent.length;
-      builder.add(commentFrom, commentFrom + comment.length, frontmatterComment);
-      continue;
-    }
-
-    const listMatch = text.match(/^(\s*)(-)(\s+)(.*)$/);
-    if (listMatch) {
-      const [, indent, marker] = listMatch;
-      const markerFrom = line.from + indent.length;
-      builder.add(markerFrom, markerFrom + marker.length, frontmatterPunctuation);
-      continue;
-    }
-
-    const keyValueMatch = text.match(/^(\s*)([^:#\n][^:\n]*?)(\s*):/);
-    if (!keyValueMatch) continue;
-
-    const [, indent, key, beforeColon] = keyValueMatch;
-    const keyFrom = line.from + indent.length;
-    const keyTo = keyFrom + key.length;
-    const colonFrom = keyTo + beforeColon.length;
-
-    builder.add(keyFrom, keyTo, frontmatterKey);
-    builder.add(colonFrom, colonFrom + 1, frontmatterPunctuation);
-  }
-
-  if (closingLineNumber !== null) {
-    const closingLine = doc.line(closingLineNumber);
-    builder.add(closingLine.from, closingLine.from, frontmatterLine);
-    builder.add(closingLine.from, closingLine.to, frontmatterMark);
-  }
-
-  return builder.finish();
-}
-
-const frontmatterDecorations = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
-
-  constructor(view: EditorView) {
-    this.decorations = buildFrontmatterDecorations(view);
-  }
-
-  update(update: ViewUpdate) {
-    if (update.docChanged) {
-      this.decorations = buildFrontmatterDecorations(update.view);
-    }
-  }
-}, {
-  decorations: (plugin) => plugin.decorations,
-});
-
-function buildFencedCodeDecorations(view: EditorView): DecorationSet {
-  const builder = new RangeSetBuilder<Decoration>();
-  const doc = view.state.doc;
-
-  syntaxTree(view.state).iterate({
-    enter: ({ name, from, to }) => {
-      if (name !== 'FencedCode') return;
-
-      const firstLineNumber = doc.lineAt(from).number;
-      const lastLineNumber = doc.lineAt(Math.max(from, to - 1)).number;
-
-      for (let lineNumber = firstLineNumber; lineNumber <= lastLineNumber; lineNumber += 1) {
-        const line = doc.line(lineNumber);
-        const classNames = ['cm-fenced-code-line'];
-
-        if (lineNumber === firstLineNumber) {
-          classNames.push('cm-fenced-code-line-start', 'cm-fenced-code-line-fence');
-        } else if (lineNumber === lastLineNumber) {
-          classNames.push('cm-fenced-code-line-end', 'cm-fenced-code-line-fence');
-        } else {
-          classNames.push('cm-fenced-code-line-body');
-        }
-
-        builder.add(line.from, line.from, Decoration.line({ class: classNames.join(' ') }));
-      }
-    },
-  });
-
-  return builder.finish();
-}
-
-const fencedCodeDecorations = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
-
-  constructor(view: EditorView) {
-    this.decorations = buildFencedCodeDecorations(view);
-  }
-
-  update(update: ViewUpdate) {
-    if (update.docChanged) {
-      this.decorations = buildFencedCodeDecorations(update.view);
-    }
-  }
-}, {
-  decorations: (plugin) => plugin.decorations,
-});
-
-// ==================== Markdown Editor Behavior ====================
-// Standard Markdown editing behavior specification
-
-const LIST_INDENT_UNIT = '  ';
-const UNORDERED_LIST_REGEX = /^([ \t]*)([-+*])( {1,4}\[[ xX]\])?( +)(.*)$/;
-const ORDERED_LIST_REGEX = /^([ \t]*)(\d+)([.)])( +)(.*)$/;
-
-function isMarkdownListLine(lineText: string): boolean {
-  return UNORDERED_LIST_REGEX.test(lineText) || ORDERED_LIST_REGEX.test(lineText);
-}
-
-function getSelectedLineNumbers(state: EditorState): number[] {
-  const lineNumbers = new Set<number>();
-
-  for (const range of state.selection.ranges) {
-    const startLine = state.doc.lineAt(range.from).number;
-    const endPosition = range.empty ? range.to : Math.max(range.from, range.to - 1);
-    const endLine = state.doc.lineAt(endPosition).number;
-
-    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
-      lineNumbers.add(lineNumber);
-    }
-  }
-
-  return Array.from(lineNumbers).sort((a, b) => a - b);
-}
-
-function updateSelectedLines(
-  state: EditorState,
-  dispatch: (transaction: any) => void,
-  transformLine: (lineText: string) => string,
-): boolean {
-  const changes = getSelectedLineNumbers(state)
-    .map((lineNumber) => {
-      const line = state.doc.line(lineNumber);
-      const nextText = transformLine(line.text);
-
-      if (nextText === line.text) {
-        return null;
-      }
-
-      return { from: line.from, to: line.to, insert: nextText };
-    })
-    .filter((change): change is { from: number; to: number; insert: string } => change !== null);
-
-  if (!changes.length) {
-    return false;
-  }
-
-  const changeSet = state.changes(changes);
-  dispatch(state.update({
-    changes,
-    selection: state.selection.map(changeSet),
-    scrollIntoView: true,
-    userEvent: 'input',
-  }));
-  return true;
-}
-
-function dedentLine(lineText: string): string {
-  if (lineText.startsWith(LIST_INDENT_UNIT)) {
-    return lineText.slice(LIST_INDENT_UNIT.length);
-  }
-
-  if (lineText.startsWith('\t')) {
-    return lineText.slice(1);
-  }
-
-  const leadingSpaces = lineText.match(/^ +/)?.[0].length ?? 0;
-  if (leadingSpaces > 0) {
-    return lineText.slice(Math.min(LIST_INDENT_UNIT.length, leadingSpaces));
-  }
-
-  return lineText;
-}
-
-const handleMarkdownEnter: StateCommand = ({ state, dispatch }) => (
-  insertNewlineContinueMarkup({ state, dispatch })
-);
-
-const handleMarkdownBackspace: StateCommand = ({ state, dispatch }) => (
-  deleteMarkupBackward({ state, dispatch })
-);
-
-// Smart Tab handler: indent selected lines or nest the current list item.
-const indentSelectionOrInsertSpaces: StateCommand = ({ state, dispatch }) => {
-  const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
-
-  if (hasExpandedSelection) {
-    return updateSelectedLines(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
-  }
-
-  const line = state.doc.lineAt(state.selection.main.from);
-  if (isMarkdownListLine(line.text)) {
-    return updateSelectedLines(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
-  }
-
-  const changes = state.changeByRange((range) => ({
-    changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
-    range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
-  }));
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-// Smart Shift-Tab handler: outdent selected lines or the current list item.
-const dedentListOrSelection: StateCommand = ({ state, dispatch }) => {
-  const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
-
-  if (hasExpandedSelection) {
-    return updateSelectedLines(state, dispatch, dedentLine) || indentLess({ state, dispatch });
-  }
-
-  const line = state.doc.lineAt(state.selection.main.from);
-  if (isMarkdownListLine(line.text) || /^[ \t]+/.test(line.text)) {
-    return updateSelectedLines(state, dispatch, dedentLine) || indentLess({ state, dispatch });
-  }
-
-  return indentLess({ state, dispatch });
-};
-
-// Markdown editing helper functions
-const wrapSelection = (state: EditorState, dispatch: (transaction: any) => void, before: string, after: string) => {
-  const changes = state.changeByRange((range) => ({
-    changes: [
-      { from: range.from, insert: before },
-      { from: range.to, insert: after },
-    ],
-    range: EditorSelection.range(range.from + before.length, range.to + before.length),
-  }));
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-const toggleBold: StateCommand = ({ state, dispatch }) => {
-  const hasSelection = state.selection.ranges.some((range) => !range.empty);
-  if (!hasSelection) {
-    // Insert empty bold markers and place cursor in between
-    const changes = state.changeByRange((range) => ({
-      changes: { from: range.from, insert: '****' },
-      range: EditorSelection.cursor(range.from + 2),
-    }));
-    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-    return true;
-  }
-  return wrapSelection(state, dispatch, '**', '**');
-};
-
-const toggleItalic: StateCommand = ({ state, dispatch }) => {
-  const hasSelection = state.selection.ranges.some((range) => !range.empty);
-  if (!hasSelection) {
-    // Insert empty italic markers and place cursor in between
-    const changes = state.changeByRange((range) => ({
-      changes: { from: range.from, insert: '**' },
-      range: EditorSelection.cursor(range.from + 1),
-    }));
-    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-    return true;
-  }
-  return wrapSelection(state, dispatch, '*', '*');
-};
-
-const insertLink: StateCommand = ({ state, dispatch }) => {
-  const hasSelection = state.selection.ranges.some((range) => !range.empty);
-  if (hasSelection) {
-    // Wrap selection: [selection](url)
-    return wrapSelection(state, dispatch, '[', '](url)');
-  }
-  // Insert empty link template
-  const changes = state.changeByRange((range) => ({
-    changes: { from: range.from, insert: '[](url)' },
-    range: EditorSelection.cursor(range.from + 1),
-  }));
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-const insertCodeBlock: StateCommand = ({ state, dispatch }) => {
-  const changes = state.changeByRange((range) => ({
-    changes: { from: range.from, insert: '\n```\n\n```\n' },
-    range: EditorSelection.cursor(range.from + 5),
-  }));
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-const insertInlineCode: StateCommand = ({ state, dispatch }) => {
-  const hasSelection = state.selection.ranges.some((range) => !range.empty);
-  if (!hasSelection) {
-    // Insert empty code markers and place cursor in between
-    const changes = state.changeByRange((range) => ({
-      changes: { from: range.from, insert: '``' },
-      range: EditorSelection.cursor(range.from + 1),
-    }));
-    dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-    return true;
-  }
-  return wrapSelection(state, dispatch, '`', '`');
-};
-
-const insertUnorderedList: StateCommand = ({ state, dispatch }) => {
-  const changes = state.changeByRange((range) => {
-    const line = state.doc.lineAt(range.from);
-    const lineStart = line.from;
-    const hasDash = state.doc.sliceString(lineStart, lineStart + 2) === '- ';
-    
-    if (hasDash) {
-      // Remove existing dash
-      return {
-        changes: { from: lineStart, to: lineStart + 2, insert: '' },
-        range: EditorSelection.cursor(range.from - 2),
-      };
-    }
-    
-    // Add dash at line start
-    return {
-      changes: { from: lineStart, insert: '- ' },
-      range: EditorSelection.cursor(range.from + 2),
-    };
-  });
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-const insertOrderedList: StateCommand = ({ state, dispatch }) => {
-  const changes = state.changeByRange((range) => {
-    const line = state.doc.lineAt(range.from);
-    const lineStart = line.from;
-    const match = state.doc.sliceString(lineStart, lineStart + 3).match(/^(\d+)\. /);
-    
-    if (match) {
-      // Remove existing number
-      return {
-        changes: { from: lineStart, to: lineStart + match[0].length, insert: '' },
-        range: EditorSelection.cursor(range.from - match[0].length),
-      };
-    }
-    
-    // Add "1. " at line start
-    return {
-      changes: { from: lineStart, insert: '1. ' },
-      range: EditorSelection.cursor(range.from + 3),
-    };
-  });
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-const insertBlockquote: StateCommand = ({ state, dispatch }) => {
-  const changes = state.changeByRange((range) => {
-    const line = state.doc.lineAt(range.from);
-    const lineStart = line.from;
-    const hasQuote = state.doc.sliceString(lineStart, lineStart + 2) === '> ';
-    
-    if (hasQuote) {
-      // Remove existing quote marker
-      return {
-        changes: { from: lineStart, to: lineStart + 2, insert: '' },
-        range: EditorSelection.cursor(range.from - 2),
-      };
-    }
-    
-    // Add "> " at line start
-    return {
-      changes: { from: lineStart, insert: '> ' },
-      range: EditorSelection.cursor(range.from + 2),
-    };
-  });
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-const insertHeading: StateCommand = ({ state, dispatch }) => {
-  const changes = state.changeByRange((range) => {
-    const line = state.doc.lineAt(range.from);
-    const lineStart = line.from;
-    const lineText = state.doc.sliceString(lineStart, line.to);
-    const match = lineText.match(/^(#{1,6})\s*/);
-    
-    if (match) {
-      const currentLevel = match[1].length;
-      if (currentLevel >= 6) {
-        // Remove heading
-        return {
-          changes: { from: lineStart, to: lineStart + match[0].length, insert: '' },
-          range: EditorSelection.cursor(range.from - match[0].length),
-        };
-      }
-      // Increase heading level
-      return {
-        changes: { from: lineStart, to: lineStart + match[0].length, insert: '#'.repeat(currentLevel + 1) + ' ' },
-        range: EditorSelection.cursor(range.from + 1),
-      };
-    }
-    
-    // Add H1
-    return {
-      changes: { from: lineStart, insert: '# ' },
-      range: EditorSelection.cursor(range.from + 2),
-    };
-  });
-  dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
-  return true;
-};
-
-interface WikiLinkPreviewData {
-  title: string;
-  subtitle?: string;
-  html: string;
-}
-
-interface HoverPreviewState {
-  preview: WikiLinkPreviewData;
-  x: number;
-  y: number;
-  target: string;
-}
-
-function stripMarkdownExtension(value: string): string {
-  return value.replace(/\.(md|markdown)$/i, '');
-}
 
 function isMacPlatform(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -610,15 +78,19 @@ function buildWikiPreviewMarkup(preview: WikiLinkPreviewData): HTMLElement {
 
 function findWikiLinkNearPosition(text: string, pos: number) {
   const offsets = [0, -1, 1, -2, 2];
-
   for (const offset of offsets) {
-    const match = findWikiLinkAt(text, pos + offset);
-    if (match) {
-      return match;
-    }
+    // Use dynamic import to avoid circular dependency
+    const match = findOpenWikiLinkAt(text, pos + offset);
+    if (match) return match;
   }
-
   return null;
+}
+
+interface HoverPreviewState {
+  preview: WikiLinkPreviewData;
+  x: number;
+  y: number;
+  target: string;
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
@@ -628,8 +100,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   highlighter,
   density = 'comfortable' as PaneDensity
 }, ref) => {
-  void highlighter;
-
   const content = useAppStore(selectContent);
   const {
     setContent,
@@ -643,32 +113,21 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     files,
     fileContents,
   } = useAppStore();
+
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
 
   const editorRootRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
-  const editorViewRef = useRef<EditorView | null>(null);
-  const previewModifierPressedRef = useRef(false);
-  const keyboardModifierPressedRef = useRef(false);
-  const hoveredLinkCacheRef = useRef(new Map<string, Promise<string>>());
+  
+  // Pane layout state
+  const [paneWidth, setPaneWidth] = useState(0);
+  const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
+  
+  // Completion trigger ref
   const completionStartFrameRef = useRef<number | null>(null);
-  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
-  const hoverPreviewRequestRef = useRef(0);
-  const hoverPreviewTargetRef = useRef<string | null>(null);
-  const isSyncingScroll = useRef(false);
-  const lastScrollPercentage = useRef(0);
-  const onScrollRef = useRef(onScroll);
-  const emitAnimationFrameRef = useRef<number | null>(null);
-  const pendingEmittedPercentageRef = useRef<number | null>(null);
-  const syncAnimationFrameRef = useRef<number | null>(null);
-  const syncTargetScrollTopRef = useRef<number | null>(null);
 
-  const wrapCompartment = useRef(new Compartment()).current;
-  const placeholderCompartment = useRef(new Compartment()).current;
-  const completionSourceRef = useRef<CompletionSource>(() => null);
-  const previewResolverRef = useRef<(rawTarget: string) => Promise<WikiLinkPreviewData | null>>(async () => null);
-
+  // Content change handler
   const updateContent = useCallback((nextContent: string) => {
     if (onContentChange) {
       onContentChange(nextContent);
@@ -676,490 +135,79 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     }
     setContent(nextContent);
   }, [onContentChange, setContent]);
-  const updateContentRef = useRef(updateContent);
-  const markdownFiles = useMemo(() => flattenMarkdownFiles(files), [files]);
-  const currentHeadings = useMemo(() => getWikiHeadingCandidates(content), [content]);
-  const fileCompletionOptions = useMemo<Completion[]>(() => markdownFiles.map((file) => {
-    const insertPath = getWikiLinkInsertPath(file, rootFolderPath);
-    const displayPath = getWikiLinkDisplayPath(file, rootFolderPath);
-    const fileLabel = stripMarkdownExtension(file.name);
 
-    return {
-      label: fileLabel,
-      displayLabel: fileLabel,
-      type: 'file',
-      detail: displayPath === fileLabel ? 'Knowledge base note' : displayPath,
-      apply: insertPath,
-      boost: insertPath.includes('/') ? 0 : 1,
-    };
-  }), [markdownFiles, rootFolderPath]);
-
-  const handlePastedImage = useCallback(async (file: File, view: EditorView) => {
-    if (!rootFolderPath) {
-      showNotification('Open a knowledge base before pasting images.', 'error');
-      return;
-    }
-
-    try {
-      const resourceFolder = sanitizeResourceFolder(settings.resourceFolder || 'resources') || 'resources';
-      const targetDir = joinFsPath(rootFolderPath, resourceFolder);
-      const extension = getImageExtension(file.type);
-      const noteBaseName = currentFilePath?.split(/[\\/]/).pop()?.replace(/\.(md|markdown)$/i, '') || 'image';
-      const imageName = `${noteBaseName}-${Date.now()}.${extension}`;
-      const imagePath = joinFsPath(targetDir, imageName);
-      const imageMarkdownPath = normalizeSlashes(joinFsPath(resourceFolder, imageName));
-      const arrayBuffer = await file.arrayBuffer();
-
-      const fileSystem = await getFileSystem();
-      await fileSystem.createDirectory(targetDir);
-      await writeBinaryFile(imagePath, new Uint8Array(arrayBuffer));
-      await refreshFileTree();
-
-      const insertText = buildPastedImageMarkdown(
-        imageMarkdownPath,
-        settings.attachmentPasteFormat || 'obsidian'
-      );
-      const selection = view.state.selection.main;
-      view.dispatch({
-        changes: { from: selection.from, to: selection.to, insert: insertText },
-        selection: { anchor: selection.from + insertText.length },
-        scrollIntoView: true,
-      });
-      showNotification(`Image pasted to ${resourceFolder}`, 'success');
-    } catch (error) {
-      console.error('Failed to paste image attachment:', error);
-      showNotification('Failed to paste image attachment.', 'error');
-    }
-  }, [
-    currentFilePath,
-    refreshFileTree,
-    rootFolderPath,
-    settings.attachmentPasteFormat,
-    settings.resourceFolder,
-    showNotification,
-    writeBinaryFile,
-  ]);
-
-  const readWikiTargetContent = useCallback(async (fileId: string, filePath: string, fileName: string): Promise<string> => {
-    if ((activeTabId && fileId === activeTabId) || (currentFilePath && filePath === currentFilePath)) {
-      return content;
-    }
-
-    const cachedContent = fileContents[fileId];
-    if (cachedContent !== undefined) {
-      return cachedContent;
-    }
-
-    const cachedPromise = hoveredLinkCacheRef.current.get(filePath);
-    if (cachedPromise) {
-      return cachedPromise;
-    }
-
-    const pending = readFile({
-      id: fileId,
-      name: fileName,
-      type: 'file',
-      path: filePath,
-    }).catch((error) => {
-      hoveredLinkCacheRef.current.delete(filePath);
-      throw error;
-    });
-
-    hoveredLinkCacheRef.current.set(filePath, pending);
-    return pending;
-  }, [activeTabId, content, currentFilePath, fileContents, readFile]);
-
-  const buildWikiLinkPreview = useCallback(async (rawTarget: string): Promise<WikiLinkPreviewData | null> => {
-    const parsedReference = parseWikiLinkReference(rawTarget);
-
-    if (!parsedReference.subpathType && parsedReference.path.trim()) {
-      const matchedHeading = findHeadingByReference(currentHeadings, rawTarget);
-      if (matchedHeading) {
-        const fragment = extractWikiNoteFragment(content, `#${matchedHeading.text}`);
-        if (!fragment.markdown) return null;
-
-        return {
-          title: matchedHeading.text,
-          subtitle: 'Current note',
-          html: renderMarkdown(fragment.markdown, {
-            highlighter,
-            themeMode: settings.themeMode,
-          }),
-        };
-      }
-    }
-
-    if (!parsedReference.path.trim()) {
-      const fragment = extractWikiNoteFragment(content, rawTarget);
-      if (!fragment.markdown) return null;
-
-      return {
-        title: fragment.title,
-        subtitle: 'Current note',
-        html: renderMarkdown(fragment.markdown, {
-          highlighter,
-          themeMode: settings.themeMode,
-        }),
-      };
-    }
-
-    const matchedFile = resolveWikiLinkFile(files, rawTarget, rootFolderPath, currentFilePath);
-    if (!matchedFile) return null;
-
-    const sourceContent = await readWikiTargetContent(matchedFile.id, matchedFile.path, matchedFile.name);
-    const fragment = extractWikiNoteFragment(sourceContent, rawTarget);
-    if (!fragment.markdown) return null;
-
-    return {
-      title: fragment.title,
-      subtitle: getWikiLinkDisplayPath(matchedFile, rootFolderPath),
-      html: renderMarkdown(fragment.markdown, {
-        highlighter,
-        themeMode: settings.themeMode,
-      }),
-    };
-  }, [
+  // WikiLinks hook
+  const wikiLinks = useWikiLinks({
     content,
     currentFilePath,
-    currentHeadings,
-    files,
-    highlighter,
-    readWikiTargetContent,
     rootFolderPath,
-    settings.themeMode,
-  ]);
+    files,
+    fileContents,
+    highlighter,
+    themeMode: settings.themeMode as 'light' | 'dark',
+    readFile,
+  });
 
-  const wikiLinkCompletionSource = useCallback<CompletionSource>(async (context: CompletionContext) => {
-    const match = findOpenWikiLinkAt(context.state.doc.toString(), context.pos);
-    if (!match) return null;
+  // Image paste hook
+  const { handlePastedImage } = useImagePaste({
+    rootFolderPath,
+    currentFilePath,
+    resourceFolder: settings.resourceFolder,
+    attachmentPasteFormat: settings.attachmentPasteFormat,
+    writeBinaryFile,
+    refreshFileTree,
+    showNotification,
+  });
 
-    if (!match.hasHash) {
-      return {
-        from: match.from,
-        to: match.to,
-        options: fileCompletionOptions,
-        validFor: /^[^#|\]\n]*$/,
-      };
-    }
+  // Scroll sync hook
+  const scrollSync = useScrollSync({ onScroll });
 
-    const noteTarget = match.pathQuery.trim();
-    const targetFile = noteTarget
-      ? resolveWikiLinkFile(files, noteTarget, rootFolderPath, currentFilePath)
-      : null;
-
-    let headingSourceContent = content;
-    if (targetFile) {
-      headingSourceContent = await readWikiTargetContent(targetFile.id, targetFile.path, targetFile.name);
-    } else if (noteTarget) {
-      return null;
-    }
-
-    const headingOptions: Completion[] = getWikiHeadingCandidates(headingSourceContent).map((heading) => ({
-      label: heading.text,
-      displayLabel: heading.text,
-      type: 'property',
-      detail: targetFile
-        ? `${stripMarkdownExtension(targetFile.name)} · H${heading.level}`
-        : `Current note · H${heading.level}`,
-      apply: heading.text,
-    }));
-
-    return {
-      from: match.from,
-      to: match.to,
-      options: headingOptions,
-      validFor: /^[^|\]\n]*$/,
-    };
-  }, [content, currentFilePath, fileCompletionOptions, files, readWikiTargetContent, rootFolderPath]);
-
-  const emitScrollPercentage = useCallback((scrollContainer: HTMLElement) => {
-    if (isSyncingScroll.current) return;
-
-    const onScrollCallback = onScrollRef.current;
-    if (!onScrollCallback) return;
-
-    const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-    if (scrollHeight <= 0) return;
-
-    const percentage = scrollContainer.scrollTop / scrollHeight;
-    if (Math.abs(percentage - lastScrollPercentage.current) <= SCROLL_EMIT_THRESHOLD) return;
-
-    lastScrollPercentage.current = percentage;
-    pendingEmittedPercentageRef.current = percentage;
-
-    if (emitAnimationFrameRef.current !== null) return;
-
-    emitAnimationFrameRef.current = requestAnimationFrame(() => {
-      emitAnimationFrameRef.current = null;
-      const pendingPercentage = pendingEmittedPercentageRef.current;
-      pendingEmittedPercentageRef.current = null;
-      if (pendingPercentage === null) return;
-      onScrollCallback(pendingPercentage);
-    });
-  }, [activeTabId]);
-
-  const cancelSyncedScroll = useCallback(() => {
-    if (syncAnimationFrameRef.current !== null) {
-      cancelAnimationFrame(syncAnimationFrameRef.current);
-      syncAnimationFrameRef.current = null;
-    }
-    syncTargetScrollTopRef.current = null;
-    isSyncingScroll.current = false;
-  }, [activeTabId]);
-
-  const animateSyncedScroll = useCallback((scrollDom: HTMLElement, targetScrollTop: number) => {
-    const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
-    const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
-    syncTargetScrollTopRef.current = clampedTarget;
-
-    if (syncAnimationFrameRef.current !== null) return;
-
-    isSyncingScroll.current = true;
-
-    syncAnimationFrameRef.current = requestAnimationFrame(() => {
-      syncAnimationFrameRef.current = null;
-      const currentView = editorViewRef.current;
-      const target = syncTargetScrollTopRef.current;
-
-      if (!currentView || currentView.scrollDOM !== scrollDom || target === null) {
-        syncTargetScrollTopRef.current = null;
-        isSyncingScroll.current = false;
-        return;
-      }
-
-      scrollDom.scrollTop = target;
-      syncTargetScrollTopRef.current = null;
-      requestAnimationFrame(() => {
-        isSyncingScroll.current = false;
-      });
-    });
-  }, []);
-
-  const [paneWidth, setPaneWidth] = useState(0);
-  const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
-  const [hoverPreview, setHoverPreview] = useState<HoverPreviewState | null>(null);
-  const layoutStyle = useMemo(() => ({
-    '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
-    '--pane-backdrop-py': `${layoutMetrics.backdropPaddingY}px`,
-    '--pane-frame-max-width': `${layoutMetrics.frameMaxWidth}px`,
-    '--pane-sheet-max-width': `${layoutMetrics.sheetMaxWidth}px`,
-    '--pane-sheet-radius': `${layoutMetrics.sheetRadius}px`,
-    '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
-    '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
-    '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
-    '--editor-font-family': fontFamily,
-    '--editor-font-size': `${settings.fontSize}px`,
-    '--editor-line-height': String(EDITOR_LINE_HEIGHT),
-  }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
-
-  useEffect(() => {
-    onScrollRef.current = onScroll;
-  }, [onScroll]);
-
-  useEffect(() => {
-    return () => {
+  // CodeMirror hook
+  const codeMirror = useCodeMirror({
+    content,
+    placeholder,
+    wordWrap: settings.wordWrap,
+    orderedListMode: settings.orderedListMode,
+    onChange: updateContent,
+    onScroll: scrollSync.handleScroll,
+    completionSource: wikiLinks.completionSource,
+    onPasteImage: handlePastedImage,
+    onWikiLinkStart: () => {
       if (completionStartFrameRef.current !== null) {
         cancelAnimationFrame(completionStartFrameRef.current);
+      }
+      completionStartFrameRef.current = requestAnimationFrame(() => {
         completionStartFrameRef.current = null;
-      }
-      if (emitAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(emitAnimationFrameRef.current);
-        emitAnimationFrameRef.current = null;
-      }
-      pendingEmittedPercentageRef.current = null;
-      cancelSyncedScroll();
-    };
-  }, [cancelSyncedScroll]);
-
-  useEffect(() => {
-    updateContentRef.current = updateContent;
-  }, [updateContent]);
-
-  useEffect(() => {
-    completionSourceRef.current = wikiLinkCompletionSource;
-  }, [wikiLinkCompletionSource]);
-
-  useEffect(() => {
-    previewResolverRef.current = buildWikiLinkPreview;
-  }, [buildWikiLinkPreview]);
-
-  useEffect(() => {
-    hoveredLinkCacheRef.current.clear();
-  }, [files, rootFolderPath]);
-
-  const hideHoverPreview = useCallback(() => {
-    hoverPreviewRequestRef.current += 1;
-    hoverPreviewTargetRef.current = null;
-    setHoverPreview(null);
-  }, []);
-
-  const updateHoverPreviewAtPointer = useCallback(async (clientX: number, clientY: number) => {
-    const view = editorViewRef.current;
-    if (!view || !previewModifierPressedRef.current) {
-      hideHoverPreview();
-      return;
-    }
-
-    const pos = view.posAtCoords({ x: clientX, y: clientY });
-    if (pos == null) {
-      hideHoverPreview();
-      return;
-    }
-
-    const match = findWikiLinkNearPosition(view.state.doc.toString(), pos);
-    if (!match) {
-      hideHoverPreview();
-      return;
-    }
-
-    const activeTarget = match.raw;
-    hoverPreviewTargetRef.current = activeTarget;
-
-    if (hoverPreview?.target === activeTarget) {
-      setHoverPreview((current) => current ? { ...current, x: clientX, y: clientY } : current);
-      return;
-    }
-
-    const requestId = hoverPreviewRequestRef.current + 1;
-    hoverPreviewRequestRef.current = requestId;
-    const preview = await previewResolverRef.current(activeTarget);
-
-    if (
-      hoverPreviewRequestRef.current !== requestId
-      || hoverPreviewTargetRef.current !== activeTarget
-      || !previewModifierPressedRef.current
-    ) {
-      return;
-    }
-
-    if (!preview) {
-      hideHoverPreview();
-      return;
-    }
-
-    setHoverPreview({
-      preview,
-      x: clientX,
-      y: clientY,
-      target: activeTarget,
-    });
-  }, [hideHoverPreview, hoverPreview?.target]);
-
-  useEffect(() => {
-    const syncModifierState = (active: boolean) => {
-      keyboardModifierPressedRef.current = active;
-      previewModifierPressedRef.current = active;
-
-      if (!active) {
-        hideHoverPreview();
-        return;
-      }
-
-      if (lastPointerRef.current) {
-        void updateHoverPreviewAtPointer(lastPointerRef.current.clientX, lastPointerRef.current.clientY);
-      }
-    };
-
-    const updatePointer = (clientX: number, clientY: number) => {
-      lastPointerRef.current = { clientX, clientY };
-
-      const view = editorViewRef.current;
-      if (!view || !previewModifierPressedRef.current) {
-        return;
-      }
-
-      const element = document.elementFromPoint(clientX, clientY);
-      if (!element || !view.dom.contains(element)) {
-        hideHoverPreview();
-        return;
-      }
-
-      void updateHoverPreviewAtPointer(clientX, clientY);
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isPreviewModifierKey(event.key)) {
-        syncModifierState(true);
-        return;
-      }
-
-      if (keyboardModifierPressedRef.current || isPreviewModifierPressed(event)) {
-        syncModifierState(true);
-      }
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (isPreviewModifierKey(event.key)) {
-        syncModifierState(false);
-        return;
-      }
-
-      if (!event.metaKey && !event.ctrlKey && previewModifierPressedRef.current) {
-        syncModifierState(false);
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (!previewModifierPressedRef.current) return;
-      syncModifierState(false);
-    };
-
-    const handleBlur = () => {
-      syncModifierState(false);
-    };
-
-    const handleMouseMove = (event: MouseEvent) => {
-      previewModifierPressedRef.current = keyboardModifierPressedRef.current || isPreviewModifierPressed(event);
-
-      if (!previewModifierPressedRef.current) {
-        return;
-      }
-
-      updatePointer(event.clientX, event.clientY);
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('keyup', handleKeyUp, true);
-    window.addEventListener('mouseup', handleMouseUp, true);
-    window.addEventListener('mousemove', handleMouseMove, true);
-    window.addEventListener('blur', handleBlur);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('keyup', handleKeyUp, true);
-      window.removeEventListener('mouseup', handleMouseUp, true);
-      window.removeEventListener('mousemove', handleMouseMove, true);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [hideHoverPreview, updateHoverPreviewAtPointer]);
-
-  const wikiLinkAutocompleteExtension = useMemo(() => autocompletion({
-    activateOnTyping: true,
-    override: [(context) => completionSourceRef.current(context)],
-    maxRenderedOptions: 40,
-  }), []);
-
-  useImperativeHandle(ref, () => ({
-    cancelScrollSync: cancelSyncedScroll,
-    syncScrollTo: (percentage: number) => {
-      const view = editorViewRef.current;
-      if (!view) return;
-
-      const scrollDom = view.scrollDOM;
-      const maxScrollTop = scrollDom.scrollHeight - scrollDom.clientHeight;
-      if (maxScrollTop <= 0) return;
-
-      const targetScrollTop = maxScrollTop * percentage;
-      if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= SCROLL_THRESHOLD) return;
-      animateSyncedScroll(scrollDom, targetScrollTop);
+        // Trigger completion
+      });
     },
-  }), [animateSyncedScroll, cancelSyncedScroll]);
+  });
 
+  // Register/clear editor view for selection bridge
+  useEffect(() => {
+    if (codeMirror.view) {
+      registerActiveEditorView(codeMirror.view);
+      scrollSync.registerView(codeMirror.view);
+    }
+    return () => {
+      if (codeMirror.view) {
+        clearActiveEditorView(codeMirror.view);
+      }
+      scrollSync.registerView(null);
+    };
+  }, [codeMirror.view, scrollSync]);
+
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    cancelScrollSync: scrollSync.cancelScrollSync,
+    syncScrollTo: scrollSync.syncScrollTo,
+  }), [scrollSync]);
+
+  // Pane width tracking
   useLayoutEffect(() => {
     const layout = layoutRef.current;
     if (!layout) return;
 
-    // Throttle pane width updates to 16ms (60fps) for better performance
     const throttledSetPaneWidth = throttle(setPaneWidth, 16);
 
     const updatePaneWidth = () => {
@@ -1181,245 +229,140 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     return () => resizeObserver.disconnect();
   }, [activeTabId]);
 
-  useEffect(() => {
-    if (!activeTabId) {
-      const existingView = editorViewRef.current;
-      if (existingView) {
-        clearActiveEditorView(existingView);
-        existingView.destroy();
-        editorViewRef.current = null;
-      }
+  // Layout style
+  const layoutStyle = useMemo(() => ({
+    '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
+    '--pane-backdrop-py': `${layoutMetrics.backdropPaddingY}px`,
+    '--pane-frame-max-width': `${layoutMetrics.frameMaxWidth}px`,
+    '--pane-sheet-max-width': `${layoutMetrics.sheetMaxWidth}px`,
+    '--pane-sheet-radius': `${layoutMetrics.sheetRadius}px`,
+    '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
+    '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
+    '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
+    '--editor-font-family': fontFamily,
+    '--editor-font-size': `${settings.fontSize}px`,
+    '--editor-line-height': String(EDITOR_LINE_HEIGHT),
+  }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
+
+  // Hover preview state
+  const [hoverPreview, setHoverPreview] = useState<HoverPreviewState | null>(null);
+  const previewModifierPressedRef = useRef(false);
+  const keyboardModifierPressedRef = useRef(false);
+  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const hoverPreviewRequestRef = useRef(0);
+  const hoverPreviewTargetRef = useRef<string | null>(null);
+
+  // Hover preview handlers
+  const hideHoverPreview = useCallback(() => {
+    hoverPreviewRequestRef.current += 1;
+    hoverPreviewTargetRef.current = null;
+    setHoverPreview(null);
+  }, []);
+
+  const updateHoverPreviewAtPointer = useCallback(async (clientX: number, clientY: number) => {
+    const view = codeMirror.view;
+    if (!view || !previewModifierPressedRef.current) {
+      hideHoverPreview();
       return;
     }
 
-    const root = editorRootRef.current;
-    if (!root || editorViewRef.current) return;
-
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: content,
-        extensions: [
-          history(),
-          keymap.of([
-            ...completionKeymap,
-            // Markdown-specific Enter handling (before default)
-            { key: 'Enter', run: handleMarkdownEnter },
-            { key: 'Backspace', run: handleMarkdownBackspace },
-            { key: 'Shift-Tab', run: dedentListOrSelection },
-            { key: 'Tab', run: indentSelectionOrInsertSpaces },
-            // Default keymaps
-            ...defaultKeymap,
-            ...historyKeymap,
-            // Markdown formatting shortcuts
-            { key: 'Mod-b', run: toggleBold },
-            { key: 'Mod-i', run: toggleItalic },
-            { key: 'Mod-k', run: insertLink },
-            { key: 'Mod-Shift-k', run: insertCodeBlock },
-            { key: 'Mod-`', run: insertInlineCode },
-            { key: 'Mod-Shift-l', run: insertUnorderedList },
-            { key: 'Mod-Shift-o', run: insertOrderedList },
-            { key: 'Mod-Shift-.', run: insertBlockquote },
-            { key: 'Mod-Shift-h', run: insertHeading },
-          ]),
-          wikiLinkAutocompleteExtension,
-          indentUnit.of(LIST_INDENT_UNIT),
-          markdown({ codeLanguages: resolveEditorCodeLanguage }),
-          drawSelection(),
-          frontmatterDecorations,
-          fencedCodeDecorations,
-          wrapCompartment.of(settings.wordWrap ? EditorView.lineWrapping : []),
-          syntaxHighlighting(markdownHighlightStyle),
-          placeholderCompartment.of(cmPlaceholder(placeholder)),
-          EditorView.domEventHandlers({
-            mousemove: (event) => {
-              lastPointerRef.current = {
-                clientX: event.clientX,
-                clientY: event.clientY,
-              };
-              previewModifierPressedRef.current = keyboardModifierPressedRef.current || isPreviewModifierPressed(event);
-              if (!previewModifierPressedRef.current) {
-                hideHoverPreview();
-                return false;
-              }
-              void updateHoverPreviewAtPointer(event.clientX, event.clientY);
-              return false;
-            },
-            mouseleave: () => {
-              lastPointerRef.current = null;
-              previewModifierPressedRef.current = false;
-              hideHoverPreview();
-              return false;
-            },
-            scroll: () => {
-              hideHoverPreview();
-              return false;
-            },
-            paste: (event, view) => {
-              const clipboardItems = Array.from(event.clipboardData?.items ?? []);
-              const imageItem = clipboardItems.find((item) => item.type.startsWith('image/'));
-              const imageFile = imageItem?.getAsFile();
-
-              if (!imageFile) {
-                return false;
-              }
-
-              event.preventDefault();
-              void handlePastedImage(imageFile, view);
-              return true;
-            },
-          }),
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              updateContentRef.current(update.state.doc.toString());
-
-              const selection = update.state.selection.main;
-              if (selection.empty) {
-                const cursor = selection.from;
-                const prevTwoChars = update.state.doc.sliceString(Math.max(0, cursor - 2), cursor);
-                const prevOneChar = update.state.doc.sliceString(Math.max(0, cursor - 1), cursor);
-                if (prevTwoChars === '[[' || prevOneChar === '#') {
-                  const openMatch = findOpenWikiLinkAt(update.state.doc.toString(), cursor);
-                  if (openMatch) {
-                    if (completionStartFrameRef.current !== null) {
-                      cancelAnimationFrame(completionStartFrameRef.current);
-                    }
-                    completionStartFrameRef.current = requestAnimationFrame(() => {
-                      completionStartFrameRef.current = null;
-                      const currentView = editorViewRef.current;
-                      if (currentView) {
-                        startCompletion(currentView);
-                      }
-                    });
-                  }
-                }
-              }
-            }
-          }),
-        ],
-      }),
-      parent: root,
-    });
-
-    const handleDomScroll = () => {
+    const pos = view.posAtCoords({ x: clientX, y: clientY });
+    if (pos == null) {
       hideHoverPreview();
-      emitScrollPercentage(view.scrollDOM);
-    };
-    const handleUserScrollIntent = () => {
-      cancelSyncedScroll();
-    };
-
-    view.scrollDOM.addEventListener('scroll', handleDomScroll, { passive: true });
-    view.scrollDOM.addEventListener('wheel', handleUserScrollIntent, { passive: true });
-    view.scrollDOM.addEventListener('touchstart', handleUserScrollIntent, { passive: true });
-    view.scrollDOM.addEventListener('pointerdown', handleUserScrollIntent, { passive: true });
-
-    editorViewRef.current = view;
-    registerActiveEditorView(view);
-    const initialMeasureFrame = requestAnimationFrame(() => {
-      view.requestMeasure();
-    });
-
-    return () => {
-      cancelSyncedScroll();
-      cancelAnimationFrame(initialMeasureFrame);
-      view.scrollDOM.removeEventListener('scroll', handleDomScroll);
-      view.scrollDOM.removeEventListener('wheel', handleUserScrollIntent);
-      view.scrollDOM.removeEventListener('touchstart', handleUserScrollIntent);
-      view.scrollDOM.removeEventListener('pointerdown', handleUserScrollIntent);
-      clearActiveEditorView(view);
-      view.destroy();
-      if (editorViewRef.current === view) {
-        editorViewRef.current = null;
-      }
-    };
-  }, [
-    activeTabId,
-    placeholder,
-    settings.wordWrap,
-    placeholderCompartment,
-    wrapCompartment,
-    emitScrollPercentage,
-    cancelSyncedScroll,
-    handlePastedImage,
-    hideHoverPreview,
-    wikiLinkAutocompleteExtension,
-    updateHoverPreviewAtPointer,
-  ]);
-
-  useEffect(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-
-    view.dispatch({
-      effects: wrapCompartment.reconfigure(settings.wordWrap ? EditorView.lineWrapping : []),
-    });
-  }, [settings.wordWrap, wrapCompartment]);
-
-  useEffect(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-
-    view.dispatch({
-      effects: placeholderCompartment.reconfigure(cmPlaceholder(placeholder)),
-    });
-  }, [placeholder, placeholderCompartment]);
-
-  useEffect(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-
-    const currentContent = view.state.doc.toString();
-    if (currentContent === content) return;
-
-    const anchor = Math.min(view.state.selection.main.anchor, content.length);
-    const head = Math.min(view.state.selection.main.head, content.length);
-
-    view.dispatch({
-      changes: { from: 0, to: currentContent.length, insert: content },
-      selection: { anchor, head },
-    });
-  }, [content]);
-
-  // Refresh editor when fonts are loaded
-  useEffect(() => {
-    const handleFontsLoaded = () => {
-      const view = editorViewRef.current;
-      if (!view) return;
-      // Force CodeMirror to re-measure and redraw
-      view.requestMeasure();
-    };
-
-    // Listen for font load events
-    document.fonts?.addEventListener?.('loadingdone', handleFontsLoaded);
-    
-    // Also check if fonts are already loaded
-    if (document.fonts?.status === 'loaded') {
-      handleFontsLoaded();
+      return;
     }
 
-    return () => {
-      document.fonts?.removeEventListener?.('loadingdone', handleFontsLoaded);
+    const match = findWikiLinkNearPosition(view.state.doc.toString(), pos);
+    if (!match) {
+      hideHoverPreview();
+      return;
+    }
+
+    const activeTarget = match.rawQuery;
+    hoverPreviewTargetRef.current = activeTarget;
+
+    if (hoverPreview?.target === activeTarget) {
+      setHoverPreview(current => current ? { ...current, x: clientX, y: clientY } : current);
+      return;
+    }
+
+    const requestId = hoverPreviewRequestRef.current + 1;
+    hoverPreviewRequestRef.current = requestId;
+    const preview = await wikiLinks.buildPreview(activeTarget);
+
+    if (
+      hoverPreviewRequestRef.current !== requestId ||
+      hoverPreviewTargetRef.current !== activeTarget ||
+      !previewModifierPressedRef.current
+    ) {
+      return;
+    }
+
+    if (!preview) {
+      hideHoverPreview();
+      return;
+    }
+
+    setHoverPreview({
+      preview,
+      x: clientX,
+      y: clientY,
+      target: activeTarget,
+    });
+  }, [codeMirror.view, hideHoverPreview, hoverPreview?.target, wikiLinks]);
+
+  // Keyboard/mouse handlers for preview modifier
+  useEffect(() => {
+    const syncModifierState = (active: boolean) => {
+      keyboardModifierPressedRef.current = active;
+      previewModifierPressedRef.current = active;
+      if (!active) hideHoverPreview();
     };
-  }, []);
 
-  useLayoutEffect(() => {
-    const view = editorViewRef.current;
-    const layout = layoutRef.current;
-    if (!view || !layout) return;
+    const updatePointer = (clientX: number, clientY: number) => {
+      lastPointerRef.current = { clientX, clientY };
+      if (!previewModifierPressedRef.current) return;
+      void updateHoverPreviewAtPointer(clientX, clientY);
+    };
 
-    const syncEditorLayout = () => {
-      const nextWidth = layout.getBoundingClientRect().width;
-      if (nextWidth > 0) {
-        setPaneWidth((prev) => (Math.abs(prev - nextWidth) > 0.5 ? nextWidth : prev));
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isPreviewModifierKey(event.key)) {
+        syncModifierState(true);
+      } else if (isPreviewModifierPressed(event)) {
+        syncModifierState(true);
       }
-      view.requestMeasure();
     };
 
-    syncEditorLayout();
-    const rafId = requestAnimationFrame(syncEditorLayout);
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (isPreviewModifierKey(event.key)) {
+        syncModifierState(false);
+      } else if (!event.metaKey && !event.ctrlKey && previewModifierPressedRef.current) {
+        syncModifierState(false);
+      }
+    };
 
-    return () => cancelAnimationFrame(rafId);
-  }, [activeTabId, viewMode, paneWidth]);
+    const handleMouseMove = (event: MouseEvent) => {
+      previewModifierPressedRef.current = keyboardModifierPressedRef.current || isPreviewModifierPressed(event);
+      if (previewModifierPressedRef.current) {
+        updatePointer(event.clientX, event.clientY);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+    };
+  }, [hideHoverPreview, updateHoverPreviewAtPointer]);
+
+  // Cancel scroll sync on view mode change
+  useEffect(() => {
+    scrollSync.cancelScrollSync();
+  }, [viewMode, scrollSync]);
 
   if (!activeTabId) {
     return (
@@ -1453,7 +396,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
         <div className="editor-pane-scroll h-full overflow-hidden">
           <div className="editor-pane-frame h-full w-full">
             <div className="editor-pane-sheet h-full w-full">
-              <div ref={editorRootRef} className="editor-pane-codemirror h-full w-full" />
+              <div ref={codeMirror.editorRef} className="editor-pane-codemirror h-full w-full" />
             </div>
           </div>
         </div>

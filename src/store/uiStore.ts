@@ -52,6 +52,7 @@ export const defaultSettings: AppSettings = {
   chineseFontFamily: DEFAULT_CHINESE_FONT_FAMILY,
   resourceFolder: 'resources',
   attachmentPasteFormat: 'obsidian',
+  orderedListMode: 'strict',
   githubRepo: '',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash-exp',
@@ -73,6 +74,7 @@ export const defaultSettings: AppSettings = {
   },
   knowledgeBases: [],
   lastKnowledgeBasePath: '',
+  lastOpenedFilePath: '',
   themeMode: 'dark',
   metadataFields: [
     { key: 'category', defaultValue: '' },

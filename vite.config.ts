@@ -30,8 +30,6 @@ export default defineConfig(({ mode }) => {
         outDir: 'dist',
         emptyOutDir: true,
         chunkSizeWarningLimit: 1600,
-        // Use absolute path for Tauri, relative for web
-        base: isTauri ? '/' : './',
         // Generate source maps for debugging
         sourcemap: mode === 'development',
         rollupOptions: {
@@ -76,7 +74,7 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      // Base path: absolute for Tauri (asset:// protocol), relative for web
-      base: isTauri ? '/' : './',
+      // Base path: absolute for production/Tauri (asset:// protocol), relative for web dev
+      base: mode === 'production' ? '/' : './',
     };
 });

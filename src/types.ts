@@ -72,6 +72,7 @@ export interface KnowledgeBaseMeta {
 
 export type ThemeMode = 'light' | 'dark';
 export type AttachmentPasteFormat = 'markdown' | 'obsidian';
+export type OrderedListMode = 'strict' | 'loose';
 
 export interface AppSettings {
   fontSize: number;
@@ -80,12 +81,14 @@ export interface AppSettings {
   chineseFontFamily: string;
   resourceFolder: string;
   attachmentPasteFormat: AttachmentPasteFormat;
+  orderedListMode: OrderedListMode;
   githubRepo: string;
   geminiApiKey?: string;
   geminiModel?: string;
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;
+  lastOpenedFilePath?: string;
   themeMode: ThemeMode;
   metadataFields: MetadataField[];
   autoSaveInterval: number; // Auto-save interval in milliseconds

@@ -164,6 +164,14 @@ const App: React.FC = () => {
     return () => window.cancelAnimationFrame(frame);
   }, [settingsHydrated]);
 
+  // Remember the last opened file so startup can restore it after hydration.
+  useEffect(() => {
+    if (!settingsHydrated || !currentFilePath) return;
+    if (settings.lastOpenedFilePath === currentFilePath) return;
+
+    updateSettings({ lastOpenedFilePath: currentFilePath });
+  }, [settingsHydrated, currentFilePath, settings.lastOpenedFilePath, updateSettings]);
+
   // Keep the watched/saved path derived from the active tab and current file tree.
   useEffect(() => {
     const nextPath = activeTabId ? findFileInTree(files, activeTabId)?.path ?? null : null;
