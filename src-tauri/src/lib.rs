@@ -38,8 +38,12 @@ async fn copy_sample_notes(
   let source = Path::new(&resource_dir);
   let target = Path::new(&target_dir);
 
+  println!("[copy_sample_notes] Source: {:?}", source);
+  println!("[copy_sample_notes] Target: {:?}", target);
+  println!("[copy_sample_notes] Source exists: {}", source.exists());
+
   if !source.exists() {
-    return Err("Sample notes source directory not found".to_string());
+    return Err(format!("Sample notes source directory not found: {:?}", source));
   }
 
   // Ensure target directory exists
