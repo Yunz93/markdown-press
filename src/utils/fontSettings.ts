@@ -1,10 +1,68 @@
 import type { AppSettings } from '../types';
-import bundledChineseFontUrl from '../assets/fonts/LXGWWenKai-Regular.ttf?url';
 
 const DYNAMIC_FONT_STYLE_ID = 'markdown-press-dynamic-font-faces';
 const LATIN_FONT_ALIAS = 'MarkdownPressLatin';
 const BUNDLED_CHINESE_FONT_NAMES = ['LXGW WenKai', '霞鹜文楷'];
 export type FontSettings = Pick<AppSettings, 'englishFontFamily' | 'chineseFontFamily'>;
+
+// Font URL cache
+let cachedFontUrl: string | null = null;
+
+/**
+ * Get the bundled font URL - handles both web and Tauri environments
+ * In Tauri production builds, resources are accessed via the resource:// protocol
+ * or relative paths depending on the platform
+ */
+async function resolveBundledFontUrl(): Promise<string> {
+  if (cachedFontUrl) return cachedFontUrl;
+  
+  // Check if running in Tauri
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+  
+  if (isTauri) {
+    try {
+      // Dynamically import Tauri APIs
+      const { resourceDir } = await import('@tauri-apps/api/path');
+      const { convertFileSrc } = await import('@tauri-apps/api/core');
+      
+      const resDir = await resourceDir();
+      const fontPath = `${resDir}fonts/LXGWWenKai-Regular.ttf`;
+      
+      // Convert to a URL that can be loaded in the webview
+      cachedFontUrl = convertFileSrc(fontPath);
+      console.log('[fontSettings] Resolved Tauri font URL:', cachedFontUrl);
+      return cachedFontUrl;
+    } catch (error) {
+      console.warn('[fontSettings] Failed to resolve Tauri font path:', error);
+      // Fallback to relative path for resources
+      cachedFontUrl = './resources/fonts/LXGWWenKai-Regular.ttf';
+      return cachedFontUrl;
+    }
+  }
+  
+  // For web build, use Vite's asset handling
+  try {
+    // Import the font with ?url to get the processed URL
+    const fontUrl = await import('../assets/fonts/LXGWWenKai-Regular.ttf?url').then(m => m.default);
+    cachedFontUrl = fontUrl;
+    return cachedFontUrl;
+  } catch {
+    // Fallback to relative path
+    cachedFontUrl = './assets/LXGWWenKai-Regular.ttf';
+    return cachedFontUrl;
+  }
+}
+
+/**
+ * Synchronous version - returns cached URL or default
+ */
+function getBundledFontUrl(): string {
+  if (cachedFontUrl) return cachedFontUrl;
+  
+  // Return a placeholder that will be resolved asynchronously
+  // The actual URL will be resolved by ensureDynamicFontFaces
+  return '';
+}
 
 const GENERIC_FONT_FAMILIES = new Set([
   'serif',
@@ -112,8 +170,8 @@ export function usesBundledChineseFont(settings: Pick<AppSettings, 'chineseFontF
   return fontFamilyMentionsBundledChineseFont(getResolvedChineseFontFamily(settings));
 }
 
-export function getBundledChineseFontAssetUrl(): string {
-  return bundledChineseFontUrl;
+export function getBundledChineseFontAssetUrl(): Promise<string> {
+  return resolveBundledFontUrl();
 }
 
 export function buildDynamicFontFaceCss(
@@ -123,7 +181,7 @@ export function buildDynamicFontFaceCss(
   } = {}
 ): string {
   const englishFontFamily = getResolvedEnglishFontFamily(settings);
-  const bundledChineseFontSrc = options.bundledChineseFontSrc || bundledChineseFontUrl;
+  const bundledChineseFontSrc = options.bundledChineseFontSrc || getBundledFontUrl();
 
   return `
 ${buildBundledChineseFontFaces(bundledChineseFontSrc)}
@@ -142,12 +200,16 @@ ${buildBundledChineseFontFaces(bundledChineseFontSrc)}
 `.trim();
 }
 
-export function ensureDynamicFontFaces(
+export async function ensureDynamicFontFaces(
   settings: FontSettings
 ): Promise<void> {
   if (typeof document === 'undefined') return Promise.resolve();
 
-  const css = buildDynamicFontFaceCss(settings);
+  // Resolve the font URL first
+  const fontUrl = await resolveBundledFontUrl();
+  console.log('[fontSettings] Using bundled font URL:', fontUrl);
+
+  const css = buildDynamicFontFaceCss(settings, { bundledChineseFontSrc: fontUrl });
 
   let styleElement = document.getElementById(DYNAMIC_FONT_STYLE_ID) as HTMLStyleElement | null;
   const cssChanged = !styleElement || styleElement.textContent !== css;
@@ -173,8 +235,6 @@ export function ensureDynamicFontFaces(
       pendingLoads.push(document.fonts.load(`1em ${chineseFontFamily}`, '测'));
     }
 
-    return Promise.all(pendingLoads).then(() => undefined);
+    await Promise.all(pendingLoads);
   }
-  
-  return Promise.resolve();
 }

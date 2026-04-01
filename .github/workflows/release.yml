@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     permissions:
@@ -96,4 +99,4 @@ jobs:
           releaseDraft: false
           prerelease: false
           releaseAssetNamePattern: MarkdownPress_[version]_[arch][ext]
-          args: --bundles msi
+          args: --bundles nsis

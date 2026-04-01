@@ -54,8 +54,9 @@ export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promi
     return '';
   }
 
-  const bundledChineseFontSrc = usesBundledChineseFont(fontSettings)
-    ? await inlineAssetAsDataUrl(getBundledChineseFontAssetUrl())
+  const fontUrl = await getBundledChineseFontAssetUrl();
+  const bundledChineseFontSrc = usesBundledChineseFont(fontSettings) && fontUrl
+    ? await inlineAssetAsDataUrl(fontUrl)
     : undefined;
 
   return buildDynamicFontFaceCss(
