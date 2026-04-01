@@ -357,12 +357,10 @@ export function adjustListItemLevel(
   delta: number
 ): ListItemInfo {
   const newLevel = Math.max(0, item.level + delta);
-  const newIndent = getIndentFromLevel(newLevel);
-  console.log('[adjustListItemLevel] newLevel:', newLevel, 'newIndent:', JSON.stringify(newIndent));
   return {
     ...item,
     level: newLevel,
-    indent: newIndent,
+    indent: getIndentFromLevel(newLevel),
     number: item.type === 'ordered' ? 1 : item.number,
   };
 }
@@ -372,8 +370,6 @@ export function adjustListItemLevel(
  */
 export function formatListItem(item: ListItemInfo): string {
   const indent = getIndentFromLevel(item.level);
-  console.log('[formatListItem] item.level:', item.level);
-  console.log('[formatListItem] indent:', JSON.stringify(indent));
   // 确保内容没有前导空格，避免格式化后出现多余空格
   const content = item.content.trimStart();
 
