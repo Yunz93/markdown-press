@@ -31,7 +31,8 @@
     "active": true,
     "targets": [
       "app",
-      "dmg"
+      "dmg",
+      "msi"
     ],
     "icon": [
       "icons/32x32.png",

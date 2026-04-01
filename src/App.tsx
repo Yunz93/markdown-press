@@ -452,7 +452,6 @@ const App: React.FC = () => {
         onRename={fileOps.handleRename}
         onDelete={fileOps.handleDelete}
         onReveal={fileOps.handleRevealInExplorer}
-        onOpenInBrowser={fileOps.handleOpenInFileExplorer}
         onMoveToTrash={fileOps.handleMoveToTrash}
         onRestoreFromTrash={fileOps.handleRestoreFromTrash}
         onDeleteForever={fileOps.handleDeleteForever}
