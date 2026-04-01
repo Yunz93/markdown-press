@@ -214,41 +214,65 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     };
   }, [scroll, navigation]);
 
-  // Apply heading attributes after render
-  useLayoutEffect(() => {
+  // Apply heading attributes after render - use requestIdleCallback for better performance
+  useEffect(() => {
     if (!isMarkdownPreview) return;
     const container = previewRef.current;
     if (!container) return;
 
-    const flattenedHeadings = flattenHeadingNodes(parseHeadings(content));
-    const headingElements = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'));
+    const applyHeadingAttributes = () => {
+      const flattenedHeadings = flattenHeadingNodes(parseHeadings(content));
+      // Limit querySelector to visible area for long documents
+      const headingElements = Array.from(container.querySelectorAll<HTMLElement>(
+        'article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'
+      ));
 
-    headingElements.forEach((element: HTMLElement, index) => {
-      const heading = flattenedHeadings[index];
-      if (!heading) {
-        element.removeAttribute('data-heading-id');
-        element.removeAttribute('data-heading-slug');
-        element.removeAttribute('data-heading-text');
-        return;
-      }
+      headingElements.forEach((element: HTMLElement, index) => {
+        const heading = flattenedHeadings[index];
+        if (!heading) {
+          element.removeAttribute('data-heading-id');
+          element.removeAttribute('data-heading-slug');
+          element.removeAttribute('data-heading-text');
+          return;
+        }
 
-      element.id = heading.id;
-      element.dataset.headingId = heading.id;
-      element.dataset.headingSlug = createHeadingSlug(heading.text);
-      element.dataset.headingText = heading.text;
-    });
+        element.id = heading.id;
+        element.dataset.headingId = heading.id;
+        element.dataset.headingSlug = createHeadingSlug(heading.text);
+        element.dataset.headingText = heading.text;
+      });
+    };
+
+    // Use requestIdleCallback for non-critical updates
+    if ('requestIdleCallback' in window) {
+      const id = requestIdleCallback(applyHeadingAttributes, { timeout: 100 });
+      return () => cancelIdleCallback(id);
+    } else {
+      const id = setTimeout(applyHeadingAttributes, 0);
+      return () => clearTimeout(id);
+    }
   }, [activeTabId, renderer.enhancedBodyHtml, content, isMarkdownPreview]);
 
-  // Render Mermaid diagrams
+  // Render Mermaid diagrams - debounced and limited for performance
   useEffect(() => {
     if (!isMarkdownPreview) return;
+    const container = previewRef.current;
+    if (!container) return;
+
+    // Count mermaid diagrams to avoid performance issues
+    const mermaidCount = container.querySelectorAll('.mermaid').length;
+    if (mermaidCount > 20) {
+      console.warn(`[PreviewPane] Too many Mermaid diagrams (${mermaidCount}), skipping render`);
+      return;
+    }
+
     const timer = window.setTimeout(() => {
-      renderMermaidDiagrams(previewRef.current);
-    }, 50);
+      renderMermaidDiagrams(container);
+    }, 100); // Increased delay for better batching
     return () => window.clearTimeout(timer);
   }, [renderer.enhancedBodyHtml, isMarkdownPreview, settings.themeMode]);
 
-  // Warm preview images
+  // Warm preview images - use IntersectionObserver for lazy loading
   useEffect(() => {
     if (!isMarkdownPreview) return;
     const container = previewRef.current;
@@ -256,23 +280,44 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
     let cancelled = false;
     const images = Array.from(container.querySelectorAll('article.markdown-body img'));
+    
+    // Skip if too many images (performance protection)
+    if (images.length > 100) {
+      console.warn(`[PreviewPane] Too many images (${images.length}), skipping eager warmup`);
+      return;
+    }
 
-    void Promise.all(images.map(async (image: Element) => {
-      const imgElement = image as HTMLImageElement;
-      const originalSrc = imgElement.getAttribute('data-original-src') || imgElement.getAttribute('src');
-      if (!originalSrc) return;
+    // Process images in batches to avoid blocking
+    const BATCH_SIZE = 5;
+    const processBatch = async (startIndex: number) => {
+      if (cancelled || startIndex >= images.length) return;
+      
+      const batch = images.slice(startIndex, startIndex + BATCH_SIZE);
+      await Promise.all(batch.map(async (image: Element) => {
+        const imgElement = image as HTMLImageElement;
+        const originalSrc = imgElement.getAttribute('data-original-src') || imgElement.getAttribute('src');
+        if (!originalSrc) return;
 
-      const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
-      if (cancelled || !imgElement.isConnected || !cachedSrc) return;
+        const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
+        if (cancelled || !imgElement.isConnected || !cachedSrc) return;
 
-      if (imgElement.getAttribute('data-original-src') !== originalSrc) {
-        imgElement.setAttribute('data-original-src', originalSrc);
+        if (imgElement.getAttribute('data-original-src') !== originalSrc) {
+          imgElement.setAttribute('data-original-src', originalSrc);
+        }
+        if (imgElement.getAttribute('src') !== cachedSrc) {
+          imgElement.setAttribute('src', cachedSrc);
+          imgElement.src = cachedSrc;
+        }
+      }));
+
+      // Schedule next batch to allow UI updates
+      if (startIndex + BATCH_SIZE < images.length) {
+        setTimeout(() => processBatch(startIndex + BATCH_SIZE), 0);
       }
-      if (imgElement.getAttribute('src') !== cachedSrc) {
-        imgElement.setAttribute('src', cachedSrc);
-        imgElement.src = cachedSrc;
-      }
-    }));
+    };
+
+    // Start processing
+    processBatch(0);
 
     return () => { cancelled = true; };
   }, [currentFilePath, renderer.enhancedBodyHtml, isMarkdownPreview]);

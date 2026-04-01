@@ -85,6 +85,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const [viewReady, setViewReady] = useState(false);
   const [editorElementReady, setEditorElementReady] = useState(false);
   const isApplyingOrderedNormalizationRef = useRef(false);
+  const normalizationTimeoutRef = useRef<number | null>(null);
   const completionSourceRef = useRef(completionSource);
   const onScrollRef = useRef(onScroll);
   const onPasteImageRef = useRef(onPasteImage);
@@ -181,18 +182,27 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
             syntaxHighlighting(markdownHighlightStyle),
             compartments.placeholder.of(cmPlaceholder(placeholder)),
             EditorView.domEventHandlers({
-              scroll: () => {
-                const scrollHandler = onScrollRef.current;
-                if (scrollHandler && viewRef.current) {
-                  const scrollDom = viewRef.current.scrollDOM;
-                  const scrollHeight = scrollDom.scrollHeight - scrollDom.clientHeight;
-                  if (scrollHeight > 0) {
-                    const percentage = scrollDom.scrollTop / scrollHeight;
-                    scrollHandler(percentage);
+              scroll: (() => {
+                // Throttle scroll events for better performance
+                let lastScrollTime = 0;
+                const SCROLL_THROTTLE = 16; // ~60fps
+                return () => {
+                  const now = performance.now();
+                  if (now - lastScrollTime < SCROLL_THROTTLE) return false;
+                  lastScrollTime = now;
+                  
+                  const scrollHandler = onScrollRef.current;
+                  if (scrollHandler && viewRef.current) {
+                    const scrollDom = viewRef.current.scrollDOM;
+                    const scrollHeight = scrollDom.scrollHeight - scrollDom.clientHeight;
+                    if (scrollHeight > 0) {
+                      const percentage = scrollDom.scrollTop / scrollHeight;
+                      scrollHandler(percentage);
+                    }
                   }
-                }
-                return false;
-              },
+                  return false;
+                };
+              })(),
               paste: (event, view) => {
                 // Handle structured paste (lists, links)
                 // Note: This is handled separately in useStructuredPaste
@@ -216,18 +226,30 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
             EditorView.updateListener.of((update: ViewUpdate) => {
               if (!update.docChanged) return;
 
-              // Handle strict ordered list normalization
+              // Handle strict ordered list normalization - debounced for performance
               if (orderedListMode === 'strict' && !isApplyingOrderedNormalizationRef.current) {
-                const normalizationChanges = getStrictOrderedListNormalizationChanges(update.state);
-                if (normalizationChanges) {
-                  isApplyingOrderedNormalizationRef.current = true;
-                  update.view.dispatch({
-                    changes: normalizationChanges,
-                    annotations: Transaction.addToHistory.of(false),
-                    userEvent: 'input',
-                  });
-                  isApplyingOrderedNormalizationRef.current = false;
-                  return;
+                // Only normalize on user input events, not on programmatic changes
+                const isUserInput = update.transactions.some(t => t.isUserEvent('input') || t.isUserEvent('delete'));
+                if (isUserInput) {
+                  // Use debounced normalization to avoid blocking during typing
+                  if (normalizationTimeoutRef.current) {
+                    clearTimeout(normalizationTimeoutRef.current);
+                  }
+                  normalizationTimeoutRef.current = window.setTimeout(() => {
+                    const view = viewRef.current;
+                    if (!view || isApplyingOrderedNormalizationRef.current) return;
+                    const normalizationChanges = getStrictOrderedListNormalizationChanges(view.state);
+                    if (normalizationChanges) {
+                      isApplyingOrderedNormalizationRef.current = true;
+                      view.dispatch({
+                        changes: normalizationChanges,
+                        annotations: Transaction.addToHistory.of(false),
+                        userEvent: 'input',
+                      });
+                      isApplyingOrderedNormalizationRef.current = false;
+                    }
+                    normalizationTimeoutRef.current = null;
+                  }, 150); // 150ms debounce
                 }
               }
 
@@ -262,6 +284,9 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     }
 
     return () => {
+      if (normalizationTimeoutRef.current) {
+        clearTimeout(normalizationTimeoutRef.current);
+      }
       viewRef.current?.destroy();
       viewRef.current = null;
       setViewReady(false);
