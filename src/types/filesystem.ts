@@ -22,6 +22,11 @@ export interface IFileSystem {
   revealInExplorer?(path: string): Promise<void>;
   moveFile?(sourcePath: string, targetPath: string): Promise<string>;
   watchFile?(path: string, callback: (event: any) => void): Promise<() => void>;
+  /**
+   * Copy sample notes from bundled resources to target directory
+   * Only available in Tauri environment
+   */
+  copySampleNotes?(targetDir: string): Promise<void>;
 }
 
 /**
