@@ -67,7 +67,7 @@ M記 是一个基于 Tauri 2、React 19 和 TypeScript 构建的桌面 Markdown 
 
 ## 安装要求
 
-当前仅支持 macOS。Windows / Linux 构建与文件操作支持已暂时移除。
+支持 macOS 和 Windows。Linux 构建与文件操作支持已暂时移除。
 
 ### 通用要求
 

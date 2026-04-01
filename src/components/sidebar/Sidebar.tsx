@@ -39,7 +39,6 @@ export interface SidebarProps {
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
   onReveal: (path: string) => void;
-  onOpenInBrowser?: (file: FileNode) => void;
   onMoveToTrash: (file: FileNode) => void;
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
@@ -65,7 +64,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRename,
   onDelete,
   onReveal,
-  onOpenInBrowser,
   onMoveToTrash,
   onRestoreFromTrash,
   onDeleteForever,
@@ -489,10 +487,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )
           }
           onDelete={() => openDeleteDialog(contextMenu.node)}
-          onReveal={() => onReveal(contextMenu.node.path)}
-          onOpenInBrowser={
-            onOpenInBrowser ? () => onOpenInBrowser(contextMenu.node) : undefined
-          }
+                  onReveal={() => onReveal(contextMenu.node.path)}
           onCreateFile={() =>
             openNewFileDialog(
               contextMenu.node.type === 'folder' ? contextMenu.node : undefined,

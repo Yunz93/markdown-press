@@ -10,7 +10,6 @@ export interface ContextMenuProps {
   onRename: () => void;
   onDelete: () => void;
   onReveal: () => void;
-  onOpenInBrowser?: () => void;
   onCreateFile: () => void;
   onCreateFolder: () => void;
   onMoveToTrash: () => void;
@@ -26,7 +25,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onRename,
   onDelete,
   onReveal,
-  onOpenInBrowser,
   onCreateFile,
   onCreateFolder,
   onMoveToTrash,
@@ -185,31 +183,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             >
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
-            Reveal in Finder
+            Open in Finder
           </button>
-
-          {onOpenInBrowser && (
-            <button
-              onClick={() => {
-                onOpenInBrowser();
-                onClose();
-              }}
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group mx-1.5 w-[calc(100%-12px)]"
-            >
-              <svg
-                className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-              Open in Browser
-            </button>
-          )}
 
           <div className="h-px bg-gray-100 dark:bg-white/5 my-1 mx-2" />
 
