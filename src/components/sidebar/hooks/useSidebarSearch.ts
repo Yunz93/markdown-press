@@ -103,11 +103,27 @@ export function useSidebarSearch(
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredFiles = useMemo(() => {
-    if (!normalizedQuery) return files;
-    return files.filter((file) =>
+    // Sort files: folders first, then by name (case-insensitive, locale-aware)
+    const sortNodes = (nodes: FileNode[]): FileNode[] => {
+      return [...nodes].sort((a, b) => {
+        // Folders come before files
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
+        // Sort by name (case-insensitive)
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      });
+    };
+
+    if (!normalizedQuery) {
+      return sortNodes(files);
+    }
+
+    const filtered = files.filter((file) =>
       file.name.toLowerCase().includes(normalizedQuery) ||
       normalizeSearchTarget(file.name).includes(normalizedQuery)
     );
+    return sortNodes(filtered);
   }, [files, normalizedQuery]);
 
   const hasSearchQuery = normalizedQuery.length > 0;
