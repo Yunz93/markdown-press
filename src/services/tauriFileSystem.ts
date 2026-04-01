@@ -1,6 +1,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, readFile as readBinaryFile, writeTextFile, writeFile, exists, mkdir, readDir, rename, remove } from '@tauri-apps/plugin-fs';
 import { basename, dirname, join } from '@tauri-apps/api/path';
+import { invoke } from '@tauri-apps/api/core';
 import type { FileNode } from '../types';
 import type { IFileSystem } from '../types/filesystem';
 
@@ -437,6 +438,18 @@ export class TauriFileSystem implements IFileSystem {
         return;
       }
       console.error('Failed to create directory:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Copy sample notes from bundled resources to target directory
+   */
+  async copySampleNotes(targetDir: string): Promise<void> {
+    try {
+      await invoke('copy_sample_notes', { targetDir });
+    } catch (error) {
+      console.error('Failed to copy sample notes:', error);
       throw error;
     }
   }

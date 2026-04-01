@@ -9,6 +9,7 @@ const PRIMARY_TRASH_DIR_NAME = '.trash';
 const LEGACY_TRASH_DIR_NAMES = ['_markdown_press_trash'] as const;
 const TRASH_DIR_NAMES = [PRIMARY_TRASH_DIR_NAME, ...LEGACY_TRASH_DIR_NAMES] as const;
 const TRASH_ROOT_MARKER = '__root__';
+const SAMPLE_NOTES_INITIALIZED_KEY = 'markdown-press:sample-notes-initialized';
 
 function getPathSeparator(path: string): '/' | '\\' {
   return path.includes('\\') ? '\\' : '/';
@@ -270,21 +271,66 @@ export function useFileSystem() {
   }, [setFiles, addTab, setCurrentFilePath, showNotification, handleFileSystemError]);
 
   /**
+   * Initialize sample notes for first-time users
+   */
+  const initializeSampleNotes = useCallback(async (targetDir: string): Promise<boolean> => {
+    try {
+      const fs = await getFileSystem();
+      if (!fs.copySampleNotes) {
+        console.log('Sample notes not supported in this environment');
+        return false;
+      }
+
+      // Check if already initialized for this directory
+      const initializedKey = `${SAMPLE_NOTES_INITIALIZED_KEY}:${targetDir}`;
+      if (localStorage.getItem(initializedKey)) {
+        return false;
+      }
+
+      await fs.copySampleNotes(targetDir);
+      localStorage.setItem(initializedKey, 'true');
+      showNotification('示例笔记已添加到知识库', 'success');
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize sample notes:', error);
+      return false;
+    }
+  }, [showNotification]);
+
+  /**
    * Open a knowledge base directory.
    * If path is provided, opens directly; otherwise prompts user to select.
    */
   const openKnowledgeBase = useCallback(async (
     path?: string,
-    options?: { silentSuccess?: boolean }
+    options?: { silentSuccess?: boolean; skipSampleNotes?: boolean }
   ): Promise<string | null> => {
     try {
       const fs = await getFileSystem();
       const dirPath = path || await fs.openDirectory();
       if (dirPath) {
-        const fileNodes = await withErrorHandling(
+        let fileNodes = await withErrorHandling(
           () => fs.readDirectory(dirPath),
           'Failed to read knowledge base'
         );
+
+        // Check if this is an empty knowledge base and initialize sample notes
+        const hasOnlyTrash = fileNodes.length === 0 || 
+          (fileNodes.length === 1 && fileNodes[0].name === '.trash');
+        
+        if (!options?.skipSampleNotes && hasOnlyTrash && fs.copySampleNotes) {
+          const initializedKey = `${SAMPLE_NOTES_INITIALIZED_KEY}:${dirPath}`;
+          const isFirstTime = !localStorage.getItem(initializedKey);
+          
+          if (isFirstTime) {
+            const initialized = await initializeSampleNotes(dirPath);
+            if (initialized) {
+              // Re-read directory after copying sample notes
+              fileNodes = await fs.readDirectory(dirPath);
+            }
+          }
+        }
+
         const lastOpenedFilePath = useAppStore.getState().settings.lastOpenedFilePath;
         const preferredInitialFile = lastOpenedFilePath ? findFileInTree(fileNodes, lastOpenedFilePath) : undefined;
         clearAllCache();
@@ -321,7 +367,7 @@ export function useFileSystem() {
       handleFileSystemError(error, 'Failed to open knowledge base');
       return null;
     }
-  }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata]);
+  }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata, initializeSampleNotes]);
 
   /**
    * Backward-compatible alias used by existing UI call sites.
@@ -711,6 +757,7 @@ export function useFileSystem() {
     openFile,
     openDirectory,
     openKnowledgeBase,
+    initializeSampleNotes,
     readFile,
     writeFile,
     writeBinaryFile,
