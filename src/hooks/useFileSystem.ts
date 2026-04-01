@@ -309,27 +309,20 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const dirPath = path || await fs.openDirectory();
       if (dirPath) {
-        let fileNodes = await withErrorHandling(
-          () => fs.readDirectory(dirPath),
-          'Failed to read knowledge base'
-        );
-
-        // Check if this is an empty knowledge base and initialize sample notes
-        const hasOnlyTrash = fileNodes.length === 0 || 
-          (fileNodes.length === 1 && fileNodes[0].name === '.trash');
-        
-        if (!options?.skipSampleNotes && hasOnlyTrash && fs.copySampleNotes) {
+        // Initialize sample notes for first-time opened knowledge bases
+        if (!options?.skipSampleNotes && fs.copySampleNotes) {
           const initializedKey = `${SAMPLE_NOTES_INITIALIZED_KEY}:${dirPath}`;
           const isFirstTime = !localStorage.getItem(initializedKey);
           
           if (isFirstTime) {
-            const initialized = await initializeSampleNotes(dirPath);
-            if (initialized) {
-              // Re-read directory after copying sample notes
-              fileNodes = await fs.readDirectory(dirPath);
-            }
+            await initializeSampleNotes(dirPath);
           }
         }
+
+        let fileNodes = await withErrorHandling(
+          () => fs.readDirectory(dirPath),
+          'Failed to read knowledge base'
+        );
 
         const lastOpenedFilePath = useAppStore.getState().settings.lastOpenedFilePath;
         const preferredInitialFile = lastOpenedFilePath ? findFileInTree(fileNodes, lastOpenedFilePath) : undefined;
