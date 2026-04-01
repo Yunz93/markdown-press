@@ -357,10 +357,12 @@ export function adjustListItemLevel(
   delta: number
 ): ListItemInfo {
   const newLevel = Math.max(0, item.level + delta);
+  const newIndent = getIndentFromLevel(newLevel);
+  console.log('[adjustListItemLevel] newLevel:', newLevel, 'newIndent:', JSON.stringify(newIndent));
   return {
     ...item,
     level: newLevel,
-    indent: getIndentFromLevel(newLevel),
+    indent: newIndent,
     number: item.type === 'ordered' ? 1 : item.number,
   };
 }
@@ -370,6 +372,8 @@ export function adjustListItemLevel(
  */
 export function formatListItem(item: ListItemInfo): string {
   const indent = getIndentFromLevel(item.level);
+  console.log('[formatListItem] item.level:', item.level);
+  console.log('[formatListItem] indent:', JSON.stringify(indent));
   // 确保内容没有前导空格，避免格式化后出现多余空格
   const content = item.content.trimStart();
 
@@ -411,7 +415,10 @@ export function getSelectedListItems(state: EditorState): ListItemInfo[] {
 
   for (const range of state.selection.ranges) {
     const startLine = state.doc.lineAt(range.from).number;
-    const endLine = state.doc.lineAt(Math.max(range.from, range.to - 1)).number;
+    // Fix: when selection is empty (cursor mode), use range.to directly
+    // to avoid lineAt(range.to - 1) returning wrong line when cursor is at line boundary
+    const endPosition = range.empty ? range.to : Math.max(range.from, range.to - 1);
+    const endLine = state.doc.lineAt(endPosition).number;
     for (let i = startLine; i <= endLine; i++) {
       selectedLines.add(i);
     }

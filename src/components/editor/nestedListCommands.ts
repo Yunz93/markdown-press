@@ -17,6 +17,7 @@ import {
   findPreviousSiblingItem,
   getStrictOrderedListNormalizationChanges,
   LIST_INDENT_SIZE,
+  LIST_INDENT_UNIT,
   getIndentFromLevel,
 } from './nestedListBehavior';
 
@@ -123,7 +124,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
       number: nextNumber,
       content: '',
     };
-    const insert = '\n' + formatListItem(newItem);
+    const insert = '\n' + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
 
     dispatch(state.update({
       changes: { from: main.from, insert },
@@ -142,7 +143,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
       checkbox,
       content: '',
     };
-    const insert = '\n' + formatListItem(newItem);
+    const insert = '\n' + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
 
     dispatch(state.update({
       changes: { from: main.from, insert },
@@ -158,7 +159,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
     ...item,
     content: '',
   };
-  const insert = '\n' + formatListItem(newItem);
+  const insert = '\n' + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
 
   dispatch(state.update({
     changes: { from: main.from, insert },
@@ -217,10 +218,12 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
       for (const item of items) {
         const line = state.doc.line(item.lineNumber);
         const newItem = adjustListItemLevel(item, +1);
+        // Ensure output uses spaces only, replace any tabs with 4 spaces
+        const formatted = formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
         changes.push({
           from: line.from,
           to: line.to,
-          insert: formatListItem(newItem),
+          insert: formatted,
         });
       }
 
@@ -270,7 +273,7 @@ export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCom
         changes.push({
           from: line.from,
           to: line.to,
-          insert: formatListItem(newItem),
+          insert: formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT),
         });
       }
 
