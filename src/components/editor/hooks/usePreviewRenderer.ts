@@ -63,6 +63,10 @@ function isHtmlDocument(fileName: string): boolean {
   return /\.html?$/i.test(fileName);
 }
 
+function hasWikiEmbedsInHtml(html: string): boolean {
+  return html.includes('data-wiki-embed="true"') || html.includes('class="markdown-link markdown-embed"');
+}
+
 export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePreviewRendererReturn {
   const {
     content,
@@ -84,6 +88,12 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   const [enhancedBodyHtml, setEnhancedBodyHtml] = useState('');
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const mermaidTimerRef = useRef<number | null>(null);
+  const enhancedBodyHtmlRef = useRef('');
+  const lastPreviewIdentityRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    enhancedBodyHtmlRef.current = enhancedBodyHtml;
+  }, [enhancedBodyHtml]);
 
   // Parse markdown content
   const parsedContent = useMemo(() => {
@@ -129,11 +139,24 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   useEffect(() => {
     if (!isMarkdownPreview && !isHtmlPreview) {
       setEnhancedBodyHtml('');
+      enhancedBodyHtmlRef.current = '';
+      lastPreviewIdentityRef.current = null;
       return;
     }
 
     const baseHtml = isMarkdownPreview ? parsedContent.bodyHTML : sanitizedHtmlPreview;
-    setEnhancedBodyHtml(baseHtml);
+    const previewIdentity = [
+      activeTabId ?? '',
+      currentFilePath ?? '',
+      isMarkdownPreview ? 'markdown' : 'html',
+    ].join('::');
+    const previewChanged = lastPreviewIdentityRef.current !== previewIdentity;
+    lastPreviewIdentityRef.current = previewIdentity;
+    const hasWikiEmbeds = isMarkdownPreview && hasWikiEmbedsInHtml(baseHtml);
+
+    if (previewChanged || !hasWikiEmbeds || !enhancedBodyHtmlRef.current) {
+      setEnhancedBodyHtml(baseHtml);
+    }
 
     if (!baseHtml || typeof DOMParser === 'undefined') {
       return;
@@ -176,7 +199,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
       if (embeds.length === 0) {
         if (!cancelled) {
-          setEnhancedBodyHtml(parsed.body.innerHTML);
+          const nextHtml = parsed.body.innerHTML;
+          if (nextHtml !== enhancedBodyHtmlRef.current) {
+            setEnhancedBodyHtml(nextHtml);
+          }
         }
         return;
       }
@@ -330,7 +356,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       }));
 
       if (!cancelled) {
-        setEnhancedBodyHtml(parsed.body.innerHTML);
+        const nextHtml = parsed.body.innerHTML;
+        if (nextHtml !== enhancedBodyHtmlRef.current) {
+          setEnhancedBodyHtml(nextHtml);
+        }
       }
     } catch (error) {
       console.error('Preview renderer error:', error);
