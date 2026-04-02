@@ -132,6 +132,20 @@ Artifacts are generated under `src-tauri/target/release/bundle/`.
 
 The repository is configured with a GitHub Actions release workflow. Push a `v`-prefixed tag to automatically build and upload macOS installers.
 
+The macOS GitHub Release currently uses `ad-hoc signing`, so CI can build `.app` and `.dmg` artifacts without an Apple Developer certificate.
+
+These artifacts are not notarized by Apple, so macOS may still block them on first launch and require a manual allow step.
+
+Common workarounds:
+
+- Right-click the app in Finder and choose `Open`
+- Or run:
+```bash
+xattr -dr com.apple.quarantine /Applications/M記.app
+```
+
+If you want browser-downloaded macOS builds to install cleanly without manual intervention, you will still need Apple Developer signing and notarization.
+
 ## Release Smoke Test
 
 The project includes a release smoke-test script:

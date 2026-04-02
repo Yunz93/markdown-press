@@ -136,6 +136,20 @@ git push origin v0.1.1
 
 CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
 
+当前仓库的 macOS GitHub Release 使用 `ad-hoc signing`，不依赖 Apple Developer 证书，因此可以直接在 CI 中产出 `.app` 和 `.dmg`。
+
+这类产物不是 Apple 公证包，用户首次打开时仍然可能被 macOS 拦截，需要手动放行。
+
+常见处理方式：
+
+- 在 Finder 中右键应用，选择“打开”
+- 或在终端执行：
+```bash
+xattr -dr com.apple.quarantine /Applications/M記.app
+```
+
+如果后续需要“下载后可直接安装、无需手动放行”的体验，仍然需要 Apple Developer 证书和 notarization。
+
 ## Release 校验
 
 项目已提供 release 冒烟检查脚本：
