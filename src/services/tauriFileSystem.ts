@@ -23,6 +23,12 @@ interface FileFormatState {
   lastContent: string;
 }
 
+interface CopySampleNotesResult {
+  updated: boolean;
+  copiedFiles: string[];
+  skippedFiles: string[];
+}
+
 /**
  * Pure Tauri FileSystem implementation
  * Uses native Tauri FS and Dialog plugins for all file operations
@@ -387,13 +393,14 @@ export class TauriFileSystem implements IFileSystem {
           });
         }
         else {
-          const shouldIncludeFile =
-            nodeInTrash ||
+          const isKnownVisibleFile =
             MARKDOWN_EXTENSIONS.some(e => ext.endsWith(e)) ||
             (this.showImages && IMAGE_EXTENSIONS.some(e => ext.endsWith(e))) ||
             DOCUMENT_EXTENSIONS.some(e => ext.endsWith(e)) ||
             HTML_EXTENSIONS.some(e => ext.endsWith(e)) ||
             (this.showConfigFiles && CONFIG_EXTENSIONS.some(e => ext.endsWith(e)));
+          const isGenericAttachment = !entry.name.startsWith('.');
+          const shouldIncludeFile = nodeInTrash || isKnownVisibleFile || isGenericAttachment;
 
           if (!shouldIncludeFile) continue;
           nodes.push({
@@ -445,9 +452,15 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Copy sample notes from bundled resources to target directory
    */
-  async copySampleNotes(targetDir: string): Promise<void> {
+  async copySampleNotes(targetDir: string): Promise<boolean> {
     try {
-      await invoke('copy_sample_notes', { targetDir });
+      const result = await invoke<CopySampleNotesResult>('copy_sample_notes', { targetDir });
+
+      if (result.skippedFiles.length > 0) {
+        console.info('Skipped sample notes with local edits:', result.skippedFiles);
+      }
+
+      return result.updated;
     } catch (error) {
       console.error('Failed to copy sample notes:', error);
       throw error;

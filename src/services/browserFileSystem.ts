@@ -343,11 +343,7 @@ export class BrowserFileSystem implements IFileSystem {
           entry.kind === 'file'
           && (
             nodeInTrash
-            || name.endsWith('.md')
-            || name.endsWith('.markdown')
-            || BrowserFileSystem.IMAGE_FILE_REGEX.test(name)
-            || BrowserFileSystem.PDF_FILE_REGEX.test(name)
-            || BrowserFileSystem.HTML_FILE_REGEX.test(name)
+            || !name.startsWith('.')
           )
         ) {
           nodes.push({

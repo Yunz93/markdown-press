@@ -52,7 +52,7 @@ export interface UseCodeMirrorOptions {
   wordWrap?: boolean;
   orderedListMode?: OrderedListMode;
   onChange: (content: string) => void;
-  onScroll?: (percentage: number) => void;
+  onScroll?: () => void;
   completionSource?: CompletionSource;
   onPasteImage?: (file: File, view: EditorView) => boolean | Promise<boolean>;
   onWikiLinkStart?: () => void;
@@ -192,13 +192,8 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
                   lastScrollTime = now;
                   
                   const scrollHandler = onScrollRef.current;
-                  if (scrollHandler && viewRef.current) {
-                    const scrollDom = viewRef.current.scrollDOM;
-                    const scrollHeight = scrollDom.scrollHeight - scrollDom.clientHeight;
-                    if (scrollHeight > 0) {
-                      const percentage = scrollDom.scrollTop / scrollHeight;
-                      scrollHandler(percentage);
-                    }
+                  if (scrollHandler) {
+                    scrollHandler();
                   }
                   return false;
                 };

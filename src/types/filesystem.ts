@@ -26,7 +26,7 @@ export interface IFileSystem {
    * Copy sample notes from bundled resources to target directory
    * Only available in Tauri environment
    */
-  copySampleNotes?(targetDir: string): Promise<void>;
+  copySampleNotes?(targetDir: string): Promise<boolean>;
 }
 
 /**

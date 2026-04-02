@@ -6,10 +6,12 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { EditorView } from '@codemirror/view';
-import { throttle } from '../../../utils/throttle';
+import { isWindowsPlatform } from '../../../utils/platform';
 
-const SCROLL_THRESHOLD = 5;
-const SCROLL_EMIT_THRESHOLD = 0.001;
+const DEFAULT_SCROLL_THRESHOLD = 5;
+const WINDOWS_SCROLL_THRESHOLD = 12;
+const DEFAULT_SCROLL_EMIT_THRESHOLD = 0.001;
+const WINDOWS_SCROLL_EMIT_THRESHOLD = 0.0025;
 
 export interface UseScrollSyncOptions {
   onScroll?: (percentage: number) => void;
@@ -37,6 +39,14 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
   const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
+  const unlockAnimationFrameRef = useRef<number | null>(null);
+  const useImmediateSyncRef = useRef(isWindowsPlatform());
+  const scrollThresholdRef = useRef(
+    useImmediateSyncRef.current ? WINDOWS_SCROLL_THRESHOLD : DEFAULT_SCROLL_THRESHOLD
+  );
+  const emitThresholdRef = useRef(
+    useImmediateSyncRef.current ? WINDOWS_SCROLL_EMIT_THRESHOLD : DEFAULT_SCROLL_EMIT_THRESHOLD
+  );
 
   // 更新 onScroll ref
   useEffect(() => {
@@ -64,7 +74,7 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     if (scrollHeight <= 0) return;
 
     const percentage = scrollContainer.scrollTop / scrollHeight;
-    if (Math.abs(percentage - lastScrollPercentage.current) <= SCROLL_EMIT_THRESHOLD) return;
+    if (Math.abs(percentage - lastScrollPercentage.current) <= emitThresholdRef.current) return;
 
     lastScrollPercentage.current = percentage;
     pendingEmittedPercentageRef.current = percentage;
@@ -86,8 +96,23 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
       cancelAnimationFrame(syncAnimationFrameRef.current);
       syncAnimationFrameRef.current = null;
     }
+    if (unlockAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(unlockAnimationFrameRef.current);
+      unlockAnimationFrameRef.current = null;
+    }
     syncTargetScrollTopRef.current = null;
     isSyncingScroll.current = false;
+  }, []);
+
+  const scheduleSyncUnlock = useCallback(() => {
+    if (unlockAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(unlockAnimationFrameRef.current);
+    }
+
+    unlockAnimationFrameRef.current = requestAnimationFrame(() => {
+      unlockAnimationFrameRef.current = null;
+      isSyncingScroll.current = false;
+    });
   }, []);
 
   // 动画同步滚动
@@ -96,12 +121,7 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
     syncTargetScrollTopRef.current = clampedTarget;
 
-    if (syncAnimationFrameRef.current !== null) return;
-
-    isSyncingScroll.current = true;
-
-    syncAnimationFrameRef.current = requestAnimationFrame(() => {
-      syncAnimationFrameRef.current = null;
+    const commitScroll = () => {
       const currentView = viewRef.current;
       const target = syncTargetScrollTopRef.current;
 
@@ -113,11 +133,27 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
 
       scrollDom.scrollTop = target;
       syncTargetScrollTopRef.current = null;
-      requestAnimationFrame(() => {
-        isSyncingScroll.current = false;
-      });
+      scheduleSyncUnlock();
+    };
+
+    isSyncingScroll.current = true;
+
+    if (useImmediateSyncRef.current) {
+      if (syncAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(syncAnimationFrameRef.current);
+        syncAnimationFrameRef.current = null;
+      }
+      commitScroll();
+      return;
+    }
+
+    if (syncAnimationFrameRef.current !== null) return;
+
+    syncAnimationFrameRef.current = requestAnimationFrame(() => {
+      syncAnimationFrameRef.current = null;
+      commitScroll();
     });
-  }, []);
+  }, [scheduleSyncUnlock]);
 
   // 同步到指定百分比
   const syncScrollTo = useCallback((percentage: number) => {
@@ -129,7 +165,7 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     if (maxScrollTop <= 0) return;
 
     const targetScrollTop = maxScrollTop * percentage;
-    if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= SCROLL_THRESHOLD) return;
+    if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= scrollThresholdRef.current) return;
     animateSyncedScroll(scrollDom, targetScrollTop);
   }, [animateSyncedScroll]);
 

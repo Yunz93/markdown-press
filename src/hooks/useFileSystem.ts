@@ -9,8 +9,6 @@ const PRIMARY_TRASH_DIR_NAME = '.trash';
 const LEGACY_TRASH_DIR_NAMES = ['_markdown_press_trash'] as const;
 const TRASH_DIR_NAMES = [PRIMARY_TRASH_DIR_NAME, ...LEGACY_TRASH_DIR_NAMES] as const;
 const TRASH_ROOT_MARKER = '__root__';
-const SAMPLE_NOTES_INITIALIZED_KEY = 'markdown-press:sample-notes-initialized';
-
 function getPathSeparator(path: string): '/' | '\\' {
   return path.includes('\\') ? '\\' : '/';
 }
@@ -281,16 +279,11 @@ export function useFileSystem() {
         return false;
       }
 
-      // Check if already initialized for this directory
-      const initializedKey = `${SAMPLE_NOTES_INITIALIZED_KEY}:${targetDir}`;
-      if (localStorage.getItem(initializedKey)) {
-        return false;
+      const updated = await fs.copySampleNotes(targetDir);
+      if (updated) {
+        showNotification('示例笔记已同步到知识库', 'success');
       }
-
-      await fs.copySampleNotes(targetDir);
-      localStorage.setItem(initializedKey, 'true');
-      showNotification('示例笔记已添加到知识库', 'success');
-      return true;
+      return updated;
     } catch (error) {
       console.error('Failed to initialize sample notes:', error);
       return false;
@@ -309,14 +302,9 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const dirPath = path || await fs.openDirectory();
       if (dirPath) {
-        // Initialize sample notes for first-time opened knowledge bases
+        // Sync bundled sample notes into the knowledge base when needed
         if (!options?.skipSampleNotes && fs.copySampleNotes) {
-          const initializedKey = `${SAMPLE_NOTES_INITIALIZED_KEY}:${dirPath}`;
-          const isFirstTime = !localStorage.getItem(initializedKey);
-          
-          if (isFirstTime) {
-            await initializeSampleNotes(dirPath);
-          }
+          await initializeSampleNotes(dirPath);
         }
 
         let fileNodes = await withErrorHandling(
