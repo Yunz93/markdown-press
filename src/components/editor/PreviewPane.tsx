@@ -21,6 +21,7 @@ import { createAttachmentResolverContext } from '../../utils/attachmentResolver'
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
 import { parseFrontmatter } from '../../utils/frontmatter';
+import { isWindowsPlatform } from '../../utils/platform';
 import type { FileNode } from '../../types';
 
 interface PreviewPaneProps {
@@ -88,6 +89,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const { readFile } = useFileSystem();
 
   const isCompact = density === 'compact';
+  const isWindows = useMemo(() => isWindowsPlatform(), []);
   const hasActiveFile = Boolean(activeTabId);
   const previewFileType = useMemo(() => getPreviewFileType(currentFilePath), [currentFilePath]);
   const isMarkdownPreview = previewFileType === 'markdown';
@@ -526,7 +528,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               </div>
             ) : (
               <article
-                className={`markdown-body preview-pane-document ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
+                className={`markdown-body preview-pane-document ${isWindows ? 'preview-pane-document-windows' : ''} ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
                 style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderer.enhancedBodyHtml || renderer.parsedContent.bodyHTML }}
               />

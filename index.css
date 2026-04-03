@@ -1110,6 +1110,16 @@ html[data-app-booting="true"] *::after {
   contain-intrinsic-size: 0 240px;
 }
 
+.preview-pane-document.preview-pane-document-windows.markdown-body pre,
+.preview-pane-document.preview-pane-document-windows.markdown-body table,
+.preview-pane-document.preview-pane-document-windows.markdown-body blockquote,
+.preview-pane-document.preview-pane-document-windows.markdown-body .preview-note-embed,
+.preview-pane-document.preview-pane-document-windows.markdown-body img,
+.preview-pane-document.preview-pane-document-windows.markdown-body iframe {
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
+}
+
 .preview-pane-document.markdown-body p,
 .preview-pane-document.markdown-body li,
 .preview-pane-document.markdown-body blockquote,
