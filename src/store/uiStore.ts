@@ -53,7 +53,9 @@ export const defaultSettings: AppSettings = {
   resourceFolder: 'resources',
   attachmentPasteFormat: 'obsidian',
   orderedListMode: 'strict',
-  githubRepo: '',
+  blogRepoUrl: '',
+  blogSiteUrl: '',
+  blogGithubToken: '',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash-exp',
   shortcuts: {

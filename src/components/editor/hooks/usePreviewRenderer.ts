@@ -37,6 +37,7 @@ export interface UsePreviewRendererReturn {
   enhancedBodyHtml: string;
   sanitizedHtmlPreview: string;
   assetPreviewSrc: string;
+  requiresAsyncEnhancement: boolean;
   
   // 刷新 Mermaid
   refreshMermaid: () => void;
@@ -85,16 +86,6 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   // Initialize markdown renderer
   useMarkdownRenderer(highlighter, themeMode);
 
-  const [enhancedBodyHtml, setEnhancedBodyHtml] = useState('');
-  const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
-  const mermaidTimerRef = useRef<number | null>(null);
-  const enhancedBodyHtmlRef = useRef('');
-  const lastPreviewIdentityRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    enhancedBodyHtmlRef.current = enhancedBodyHtml;
-  }, [enhancedBodyHtml]);
-
   // Parse markdown content
   const parsedContent = useMemo(() => {
     if (!isMarkdownPreview) {
@@ -129,6 +120,33 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     });
   }, [content, isHtmlPreview]);
 
+  const basePreviewHtml = useMemo(
+    () => (isMarkdownPreview ? parsedContent.bodyHTML : sanitizedHtmlPreview),
+    [isMarkdownPreview, parsedContent.bodyHTML, sanitizedHtmlPreview]
+  );
+
+  const hasWikiEmbeds = useMemo(
+    () => isMarkdownPreview && hasWikiEmbedsInHtml(basePreviewHtml),
+    [basePreviewHtml, isMarkdownPreview]
+  );
+
+  const requiresAsyncEnhancement = useMemo(
+    () => Boolean(basePreviewHtml) && (basePreviewHtml.includes('<img') || hasWikiEmbeds),
+    [basePreviewHtml, hasWikiEmbeds]
+  );
+
+  const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => (
+    requiresAsyncEnhancement ? '' : basePreviewHtml
+  ));
+  const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
+  const mermaidTimerRef = useRef<number | null>(null);
+  const enhancedBodyHtmlRef = useRef(enhancedBodyHtml);
+  const previewIdentityRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    enhancedBodyHtmlRef.current = enhancedBodyHtml;
+  }, [enhancedBodyHtml]);
+
   // Attachment resolver context
   const attachmentResolverContext = useMemo(
     () => createAttachmentResolverContext(files, rootFolderPath, currentFilePath),
@@ -140,33 +158,39 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     if (!isMarkdownPreview && !isHtmlPreview) {
       setEnhancedBodyHtml('');
       enhancedBodyHtmlRef.current = '';
-      lastPreviewIdentityRef.current = null;
+      previewIdentityRef.current = null;
       return;
     }
 
-    const baseHtml = isMarkdownPreview ? parsedContent.bodyHTML : sanitizedHtmlPreview;
     const previewIdentity = [
       activeTabId ?? '',
       currentFilePath ?? '',
       isMarkdownPreview ? 'markdown' : 'html',
     ].join('::');
-    const previewChanged = lastPreviewIdentityRef.current !== previewIdentity;
-    lastPreviewIdentityRef.current = previewIdentity;
-    const hasWikiEmbeds = isMarkdownPreview && hasWikiEmbedsInHtml(baseHtml);
+    const previewChanged = previewIdentityRef.current !== previewIdentity;
+    previewIdentityRef.current = previewIdentity;
 
-    if (previewChanged || !hasWikiEmbeds || !enhancedBodyHtmlRef.current) {
-      setEnhancedBodyHtml(baseHtml);
+    if (!basePreviewHtml || typeof DOMParser === 'undefined') {
+      setEnhancedBodyHtml(basePreviewHtml);
+      return;
     }
 
-    if (!baseHtml || typeof DOMParser === 'undefined') {
+    if (!requiresAsyncEnhancement) {
+      if (basePreviewHtml !== enhancedBodyHtmlRef.current) {
+        setEnhancedBodyHtml(basePreviewHtml);
+      }
       return;
+    }
+
+    if (previewChanged) {
+      setEnhancedBodyHtml('');
     }
 
     let cancelled = false;
 
     void (async () => {
       try {
-        const parsed = new DOMParser().parseFromString(baseHtml, 'text/html');
+        const parsed = new DOMParser().parseFromString(basePreviewHtml, 'text/html');
         const embeds = isMarkdownPreview
           ? Array.from(parsed.body.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
           : [];
@@ -363,7 +387,9 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       }
     } catch (error) {
       console.error('Preview renderer error:', error);
-      // Keep the base HTML on error
+      if (!cancelled) {
+        setEnhancedBodyHtml(basePreviewHtml);
+      }
     }})();
 
     return () => {
@@ -378,9 +404,9 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     highlighter,
     isHtmlPreview,
     isMarkdownPreview,
-    parsedContent.bodyHTML,
+    basePreviewHtml,
+    requiresAsyncEnhancement,
     readFile,
-    sanitizedHtmlPreview,
     themeMode,
   ]);
 
@@ -417,6 +443,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     enhancedBodyHtml,
     sanitizedHtmlPreview,
     assetPreviewSrc,
+    requiresAsyncEnhancement,
     refreshMermaid,
   };
 }

@@ -11,6 +11,7 @@ import {
   DEFAULT_ENGLISH_FONT_FAMILY,
   isLegacyDefaultChineseFontFamily,
 } from '../utils/fontSettings';
+import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
 
 // Re-export types from slice stores
 export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
@@ -27,6 +28,32 @@ export interface AppState extends
   TabActions,
   EditorActions,
   UIActions {}
+
+function resolvePersistedBlogRepoUrl(persistedSettings: Record<string, unknown>): string {
+  if (typeof persistedSettings.blogRepoUrl === 'string') {
+    const normalized = normalizeBlogRepoUrl(persistedSettings.blogRepoUrl);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  if (typeof persistedSettings.simpleBlogPath === 'string') {
+    const normalized = normalizeBlogRepoUrl(persistedSettings.simpleBlogPath);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return '';
+}
+
+function resolvePersistedBlogSiteUrl(persistedSettings: Record<string, unknown>): string {
+  if (typeof persistedSettings.blogSiteUrl === 'string') {
+    return normalizeBlogSiteUrl(persistedSettings.blogSiteUrl);
+  }
+
+  return '';
+}
 
 /**
  * Create the combined store using slice pattern
@@ -51,6 +78,8 @@ export const useAppStore = create<AppState>()(
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
+          blogRepoUrl: resolvePersistedBlogRepoUrl(persistedSettings),
+          blogSiteUrl: resolvePersistedBlogSiteUrl(persistedSettings),
           englishFontFamily: typeof persistedSettings.englishFontFamily === 'string' && persistedSettings.englishFontFamily.trim()
             ? persistedSettings.englishFontFamily
             : (typeof persistedSettings.fontFamily === 'string' && persistedSettings.fontFamily.trim()

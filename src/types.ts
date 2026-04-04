@@ -15,6 +15,9 @@ export interface Frontmatter {
   tags?: string[];
   description?: string;
   layout?: string;
+  slug?: string;
+  aliases?: string | string[];
+  link?: string;
   [key: string]: string | string[] | number | boolean | null | undefined;
 }
 
@@ -73,7 +76,6 @@ export interface KnowledgeBaseMeta {
 export type ThemeMode = 'light' | 'dark';
 export type AttachmentPasteFormat = 'markdown' | 'obsidian';
 export type OrderedListMode = 'strict' | 'loose';
-
 export interface AppSettings {
   fontSize: number;
   wordWrap: boolean;
@@ -82,7 +84,9 @@ export interface AppSettings {
   resourceFolder: string;
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
-  githubRepo: string;
+  blogRepoUrl: string;
+  blogSiteUrl: string;
+  blogGithubToken?: string;
   geminiApiKey?: string;
   geminiModel?: string;
   shortcuts: ShortcutConfig;

@@ -185,10 +185,15 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   }, [content, enabled, activeTabId, currentFilePath, effectiveDebounceMs, executeSave]);
 
   // Force save function (for manual save)
-  const forceSave = useCallback(async (): Promise<boolean> => {
+  const forceSave = useCallback(async (contentOverride?: string): Promise<boolean> => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
+
+    if (contentOverride !== undefined) {
+      contentRef.current = contentOverride;
+    }
+
     return executeSave();
   }, [executeSave]);
 

@@ -15,7 +15,7 @@ import { useFileSystem } from '../../hooks/useFileSystem';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
 import { throttle } from '../../utils/throttle';
-import { warmPreviewImage } from '../../utils/previewImageCache';
+import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
 import { resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { createAttachmentResolverContext } from '../../utils/attachmentResolver';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
@@ -340,7 +340,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       try {
         const src = previewFileType === 'image'
           ? await warmPreviewImage(currentFilePath, currentFilePath)
-          : currentFilePath;
+          : await resolvePreviewSource(currentFilePath, currentFilePath);
         if (!cancelled) setAssetPreviewSrc(src);
       } catch {
         if (!cancelled) setAssetPreviewSrc('');
@@ -520,7 +520,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               <div
                 className="preview-html-document editor-pane-width-constrained mx-auto w-full"
                 style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
-                dangerouslySetInnerHTML={{ __html: renderer.enhancedBodyHtml || renderer.sanitizedHtmlPreview }}
+                dangerouslySetInnerHTML={{ __html: renderer.requiresAsyncEnhancement ? renderer.enhancedBodyHtml : renderer.sanitizedHtmlPreview }}
               />
             ) : previewFileType === 'unsupported' ? (
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
@@ -530,7 +530,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               <article
                 className={`markdown-body preview-pane-document ${isWindows ? 'preview-pane-document-windows' : ''} ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
                 style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
-                dangerouslySetInnerHTML={{ __html: renderer.enhancedBodyHtml || renderer.parsedContent.bodyHTML }}
+                dangerouslySetInnerHTML={{ __html: renderer.requiresAsyncEnhancement ? renderer.enhancedBodyHtml : renderer.parsedContent.bodyHTML }}
               />
             )}
           </div>

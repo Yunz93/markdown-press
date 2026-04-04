@@ -10,6 +10,7 @@ interface ToolbarProps {
   onAIAnalyze: () => void;
   isAnalyzing: boolean;
   isSaving: boolean;
+  isPublishing?: boolean;
   isSidebarOpen: boolean;
   onMenuClick: () => void;
   onToggleTheme: () => void;
@@ -25,6 +26,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onAIAnalyze,
   isAnalyzing,
   isSaving,
+  isPublishing = false,
   isSidebarOpen,
   onMenuClick,
   onToggleTheme,
@@ -106,14 +108,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             {onPublishBlog && (
               <button
                 onClick={onPublishBlog}
+                disabled={isPublishing}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                title="Publish Blog"
+                title={isPublishing ? 'Publishing Blog' : 'Publish Blog'}
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
+                {isPublishing ? (
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v3a5 5 0 0 0-5 5H4z" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                )}
               </button>
             )}
 

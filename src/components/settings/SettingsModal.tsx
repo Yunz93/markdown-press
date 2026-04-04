@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import type { AppSettings, MetadataField } from '../../types';
+import { isTauriEnvironment } from '../../types/filesystem';
+import {
+  isValidOrEmptyBlogRepoUrl,
+  isValidOrEmptyBlogSiteUrl,
+  normalizeBlogRepoUrl,
+  normalizeBlogSiteUrl,
+} from '../../utils/blogRepo';
 
 function formatAutoSaveInterval(intervalMs: number): string {
   if (intervalMs < 60000) {
@@ -304,11 +311,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       ...prev,
       [groupId]: !prev[groupId],
     }));
-  };
-
-  const isValidGithubRepo = (repo: string): boolean => {
-    if (!repo.trim()) return true; // Allow empty
-    return /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/.test(repo.trim());
   };
 
   if (!isOpen) return null;
@@ -633,36 +635,121 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'general' && (
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">GitHub Pages</h3>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Repository</label>
-                    <div className="relative">
-                      <svg className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
-                      </svg>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Simple Blog</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Blog Repository URL
+                      </label>
                       <input
                         type="text"
-                        value={settings.githubRepo}
-                        onChange={(e) => {
-                          const repo = e.target.value;
-                          if (isValidGithubRepo(repo)) {
-                            onUpdateSettings({ githubRepo: repo });
+                        value={settings.blogRepoUrl}
+                        onChange={(e) => onUpdateSettings({ blogRepoUrl: e.target.value })}
+                        onBlur={() => {
+                          const normalized = normalizeBlogRepoUrl(settings.blogRepoUrl);
+                          if (normalized && normalized !== settings.blogRepoUrl) {
+                            onUpdateSettings({ blogRepoUrl: normalized });
                           }
                         }}
-                        placeholder="username/repo"
-                        className={`w-full pl-9 pr-3 py-2 border text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl ${
-                          isValidGithubRepo(settings.githubRepo)
+                        placeholder="https://github.com/you/bxyz-blog"
+                        className={`w-full px-3 py-2 border text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl ${
+                          isValidOrEmptyBlogRepoUrl(settings.blogRepoUrl)
                             ? 'border-gray-200 dark:border-white/10'
                             : 'border-red-500 dark:border-red-500'
                         }`}
                       />
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Paste the GitHub repository address for your deployed `simple-blog` site. Publishing writes to this repository through the GitHub API and then triggers a new deployment from Git.
+                      </p>
+                      {settings.blogRepoUrl && !isValidOrEmptyBlogRepoUrl(settings.blogRepoUrl) && (
+                        <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                          Use a GitHub repository like `https://github.com/owner/repo`, `git@github.com:owner/repo.git`, or `owner/repo`.
+                        </p>
+                      )}
                     </div>
-                    {settings.githubRepo && !isValidGithubRepo(settings.githubRepo) && (
-                      <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        Please use the format "username/repo"
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Blog Site URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.blogSiteUrl}
+                        onChange={(e) => onUpdateSettings({ blogSiteUrl: e.target.value })}
+                        onBlur={() => {
+                          const normalized = normalizeBlogSiteUrl(settings.blogSiteUrl);
+                          if (normalized && normalized !== settings.blogSiteUrl) {
+                            onUpdateSettings({ blogSiteUrl: normalized });
+                          }
+                        }}
+                        placeholder="https://your-blog.com"
+                        className={`w-full px-3 py-2 border text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl ${
+                          isValidOrEmptyBlogSiteUrl(settings.blogSiteUrl)
+                            ? 'border-gray-200 dark:border-white/10'
+                            : 'border-red-500 dark:border-red-500'
+                        }`}
+                      />
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        This is the public site prefix used to write back the article `link`, for example `https://your-blog.com` or `your-blog.vercel.app`.
+                      </p>
+                      {settings.blogSiteUrl && !isValidOrEmptyBlogSiteUrl(settings.blogSiteUrl) && (
+                        <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                          Use a public URL like `https://your-blog.com` or `your-blog.vercel.app`.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        GitHub Token
+                      </label>
+                      <input
+                        type="password"
+                        value={settings.blogGithubToken ?? ''}
+                        onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
+                        placeholder="github_pat_..."
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl"
+                      />
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Required. Publishing now uses the GitHub API only, so this token must be set before the publish action can run.
+                      </p>
+                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        Use a Fine-grained Personal Access Token with repository <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">Contents: Read and write</code>. The token is stored locally on this device.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
+                      <p>
+                        Start with{' '}
+                        <a
+                          href="https://github.com/Yunz93/simple-blog"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-accent-DEFAULT hover:underline"
+                        >
+                          simple-blog
+                        </a>
+                        , deploy it, then paste the GitHub repository that your deployed blog uses here.
+                      </p>
+                      <p className="mt-2">
+                        If you deployed through Vercel, open the project dashboard and look for the connected Git repository. Copy that repository URL, for example `https://github.com/owner/repo`, and use it as the publish target.
+                      </p>
+                      <p className="mt-2">
+                        Also fill in your public blog domain here. After a successful publish, markdown-press will automatically write the final article URL back into the note&apos;s frontmatter `link`.
+                      </p>
+                    </div>
+
+                    {!isTauriEnvironment() && (
+                      <p className="rounded-xl border border-yellow-200/70 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-200">
+                        One-click publishing is available in the desktop app.
                       </p>
                     )}
                   </div>

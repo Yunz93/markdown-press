@@ -41,8 +41,12 @@ export function useSettings() {
     updateSettings({ chineseFontFamily });
   }, [updateSettings]);
 
-  const updateGithubRepo = useCallback((githubRepo: string) => {
-    updateSettings({ githubRepo });
+  const updateBlogRepoUrl = useCallback((blogRepoUrl: string) => {
+    updateSettings({ blogRepoUrl });
+  }, [updateSettings]);
+
+  const updateBlogSiteUrl = useCallback((blogSiteUrl: string) => {
+    updateSettings({ blogSiteUrl });
   }, [updateSettings]);
 
   const updateShortcuts = useCallback((shortcuts: AppSettings['shortcuts']) => {
@@ -89,7 +93,8 @@ export function useSettings() {
     toggleWordWrap,
     updateEnglishFontFamily,
     updateChineseFontFamily,
-    updateGithubRepo,
+    updateBlogRepoUrl,
+    updateBlogSiteUrl,
     updateShortcuts,
     updateMetadataFields,
     addMetadataField,
