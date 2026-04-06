@@ -235,7 +235,7 @@ export function useExportActions(
     } finally {
       setPublishing(false);
     }
-  }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContent, setPublishing, settings.blogRepoUrl, settings.blogSiteUrl, showNotification]);
+  }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContent, setPublishing, settings.blogGithubToken, settings.blogRepoUrl, settings.blogSiteUrl, showNotification]);
 
   return { handleExportToHtml, handlePublishBlog };
 }
