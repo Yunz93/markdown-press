@@ -268,6 +268,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('editor');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showGithubToken, setShowGithubToken] = useState(false);
+  const [draggingMetadataIndex, setDraggingMetadataIndex] = useState<number | null>(null);
   const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<Record<ShortcutGroupId, boolean>>({
     workspace: true,
     editing: true,
@@ -332,6 +334,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleRemoveMetadata = (idx: number) => {
     if (idx < 0 || idx >= settings.metadataFields.length) return;
     const newFields = settings.metadataFields.filter((_, i) => i !== idx);
+    onUpdateSettings({ metadataFields: newFields });
+  };
+
+  const handleMoveMetadata = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex < 0
+      || toIndex < 0
+      || fromIndex >= settings.metadataFields.length
+      || toIndex >= settings.metadataFields.length
+      || fromIndex === toIndex
+    ) {
+      return;
+    }
+
+    const newFields = [...settings.metadataFields];
+    const [movedField] = newFields.splice(fromIndex, 1);
+    newFields.splice(toIndex, 0, movedField);
     onUpdateSettings({ metadataFields: newFields });
   };
 
@@ -592,7 +611,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                     {settings.metadataFields.map((field, idx) => (
-                      <div key={idx} className="flex gap-2 items-center bg-gray-50 dark:bg-white/5 p-2 rounded-xl border border-gray-100 dark:border-white/5 group">
+                      <div
+                        key={`${field.key}-${idx}`}
+                        draggable
+                        onDragStart={() => setDraggingMetadataIndex(idx)}
+                        onDragEnd={() => setDraggingMetadataIndex(null)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          if (draggingMetadataIndex === null) return;
+                          handleMoveMetadata(draggingMetadataIndex, idx);
+                          setDraggingMetadataIndex(null);
+                        }}
+                        className={`flex gap-2 items-center bg-gray-50 dark:bg-white/5 p-2 rounded-xl border transition-colors group ${
+                          draggingMetadataIndex === idx
+                            ? 'border-accent-DEFAULT/50 bg-accent-DEFAULT/5'
+                            : 'border-gray-100 dark:border-white/5'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          title="Drag to reorder"
+                          className="p-2 text-gray-400 cursor-grab active:cursor-grabbing hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="9" cy="6" r="1" />
+                            <circle cx="15" cy="6" r="1" />
+                            <circle cx="9" cy="12" r="1" />
+                            <circle cx="15" cy="12" r="1" />
+                            <circle cx="9" cy="18" r="1" />
+                            <circle cx="15" cy="18" r="1" />
+                          </svg>
+                        </button>
                         <input
                           type="text"
                           value={field.key}
@@ -625,7 +674,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                     </svg>
-                    <span>Tip: Use <code className="bg-gray-100 dark:bg-white/10 px-1 rounded text-gray-600 dark:text-gray-300">{'{now}'}</code> for the current date.</span>
+                    <span>Tip: drag to reorder. Use <code className="bg-gray-100 dark:bg-white/10 px-1 rounded text-gray-600 dark:text-gray-300">{'{now}'}</code> for a date and <code className="bg-gray-100 dark:bg-white/10 px-1 rounded text-gray-600 dark:text-gray-300">{'{now:datetime}'}</code> for a timestamp. `status` is editorial only; publishing is controlled by `is_publish`.</span>
                   </div>
                 </div>
               </div>
@@ -675,15 +724,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         GitHub Token
                       </label>
-                      <input
-                        type="text"
-                        value={settings.blogGithubToken ?? ''}
-                        onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
-                        placeholder="github_pat_..."
-                        autoComplete="off"
-                        spellCheck={false}
-                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showGithubToken ? 'text' : 'password'}
+                          value={settings.blogGithubToken ?? ''}
+                          onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
+                          placeholder="github_pat_..."
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowGithubToken((value) => !value)}
+                          className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                          title={showGithubToken ? 'Hide GitHub token' : 'Show GitHub token'}
+                        >
+                          {showGithubToken ? (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                         Required. Publishing now uses the GitHub API only, so this token must be set before the publish action can run.
                       </p>
@@ -747,6 +816,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </p>
                       <p className="mt-2">
                         Publish semantics: `title` defaults to the current file name, `aliases` defaults to `title`, and `slug` controls the final blog URL. If `slug` is empty, publishing will fall back to `title`.
+                      </p>
+                      <p className="mt-2">
+                        `status` is not used to decide whether a note is published. Publishing writes `is_publish: true`, so `status` can stay focused on your draft or review workflow.
                       </p>
                     </div>
 

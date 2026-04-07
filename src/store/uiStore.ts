@@ -1,6 +1,7 @@
 import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
+import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
 
 let notificationTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -78,14 +79,7 @@ export const defaultSettings: AppSettings = {
   lastKnowledgeBasePath: '',
   lastOpenedFilePath: '',
   themeMode: 'dark',
-  metadataFields: [
-    { key: 'category', defaultValue: '' },
-    { key: 'tags', defaultValue: '[]' },
-    { key: 'status', defaultValue: 'draft' },
-    { key: 'is_publish', defaultValue: 'false' },
-    { key: 'date created', defaultValue: '{now}' },
-    { key: 'date modified', defaultValue: '{now}' },
-  ],
+  metadataFields: DEFAULT_METADATA_FIELDS,
   autoSaveInterval: 60000,
 };
 

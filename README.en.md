@@ -122,6 +122,8 @@ Publishing field semantics:
 - `aliases`: article aliases; if omitted, publishing defaults it to the article title
 - `slug`: published URL suffix; if omitted, publishing defaults it to the article title
 - `link`: automatically written back after a successful publish
+- `status`: editorial workflow only, such as `draft` or `review`; it does not control publishing
+- `is_publish`: publish flag; the publish action writes it as `true`
 
 Notes:
 
@@ -129,6 +131,8 @@ Notes:
 - The actual public URL in `simple-blog` is determined by `slug`
 - If you want an English URL, fill in `slug` explicitly
 - `aliases` is kept as metadata only and is not used to build the publish URL
+- New-note metadata templates now include `slug`, `aliases`, `create_time`, and `update_time`
+- When a note is edited and saved, `update_time` is refreshed automatically if it exists in frontmatter
 
 ## Build
 

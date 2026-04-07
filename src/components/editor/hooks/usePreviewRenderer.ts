@@ -135,9 +135,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     [basePreviewHtml, hasWikiEmbeds]
   );
 
-  const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => (
-    requiresAsyncEnhancement ? '' : basePreviewHtml
-  ));
+  const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => basePreviewHtml);
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const mermaidTimerRef = useRef<number | null>(null);
   const enhancedBodyHtmlRef = useRef(enhancedBodyHtml);
@@ -182,8 +180,8 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       return;
     }
 
-    if (previewChanged) {
-      setEnhancedBodyHtml('');
+    if (previewChanged && basePreviewHtml !== enhancedBodyHtmlRef.current) {
+      setEnhancedBodyHtml(basePreviewHtml);
     }
 
     let cancelled = false;
@@ -210,8 +208,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
         try {
           const warmedSrc = await warmPreviewImage(previewTarget, currentFilePath || undefined);
           image.setAttribute('src', warmedSrc);
+          image.setAttribute('data-preview-warmed', 'true');
         } catch {
           image.setAttribute('src', previewTarget);
+          image.removeAttribute('data-preview-warmed');
         }
 
         image.setAttribute('data-original-src', previewTarget);

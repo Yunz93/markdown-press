@@ -12,6 +12,7 @@ import {
   isLegacyDefaultChineseFontFamily,
 } from '../utils/fontSettings';
 import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
+import { normalizeMetadataFields } from '../utils/metadataFields';
 
 // Re-export types from slice stores
 export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
@@ -89,6 +90,7 @@ export const useAppStore = create<AppState>()(
             ? persistedChineseFontFamily
             : DEFAULT_CHINESE_FONT_FAMILY,
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
+          metadataFields: normalizeMetadataFields(persistedSettings.metadataFields),
           shortcuts: {
             ...defaultSettings.shortcuts,
             ...(persistedSettings.shortcuts ?? {})

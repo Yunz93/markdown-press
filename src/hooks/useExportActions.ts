@@ -12,6 +12,7 @@ import {
   normalizeBlogRepoUrl,
   normalizeBlogSiteUrl,
 } from '../utils/blogRepo';
+import { refreshDocumentUpdateTime } from '../utils/metadataFields';
 
 const PUBLISH_TIMEOUT_MS = 45000;
 
@@ -75,7 +76,7 @@ export function useExportActions(
       return false;
     }
 
-    const linkedContent = updateFrontmatter(latestContent, { link: publishedUrl });
+    const linkedContent = refreshDocumentUpdateTime(updateFrontmatter(latestContent, { link: publishedUrl }));
     if (linkedContent === latestContent) {
       return true;
     }

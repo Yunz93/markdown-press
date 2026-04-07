@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
 import { getFileSystem } from '../types/filesystem';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
+import { refreshDocumentUpdateTime } from '../utils/metadataFields';
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -35,6 +36,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     isSaving,
     setSaving,
     updateFileContent,
+    updateTabContent,
     markAsSaved,
     showNotification,
     settings
@@ -87,9 +89,16 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       return true; // No changes to save
     }
 
+    const contentToSave = refreshDocumentUpdateTime(currentContent);
+
     // Prevent concurrent saves
     if (isSavingRef.current) {
       return false;
+    }
+
+    if (contentToSave !== currentContent) {
+      contentRef.current = contentToSave;
+      updateTabContent(activeTabId, contentToSave);
     }
 
     isSavingRef.current = true;
@@ -100,14 +109,14 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       await withErrorHandling(
         async () => {
           const fs = await getFileSystem();
-          await fs.writeFile(currentPath, currentContent);
+          await fs.writeFile(currentPath, contentToSave);
         },
         'Auto-save failed'
       );
 
-      updateFileContent(activeTabId, currentContent);
+      updateFileContent(activeTabId, contentToSave);
       markAsSaved(activeTabId);
-      lastSavedContentRef.current = currentContent;
+      lastSavedContentRef.current = contentToSave;
       saveStateRef.current = {
         status: 'saved',
         lastSavedAt: new Date(),
@@ -161,7 +170,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       return false;
     }
-  }, [activeTabId, setSaving, updateFileContent, markAsSaved, showNotification, maxRetries, retryDelayMs]);
+  }, [activeTabId, setSaving, updateFileContent, updateTabContent, markAsSaved, showNotification, maxRetries, retryDelayMs]);
 
   // Debounced auto-save effect
   useEffect(() => {

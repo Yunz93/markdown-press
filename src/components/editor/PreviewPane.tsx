@@ -94,6 +94,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const previewFileType = useMemo(() => getPreviewFileType(currentFilePath), [currentFilePath]);
   const isMarkdownPreview = previewFileType === 'markdown';
   const isHtmlPreview = previewFileType === 'html';
+  const flattenedHeadings = useMemo(() => (
+    isMarkdownPreview ? flattenHeadingNodes(parseHeadings(content)) : []
+  ), [content, isMarkdownPreview]);
 
   const [paneWidth, setPaneWidth] = useState(0);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
@@ -223,8 +226,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     if (!container) return;
 
     const applyHeadingAttributes = () => {
-      const flattenedHeadings = flattenHeadingNodes(parseHeadings(content));
-      // Limit querySelector to visible area for long documents
       const headingElements = Array.from(container.querySelectorAll<HTMLElement>(
         'article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'
       ));
@@ -251,9 +252,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       return () => cancelIdleCallback(id);
     } else {
       const id = setTimeout(applyHeadingAttributes, 0);
-      return () => clearTimeout(id);
+        return () => clearTimeout(id);
     }
-  }, [activeTabId, renderer.enhancedBodyHtml, content, isMarkdownPreview]);
+  }, [activeTabId, flattenedHeadings, renderer.enhancedBodyHtml, isMarkdownPreview]);
 
   // Render Mermaid diagrams - debounced and limited for performance
   useEffect(() => {
@@ -297,6 +298,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       const batch = images.slice(startIndex, startIndex + BATCH_SIZE);
       await Promise.all(batch.map(async (image: Element) => {
         const imgElement = image as HTMLImageElement;
+        if (imgElement.getAttribute('data-preview-warmed') === 'true') return;
+
         const originalSrc = imgElement.getAttribute('data-original-src') || imgElement.getAttribute('src');
         if (!originalSrc) return;
 
@@ -310,6 +313,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
           imgElement.setAttribute('src', cachedSrc);
           imgElement.src = cachedSrc;
         }
+        imgElement.setAttribute('data-preview-warmed', 'true');
       }));
 
       // Schedule next batch to allow UI updates
@@ -481,12 +485,23 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                       {key}
                     </div>
                     <div className="preview-pane-properties-cell table-cell py-1.5 px-2 text-gray-800 dark:text-gray-200 align-top">
-                      <input
-                        type="text"
-                        value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
-                        readOnly
-                        className="preview-pane-properties-input w-full bg-transparent border-none focus:ring-0 py-0.5"
-                      />
+                      {key === 'link' && typeof value === 'string' && isExternalLink(value) && isValidExternalUrl(value) ? (
+                        <a
+                          href={value}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex max-w-full break-all py-0.5 text-accent-DEFAULT underline underline-offset-2 hover:opacity-80"
+                        >
+                          {value}
+                        </a>
+                      ) : (
+                        <input
+                          type="text"
+                          value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
+                          readOnly
+                          className="preview-pane-properties-input w-full bg-transparent border-none focus:ring-0 py-0.5"
+                        />
+                      )}
                     </div>
                   </div>
                 ))}

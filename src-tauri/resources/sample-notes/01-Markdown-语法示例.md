@@ -3,9 +3,11 @@ category: 示例
 tags:
   - Markdown
 status: draft
+slug: ''
+aliases: ''
 is_publish: false
-date created: 2026-03-21
-date modified: 2026-03-21
+create_time: 2026-03-21
+update_time: "2026-03-21 00:00:00"
 ---
 
 ## 主要内容

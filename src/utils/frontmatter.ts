@@ -9,6 +9,7 @@ function shouldQuoteYamlString(value: string): boolean {
     || /[\n\r]/.test(value)
     || /^(true|false|null|~)$/i.test(trimmed)
     || /^[+-]?\d+(?:\.\d+)?$/.test(trimmed)
+    || /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.test(trimmed)
     || /^[-?:@`!&*|>%{\[]/.test(trimmed)
     || /:\s/.test(value)
     || /^#/.test(trimmed)

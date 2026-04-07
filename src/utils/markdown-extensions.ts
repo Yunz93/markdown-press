@@ -162,14 +162,22 @@ export async function renderMermaidDiagrams(container?: HTMLElement | null) {
 
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i] as HTMLElement;
-      const code = el.textContent || '';
+      const code = el.dataset.mermaidSource || el.textContent || '';
       const id = el.id || `mermaid-${renderBatchId}-${i}`;
+      if (!code) continue;
+      if (el.dataset.mermaidRendered === 'true' && el.dataset.mermaidSource === code) {
+        continue;
+      }
 
       try {
         const { svg } = await mermaid.render(id, code);
         el.innerHTML = svg;
+        el.dataset.mermaidSource = code;
+        el.dataset.mermaidRendered = 'true';
       } catch (e) {
         el.innerHTML = `<div class="mermaid-error">Failed to render diagram: ${e}</div>`;
+        el.dataset.mermaidSource = code;
+        el.dataset.mermaidRendered = 'error';
       }
     }
   } catch (e) {

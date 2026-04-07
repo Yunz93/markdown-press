@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore';
 import { useFileSystem } from './useFileSystem';
 import { ViewMode, type FileNode } from '../types';
 import { generateFrontmatter } from '../utils/frontmatter';
+import { parseMetadataTemplateValue } from '../utils/metadataFields';
 
 function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   for (const node of nodes) {
@@ -154,22 +155,10 @@ export function useFileOperations() {
     const normalizedName = (fileName?.trim() || `note-${timestamp}`).replace(/\.md$/i, '');
     const finalFileName = `${normalizedName}.md`;
     const documentTitle = normalizedName;
-    const now = new Date().toISOString().split('T')[0];
     const meta: Record<string, string | string[] | number | boolean> = {};
 
-    const parseDefaultValue = (val: string): string | string[] | number | boolean => {
-      if (val === '{now}') return now;
-      if (val === '[]') return [];
-      if (val === '{}') return ''; // Return empty string instead of empty object
-      if (val.toLowerCase() === 'true') return true;
-      if (val.toLowerCase() === 'false') return false;
-      const num = Number(val);
-      if (!isNaN(num) && val.trim() !== '') return num;
-      return val;
-    };
-
     settings.metadataFields.forEach(f => {
-      meta[f.key] = parseDefaultValue(f.defaultValue);
+      meta[f.key] = parseMetadataTemplateValue(f.defaultValue);
     });
 
     const frontmatterBlock = Object.keys(meta).length > 0 ? generateFrontmatter(meta) : '';

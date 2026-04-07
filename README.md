@@ -132,12 +132,16 @@ npm run tauri:dev
 - `aliases`：文章别名；如果未填写，发布时默认使用文章标题
 - `slug`：文章发布 URL 后缀；如果未填写，发布时默认使用文章标题
 - `link`：发布完成后自动回填为最终文章地址
+- `status`：仅用于写作流程，例如 `draft`、`review`；不参与发布判断
+- `is_publish`：发布标记；发布动作会写入 `true`
 
 说明：
 
 - 博客仓库中的 Markdown 文件名保持当前文件名，不会因为 `slug` 或 `aliases` 改名
 - simple-blog 的真实访问地址由 `slug` 决定；如果需要英文 URL，应手动填写 `slug`
 - `aliases` 不参与发布 URL 计算，只作为文章别名字段保留
+- 新建笔记默认 metadata 模板已内置 `slug`、`aliases`、`create_time`、`update_time`
+- 编辑并保存时，如果 frontmatter 中存在 `update_time`，应用会自动刷新它的值
 
 支持的仓库格式：
 
