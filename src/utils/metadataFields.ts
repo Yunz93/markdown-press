@@ -116,6 +116,11 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
     return cloneMetadataFields(DEFAULT_METADATA_FIELDS);
   }
 
+  // Preserve an intentionally empty template instead of repopulating defaults on restart.
+  if (input.length === 0) {
+    return [];
+  }
+
   const rawFields = input
     .map((field): MetadataField | null => {
       if (!field || typeof field !== 'object') return null;

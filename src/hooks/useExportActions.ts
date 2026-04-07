@@ -200,11 +200,13 @@ export function useExportActions(
         return;
       }
 
+      const contentToPublish = useAppStore.getState().fileContents[activeTabId] ?? nextContent;
+
       const prepared = await prepareSimpleBlogPublish({
         files,
         rootFolderPath,
         currentFilePath: activeFile.path,
-        markdownContent: nextContent,
+        markdownContent: contentToPublish,
       });
 
       await invokePublishWithTimeout({
@@ -220,7 +222,7 @@ export function useExportActions(
 
       const publishedUrl = buildSimpleBlogPostUrl(
         normalizeBlogSiteUrl(settings.blogSiteUrl),
-        nextContent,
+        contentToPublish,
         prepared.postRelativePath
       );
 
