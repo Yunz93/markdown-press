@@ -9,6 +9,7 @@
  */
 
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
@@ -25,6 +26,7 @@ interface EditorPaneProps {
   placeholder?: string;
   onContentChange?: (content: string) => void;
   onScroll?: (percentage: number) => void;
+  onGenerateWikiFromSelection?: (selection: { text: string; from: number; to: number }) => Promise<string | null>;
   highlighter?: any;
   density?: PaneDensity;
 }
@@ -97,6 +99,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   placeholder = 'Type here...',
   onContentChange,
   onScroll,
+  onGenerateWikiFromSelection,
   highlighter,
   density = 'comfortable' as PaneDensity
 }, ref) => {
@@ -123,9 +126,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   // Pane layout state
   const [paneWidth, setPaneWidth] = useState(0);
   const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
+  const [selectionMenu, setSelectionMenu] = useState<{
+    x: number;
+    y: number;
+    from: number;
+    to: number;
+    text: string;
+  } | null>(null);
+  const [isGeneratingWiki, setIsGeneratingWiki] = useState(false);
   
   // Completion trigger ref
   const completionStartFrameRef = useRef<number | null>(null);
+  const closeSelectionMenu = useCallback(() => {
+    setSelectionMenu(null);
+  }, []);
 
   // Content change handler
   const updateContent = useCallback((nextContent: string) => {
@@ -162,6 +176,40 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   // Scroll sync hook
   const scrollSync = useScrollSync({ onScroll });
 
+  const handleSelectionContextMenu = useCallback((event: MouseEvent, view: EditorView) => {
+    if (!onGenerateWikiFromSelection) {
+      return false;
+    }
+
+    const selection = view.state.selection.main;
+    if (selection.empty) {
+      closeSelectionMenu();
+      return false;
+    }
+
+    const clickPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (clickPos == null || clickPos < selection.from || clickPos > selection.to) {
+      closeSelectionMenu();
+      return false;
+    }
+
+    const selectedText = view.state.sliceDoc(selection.from, selection.to).trim();
+    if (!selectedText) {
+      closeSelectionMenu();
+      return false;
+    }
+
+    event.preventDefault();
+    setSelectionMenu({
+      x: event.clientX,
+      y: event.clientY,
+      from: selection.from,
+      to: selection.to,
+      text: selectedText,
+    });
+    return true;
+  }, [closeSelectionMenu, onGenerateWikiFromSelection]);
+
   // CodeMirror hook
   const codeMirror = useCodeMirror({
     content,
@@ -181,7 +229,43 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
         // Trigger completion
       });
     },
+    onContextMenu: handleSelectionContextMenu,
   });
+
+  const handleGenerateWikiClick = useCallback(async () => {
+    const menuState = selectionMenu;
+    const view = codeMirror.view;
+    if (!menuState || !view || !onGenerateWikiFromSelection) {
+      return;
+    }
+
+    setIsGeneratingWiki(true);
+    try {
+      const replacement = await onGenerateWikiFromSelection({
+        text: menuState.text,
+        from: menuState.from,
+        to: menuState.to,
+      });
+
+      if (!replacement) {
+        return;
+      }
+
+      view.dispatch({
+        changes: {
+          from: menuState.from,
+          to: menuState.to,
+          insert: replacement,
+        },
+        selection: {
+          anchor: menuState.from + replacement.length,
+        },
+      });
+      closeSelectionMenu();
+    } finally {
+      setIsGeneratingWiki(false);
+    }
+  }, [closeSelectionMenu, codeMirror.view, onGenerateWikiFromSelection, selectionMenu]);
 
   // Register/clear editor view for selection bridge
   useEffect(() => {
@@ -359,6 +443,32 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     };
   }, [hideHoverPreview, updateHoverPreviewAtPointer]);
 
+  useEffect(() => {
+    if (!selectionMenu) return;
+
+    const handleClick = () => {
+      closeSelectionMenu();
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeSelectionMenu();
+      }
+    };
+    const handleScroll = () => {
+      closeSelectionMenu();
+    };
+
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', handleScroll, true);
+
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [closeSelectionMenu, selectionMenu]);
+
   // Cancel scroll sync on view mode change
   useEffect(() => {
     scrollSync.cancelScrollSync();
@@ -423,6 +533,29 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             );
           })()}
         </div>
+      )}
+
+      {selectionMenu && createPortal(
+        <div
+          className="fixed z-[160] min-w-[220px] rounded-xl border border-gray-200/70 bg-white/95 py-1.5 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95"
+          style={{ left: selectionMenu.x, top: selectionMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              void handleGenerateWikiClick();
+            }}
+            disabled={isGeneratingWiki}
+            className="mx-1.5 flex w-[calc(100%-12px)] items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2l2.8 6.2L21 9l-4.5 4 1.2 6.1L12 16l-5.7 3.1L7.5 13 3 9l6.2-.8L12 2z" />
+            </svg>
+            {isGeneratingWiki ? '正在生成 Wiki…' : 'AI 生成字段解读 Wiki'}
+          </button>
+        </div>,
+        document.body
       )}
     </div>
   );

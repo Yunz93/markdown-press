@@ -47,6 +47,7 @@ export interface UIActions {
  * Default settings
  */
 export const defaultSettings: AppSettings = {
+  aiProvider: 'gemini',
   fontSize: 15,
   wordWrap: true,
   englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,
@@ -59,6 +60,9 @@ export const defaultSettings: AppSettings = {
   blogGithubToken: '',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash-exp',
+  codexApiBaseUrl: 'https://api.openai.com/v1',
+  codexApiKey: '',
+  codexModel: 'gpt-5.2-codex',
   shortcuts: {
     save: 'Ctrl+S',
     toggleView: 'Ctrl+E',

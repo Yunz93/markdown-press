@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { AIAnalysisResult } from "../types";
+import type { AIAnalysisResult, AIWikiGenerationResult } from "../types";
 
 // Singleton instance - API key is not stored in a Map to avoid memory caching issues
 let aiInstance: GoogleGenAI | null = null;
@@ -65,8 +65,6 @@ export const analyzeContent = async (
     throw new Error("Gemini API key is required");
   }
 
-  const ai = getAIInstance(apiKey);
-
   const prompt = `
     You are editing Markdown content for publication quality.
     Do all of the following:
@@ -87,6 +85,44 @@ export const analyzeContent = async (
     ${content}
   `;
 
+  return generateGeminiJson<AIAnalysisResult>({
+    apiKey,
+    modelName,
+    prompt,
+    schema: {
+      type: Type.OBJECT,
+      properties: {
+        summary: { type: Type.STRING },
+        suggestedTags: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        },
+        seoTitle: { type: Type.STRING },
+        optimizedMarkdown: { type: Type.STRING }
+      },
+      required: ["summary", "suggestedTags", "seoTitle", "optimizedMarkdown"]
+    }
+  });
+};
+
+interface GeminiJsonRequest {
+  apiKey: string;
+  modelName?: string;
+  prompt: string;
+  schema: Record<string, unknown>;
+}
+
+export async function generateGeminiJson<T>({
+  apiKey,
+  modelName = "gemini-2.0-flash-exp",
+  prompt,
+  schema,
+}: GeminiJsonRequest): Promise<T> {
+  if (!apiKey) {
+    throw new Error("Gemini API key is required");
+  }
+
+  const ai = getAIInstance(apiKey);
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -101,19 +137,7 @@ export const analyzeContent = async (
         contents: prompt,
         config: {
           responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              summary: { type: Type.STRING },
-              suggestedTags: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
-              seoTitle: { type: Type.STRING },
-              optimizedMarkdown: { type: Type.STRING }
-            },
-            required: ["summary", "suggestedTags", "seoTitle", "optimizedMarkdown"]
-          }
+          responseSchema: schema
         }
       });
 
@@ -122,7 +146,7 @@ export const analyzeContent = async (
 
       if (!text) throw new Error("No response from AI");
 
-      return JSON.parse(text) as AIAnalysisResult;
+      return JSON.parse(text) as T;
 
     } catch (error: any) {
       lastError = error;
@@ -142,4 +166,29 @@ export const analyzeContent = async (
   // Clear instance on failure
   clearAIInstance();
   throw lastError || new Error("Failed to analyze content after multiple attempts");
-};
+}
+
+export async function generateGeminiWikiArticle(
+  prompt: string,
+  apiKey: string,
+  modelName: string = "gemini-2.0-flash-exp"
+): Promise<AIWikiGenerationResult> {
+  return generateGeminiJson<AIWikiGenerationResult>({
+    apiKey,
+    modelName,
+    prompt,
+    schema: {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        summary: { type: Type.STRING },
+        suggestedTags: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        },
+        markdown: { type: Type.STRING }
+      },
+      required: ["title", "summary", "suggestedTags", "markdown"]
+    }
+  });
+}

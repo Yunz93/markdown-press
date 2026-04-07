@@ -10,6 +10,7 @@ import type { PaneDensity } from './paneLayout';
 interface SplitViewProps {
   highlighter?: any;
   onContentChange?: (content: string) => void;
+  onGenerateWikiFromSelection?: (selection: { text: string; from: number; to: number }) => Promise<string | null>;
   isOutlineOpen: boolean;
   canShowOutline: boolean;
   canShowOutlineToggle: boolean;
@@ -20,6 +21,7 @@ interface SplitViewProps {
 export const SplitView: React.FC<SplitViewProps> = ({
   highlighter,
   onContentChange,
+  onGenerateWikiFromSelection,
   isOutlineOpen,
   canShowOutline,
   canShowOutlineToggle,
@@ -131,6 +133,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
               density={contentDensity}
               onContentChange={onContentChange}
               onScroll={handleEditorScroll}
+              onGenerateWikiFromSelection={onGenerateWikiFromSelection}
             />
           </div>
         )}

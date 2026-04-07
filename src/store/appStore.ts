@@ -56,6 +56,52 @@ function resolvePersistedBlogSiteUrl(persistedSettings: Record<string, unknown>)
   return '';
 }
 
+function looksLikeGeminiModel(value: unknown): boolean {
+  return typeof value === 'string' && /^gemini(?:-|$)/i.test(value.trim());
+}
+
+function looksLikeOpenAIModel(value: unknown): boolean {
+  return typeof value === 'string' && /^(gpt-|o[1-9]\b|o[1-9]-|codex\b)/i.test(value.trim());
+}
+
+function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) {
+  const persistedProvider = typeof persistedSettings.aiProvider === 'string'
+    ? persistedSettings.aiProvider
+    : '';
+  const persistedGeminiModel = typeof persistedSettings.geminiModel === 'string'
+    ? persistedSettings.geminiModel.trim()
+    : '';
+  const persistedCodexModel = typeof persistedSettings.codexModel === 'string'
+    ? persistedSettings.codexModel.trim()
+    : '';
+  const hasCodexApiKey = typeof persistedSettings.codexApiKey === 'string'
+    && persistedSettings.codexApiKey.trim().length > 0;
+
+  if (persistedProvider === 'codex' || persistedProvider === 'gemini') {
+    return {
+      aiProvider: persistedProvider,
+      codexModel: persistedCodexModel || (persistedProvider === 'codex' && looksLikeOpenAIModel(persistedGeminiModel)
+        ? persistedGeminiModel
+        : defaultSettings.codexModel),
+      geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
+    };
+  }
+
+  if (hasCodexApiKey || (!persistedCodexModel && looksLikeOpenAIModel(persistedGeminiModel))) {
+    return {
+      aiProvider: 'codex',
+      codexModel: persistedCodexModel || persistedGeminiModel || defaultSettings.codexModel,
+      geminiModel: looksLikeGeminiModel(persistedGeminiModel) ? persistedGeminiModel : defaultSettings.geminiModel,
+    };
+  }
+
+  return {
+    aiProvider: 'gemini',
+    codexModel: persistedCodexModel || defaultSettings.codexModel,
+    geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
+  };
+}
+
 /**
  * Create the combined store using slice pattern
  */
@@ -76,6 +122,7 @@ export const useAppStore = create<AppState>()(
         const persistedChineseFontFamily = typeof persistedSettings.chineseFontFamily === 'string'
           ? persistedSettings.chineseFontFamily.trim()
           : '';
+        const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
@@ -89,6 +136,7 @@ export const useAppStore = create<AppState>()(
           chineseFontFamily: persistedChineseFontFamily && !isLegacyDefaultChineseFontFamily(persistedChineseFontFamily)
             ? persistedChineseFontFamily
             : DEFAULT_CHINESE_FONT_FAMILY,
+          ...resolvedAISettings,
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
           metadataFields: normalizeMetadataFields(persistedSettings.metadataFields),
           shortcuts: {

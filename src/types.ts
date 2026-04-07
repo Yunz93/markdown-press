@@ -45,6 +45,15 @@ export interface AIAnalysisResult {
   optimizedMarkdown: string;
 }
 
+export interface AIWikiGenerationResult {
+  title: string;
+  summary: string;
+  suggestedTags: string[];
+  markdown: string;
+}
+
+export type AIProvider = 'gemini' | 'codex';
+
 export interface ShortcutConfig {
   save: string;
   toggleView: string;
@@ -77,6 +86,7 @@ export type ThemeMode = 'light' | 'dark';
 export type AttachmentPasteFormat = 'markdown' | 'obsidian';
 export type OrderedListMode = 'strict' | 'loose';
 export interface AppSettings {
+  aiProvider: AIProvider;
   fontSize: number;
   wordWrap: boolean;
   englishFontFamily: string;
@@ -89,6 +99,9 @@ export interface AppSettings {
   blogGithubToken?: string;
   geminiApiKey?: string;
   geminiModel?: string;
+  codexApiBaseUrl?: string;
+  codexApiKey?: string;
+  codexModel?: string;
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;

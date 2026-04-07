@@ -87,7 +87,7 @@ const App: React.FC = () => {
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
   const { highlighter } = useShikiHighlighter(content);
-  const { handleAIAnalyze } = useAIAnalyze();
+  const { handleAIAnalyze, handleGenerateWikiFromSelection } = useAIAnalyze();
   const fileOps = useFileOperations();
 
   useOutline();
@@ -495,6 +495,7 @@ const App: React.FC = () => {
           <SplitView
             highlighter={highlighter}
             onContentChange={handleContentChange}
+            onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
             isOutlineOpen={isOutlineOpen}
             canShowOutline={canShowOutlinePanel}
             canShowOutlineToggle={canShowOutlineToggle}

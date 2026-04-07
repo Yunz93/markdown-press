@@ -56,6 +56,7 @@ export interface UseCodeMirrorOptions {
   completionSource?: CompletionSource;
   onPasteImage?: (file: File, view: EditorView) => boolean | Promise<boolean>;
   onWikiLinkStart?: () => void;
+  onContextMenu?: (event: MouseEvent, view: EditorView) => boolean;
 }
 
 export interface UseCodeMirrorReturn {
@@ -78,6 +79,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     completionSource,
     onPasteImage,
     onWikiLinkStart,
+    onContextMenu,
   } = options;
 
   const editorRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const onScrollRef = useRef(onScroll);
   const onPasteImageRef = useRef(onPasteImage);
   const onWikiLinkStartRef = useRef(onWikiLinkStart);
+  const onContextMenuRef = useRef(onContextMenu);
 
   // Compartments for dynamic reconfiguration
   const compartments = useMemo(() => ({
@@ -144,6 +147,10 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   useEffect(() => {
     onWikiLinkStartRef.current = onWikiLinkStart;
   }, [onWikiLinkStart]);
+
+  useEffect(() => {
+    onContextMenuRef.current = onContextMenu;
+  }, [onContextMenu]);
 
   // Initialize editor as soon as the DOM node is ready.
   useLayoutEffect(() => {
@@ -216,6 +223,10 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
                   }
                 }
                 return false;
+              },
+              contextmenu: (event, view) => {
+                const handler = onContextMenuRef.current;
+                return handler ? handler(event, view) : false;
               },
             }),
             EditorView.updateListener.of((update: ViewUpdate) => {

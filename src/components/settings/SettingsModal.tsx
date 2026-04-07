@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
+import { fetchAvailableModels, type ModelOption } from '../../services/modelCatalogService';
 import {
   isValidOrEmptyBlogRepoUrl,
   isValidOrEmptyBlogSiteUrl,
@@ -268,8 +269,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('editor');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [draggingMetadataIndex, setDraggingMetadataIndex] = useState<number | null>(null);
+  const [availableModels, setAvailableModels] = useState<Record<'gemini' | 'codex', ModelOption[]>>({
+    gemini: [],
+    codex: [],
+  });
+  const [isLoadingModels, setIsLoadingModels] = useState<Record<'gemini' | 'codex', boolean>>({
+    gemini: false,
+    codex: false,
+  });
+  const [modelLoadMessage, setModelLoadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<Record<ShortcutGroupId, boolean>>({
     workspace: true,
     editing: true,
@@ -316,6 +327,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const loadModels = async (provider: 'gemini' | 'codex') => {
+    try {
+      setModelLoadMessage(null);
+      setIsLoadingModels((prev) => ({ ...prev, [provider]: true }));
+      const models = await fetchAvailableModels(provider, settings);
+      setAvailableModels((prev) => ({ ...prev, [provider]: models }));
+      setModelLoadMessage({
+        type: 'success',
+        text: models.length > 0 ? `已加载 ${models.length} 个${provider === 'gemini' ? ' Gemini' : ' OpenAI'}模型。` : '接口已返回，但没有筛到可用模型。',
+      });
+    } catch (error) {
+      setModelLoadMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : '加载模型列表失败。',
+      });
+    } finally {
+      setIsLoadingModels((prev) => ({ ...prev, [provider]: false }));
+    }
+  };
 
   const handleUpdateMetadata = (idx: number, field: Partial<MetadataField>) => {
     if (idx < 0 || idx >= settings.metadataFields.length) return;
@@ -390,47 +421,164 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">AI Content Enhancement</h3>
-                  <p className="text-sm text-gray-500 mb-6">Use the configured Gemini model to optimize markdown formatting, fix spelling, and refresh SEO metadata.</p>
+                  <p className="text-sm text-gray-500 mb-6">Choose an AI provider for full-note enhancement and for right-click wiki generation on selected fields.</p>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini API Key</label>
-                      <div className="relative">
-                        <input
-                          type={showApiKey ? 'text' : 'password'}
-                          value={settings.geminiApiKey || ''}
-                          onChange={(e) => onUpdateSettings({ ...settings, geminiApiKey: e.target.value })}
-                          placeholder="Paste your API key here..."
-                          className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
-                        />
-                        <button
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                        >
-                          {showApiKey ? (
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-gray-400">Your API key is stored locally and never shared. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>.</p>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Provider</label>
+                      <select
+                        value={settings.aiProvider}
+                        onChange={(e) => onUpdateSettings({ aiProvider: e.target.value as AppSettings['aiProvider'] })}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                      >
+                        <option value="gemini">Gemini</option>
+                        <option value="codex">OpenAI</option>
+                      </select>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini Model</label>
-                      <input
-                        type="text"
-                        value={settings.geminiModel || 'gemini-2.0-flash-exp'}
-                        onChange={(e) => onUpdateSettings({ ...settings, geminiModel: e.target.value })}
-                        placeholder="gemini-2.0-flash-exp"
-                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
-                      />
-                      <p className="text-[10px] text-gray-400">Example: <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">gemini-2.0-flash-exp</code></p>
-                    </div>
+
+                    {settings.aiProvider === 'gemini' && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini API Key</label>
+                          <div className="relative">
+                            <input
+                              type={showApiKey ? 'text' : 'password'}
+                              value={settings.geminiApiKey || ''}
+                              onChange={(e) => onUpdateSettings({ geminiApiKey: e.target.value })}
+                              placeholder="Paste your API key here..."
+                              className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                            />
+                            <button
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            >
+                              {showApiKey ? (
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-gray-400">Stored locally only. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini Model</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void loadModels('gemini');
+                              }}
+                              disabled={isLoadingModels.gemini}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 disabled:opacity-60"
+                            >
+                              {isLoadingModels.gemini ? '加载中…' : '加载模型列表'}
+                            </button>
+                          </div>
+                          <select
+                            value={settings.geminiModel || 'gemini-2.0-flash-exp'}
+                            onChange={(e) => onUpdateSettings({ geminiModel: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                          >
+                            {[settings.geminiModel || 'gemini-2.0-flash-exp', ...availableModels.gemini.map((model) => model.id)]
+                              .filter((value, index, array) => value && array.indexOf(value) === index)
+                              .map((modelId) => {
+                                const option = availableModels.gemini.find((item) => item.id === modelId);
+                                return (
+                                  <option key={modelId} value={modelId}>
+                                    {option?.label || modelId}
+                                  </option>
+                                );
+                              })}
+                          </select>
+                          <p className="text-[10px] text-gray-400">请选择列表中的 Gemini 模型。</p>
+                        </div>
+                      </>
+                    )}
+
+                    {settings.aiProvider === 'codex' && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI API Base URL</label>
+                          <input
+                            type="text"
+                            value={settings.codexApiBaseUrl || 'https://api.openai.com/v1'}
+                            onChange={(e) => onUpdateSettings({ codexApiBaseUrl: e.target.value })}
+                            placeholder="https://api.openai.com/v1"
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI Model</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void loadModels('codex');
+                              }}
+                              disabled={isLoadingModels.codex}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 disabled:opacity-60"
+                            >
+                              {isLoadingModels.codex ? '加载中…' : '加载模型列表'}
+                            </button>
+                          </div>
+                          <select
+                            value={settings.codexModel || 'gpt-5.2-codex'}
+                            onChange={(e) => onUpdateSettings({ codexModel: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                          >
+                            {[settings.codexModel || 'gpt-5.2-codex', ...availableModels.codex.map((model) => model.id)]
+                              .filter((value, index, array) => value && array.indexOf(value) === index)
+                              .map((modelId) => {
+                                const option = availableModels.codex.find((item) => item.id === modelId);
+                                return (
+                                  <option key={modelId} value={modelId}>
+                                    {option?.label || modelId}
+                                  </option>
+                                );
+                              })}
+                          </select>
+                          <p className="text-[10px] text-gray-400">请选择列表中的 OpenAI 模型。</p>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI API Key</label>
+                          <div className="relative">
+                            <input
+                              type={showOpenAIApiKey ? 'text' : 'password'}
+                              value={settings.codexApiKey || ''}
+                              onChange={(e) => onUpdateSettings({ codexApiKey: e.target.value })}
+                              placeholder="Paste your OpenAI API key here..."
+                              className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                            />
+                            <button
+                              onClick={() => setShowOpenAIApiKey(!showOpenAIApiKey)}
+                              className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            >
+                              {showOpenAIApiKey ? (
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-gray-400">Stored locally only. Use a standard OpenAI API key for this provider.</p>
+                        </div>
+                      </>
+                    )}
+
+                    {modelLoadMessage && (
+                      <p className={`text-xs ${modelLoadMessage.type === 'error' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                        {modelLoadMessage.text}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
