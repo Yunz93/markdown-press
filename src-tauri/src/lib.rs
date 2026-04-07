@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -7,13 +7,36 @@ use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const SAMPLE_NOTES_STATE_FILE: &str = ".markdown-press-sample-notes-state.json";
 const SAMPLE_NOTES_FOLDER_NAME: &str = "示例笔记";
 const GITHUB_API_CONNECT_TIMEOUT_SECS: u64 = 10;
 const GITHUB_API_REQUEST_TIMEOUT_SECS: u64 = 30;
+
+fn publish_log(message: impl AsRef<str>) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let line = format!(
+        "[publish_simple_blog][{}.{:03}] {}",
+        now.as_secs(),
+        now.subsec_millis(),
+        message.as_ref()
+    );
+    println!("{}", line);
+    log::info!("{}", line);
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/markdown-press-publish.log")
+    {
+        let _ = writeln!(file, "{}", line);
+    }
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -124,7 +147,6 @@ struct GitHubTreeEntry {
     mode: String,
     #[serde(rename = "type")]
     item_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     sha: Option<String>,
 }
 
@@ -184,12 +206,13 @@ pub fn run() {
 async fn publish_simple_blog(
     request: PublishSimpleBlogRequest,
 ) -> Result<PublishSimpleBlogResult, String> {
-    publish_remote_simple_blog(&request)
+    publish_remote_simple_blog(&request).await
 }
 
-fn publish_remote_simple_blog(
+async fn publish_remote_simple_blog(
     request: &PublishSimpleBlogRequest,
 ) -> Result<PublishSimpleBlogResult, String> {
+    publish_log("start request");
     let remote_repo = normalize_repo_target(&request.blog_repo_url)?;
     let token =
         normalize_optional_token(request.blog_github_token.as_deref()).ok_or_else(|| {
@@ -200,8 +223,14 @@ fn publish_remote_simple_blog(
         "Failed to resolve the GitHub repository owner and name from the configured repository URL."
             .to_string()
     })?;
+    publish_log(format!(
+        "normalized repo={} post={} assets={}",
+        repo_slug,
+        request.post_relative_path,
+        request.assets.len()
+    ));
 
-    publish_remote_simple_blog_via_github_api(request, &remote_repo, &repo_slug, &token)
+    publish_remote_simple_blog_via_github_api(request, &remote_repo, &repo_slug, &token).await
 }
 
 /// Copy sample notes from resources to the target directory
@@ -380,53 +409,69 @@ fn write_sample_notes_state(target: &Path, state: &SampleNotesState) -> Result<(
         .map_err(|e| format!("Failed to write sample notes state {:?}: {}", state_path, e))
 }
 
-fn publish_remote_simple_blog_via_github_api(
+async fn publish_remote_simple_blog_via_github_api(
     request: &PublishSimpleBlogRequest,
     remote_repo: &str,
     repo_slug: &str,
     token: &str,
 ) -> Result<PublishSimpleBlogResult, String> {
+    publish_log("creating GitHub API client");
     let client = create_github_api_client(token)?;
     let (owner, repo) = split_github_repo_slug(repo_slug)?;
+    publish_log(format!("loading repo metadata for {}/{}", owner, repo));
     let repo_info: GitHubRepoResponse =
-        github_api_get(&client, &format!("/repos/{}/{}", owner, repo))?;
+        github_api_get(&client, &format!("/repos/{}/{}", owner, repo)).await?;
 
     let branch = repo_info.default_branch.trim();
     if branch.is_empty() {
         return Err("GitHub repository default branch is empty.".to_string());
     }
+    publish_log(format!("default branch={}", branch));
 
+    publish_log("loading branch ref");
     let branch_ref: GitHubRefResponse = github_api_get(
         &client,
         &format!("/repos/{}/{}/git/ref/heads/{}", owner, repo, branch),
-    )?;
+    )
+    .await?;
     let current_commit_sha = branch_ref.object.sha;
+    publish_log(format!("current commit sha={}", current_commit_sha));
 
+    publish_log("loading current commit");
     let current_commit: GitHubCommitResponse = github_api_get(
         &client,
         &format!(
             "/repos/{}/{}/git/commits/{}",
             owner, repo, current_commit_sha
         ),
-    )?;
+    )
+    .await?;
     let current_tree_sha = current_commit.tree.sha;
+    publish_log(format!("current tree sha={}", current_tree_sha));
 
+    publish_log("loading repository tree");
     let current_tree: GitHubTreeResponse = github_api_get(
         &client,
         &format!(
             "/repos/{}/{}/git/trees/{}?recursive=1",
             owner, repo, current_tree_sha
         ),
-    )?;
+    )
+    .await?;
     if current_tree.truncated {
         return Err(
             "GitHub returned a truncated repository tree, so this repository is not currently supported by the API-only publish flow."
                 .to_string(),
         );
     }
+    publish_log(format!("repository tree entries={}", current_tree.tree.len()));
 
+    publish_log("collecting publish files");
     let prepared_files = collect_simple_blog_publish_files(request, remote_repo, branch)?;
+    publish_log(format!("prepared files={}", prepared_files.len()));
     let current_files = current_tree_blob_map(&current_tree);
+    publish_log(format!("current blob files={}", current_files.len()));
+    publish_log("building tree entries");
     let tree_entries = build_github_tree_entries(
         &client,
         owner,
@@ -434,9 +479,12 @@ fn publish_remote_simple_blog_via_github_api(
         request,
         &prepared_files,
         &current_files,
-    )?;
+    )
+    .await?;
+    publish_log(format!("tree entries to update={}", tree_entries.len()));
 
     if tree_entries.is_empty() {
+        publish_log("no content changes detected");
         return Ok(PublishSimpleBlogResult {
             deployment_url: None,
             build_output: "No content changes detected. Skip GitHub commit update.".to_string(),
@@ -444,6 +492,7 @@ fn publish_remote_simple_blog_via_github_api(
         });
     }
 
+    publish_log("creating git tree");
     let create_tree: GitHubCreateTreeResponse = github_api_post(
         &client,
         &format!("/repos/{}/{}/git/trees", owner, repo),
@@ -451,13 +500,16 @@ fn publish_remote_simple_blog_via_github_api(
             base_tree: current_tree_sha,
             tree: tree_entries,
         },
-    )?;
+    )
+    .await?;
+    publish_log(format!("created tree sha={}", create_tree.sha));
 
     let post_relative_path = sanitize_relative_path(&request.post_relative_path)?;
     let post_name = post_relative_path
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("post");
+    publish_log(format!("creating commit for {}", post_name));
     let create_commit: GitHubCreateCommitResponse = github_api_post(
         &client,
         &format!("/repos/{}/{}/git/commits", owner, repo),
@@ -466,8 +518,11 @@ fn publish_remote_simple_blog_via_github_api(
             tree: create_tree.sha,
             parents: vec![current_commit_sha.clone()],
         },
-    )?;
+    )
+    .await?;
+    publish_log(format!("created commit sha={}", create_commit.sha));
 
+    publish_log(format!("updating branch ref {}", branch));
     let _: GitHubRefResponse = github_api_patch(
         &client,
         &format!("/repos/{}/{}/git/refs/heads/{}", owner, repo, branch),
@@ -475,7 +530,9 @@ fn publish_remote_simple_blog_via_github_api(
             sha: create_commit.sha.clone(),
             force: false,
         },
-    )?;
+    )
+    .await?;
+    publish_log("publish finished successfully");
 
     Ok(PublishSimpleBlogResult {
         deployment_url: None,
@@ -489,6 +546,7 @@ fn collect_simple_blog_publish_files(
     remote_repo: &str,
     target_branch: &str,
 ) -> Result<Vec<PreparedPublishFile>, String> {
+    publish_log("rewriting markdown asset URLs");
     let post_relative_path = sanitize_relative_path(&request.post_relative_path)?;
     let markdown_content = rewrite_markdown_asset_urls(
         &request.markdown_content,
@@ -511,6 +569,11 @@ fn collect_simple_blog_publish_files(
         }
 
         let target_relative_path = sanitize_relative_path(&asset.target_relative_path)?;
+        publish_log(format!(
+            "reading asset {} -> {}",
+            source_path.display(),
+            target_relative_path.display()
+        ));
         let bytes = fs::read(&source_path)
             .map_err(|e| format!("Failed to read asset from {:?}: {}", source_path, e))?;
 
@@ -697,52 +760,59 @@ fn split_github_repo_slug(repo_slug: &str) -> Result<(&str, &str), String> {
 }
 
 fn create_github_api_client(token: &str) -> Result<Client, String> {
+    publish_log("create_github_api_client: preparing headers");
     let mut headers = reqwest::header::HeaderMap::new();
     let auth_value = reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token))
         .map_err(|e| format!("Failed to encode GitHub token header: {}", e))?;
     headers.insert(reqwest::header::AUTHORIZATION, auth_value);
+    publish_log("create_github_api_client: building reqwest client");
 
-    Client::builder()
+    let client = Client::builder()
         .default_headers(headers)
         .connect_timeout(Duration::from_secs(GITHUB_API_CONNECT_TIMEOUT_SECS))
         .timeout(Duration::from_secs(GITHUB_API_REQUEST_TIMEOUT_SECS))
         .user_agent("markdown-press")
         .build()
-        .map_err(|e| format!("Failed to create GitHub API client: {}", e))
+        .map_err(|e| format!("Failed to create GitHub API client: {}", e))?;
+    publish_log("create_github_api_client: client ready");
+    Ok(client)
 }
 
-fn github_api_get<T: DeserializeOwned>(client: &Client, path: &str) -> Result<T, String> {
+async fn github_api_get<T: DeserializeOwned>(client: &Client, path: &str) -> Result<T, String> {
     github_api_json(
         client,
         Method::GET,
         path,
         Option::<&serde_json::Value>::None,
     )
+    .await
 }
 
-fn github_api_post<T: DeserializeOwned, B: Serialize>(
+async fn github_api_post<T: DeserializeOwned, B: Serialize>(
     client: &Client,
     path: &str,
     body: &B,
 ) -> Result<T, String> {
-    github_api_json(client, Method::POST, path, Some(body))
+    github_api_json(client, Method::POST, path, Some(body)).await
 }
 
-fn github_api_patch<T: DeserializeOwned, B: Serialize>(
+async fn github_api_patch<T: DeserializeOwned, B: Serialize>(
     client: &Client,
     path: &str,
     body: &B,
 ) -> Result<T, String> {
-    github_api_json(client, Method::PATCH, path, Some(body))
+    github_api_json(client, Method::PATCH, path, Some(body)).await
 }
 
-fn github_api_json<T: DeserializeOwned, B: Serialize>(
+async fn github_api_json<T: DeserializeOwned, B: Serialize>(
     client: &Client,
     method: Method,
     path: &str,
     body: Option<&B>,
 ) -> Result<T, String> {
     let url = format!("https://api.github.com{}", path);
+    let method_name = method.as_str().to_string();
+    publish_log(format!("GitHub API start {} {}", method_name, path));
     let mut request = client
         .request(method.clone(), &url)
         .header("Accept", "application/vnd.github+json")
@@ -754,23 +824,37 @@ fn github_api_json<T: DeserializeOwned, B: Serialize>(
 
     let response = request
         .send()
+        .await
         .map_err(|e| {
             if e.is_timeout() {
+                publish_log(format!("GitHub API timeout {} {}", method_name, path));
                 return format!(
                     "GitHub API request timed out for {} {}. Check your network connection to github.com and api.github.com, then try again.",
                     method, path
                 );
             }
 
+            publish_log(format!(
+                "GitHub API failure {} {}: {}",
+                method_name, path, e
+            ));
             format!("GitHub API request failed for {} {}: {}", method, path, e)
         })?;
     let status = response.status();
+    publish_log(format!(
+        "GitHub API response {} {} -> {}",
+        method_name, path, status
+    ));
 
     if !status.is_success() {
-        let body = response.text().unwrap_or_default();
+        let body = response.text().await.unwrap_or_default();
         let api_message = serde_json::from_str::<GitHubApiErrorResponse>(&body)
             .map(|parsed| parsed.message)
             .unwrap_or_else(|_| body.trim().to_string());
+        publish_log(format!(
+            "GitHub API error {} {} -> {}",
+            method_name, path, api_message
+        ));
         let suffix = if api_message.is_empty() {
             String::new()
         } else {
@@ -785,6 +869,7 @@ fn github_api_json<T: DeserializeOwned, B: Serialize>(
 
     response
         .json::<T>()
+        .await
         .map_err(|e| format!("Failed to decode GitHub API response for {}: {}", path, e))
 }
 
@@ -800,7 +885,7 @@ fn current_tree_blob_map(tree: &GitHubTreeResponse) -> BTreeMap<String, String> 
         .collect()
 }
 
-fn build_github_tree_entries(
+async fn build_github_tree_entries(
     client: &Client,
     owner: &str,
     repo: &str,
@@ -838,7 +923,8 @@ fn build_github_tree_entries(
                 content: BASE64_STANDARD.encode(&file.bytes),
                 encoding: "base64".to_string(),
             },
-        )?;
+        )
+        .await?;
 
         entries.push(GitHubTreeEntry {
             path,
@@ -929,7 +1015,7 @@ mod tests {
             assets: vec![],
         };
 
-        let error = publish_remote_simple_blog(&request).unwrap_err();
+        let error = tauri::async_runtime::block_on(publish_remote_simple_blog(&request)).unwrap_err();
         assert!(error.contains("GitHub token is required"));
     }
 

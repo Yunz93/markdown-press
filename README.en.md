@@ -112,6 +112,24 @@ GEMINI_API_KEY=your_api_key_here
 npm run tauri:dev
 ```
 
+## Publish To simple-blog
+
+The desktop app can publish the current note to a `simple-blog` repository and trigger a redeploy.
+
+Publishing field semantics:
+
+- `title`: article title; if omitted, publishing defaults it to the current file name
+- `aliases`: article aliases; if omitted, publishing defaults it to the article title
+- `slug`: published URL suffix; if omitted, publishing defaults it to the article title
+- `link`: automatically written back after a successful publish
+
+Notes:
+
+- The Markdown file name in the blog repository stays as the current file name
+- The actual public URL in `simple-blog` is determined by `slug`
+- If you want an English URL, fill in `slug` explicitly
+- `aliases` is kept as metadata only and is not used to build the publish URL
+
 ## Build
 
 ### Web build

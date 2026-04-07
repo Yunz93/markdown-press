@@ -673,6 +673,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        GitHub Token
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.blogGithubToken ?? ''}
+                        onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
+                        placeholder="github_pat_..."
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl"
+                      />
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Required. Publishing now uses the GitHub API only, so this token must be set before the publish action can run.
+                      </p>
+                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        Use a Fine-grained Personal Access Token with repository <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">Contents: Read and write</code>. The token is stored locally on this device.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Blog Site URL
                       </label>
                       <input
@@ -705,27 +726,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        GitHub Token
-                      </label>
-                      <input
-                        type="password"
-                        value={settings.blogGithubToken ?? ''}
-                        onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
-                        placeholder="github_pat_..."
-                        autoComplete="off"
-                        spellCheck={false}
-                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl"
-                      />
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Required. Publishing now uses the GitHub API only, so this token must be set before the publish action can run.
-                      </p>
-                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Use a Fine-grained Personal Access Token with repository <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">Contents: Read and write</code>. The token is stored locally on this device.
-                      </p>
-                    </div>
-
                     <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
                       <p>
                         Start with{' '}
@@ -744,6 +744,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </p>
                       <p className="mt-2">
                         Also fill in your public blog domain here. After a successful publish, markdown-press will automatically write the final article URL back into the note&apos;s frontmatter `link`.
+                      </p>
+                      <p className="mt-2">
+                        Publish semantics: `title` defaults to the current file name, `aliases` defaults to `title`, and `slug` controls the final blog URL. If `slug` is empty, publishing will fall back to `title`.
                       </p>
                     </div>
 

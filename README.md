@@ -126,6 +126,19 @@ npm run tauri:dev
 4. 自动把图片链接改写成对应 GitHub 文件的 raw URL
 5. 通过 GitHub API 直接更新远端 GitHub 仓库，由 Vercel Git 集成触发部署
 
+发布字段约定：
+
+- `title`：文章标题；如果未填写，发布时默认使用当前文件名
+- `aliases`：文章别名；如果未填写，发布时默认使用文章标题
+- `slug`：文章发布 URL 后缀；如果未填写，发布时默认使用文章标题
+- `link`：发布完成后自动回填为最终文章地址
+
+说明：
+
+- 博客仓库中的 Markdown 文件名保持当前文件名，不会因为 `slug` 或 `aliases` 改名
+- simple-blog 的真实访问地址由 `slug` 决定；如果需要英文 URL，应手动填写 `slug`
+- `aliases` 不参与发布 URL 计算，只作为文章别名字段保留
+
 支持的仓库格式：
 
 - `https://github.com/owner/repo`

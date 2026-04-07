@@ -39,8 +39,17 @@ function normalizeSlugCandidate(value: string): string {
   return value.trim().replace(/^\/+|\/+$/g, '');
 }
 
-function isAsciiAliasCandidate(value: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(value);
+function normalizeLinkSlugCandidate(value: string): string {
+  return normalizeSlugCandidate(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['"]/g, '')
+    .replace(/[^A-Za-z0-9/_ -]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/\/+/g, '/')
+    .replace(/^\/+|\/+$/g, '');
 }
 
 function extractAliasCandidates(frontmatter: Frontmatter | null): string[] {
@@ -131,14 +140,58 @@ async function replaceAsync(
   return output;
 }
 
-function ensurePublishedFrontmatter(markdownContent: string): {
+function resolveSimpleBlogTitle(markdownContent: string, currentFilePath: string): string {
+  const { frontmatter } = parseFrontmatter(markdownContent);
+  const title = typeof frontmatter?.title === 'string'
+    ? frontmatter.title.trim()
+    : '';
+
+  if (title) {
+    return title;
+  }
+
+  return stripExtension(getPathBasename(currentFilePath)) || 'published-post';
+}
+
+function resolveSimpleBlogAliases(markdownContent: string, currentFilePath: string): string | string[] {
+  const { frontmatter } = parseFrontmatter(markdownContent);
+  const aliases = extractAliasCandidates(frontmatter);
+  if (aliases.length > 0) {
+    return Array.isArray(frontmatter?.aliases) ? aliases : aliases[0];
+  }
+
+  return resolveSimpleBlogTitle(markdownContent, currentFilePath);
+}
+
+function resolveSimpleBlogPublishSlug(markdownContent: string, currentFilePath: string): string {
+  const { frontmatter } = parseFrontmatter(markdownContent);
+  const slug = typeof frontmatter?.slug === 'string'
+    ? normalizeSlugCandidate(frontmatter.slug)
+    : '';
+
+  if (slug) {
+    return slug;
+  }
+
+  return normalizeLinkSlugCandidate(resolveSimpleBlogTitle(markdownContent, currentFilePath))
+    || stripExtension(getPathBasename(currentFilePath))
+    || 'published-post';
+}
+
+function ensurePublishedFrontmatter(markdownContent: string, currentFilePath: string): {
   frontmatter: Frontmatter;
   body: string;
   content: string;
 } {
   const { frontmatter, body } = parseFrontmatter(markdownContent);
+  const resolvedTitle = resolveSimpleBlogTitle(markdownContent, currentFilePath);
+  const resolvedAliases = resolveSimpleBlogAliases(markdownContent, currentFilePath);
+  const resolvedSlug = resolveSimpleBlogPublishSlug(markdownContent, currentFilePath);
   const nextFrontmatter: Frontmatter = {
     ...(frontmatter || {}),
+    title: resolvedTitle,
+    aliases: resolvedAliases,
+    slug: resolvedSlug,
     is_publish: true,
   };
 
@@ -150,37 +203,11 @@ function ensurePublishedFrontmatter(markdownContent: string): {
 }
 
 export function resolveSimpleBlogPostSlug(markdownContent: string, postRelativePath: string): string {
-  const { frontmatter } = parseFrontmatter(markdownContent);
-  const slug = typeof frontmatter?.slug === 'string'
-    ? normalizeSlugCandidate(frontmatter.slug)
-    : '';
-
-  if (slug) {
-    return slug;
-  }
-
-  const asciiAlias = extractAliasCandidates(frontmatter).find(isAsciiAliasCandidate);
-  if (asciiAlias) {
-    return asciiAlias;
-  }
-
   return stripExtension(getPathBasename(postRelativePath)) || 'published-post';
 }
 
 export function resolveSimpleBlogLinkSlug(markdownContent: string, postRelativePath: string): string {
-  const { frontmatter } = parseFrontmatter(markdownContent);
-  const aliases = extractAliasCandidates(frontmatter);
-  const englishAlias = aliases.find(isAsciiAliasCandidate);
-  if (englishAlias) {
-    return englishAlias;
-  }
-
-  const fallbackAlias = aliases[0];
-  if (fallbackAlias) {
-    return fallbackAlias;
-  }
-
-  return resolveSimpleBlogPostSlug(markdownContent, postRelativePath);
+  return resolveSimpleBlogPublishSlug(markdownContent, postRelativePath);
 }
 
 export function buildSimpleBlogPostUrl(
@@ -206,11 +233,11 @@ export async function prepareSimpleBlogPublish(
   options: PrepareSimpleBlogPublishOptions
 ): Promise<PreparedSimpleBlogPublish> {
   const { currentFilePath, files, markdownContent, rootFolderPath } = options;
-  const published = ensurePublishedFrontmatter(markdownContent);
+  const published = ensurePublishedFrontmatter(markdownContent, currentFilePath);
   const currentFileName = getPathBasename(currentFilePath);
   const baseName = stripExtension(currentFileName) || 'published-post';
   const assetDirectoryRelativePath = `resource/${sanitizeAssetDirectoryName(baseName)}`;
-  const postRelativePath = `posts/${baseName || 'published-post'}.md`;
+  const postRelativePath = `posts/${baseName}.md`;
 
   const resolverContext = createAttachmentResolverContext(files, rootFolderPath, currentFilePath);
   const assetMap = new Map<string, SimpleBlogPublishAsset>();

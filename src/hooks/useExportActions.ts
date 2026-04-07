@@ -72,12 +72,12 @@ export function useExportActions(
     const stateBeforeWrite = useAppStore.getState();
     const latestContent = stateBeforeWrite.fileContents[fileId];
     if (!latestContent) {
-      return;
+      return false;
     }
 
     const linkedContent = updateFrontmatter(latestContent, { link: publishedUrl });
     if (linkedContent === latestContent) {
-      return;
+      return true;
     }
 
     stateBeforeWrite.updateTabContent(fileId, linkedContent);
@@ -91,12 +91,14 @@ export function useExportActions(
       if (stateAfterWrite.fileContents[fileId] === linkedContent) {
         stateAfterWrite.markAsSaved(fileId);
       }
+      return true;
     } catch (error) {
       console.error('Failed to backfill published link:', error);
       useAppStore.getState().showNotification(
         'Published to blog, but failed to save the published link into the note.',
         'error'
       );
+      return false;
     }
   }, []);
 
@@ -226,8 +228,12 @@ export function useExportActions(
         return;
       }
 
-      void backfillPublishedLink(activeTabId, activeFile.path, publishedUrl);
-      showNotification('Published to blog. Updating link in background.', 'success');
+      const linkUpdated = await backfillPublishedLink(activeTabId, activeFile.path, publishedUrl);
+      if (!linkUpdated) {
+        return;
+      }
+
+      showNotification('Published to blog and updated the note link.', 'success');
     } catch (error) {
       console.error('Failed to publish blog:', error);
       const message = error instanceof Error ? error.message : 'Failed to publish blog';
