@@ -14,6 +14,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const SAMPLE_NOTES_STATE_FILE: &str = ".markdown-press-sample-notes-state.json";
 const SAMPLE_NOTES_FOLDER_NAME: &str = "示例笔记";
+const LEGACY_SAMPLE_NOTES_RENAMES: [(&str, &str); 1] =
+    [("02-Obsidian-内联语法.md", "02-Obsidian-内联语法示例.md")];
 const GITHUB_API_CONNECT_TIMEOUT_SECS: u64 = 10;
 const GITHUB_API_REQUEST_TIMEOUT_SECS: u64 = 30;
 
@@ -271,10 +273,12 @@ async fn copy_sample_notes(
             .map_err(|e| format!("Failed to create target directory: {}", e))?;
     }
 
+    let (mut previous_state, _) = read_sample_notes_state(&target)?;
+    migrate_legacy_sample_notes(&target, &mut previous_state)?;
+
     let source_files = collect_files(source, source)?;
     let source_hashes = build_source_hashes(&source_files)?;
     let bundle_hash = hash_manifest(&source_hashes)?;
-    let previous_state = read_sample_notes_state(&target)?;
 
     if previous_state.bundle_hash == bundle_hash {
         return Ok(CopySampleNotesResult {
@@ -290,6 +294,8 @@ async fn copy_sample_notes(
     };
     let mut copied_files = Vec::new();
     let mut skipped_files = Vec::new();
+
+    remove_stale_sample_note_files(&target, &previous_state, &source_hashes)?;
 
     for (relative_path, source_path) in source_files {
         let source_hash = source_hashes
@@ -389,15 +395,16 @@ fn hash_bytes(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn read_sample_notes_state(target: &Path) -> Result<SampleNotesState, String> {
+fn read_sample_notes_state(target: &Path) -> Result<(SampleNotesState, bool), String> {
     let state_path = target.join(SAMPLE_NOTES_STATE_FILE);
     if !state_path.exists() {
-        return Ok(SampleNotesState::default());
+        return Ok((SampleNotesState::default(), false));
     }
 
     let content = fs::read_to_string(&state_path)
         .map_err(|e| format!("Failed to read sample notes state {:?}: {}", state_path, e))?;
     serde_json::from_str(&content)
+        .map(|state| (state, true))
         .map_err(|e| format!("Failed to parse sample notes state {:?}: {}", state_path, e))
 }
 
@@ -464,7 +471,10 @@ async fn publish_remote_simple_blog_via_github_api(
                 .to_string(),
         );
     }
-    publish_log(format!("repository tree entries={}", current_tree.tree.len()));
+    publish_log(format!(
+        "repository tree entries={}",
+        current_tree.tree.len()
+    ));
 
     publish_log("collecting publish files");
     let prepared_files = collect_simple_blog_publish_files(request, remote_repo, branch)?;
@@ -1000,9 +1010,85 @@ fn decide_copy_action(
     })
 }
 
+fn migrate_legacy_sample_notes(target: &Path, state: &mut SampleNotesState) -> Result<(), String> {
+    for (legacy_relative_path, current_relative_path) in LEGACY_SAMPLE_NOTES_RENAMES {
+        let legacy_path = target.join(legacy_relative_path);
+        if !legacy_path.exists() {
+            state.files.remove(legacy_relative_path);
+            continue;
+        }
+
+        if let Some(previous_hash) = state.files.remove(legacy_relative_path) {
+            state
+                .files
+                .entry(current_relative_path.to_string())
+                .or_insert(previous_hash);
+        }
+
+        let current_path = target.join(current_relative_path);
+        if current_path.exists() {
+            fs::remove_file(&legacy_path).map_err(|e| {
+                format!(
+                    "Failed to remove migrated legacy sample note {:?}: {}",
+                    legacy_path, e
+                )
+            })?;
+            continue;
+        }
+
+        if let Some(parent) = current_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory {:?}: {}", parent, e))?;
+        }
+
+        fs::rename(&legacy_path, &current_path).map_err(|e| {
+            format!(
+                "Failed to rename legacy sample note {:?} to {:?}: {}",
+                legacy_path, current_path, e
+            )
+        })?;
+    }
+
+    Ok(())
+}
+
+fn remove_stale_sample_note_files(
+    target: &Path,
+    previous_state: &SampleNotesState,
+    source_hashes: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (relative_path, tracked_hash) in &previous_state.files {
+        if source_hashes.contains_key(relative_path) {
+            continue;
+        }
+
+        let target_path = target.join(relative_path);
+        if !target_path.exists() {
+            continue;
+        }
+
+        let current_hash = hash_file(&target_path)?;
+        if current_hash != *tracked_hash {
+            continue;
+        }
+
+        fs::remove_file(&target_path).map_err(|e| {
+            format!(
+                "Failed to remove stale sample note {:?}: {}",
+                target_path, e
+            )
+        })?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn publish_requires_github_token() {
@@ -1015,7 +1101,8 @@ mod tests {
             assets: vec![],
         };
 
-        let error = tauri::async_runtime::block_on(publish_remote_simple_blog(&request)).unwrap_err();
+        let error =
+            tauri::async_runtime::block_on(publish_remote_simple_blog(&request)).unwrap_err();
         assert!(error.contains("GitHub token is required"));
     }
 
@@ -1041,5 +1128,65 @@ mod tests {
             rewritten,
             "![cover](https://raw.githubusercontent.com/Yunz93/bxyz-blog/main/resource/test-post/01-cover.txt)"
         );
+    }
+
+    #[test]
+    fn untracked_existing_sample_note_is_replaced_with_latest_bundle_version() {
+        let temp_dir = create_test_directory("sample-note-replace");
+        let target_path = temp_dir.join("02-Obsidian-内联语法示例.md");
+        fs::write(&target_path, "# old sample version\n").expect("write target");
+
+        let decision = decide_copy_action(&target_path, &hash_bytes(b"# bundled version\n"), None)
+            .expect("copy decision");
+
+        assert!(decision.should_copy);
+        assert!(!decision.skip_reason_user_modified);
+        assert!(decision.tracked_hash.is_none());
+
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn migrate_legacy_sample_note_removes_duplicate_file() {
+        let temp_dir = create_test_directory("sample-note-migration");
+        let legacy_relative_path = "02-Obsidian-内联语法.md";
+        let current_relative_path = "02-Obsidian-内联语法示例.md";
+        let legacy_path = temp_dir.join(legacy_relative_path);
+        let current_path = temp_dir.join(current_relative_path);
+        fs::write(&legacy_path, "# legacy sample\n").expect("write legacy sample");
+        fs::write(&current_path, "# current bundled sample\n").expect("write current sample");
+
+        let mut state = SampleNotesState::default();
+        migrate_legacy_sample_notes(&temp_dir, &mut state).expect("migrate legacy sample");
+
+        assert!(!legacy_path.exists());
+        assert!(current_path.exists());
+        assert!(state.files.get(current_relative_path).is_none());
+
+        cleanup_test_directory(&temp_dir);
+    }
+
+    fn create_test_directory(prefix: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let unique = TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        path.push(format!(
+            "markdown-press-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            unique
+        ));
+
+        if path.exists() {
+            fs::remove_dir_all(&path).expect("cleanup existing test dir");
+        }
+
+        fs::create_dir_all(&path).expect("create test dir");
+        path
+    }
+
+    fn cleanup_test_directory(path: &Path) {
+        if path.exists() {
+            fs::remove_dir_all(path).expect("cleanup test dir");
+        }
     }
 }

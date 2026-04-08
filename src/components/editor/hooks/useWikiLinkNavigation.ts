@@ -9,6 +9,8 @@ import { buildWikiReferenceTarget, parseWikiLinkReference, resolveWikiLinkFile }
 import { requestPreviewHeadingScroll, flushPendingPreviewHeadingScroll, registerPreviewPane, unregisterPreviewPane } from '../../../utils/previewNavigationBridge';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings, type HeadingNode } from '../../../utils/outline';
 import type { FileNode } from '../../../types';
+import { useAppStore } from '../../../store/appStore';
+import { t } from '../../../utils/i18n';
 
 export interface HeadingScrollOptions {
   alignTopRatio?: number;
@@ -246,7 +248,7 @@ export function useWikiLinkNavigation(options: UseWikiLinkNavigationOptions): Us
       );
       
       if (!canResolve) {
-        showNotification(`Reference not found: ${wikiTarget}`, 'error');
+        showNotification(t(useAppStore.getState().settings.language, 'notifications_referenceNotFound', { target: wikiTarget }), 'error');
         return true;
       }
 
@@ -269,7 +271,7 @@ export function useWikiLinkNavigation(options: UseWikiLinkNavigationOptions): Us
         return true;
       }
       if (!matchedElement) {
-        showNotification(`Heading not found: ${wikiTarget}`, 'error');
+        showNotification(t(useAppStore.getState().settings.language, 'notifications_headingNotFound', { target: wikiTarget }), 'error');
         return true;
       }
 
@@ -279,7 +281,7 @@ export function useWikiLinkNavigation(options: UseWikiLinkNavigationOptions): Us
 
     const matchedFile = resolveWikiLinkFile(files, wikiTarget, rootFolderPath, currentFilePath);
     if (!matchedFile) {
-      showNotification(`Linked file not found: ${wikiTarget}`, 'error');
+      showNotification(t(useAppStore.getState().settings.language, 'notifications_linkedFileNotFound', { target: wikiTarget }), 'error');
       return true;
     }
 

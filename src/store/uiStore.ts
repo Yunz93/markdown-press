@@ -9,6 +9,10 @@ function normalizeThemeMode(themeMode: unknown): AppSettings['themeMode'] {
   return themeMode === 'dark' ? 'dark' : 'light';
 }
 
+function normalizeLanguage(language: unknown): AppSettings['language'] {
+  return language === 'en' ? 'en' : 'zh-CN';
+}
+
 /**
  * UI store state interface
  */
@@ -47,6 +51,7 @@ export interface UIActions {
  * Default settings
  */
 export const defaultSettings: AppSettings = {
+  language: 'zh-CN',
   aiProvider: 'gemini',
   fontSize: 15,
   wordWrap: true,
@@ -69,7 +74,7 @@ export const defaultSettings: AppSettings = {
     aiAnalyze: 'Ctrl+J',
     search: 'Ctrl+F',
     sidebarSearch: 'Ctrl+Shift+F',
-    settings: 'Ctrl+,',
+    settings: 'Cmd+Shift+0',
     toggleOutline: 'Ctrl+O',
     toggleSidebar: 'Ctrl+B',
     toggleTheme: 'Ctrl+T',
@@ -128,6 +133,7 @@ export function createUISlice(
     setSettings: (settings) => set(() => ({
       settings: {
         ...settings,
+        language: normalizeLanguage(settings.language),
         themeMode: normalizeThemeMode(settings.themeMode),
       }
     })),
@@ -138,6 +144,7 @@ export function createUISlice(
         settings: {
           ...state.settings,
           ...updates,
+          language: normalizeLanguage(updates.language ?? state.settings.language),
           themeMode: normalizeThemeMode(updates.themeMode ?? state.settings.themeMode),
         }
       };
@@ -170,4 +177,4 @@ export function createUISlice(
   };
 }
 
-export { normalizeThemeMode };
+export { normalizeLanguage, normalizeThemeMode };

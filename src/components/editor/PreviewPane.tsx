@@ -15,6 +15,7 @@ import { useFileSystem } from '../../hooks/useFileSystem';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
 import { throttle } from '../../utils/throttle';
+import { useThrottledResize, processInBatches } from '../../utils/performance';
 import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
 import { resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { createAttachmentResolverContext } from '../../utils/attachmentResolver';
@@ -23,6 +24,7 @@ import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../uti
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { isWindowsPlatform } from '../../utils/platform';
 import type { FileNode } from '../../types';
+import { useI18n } from '../../hooks/useI18n';
 
 interface PreviewPaneProps {
   highlighter?: any;
@@ -79,6 +81,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   onScroll,
   density = 'comfortable' as PaneDensity
 }, ref) => {
+  const { t } = useI18n();
   const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
@@ -98,10 +101,18 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     isMarkdownPreview ? flattenHeadingNodes(parseHeadings(content)) : []
   ), [content, isMarkdownPreview]);
 
-  const [paneWidth, setPaneWidth] = useState(0);
-  const layoutMetrics = useMemo(() => getPaneLayoutMetrics(paneWidth, density), [paneWidth, density]);
-  
-  // Pane layout style
+  // Pane layout state - use ref to avoid re-render
+  const [layoutMetrics, setLayoutMetrics] = useState(() => getPaneLayoutMetrics(0, density));
+  const metricsRef = useRef(layoutMetrics);
+
+  // Optimized resize handling
+  const observeResize = useThrottledResize((width) => {
+    const newMetrics = getPaneLayoutMetrics(width, density);
+    metricsRef.current = newMetrics;
+    setLayoutMetrics(newMetrics);
+  }, 100);
+
+  // Pane layout style - memoized with stable deps
   const layoutStyle = useMemo(() => ({
     '--pane-backdrop-px': `${layoutMetrics.backdropPaddingX}px`,
     '--pane-backdrop-py': `${layoutMetrics.backdropPaddingY}px`,
@@ -115,31 +126,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     '--editor-font-size': `${settings.fontSize}px`,
   }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
 
-  // Pane width tracking
+  // Optimized pane resize tracking
   useLayoutEffect(() => {
-    const layout = layoutRef.current;
-    if (!layout) return;
-
-    const throttledSetPaneWidth = throttle(setPaneWidth, 16);
-
-    const updatePaneWidth = () => {
-      const nextWidth = layout.getBoundingClientRect().width;
-      if (nextWidth > 0) {
-        throttledSetPaneWidth(nextWidth);
-      }
-    };
-
-    updatePaneWidth();
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      throttledSetPaneWidth(entry.contentRect.width);
-    });
-
-    resizeObserver.observe(layout);
-    return () => resizeObserver.disconnect();
-  }, [activeTabId]);
+    observeResize(layoutRef.current);
+  }, [observeResize]);
 
   // Preview renderer hook
   const renderer = usePreviewRenderer({
@@ -277,57 +267,61 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     return () => window.clearTimeout(timer);
   }, [renderer.enhancedBodyHtml, isMarkdownPreview, settings.themeMode]);
 
-  // Warm preview images - use IntersectionObserver for lazy loading
+  // Warm preview images - optimized batch processing
   useEffect(() => {
     if (!isMarkdownPreview) return;
     const container = previewRef.current;
     if (!container) return;
 
-    let cancelled = false;
     const images = Array.from(container.querySelectorAll('article.markdown-body img'));
-    
+
     // Skip if too many images (performance protection)
     if (images.length > 100) {
       console.warn(`[PreviewPane] Too many images (${images.length}), skipping eager warmup`);
       return;
     }
 
-    // Process images in batches to avoid blocking
-    const BATCH_SIZE = 5;
-    const processBatch = async (startIndex: number) => {
-      if (cancelled || startIndex >= images.length) return;
-      
-      const batch = images.slice(startIndex, startIndex + BATCH_SIZE);
-      await Promise.all(batch.map(async (image: Element) => {
+    // Process images in batches with controlled concurrency
+    const abortController = new AbortController();
+
+    processInBatches(
+      images,
+      async (image) => {
+        if (abortController.signal.aborted) return;
+
         const imgElement = image as HTMLImageElement;
         if (imgElement.getAttribute('data-preview-warmed') === 'true') return;
 
         const originalSrc = imgElement.getAttribute('data-original-src') || imgElement.getAttribute('src');
         if (!originalSrc) return;
 
-        const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
-        if (cancelled || !imgElement.isConnected || !cachedSrc) return;
+        try {
+          const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
+          if (abortController.signal.aborted || !imgElement.isConnected || !cachedSrc) return;
 
-        if (imgElement.getAttribute('data-original-src') !== originalSrc) {
-          imgElement.setAttribute('data-original-src', originalSrc);
+          if (imgElement.getAttribute('data-original-src') !== originalSrc) {
+            imgElement.setAttribute('data-original-src', originalSrc);
+          }
+          if (imgElement.getAttribute('src') !== cachedSrc) {
+            imgElement.setAttribute('src', cachedSrc);
+            imgElement.src = cachedSrc;
+          }
+          imgElement.setAttribute('data-preview-warmed', 'true');
+        } catch (error) {
+          console.warn('Failed to warm preview image:', originalSrc, error);
         }
-        if (imgElement.getAttribute('src') !== cachedSrc) {
-          imgElement.setAttribute('src', cachedSrc);
-          imgElement.src = cachedSrc;
+      },
+      5, // batch size
+      (completed, total) => {
+        if (completed % 20 === 0) {
+          console.log(`[PreviewPane] Warming images: ${completed}/${total}`);
         }
-        imgElement.setAttribute('data-preview-warmed', 'true');
-      }));
-
-      // Schedule next batch to allow UI updates
-      if (startIndex + BATCH_SIZE < images.length) {
-        setTimeout(() => processBatch(startIndex + BATCH_SIZE), 0);
       }
+    );
+
+    return () => {
+      abortController.abort();
     };
-
-    // Start processing
-    processBatch(0);
-
-    return () => { cancelled = true; };
   }, [currentFilePath, renderer.enhancedBodyHtml, isMarkdownPreview]);
 
   // Asset preview (image/PDF)
@@ -387,7 +381,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
         await open(href);
       } catch (error) {
         console.error('Failed to open external link:', href, error);
-        showNotification('Failed to open link in browser', 'error');
+        showNotification(t('notifications_failedOpenLinkInBrowser'), 'error');
       }
       return;
     }
@@ -478,7 +472,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               style={{ fontSize: `${settings.fontSize * 0.7}px` }}
             >
               <div className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
-                <span>Properties</span>
+                <span>{t('preview_properties')}</span>
               </div>
               <div className="p-2 table w-full">
                 {Object.entries(parsedFrontmatter).map(([key, value]) => (
@@ -516,7 +510,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-6">
                 <img
                   src={assetPreviewSrc}
-                  alt={currentFilePath?.split(/[\\/]/).pop() || 'Preview image'}
+                  alt={currentFilePath?.split(/[\\/]/).pop() || t('preview_imageAlt')}
                   className="preview-attachment-image max-h-[75vh] w-auto"
                 />
               </div>
@@ -525,13 +519,13 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                 <iframe
                   src={`${assetPreviewSrc}#toolbar=0&navpanes=0&scrollbar=1`}
                   sandbox="allow-scripts allow-same-origin"
-                  title={currentFilePath?.split(/[\\/]/).pop() || 'PDF preview'}
+                  title={currentFilePath?.split(/[\\/]/).pop() || t('preview_pdfTitle')}
                   className="h-[78vh] w-full rounded-2xl bg-white dark:bg-black/30"
                 />
               </div>
             ) : previewFileType === 'image' || previewFileType === 'pdf' ? (
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
-                Loading preview...
+                {t('preview_loading')}
               </div>
             ) : previewFileType === 'html' ? (
               <div
@@ -540,7 +534,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               />
             ) : previewFileType === 'unsupported' ? (
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
-                Preview is not supported for this file type.
+                {t('preview_unsupported')}
               </div>
             ) : (
               <article

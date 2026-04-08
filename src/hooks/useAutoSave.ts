@@ -3,6 +3,7 @@ import { useAppStore, selectContent } from '../store/appStore';
 import { getFileSystem } from '../types/filesystem';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import { refreshDocumentUpdateTime } from '../utils/metadataFields';
+import { t } from '../utils/i18n';
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -157,15 +158,9 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       // Save to local storage as backup
       try {
         localStorage.setItem(`draft_${activeTabId}`, currentContent);
-        showNotification(
-          `Failed to save to disk. Draft backed up locally.`,
-          'error'
-        );
+        showNotification(t(settings.language, 'notifications_saveBackupCreated'), 'error');
       } catch (backupError) {
-        showNotification(
-          `Failed to save: ${saveStateRef.current.error}`,
-          'error'
-        );
+        showNotification(t(settings.language, 'notifications_saveFailed', { message: saveStateRef.current.error || '' }), 'error');
       }
 
       return false;

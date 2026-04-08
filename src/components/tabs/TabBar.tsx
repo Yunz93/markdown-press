@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import type { FileNode } from '../../types';
+import { useI18n } from '../../hooks/useI18n';
 
 interface TabBarProps {
   onToggleSidebar: () => void;
@@ -50,6 +51,7 @@ const TabContextMenu: React.FC<{
   onClose: () => void;
   onCloseOtherTabs: () => void;
 }> = ({ x, y, onClose, onCloseOtherTabs }) => {
+  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
 
@@ -101,7 +103,7 @@ const TabContextMenu: React.FC<{
           <path d="M3 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
           <path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8" />
         </svg>
-        Close Other Tabs
+        {t('tab_closeOtherTabs')}
       </button>
     </div>,
     document.body
@@ -109,6 +111,7 @@ const TabContextMenu: React.FC<{
 };
 
 export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
+  const { t } = useI18n();
   void onToggleSidebar;
   const {
     files,
@@ -185,7 +188,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                   <button
                     className="close-tab p-0.5 rounded-md hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-colors flex-shrink-0"
                     onClick={(e) => handleCloseTab(e, fileId)}
-                    title="Close tab"
+                    title={t('tab_closeTab')}
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18" />

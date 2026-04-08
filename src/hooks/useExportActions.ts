@@ -13,6 +13,7 @@ import {
   normalizeBlogSiteUrl,
 } from '../utils/blogRepo';
 import { refreshDocumentUpdateTime } from '../utils/metadataFields';
+import { localizeKnownError, t } from '../utils/i18n';
 
 const PUBLISH_TIMEOUT_MS = 45000;
 
@@ -55,7 +56,7 @@ export function useExportActions(
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = window.setTimeout(() => {
         reject(new Error(
-          'Publishing timed out. Check your GitHub network connection and token permissions, then try again.'
+          t(settings.language, 'notifications_publishTimeout')
         ));
       }, PUBLISH_TIMEOUT_MS);
     });
@@ -96,7 +97,7 @@ export function useExportActions(
     } catch (error) {
       console.error('Failed to backfill published link:', error);
       useAppStore.getState().showNotification(
-        'Published to blog, but failed to save the published link into the note.',
+        t(settings.language, 'notifications_publishBackfillFailed'),
         'error'
       );
       return false;
@@ -105,13 +106,13 @@ export function useExportActions(
 
   const handleExportToHtml = useCallback(async () => {
     if (!activeTabId || !content) {
-      showNotification('No file to export', 'error');
+      showNotification(t(settings.language, 'notifications_noFileToExport'), 'error');
       return;
     }
 
     const activeFile = findFileInTree(files, activeTabId);
     if (!activeFile) {
-      showNotification('No file to export', 'error');
+      showNotification(t(settings.language, 'notifications_noFileToExport'), 'error');
       return;
     }
 
@@ -128,59 +129,59 @@ export function useExportActions(
       });
       const saved = await downloadHtml(htmlContent, activeFile.name, activeFile.path);
       if (saved) {
-        showNotification('HTML exported', 'success');
+        showNotification(t(settings.language, 'notifications_htmlExported'), 'success');
       }
     } catch (error) {
       console.error('Failed to export HTML:', error);
-      showNotification('Failed to export HTML', 'error');
+      showNotification(t(settings.language, 'notifications_exportHtmlFailed'), 'error');
     }
   }, [activeTabId, content, files, fontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
     if (!activeTabId) {
-      showNotification('No file to publish', 'error');
+      showNotification(t(settings.language, 'notifications_noFileToPublish'), 'error');
       return;
     }
 
     if (!isTauriEnvironment()) {
-      showNotification('One-click publish is available in the desktop app.', 'error');
+      showNotification(t(settings.language, 'notifications_desktopPublishOnly'), 'error');
       return;
     }
 
     if (!settings.blogRepoUrl.trim()) {
-      showNotification('Set your blog repository URL in Publishing settings first.', 'error');
+      showNotification(t(settings.language, 'notifications_setBlogRepoFirst'), 'error');
       return;
     }
 
     if (!isValidBlogRepoUrl(settings.blogRepoUrl)) {
-      showNotification('Enter a valid GitHub repository URL in Publishing settings first.', 'error');
+      showNotification(t(settings.language, 'notifications_setValidBlogRepoFirst'), 'error');
       return;
     }
 
     if (!settings.blogSiteUrl.trim()) {
-      showNotification('Set your blog site URL in Publishing settings first.', 'error');
+      showNotification(t(settings.language, 'notifications_setBlogSiteFirst'), 'error');
       return;
     }
 
     if (!isValidBlogSiteUrl(settings.blogSiteUrl)) {
-      showNotification('Enter a valid blog site URL in Publishing settings first.', 'error');
+      showNotification(t(settings.language, 'notifications_setValidBlogSiteFirst'), 'error');
       return;
     }
 
     if (!settings.blogGithubToken?.trim()) {
-      showNotification('Set your GitHub token in Publishing settings first.', 'error');
+      showNotification(t(settings.language, 'notifications_setGithubTokenFirst'), 'error');
       return;
     }
 
     const currentContent = useAppStore.getState().fileContents[activeTabId];
     if (!currentContent) {
-      showNotification('No content to publish', 'error');
+      showNotification(t(settings.language, 'notifications_noContentToPublish'), 'error');
       return;
     }
 
     const activeFile = findFileInTree(files, activeTabId);
     if (!activeFile) {
-      showNotification('No file to publish', 'error');
+      showNotification(t(settings.language, 'notifications_noFileToPublish'), 'error');
       return;
     }
 
@@ -196,7 +197,7 @@ export function useExportActions(
       setContent(nextContent);
       const saved = await forceSave(nextContent);
       if (!saved) {
-        showNotification('Failed to save note before publishing.', 'error');
+        showNotification(t(settings.language, 'notifications_saveBeforePublishFailed'), 'error');
         return;
       }
 
@@ -204,6 +205,7 @@ export function useExportActions(
 
       const prepared = await prepareSimpleBlogPublish({
         files,
+        blogSiteUrl: normalizeBlogSiteUrl(settings.blogSiteUrl),
         rootFolderPath,
         currentFilePath: activeFile.path,
         markdownContent: contentToPublish,
@@ -227,7 +229,7 @@ export function useExportActions(
       );
 
       if (!publishedUrl) {
-        showNotification('Published to blog, but failed to build the published URL.', 'error');
+        showNotification(t(settings.language, 'notifications_publishUrlBuildFailed'), 'error');
         return;
       }
 
@@ -236,10 +238,12 @@ export function useExportActions(
         return;
       }
 
-      showNotification('Published to blog and updated the note link.', 'success');
+      showNotification(t(settings.language, 'notifications_publishSuccess'), 'success');
     } catch (error) {
       console.error('Failed to publish blog:', error);
-      const message = error instanceof Error ? error.message : 'Failed to publish blog';
+      const message = error instanceof Error
+        ? localizeKnownError(settings.language, error.message)
+        : t(settings.language, 'notifications_publishFailed');
       showNotification(message, 'error');
     } finally {
       setPublishing(false);

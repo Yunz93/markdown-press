@@ -9,7 +9,10 @@
       "Bash(open:*)",
       "Bash(cp:*)",
       "Bash(cd /Users/yunz/Code/VibeCoding/markdown-press/src-tauri/target/release/bundle/macos/markdown-press.app/Contents/MacOS && ./app 2>&1)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(wc -l /Users/yunz/Code/VibeCoding/markdown-press/src/**/*.ts /Users/yunz/Code/VibeCoding/markdown-press/src/**/*.tsx)",
+      "Bash(git checkout:*)",
+      "Bash(node:*)"
     ]
   }
 }

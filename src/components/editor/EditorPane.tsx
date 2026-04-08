@@ -21,6 +21,7 @@ import { useCodeMirror, useWikiLinks, useImagePaste, useScrollSync } from './hoo
 import type { WikiLinkPreviewData } from './hooks';
 import { throttle } from '../../utils/throttle';
 import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
+import { useI18n } from '../../hooks/useI18n';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -96,13 +97,14 @@ interface HoverPreviewState {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
-  placeholder = 'Type here...',
+  placeholder,
   onContentChange,
   onScroll,
   onGenerateWikiFromSelection,
   highlighter,
   density = 'comfortable' as PaneDensity
 }, ref) => {
+  const { t } = useI18n();
   const content = useAppStore(selectContent);
   const {
     setContent,
@@ -116,6 +118,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     files,
     fileContents,
   } = useAppStore();
+  const resolvedPlaceholder = placeholder ?? t('editor_emptyState');
 
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
@@ -213,7 +216,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   // CodeMirror hook
   const codeMirror = useCodeMirror({
     content,
-    placeholder,
+    placeholder: resolvedPlaceholder,
     wordWrap: settings.wordWrap,
     orderedListMode: settings.orderedListMode,
     onChange: updateContent,
@@ -481,7 +484,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
-        <p className="text-sm font-medium">Select a file to start editing</p>
+        <p className="text-sm font-medium">{t('editor_emptyState')}</p>
       </div>
     );
   }
@@ -498,7 +501,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
-          Saving...
+          {t('toolbar_saving')}
         </div>
       )}
 
@@ -552,7 +555,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
             <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2l2.8 6.2L21 9l-4.5 4 1.2 6.1L12 16l-5.7 3.1L7.5 13 3 9l6.2-.8L12 2z" />
             </svg>
-            {isGeneratingWiki ? '正在生成 Wiki…' : 'AI 生成字段解读 Wiki'}
+            {isGeneratingWiki ? t('ai_generatingWiki') : t('ai_generateWiki')}
           </button>
         </div>,
         document.body

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ViewMode } from '../../types';
+import { useI18n } from '../../hooks/useI18n';
 
 interface ViewModeToggleProps {
   viewMode: ViewMode;
@@ -10,6 +11,8 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
   viewMode,
   onViewModeChange
 }) => {
+  const { t } = useI18n();
+
   return (
     <div className="flex items-center gap-0.5">
       <button
@@ -19,7 +22,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
             ? 'bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white'
             : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
         }`}
-        title="Editor Only"
+        title={t('view_editorOnly')}
       >
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -34,7 +37,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
             ? 'bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white'
             : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
         }`}
-        title="Split View"
+        title={t('view_split')}
       >
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -49,7 +52,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
             ? 'bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white'
             : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
         }`}
-        title="Preview"
+        title={t('view_preview')}
       >
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />

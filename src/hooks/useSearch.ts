@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
+import { useDebounce, isLargeFile } from '../utils/performance';
 
 export interface SearchOptions {
   caseSensitive?: boolean;
@@ -24,23 +25,30 @@ export const useSearch = () => {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [replacement, setReplacement] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const search = useCallback(() => {
-    if (!query) {
+  // Refs for debounced search
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSearchRef = useRef(false);
+
+  // Immediate search function
+  const performSearch = useCallback((searchQuery: string, searchOptions: SearchOptions, searchContent: string) => {
+    if (!searchQuery) {
       setResults([]);
       setCurrentIndex(-1);
+      setIsSearching(false);
       return;
     }
 
-    const flags = options.caseSensitive ? 'g' : 'gi';
-    let pattern = query;
+    const flags = searchOptions.caseSensitive ? 'g' : 'gi';
+    let pattern = searchQuery;
 
-    if (!options.useRegex) {
-      pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!searchOptions.useRegex) {
+      pattern = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     // Whole word matching
-    if (options.wholeWord) {
+    if (searchOptions.wholeWord) {
       pattern = `\\b${pattern}\\b`;
     }
 
@@ -49,8 +57,13 @@ export const useSearch = () => {
       const matches: SearchResult[] = [];
       let match;
 
-      while ((match = regex.exec(content)) !== null) {
-        const line = content.substring(0, match.index).split('\n').length;
+      // For large files, use chunked processing to avoid blocking
+      const isLarge = isLargeFile(searchContent);
+      const startTime = performance.now();
+      const maxTime = isLarge ? 100 : 50; // Allow more time for large files
+
+      while ((match = regex.exec(searchContent)) !== null) {
+        const line = searchContent.substring(0, match.index).split('\n').length;
         matches.push({
           index: matches.length,
           text: match[0],
@@ -58,6 +71,12 @@ export const useSearch = () => {
           end: match.index + match[0].length,
           line,
         });
+
+        // Yield if taking too long
+        if (matches.length % 1000 === 0 && performance.now() - startTime > maxTime) {
+          console.warn('[useSearch] Search taking too long, limiting results');
+          break;
+        }
       }
 
       setResults(matches);
@@ -66,8 +85,44 @@ export const useSearch = () => {
       console.error('Search error:', error);
       setResults([]);
       setCurrentIndex(-1);
+    } finally {
+      setIsSearching(false);
     }
-  }, [query, content, options]);
+  }, []);
+
+  // Debounced search with 150ms delay
+  const search = useCallback(() => {
+    // Clear any pending search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    setIsSearching(true);
+    pendingSearchRef.current = true;
+
+    // Immediate search for small files, debounced for large files
+    const isLarge = isLargeFile(content);
+    const delay = isLarge ? 300 : 150;
+
+    searchTimeoutRef.current = setTimeout(() => {
+      pendingSearchRef.current = false;
+      performSearch(query, options, content);
+    }, delay);
+  }, [query, options, content, performSearch]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-search when query changes (with debounce)
+  useEffect(() => {
+    search();
+  }, [query, options, search]);
 
   const goToNext = useCallback(() => {
     if (results.length === 0) return;
@@ -135,6 +190,7 @@ export const useSearch = () => {
     replacement,
     setReplacement,
     isOpen,
+    isSearching,
     search,
     goToNext,
     goToPrevious,

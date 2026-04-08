@@ -29,6 +29,7 @@ import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimu
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
 import type { PaneDensity } from './components/editor/paneLayout';
+import { useI18n } from './hooks/useI18n';
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
@@ -56,6 +57,7 @@ if (typeof window !== 'undefined') {
 }
 
 const App: React.FC = () => {
+  const { t } = useI18n();
   const {
     files,
     rootFolderPath,
@@ -198,18 +200,18 @@ const App: React.FC = () => {
       unwatch = await watchFile(currentFilePath, async (event) => {
         if (disposed) return;
         if (event?.type === 'deleted') {
-          showNotification('File was deleted on disk.', 'error');
+          showNotification(t('notifications_fileDeletedOnDisk'), 'error');
           return;
         }
         if (event?.type === 'error') {
-          showNotification('Failed to watch file changes on disk.', 'error');
+          showNotification(t('notifications_watchFileFailed'), 'error');
           return;
         }
         if (event?.type !== 'modified') return;
 
         const state = useAppStore.getState();
         if (state.hasUnsavedChanges(activeTabId)) {
-          showNotification('File changed on disk. Save or discard local edits before reloading.', 'error');
+          showNotification(t('notifications_fileChangedOnDisk'), 'error');
           return;
         }
 
@@ -222,10 +224,10 @@ const App: React.FC = () => {
           if (currentCached === latestContent) return;
 
           useAppStore.getState().updateTabContent(activeTabId, latestContent);
-          showNotification('File reloaded from disk.', 'success');
+          showNotification(t('notifications_fileReloaded'), 'success');
         } catch (error) {
           console.error('Failed to reload file from disk:', error);
-          showNotification('Failed to reload file changed on disk.', 'error');
+          showNotification(t('notifications_reloadFileFailed'), 'error');
         }
       });
     };
@@ -284,7 +286,7 @@ const App: React.FC = () => {
     async () => {
       if (currentFilePath) {
         await forceSave();
-        showNotification('Change saved', 'success');
+        showNotification(t('app_saved'), 'success');
       }
     },
     handleAIAnalyze,
@@ -299,7 +301,7 @@ const App: React.FC = () => {
       onToggleSidebar: () => setSidebarOpen(!isSidebarOpen),
       onToggleTheme: toggleTheme,
       onNewNote: () => setIsNewNoteDialogOpen(true),
-      onNewFolder: () => { void fileOps.handleNewFolder(undefined, 'Untitled Folder'); },
+      onNewFolder: () => { void fileOps.handleNewFolder(undefined, t('app_untitledFolder')); },
       onCloseTab: () => {
         if (activeTabId) {
           closeTab(activeTabId);
@@ -395,9 +397,9 @@ const App: React.FC = () => {
               M
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Restoring Workspace</h1>
+              <h1 className="text-xl font-semibold">{t('app_restoringWorkspace')}</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Opening your last knowledge base and restoring the workspace.
+                {t('app_restoringWorkspaceDesc')}
               </p>
             </div>
           </div>
@@ -406,7 +408,7 @@ const App: React.FC = () => {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V1a11 11 0 00-7.78 18.78l2.12-2.12A8 8 0 014 12z" />
             </svg>
-            <span className="text-sm text-gray-600 dark:text-gray-300">Opening knowledge base...</span>
+            <span className="text-sm text-gray-600 dark:text-gray-300">{t('app_openingKnowledgeBase')}</span>
           </div>
         </div>
       </div>
@@ -422,8 +424,8 @@ const App: React.FC = () => {
               M
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Choose Your Knowledge Base</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Open a folder as your vault to start writing.</p>
+              <h1 className="text-xl font-semibold">{t('app_chooseKnowledgeBase')}</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('app_chooseKnowledgeBaseDesc')}</p>
             </div>
           </div>
           <button
@@ -435,7 +437,7 @@ const App: React.FC = () => {
               <line x1="12" y1="15" x2="12" y2="10" />
               <polyline points="9 13 12 10 15 13" />
             </svg>
-            Open Knowledge Base
+            {t('app_openKnowledgeBase')}
           </button>
         </div>
       </div>
@@ -528,10 +530,10 @@ const App: React.FC = () => {
         isOpen={isNewNoteDialogOpen}
         onClose={() => setIsNewNoteDialogOpen(false)}
         onSubmit={handleSubmitNewNote}
-        title="New File"
-        label="File name:"
-        defaultValue="Untitled"
-        submitText="Create"
+        title={t('app_newFile')}
+        label={t('app_fileName')}
+        defaultValue={t('app_untitled')}
+        submitText={t('common_create')}
       />
 
       {notification && (

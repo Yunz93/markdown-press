@@ -25,6 +25,7 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   'aiAnalyze',
   'search',
   'sidebarSearch',
+  'settings',
   'closeTab',
 ]);
 

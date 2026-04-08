@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { createFileSlice, type FileState, type FileActions, initialFileState } from './fileStore';
 import { createTabSlice, type TabState, type TabActions, initialTabState } from './tabStore';
 import { createEditorSlice, type EditorState, type EditorActions, initialEditorState, selectContent } from './editorStore';
-import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings, normalizeThemeMode } from './uiStore';
+import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings, normalizeLanguage, normalizeThemeMode } from './uiStore';
 import { ViewMode, type FileNode, type AppSettings, type Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import {
@@ -102,6 +102,30 @@ function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) 
   };
 }
 
+function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
+  const persistedShortcuts =
+    persistedSettings.shortcuts && typeof persistedSettings.shortcuts === 'object'
+      ? persistedSettings.shortcuts as Record<string, unknown>
+      : {};
+
+  const mergedShortcuts = {
+    ...defaultSettings.shortcuts,
+    ...persistedShortcuts,
+  };
+
+  if (
+    persistedShortcuts.settings === undefined ||
+    persistedShortcuts.settings === 'Ctrl+,' ||
+    persistedShortcuts.settings === 'Cmd+,' ||
+    persistedShortcuts.settings === 'Command+,' ||
+    persistedShortcuts.settings === 'Meta+,'
+  ) {
+    mergedShortcuts.settings = defaultSettings.shortcuts.settings;
+  }
+
+  return mergedShortcuts;
+}
+
 /**
  * Create the combined store using slice pattern
  */
@@ -137,12 +161,10 @@ export const useAppStore = create<AppState>()(
             ? persistedChineseFontFamily
             : DEFAULT_CHINESE_FONT_FAMILY,
           ...resolvedAISettings,
+          language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
           metadataFields: normalizeMetadataFields(persistedSettings.metadataFields),
-          shortcuts: {
-            ...defaultSettings.shortcuts,
-            ...(persistedSettings.shortcuts ?? {})
-          }
+          shortcuts: resolvePersistedShortcuts(persistedSettings),
         };
 
         return {

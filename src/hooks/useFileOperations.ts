@@ -4,6 +4,7 @@ import { useFileSystem } from './useFileSystem';
 import { ViewMode, type FileNode } from '../types';
 import { generateFrontmatter } from '../utils/frontmatter';
 import { parseMetadataTemplateValue } from '../utils/metadataFields';
+import { t } from '../utils/i18n';
 
 function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   for (const node of nodes) {
@@ -120,7 +121,7 @@ export function useFileOperations() {
 
     try {
       if (!isMarkdownFile(file.name) && !isPreviewOnlyFile(file.name)) {
-        showNotification(`Preview is not supported for ${file.name}`, 'error');
+        showNotification(t(settings.language, 'notifications_previewNotSupported', { name: file.name }), 'error');
         return;
       }
 
@@ -146,7 +147,7 @@ export function useFileOperations() {
       }
     } catch (e) {
       console.error('Failed to read file:', file.path, e);
-      showNotification(`Failed to read file: ${file.name}`, 'error');
+      showNotification(t(settings.language, 'notifications_failedToReadFile', { name: file.name }), 'error');
     }
   }, [readFile, addTab, setCurrentFilePath, setViewMode, updateTabContent, showNotification, fileContents]);
 
@@ -188,15 +189,15 @@ export function useFileOperations() {
       const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
       await deleteFile(file);
       affectedTabIds.forEach((tabId) => closeTab(tabId));
-      showNotification('Permanently deleted.', 'success');
+      showNotification(t(settings.language, 'notifications_permanentlyDeleted'), 'success');
     } catch {
-      showNotification('Failed to delete file.', 'error');
+      showNotification(t(settings.language, 'notifications_failedDeleteFile'), 'error');
     }
   }, [files, openTabs, deleteFile, closeTab, showNotification]);
 
   const handleEmptyTrash = useCallback(async (trashItems: FileNode[]) => {
     if (trashItems.length === 0) {
-      showNotification('Trash is already empty.', 'success');
+      showNotification(t(settings.language, 'notifications_trashAlreadyEmpty'), 'success');
       return;
     }
 
@@ -211,9 +212,9 @@ export function useFileOperations() {
       }
 
       affectedTabIds.forEach((tabId) => closeTab(tabId));
-      showNotification('Trash emptied.', 'success');
+      showNotification(t(settings.language, 'notifications_trashEmptied'), 'success');
     } catch {
-      showNotification('Failed to empty trash.', 'error');
+      showNotification(t(settings.language, 'notifications_failedEmptyTrash'), 'error');
     }
   }, [files, openTabs, deleteFile, closeTab, showNotification]);
 
@@ -246,7 +247,7 @@ export function useFileOperations() {
 
       remapPathReferencesAfterMove(buildMovedPathMap(file, newPath));
     } catch {
-      showNotification('Rename failed', 'error');
+      showNotification(t(settings.language, 'notifications_renameFailed'), 'error');
     }
   }, [renameFile, remapPathReferencesAfterMove, showNotification]);
 
@@ -255,7 +256,7 @@ export function useFileOperations() {
     const normalizedSourceParent = normalizePath(getParentPath(sourceNode.path));
 
     if (!normalizedTargetPath) {
-      showNotification('Invalid target folder', 'error');
+      showNotification(t(settings.language, 'notifications_invalidTargetFolder'), 'error');
       return;
     }
 
@@ -264,12 +265,12 @@ export function useFileOperations() {
     }
 
     if (sourceNode.type === 'folder' && isSameOrChildPath(targetPath, sourceNode.path)) {
-      showNotification('Cannot move a folder into itself', 'error');
+      showNotification(t(settings.language, 'notifications_cannotMoveFolderIntoItself'), 'error');
       return;
     }
 
     if (sourceNode.isTrash) {
-      showNotification('Cannot move trash items from this area', 'error');
+      showNotification(t(settings.language, 'notifications_cannotMoveTrashItemsFromHere'), 'error');
       return;
     }
 
@@ -279,10 +280,10 @@ export function useFileOperations() {
 
       remapPathReferencesAfterMove(buildMovedPathMap(sourceNode, newPath));
       await refreshFileTree();
-      showNotification(sourceNode.type === 'folder' ? 'Folder moved' : 'File moved', 'success');
+      showNotification(t(settings.language, sourceNode.type === 'folder' ? 'notifications_folderMoved' : 'notifications_fileMoved'), 'success');
     } catch (e) {
       console.error('Failed to move item:', e);
-      showNotification(sourceNode.type === 'folder' ? 'Failed to move folder' : 'Failed to move file', 'error');
+      showNotification(t(settings.language, sourceNode.type === 'folder' ? 'notifications_failedMoveFolder' : 'notifications_failedMoveFile'), 'error');
     }
   }, [moveFile, refreshFileTree, remapPathReferencesAfterMove, showNotification]);
 
@@ -292,12 +293,12 @@ export function useFileOperations() {
     const targetNode = findFileInTree(files, targetId);
 
     if (!sourceNode || !targetNode) {
-      showNotification('Move target not found', 'error');
+      showNotification(t(settings.language, 'notifications_moveTargetNotFound'), 'error');
       return;
     }
 
     if (targetNode.isTrash) {
-      showNotification('Cannot move items into trash directly', 'error');
+      showNotification(t(settings.language, 'notifications_cannotMoveIntoTrashDirectly'), 'error');
       return;
     }
 
@@ -306,7 +307,7 @@ export function useFileOperations() {
       : (getParentPath(targetNode.path) || rootFolderPath);
 
     if (!targetPath) {
-      showNotification('Target folder not found', 'error');
+      showNotification(t(settings.language, 'notifications_targetFolderNotFound'), 'error');
       return;
     }
 
@@ -315,13 +316,13 @@ export function useFileOperations() {
 
   const handleMoveToRoot = useCallback(async (sourceId: string) => {
     if (!rootFolderPath) {
-      showNotification('No knowledge base opened.', 'error');
+      showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
       return;
     }
 
     const sourceNode = findFileInTree(files, sourceId);
     if (!sourceNode) {
-      showNotification('Item not found', 'error');
+      showNotification(t(settings.language, 'notifications_itemNotFound'), 'error');
       return;
     }
 
@@ -332,7 +333,7 @@ export function useFileOperations() {
     if (!name || !name.trim()) return;
     const newNode = await createFolder(name, parentFolder?.path);
     if (newNode) {
-      showNotification('Folder created', 'success');
+      showNotification(t(settings.language, 'notifications_folderCreated'), 'success');
     }
   }, [createFolder, showNotification]);
 
@@ -341,17 +342,17 @@ export function useFileOperations() {
       await revealInExplorer(path);
     } catch (e) {
       console.error('Failed to reveal in explorer:', e);
-      showNotification('Failed to reveal in explorer', 'error');
+      showNotification(t(settings.language, 'notifications_failedRevealInExplorer'), 'error');
     }
   }, [revealInExplorer, showNotification]);
 
   const handleOpenInFileExplorer = useCallback(async (file: FileNode) => {
     try {
       await revealInExplorer(file.path);
-      showNotification('Opened file location in explorer', 'success');
+      showNotification(t(settings.language, 'notifications_openedFileLocationInExplorer'), 'success');
     } catch (error) {
       console.error('Failed to open in file explorer:', error);
-      showNotification('Failed to open in file explorer', 'error');
+      showNotification(t(settings.language, 'notifications_failedOpenInFileExplorer'), 'error');
     }
   }, [revealInExplorer, showNotification]);
 
@@ -360,9 +361,9 @@ export function useFileOperations() {
       const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
       await deleteFile(file);
       affectedTabIds.forEach((tabId) => closeTab(tabId));
-      showNotification('Deleted', 'success');
+      showNotification(t(settings.language, 'notifications_deleted'), 'success');
     } catch {
-      showNotification('Failed to delete file.', 'error');
+      showNotification(t(settings.language, 'notifications_failedDeleteFile'), 'error');
     }
   }, [files, openTabs, deleteFile, closeTab, showNotification]);
 

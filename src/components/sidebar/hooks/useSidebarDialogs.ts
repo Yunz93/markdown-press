@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { FileNode } from '../../../types';
+import { useAppStore } from '../../../store/appStore';
+import { t } from '../../../utils/i18n';
 
 export type DialogType =
   | 'newFile'
@@ -47,7 +49,7 @@ export function useSidebarDialogs(options: UseSidebarDialogsOptions): UseSidebar
     setDialogState({ type: null });
   }, []);
 
-  const openNewFileDialog = useCallback((folder?: FileNode, defaultValue = 'Untitled') => {
+  const openNewFileDialog = useCallback((folder?: FileNode, defaultValue = t(useAppStore.getState().settings.language, 'app_untitled')) => {
     setDialogState({ type: 'newFile', file: folder, defaultValue });
   }, []);
 

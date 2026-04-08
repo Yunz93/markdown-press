@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import type { HeadingNode } from '../../utils/outline';
+import { useI18n } from '../../hooks/useI18n';
 
 const MIN_OUTLINE_WIDTH = 180;
 const MAX_OUTLINE_WIDTH = 360;
@@ -87,6 +88,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
   width,
   onWidthChange,
 }) => {
+  const { t } = useI18n();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -122,9 +124,9 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
         style={{ width: `${width}px` }}
       >
         <div className="outline-header">
-          <span className="title">目录</span>
+          <span className="title">{t('outline_title')}</span>
         </div>
-        <p className="empty-message">No headings found</p>
+        <p className="empty-message">{t('outline_empty')}</p>
         <div
           className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
           onMouseDown={handleResizeStart}
@@ -143,11 +145,11 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
       style={{ width: `${width}px` }}
     >
       <div className="outline-header">
-        <span className="title">目录</span>
+        <span className="title">{t('outline_title')}</span>
         <button
           className="collapse-btn"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          title={isCollapsed ? 'Expand' : 'Collapse'}
+          title={isCollapsed ? t('outline_expand') : t('outline_collapse')}
         >
           <svg
             viewBox="0 0 24 24"

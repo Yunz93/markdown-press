@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import { ViewMode } from '../types';
 import type { FileNode } from '../types';
+import { localizeKnownError, t } from '../utils/i18n';
 
 const PRIMARY_TRASH_DIR_NAME = '.trash';
 const LEGACY_TRASH_DIR_NAMES = ['_markdown_press_trash'] as const;
@@ -78,6 +79,12 @@ function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   }
 
   return undefined;
+}
+
+function hasOpenedKnowledgeBaseBefore(path: string): boolean {
+  const normalizedPath = normalizePath(path);
+  const history = useAppStore.getState().settings.knowledgeBases || [];
+  return history.some((knowledgeBase) => normalizePath(knowledgeBase.path) === normalizedPath);
 }
 
 function joinPathSegments(basePath: string, ...segments: string[]): string {
@@ -194,6 +201,7 @@ export function useFileSystem() {
     showNotification,
     addTab,
     setViewMode,
+    settings,
   } = useAppStore();
 
   const updateKnowledgeBaseMetadata = useCallback((path: string) => {
@@ -229,12 +237,12 @@ export function useFileSystem() {
    */
   const handleFileSystemError = useCallback((error: unknown, context: string) => {
     if (error instanceof FileSystemError) {
-      showNotification(error.toUserMessage(), 'error');
+      showNotification(localizeKnownError(settings.language, error.toUserMessage()), 'error');
     } else {
       const message = error instanceof Error ? error.message : 'Unknown error';
       showNotification(`${context}: ${message}`, 'error');
     }
-  }, [showNotification]);
+  }, [settings.language, showNotification]);
 
   /**
    * Open a single file
@@ -261,7 +269,7 @@ export function useFileSystem() {
         setFiles([newFile]);
         addTab(path, content);
         setCurrentFilePath(path);
-        showNotification('File opened successfully', 'success');
+        showNotification(t(settings.language, 'notifications_fileOpenedSuccessfully'), 'success');
       }
     } catch (error) {
       handleFileSystemError(error, 'Failed to open file');
@@ -281,7 +289,7 @@ export function useFileSystem() {
 
       const updated = await fs.copySampleNotes(targetDir);
       if (updated) {
-        showNotification('示例笔记已同步到知识库', 'success');
+        showNotification(t(settings.language, 'notifications_sampleNotesSynced'), 'success');
       }
       return updated;
     } catch (error) {
@@ -302,8 +310,13 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const dirPath = path || await fs.openDirectory();
       if (dirPath) {
-        // Sync bundled sample notes into the knowledge base when needed
-        if (!options?.skipSampleNotes && fs.copySampleNotes) {
+        const shouldInitializeSampleNotes =
+          !options?.skipSampleNotes &&
+          !!fs.copySampleNotes &&
+          !hasOpenedKnowledgeBaseBefore(dirPath);
+
+        // Only sync sample notes the first time a workspace is opened.
+        if (shouldInitializeSampleNotes) {
           await initializeSampleNotes(dirPath);
         }
 
@@ -340,7 +353,7 @@ export function useFileSystem() {
 
         updateKnowledgeBaseMetadata(dirPath);
         if (!options?.silentSuccess) {
-          showNotification('Knowledge base opened successfully', 'success');
+          showNotification(t(settings.language, 'notifications_knowledgeBaseOpenedSuccessfully'), 'success');
         }
       }
       return dirPath || null;
@@ -427,7 +440,7 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const basePath = folderPath || useAppStore.getState().rootFolderPath;
       if (!basePath) {
-        showNotification('No knowledge base opened. Please open one first.', 'error');
+        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
         return null;
       }
 
@@ -463,7 +476,7 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const basePath = parentPath || useAppStore.getState().rootFolderPath;
       if (!basePath) {
-        showNotification('No knowledge base opened. Please open one first.', 'error');
+        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
         return null;
       }
 
@@ -502,7 +515,7 @@ export function useFileSystem() {
           'Failed to reveal in explorer'
         );
       } else {
-        showNotification('Reveal in explorer not supported in this environment', 'error');
+        showNotification(t(settings.language, 'notifications_revealInExplorerUnsupported'), 'error');
       }
     } catch (error) {
       handleFileSystemError(error, 'Failed to reveal in explorer');
@@ -576,18 +589,18 @@ export function useFileSystem() {
     try {
       const rootPath = useAppStore.getState().rootFolderPath;
       if (!rootPath) {
-        showNotification('No knowledge base opened. Please open one first.', 'error');
+        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
         return null;
       }
 
       if (isPathInTrash(file.path, rootPath)) {
-        showNotification('Item is already in trash.', 'error');
+        showNotification(t(settings.language, 'notifications_itemAlreadyInTrash'), 'error');
         return null;
       }
 
       const fs = await getFileSystem();
       if (!fs.moveFile) {
-        showNotification('Move to trash is not supported in this environment.', 'error');
+        showNotification(t(settings.language, 'notifications_moveToTrashUnsupported'), 'error');
         return null;
       }
 
@@ -612,7 +625,7 @@ export function useFileSystem() {
       );
 
       await refreshFileTree();
-      showNotification('Moved to trash', 'success');
+      showNotification(t(settings.language, 'notifications_movedToTrash'), 'success');
       return movedPath;
     } catch (error) {
       handleFileSystemError(error, 'Failed to move item to trash');
@@ -627,19 +640,19 @@ export function useFileSystem() {
     try {
       const rootPath = useAppStore.getState().rootFolderPath;
       if (!rootPath) {
-        showNotification('No knowledge base opened. Please open one first.', 'error');
+        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
         return null;
       }
 
       const parsed = parseTrashPathInfo(file.path, rootPath);
       if (!parsed) {
-        showNotification('Invalid trash item path.', 'error');
+        showNotification(t(settings.language, 'notifications_invalidTrashItemPath'), 'error');
         return null;
       }
 
       const fs = await getFileSystem();
       if (!fs.moveFile) {
-        showNotification('Restore from trash is not supported in this environment.', 'error');
+        showNotification(t(settings.language, 'notifications_restoreFromTrashUnsupported'), 'error');
         return null;
       }
 
@@ -659,7 +672,7 @@ export function useFileSystem() {
         'Failed to check restore target'
       );
       if (targetExists) {
-        showNotification('Restore target already exists. Please rename or move the existing item first.', 'error');
+        showNotification(t(settings.language, 'notifications_restoreTargetExists'), 'error');
         return null;
       }
 
@@ -681,7 +694,7 @@ export function useFileSystem() {
       }
 
       await refreshFileTree();
-      showNotification('Restored from trash', 'success');
+      showNotification(t(settings.language, 'notifications_restoredFromTrash'), 'success');
       return restoredPath;
     } catch (error) {
       handleFileSystemError(error, 'Failed to restore item from trash');

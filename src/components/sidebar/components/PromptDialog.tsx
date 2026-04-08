@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '../../../hooks/useI18n';
 
 export interface PromptDialogProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { t } = useI18n();
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -82,7 +84,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
-              Cancel
+              {t('common_cancel')}
             </button>
             <button
               type="submit"
@@ -97,7 +99,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Confirm
+              {t('common_confirm')}
             </button>
           </div>
         </form>

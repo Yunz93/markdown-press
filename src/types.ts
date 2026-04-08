@@ -83,9 +83,11 @@ export interface KnowledgeBaseMeta {
 }
 
 export type ThemeMode = 'light' | 'dark';
+export type AppLanguage = 'zh-CN' | 'en';
 export type AttachmentPasteFormat = 'markdown' | 'obsidian';
 export type OrderedListMode = 'strict' | 'loose';
 export interface AppSettings {
+  language: AppLanguage;
   aiProvider: AIProvider;
   fontSize: number;
   wordWrap: boolean;

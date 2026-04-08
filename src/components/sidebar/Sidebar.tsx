@@ -29,6 +29,7 @@ import {
   filterNodesByFileName,
   highlightSearchText,
 } from './utils';
+import { useI18n } from '../../hooks/useI18n';
 
 export interface SidebarProps {
   files: FileNode[];
@@ -79,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onWidthChange,
   onClose,
 }) => {
+  const { t } = useI18n();
   const { readFile } = useFileSystem();
   const fileContents = useAppStore((state) => state.fileContents);
   const themeMode = useAppStore((state) => state.settings.themeMode);
@@ -230,14 +232,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search"
+                placeholder={t('sidebar_search')}
                 className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/70 dark:bg-[#141a25] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white/90 dark:focus:bg-[#181f2c]"
               />
             </label>
             <button
-              onClick={() => openNewFileDialog(undefined, 'Untitled')}
+              onClick={() => openNewFileDialog(undefined, t('app_untitled'))}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"
-              title="New Note"
+              title={t('sidebar_newNote')}
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19" />
@@ -267,13 +269,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
-              <p className="text-xs mb-3">No local files opened.</p>
-              <p className="text-xs text-gray-400">Use the knowledge base button below to open a vault.</p>
+              <p className="text-xs mb-3">{t('sidebar_noLocalFilesOpened')}</p>
+              <p className="text-xs text-gray-400">{t('sidebar_openKnowledgeBaseHint')}</p>
             </div>
           ) : hasSearchQuery ? (
             isSearching ? (
               <div className="flex h-40 items-center justify-center px-6 text-sm text-gray-500 dark:text-gray-400">
-                Searching notes...
+                {t('sidebar_searchingNotes')}
               </div>
             ) : searchResults.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 px-6 text-center text-gray-400 dark:text-gray-600">
@@ -287,9 +289,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <circle cx="11" cy="11" r="7" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No matching files</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('sidebar_noMatchingFiles')}</p>
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Try another keyword or phrase.
+                  {t('sidebar_tryAnotherKeyword')}
                 </p>
               </div>
             ) : (
@@ -311,7 +313,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                       {filenameMatched && (
                         <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                          Filename
+                          {t('sidebar_filenameMatched')}
                         </span>
                       )}
                     </button>
@@ -325,7 +327,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             className="w-full rounded-xl border border-gray-200/70 bg-white/55 px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/70 dark:border-white/10 dark:bg-[#0f151f] dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10"
                           >
                             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                              Paragraph around line {snippet.line}
+                              {t('sidebar_paragraphAroundLine', { line: snippet.line })}
                             </div>
                             <div className="text-sm leading-6 text-gray-700 dark:text-gray-200">
                               {highlightSearchText(snippet.text, searchQuery)}
@@ -350,9 +352,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <circle cx="11" cy="11" r="7" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No matching files</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('sidebar_noMatchingFiles')}</p>
               {hasSearchQuery && (
-                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Try another filename keyword.</p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('sidebar_tryAnotherFilenameKeyword')}</p>
               )}
             </div>
           ) : (
@@ -393,7 +395,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
-                <span>Trash ({trashItems.length})</span>
+                <span>{t('sidebar_trash', { count: trashItems.length })}</span>
               </div>
               {showTrash ? (
                 <svg
@@ -432,7 +434,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onSwitchKnowledgeBase}
             className="flex items-center justify-between gap-2 w-full px-3 py-2.5 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/60 dark:bg-[#121923] hover:bg-white/90 dark:hover:bg-[#18212e] transition-colors"
-            title={currentKnowledgeBasePath || 'Open Knowledge Base'}
+            title={currentKnowledgeBasePath || t('app_openKnowledgeBase')}
           >
             <div className="flex items-center gap-2 min-w-0">
               <svg
@@ -445,7 +447,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
               </svg>
               <p className="text-sm font-semibold truncate min-w-0">
-                {currentKnowledgeBaseName || 'Open Knowledge Base'}
+                {currentKnowledgeBaseName || t('app_openKnowledgeBase')}
               </p>
             </div>
             <svg
@@ -491,7 +493,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onCreateFile={() =>
             openNewFileDialog(
               contextMenu.node.type === 'folder' ? contextMenu.node : undefined,
-              'Untitled'
+              t('app_untitled')
             )
           }
           onCreateFolder={() => openNewFolderDialog(contextMenu.node)}
@@ -504,9 +506,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* New File Dialog */}
       <PromptDialog
         isOpen={dialogState.type === 'newFile'}
-        title="New File"
-        label="File name:"
-        defaultValue={dialogState.defaultValue || 'Untitled'}
+        title={t('sidebar_newFileTitle')}
+        label={t('app_fileName')}
+        defaultValue={dialogState.defaultValue || t('app_untitled')}
         onConfirm={(value) =>
           handleNewFileConfirm(
             dialogState.file?.type === 'folder' ? dialogState.file : undefined,
@@ -519,8 +521,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Rename Dialog */}
       <PromptDialog
         isOpen={dialogState.type === 'rename'}
-        title="Rename"
-        label="New name:"
+        title={t('sidebar_renameTitle')}
+        label={t('sidebar_newName')}
         defaultValue={dialogState.defaultValue || ''}
         onConfirm={(value) => handleRenameConfirm(dialogState.file, value)}
         onCancel={closeDialog}
@@ -529,8 +531,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* New Folder Dialog */}
       <PromptDialog
         isOpen={dialogState.type === 'newFolder'}
-        title="New Folder"
-        label="Folder name:"
+        title={t('sidebar_newFolderTitle')}
+        label={t('sidebar_folderName')}
         defaultValue=""
         onConfirm={(value) =>
           handleNewFolderConfirm(
@@ -544,9 +546,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={dialogState.type === 'delete'}
-        title="Delete Item"
-        message={`Are you sure you want to delete "${dialogState.file?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
+        title={t('sidebar_deleteItemTitle')}
+        message={t('sidebar_deleteItemConfirm', { name: dialogState.file?.name || '' })}
+        confirmText={t('common_delete')}
         variant="danger"
         onConfirm={() => handleDeleteConfirm(dialogState.file)}
         onCancel={closeDialog}
@@ -554,11 +556,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <ConfirmDialog
         isOpen={dialogState.type === 'emptyTrash'}
-        title="Empty Trash"
-        message={`Permanently delete all ${trashItems.length} item${
-          trashItems.length === 1 ? '' : 's'
-        } in trash? This action cannot be undone.`}
-        confirmText="Empty Trash"
+        title={t('sidebar_emptyTrashTitle')}
+        message={t('sidebar_emptyTrashConfirm', { count: trashItems.length })}
+        confirmText={t('context_emptyTrash')}
         variant="danger"
         onConfirm={() => handleEmptyTrashConfirm(trashItems)}
         onCancel={closeDialog}

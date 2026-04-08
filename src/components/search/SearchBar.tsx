@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { useSearch } from '../../hooks/useSearch';
+import { useI18n } from '../../hooks/useI18n';
 
 interface SearchBarProps {
   onClose: () => void;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
+  const { t } = useI18n();
   const {
     query,
     setQuery,
@@ -13,6 +15,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
     setOptions,
     results,
     currentIndex,
+    isSearching,
     search,
     goToNext,
     goToPrevious,
@@ -28,13 +31,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      search();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [query, options, search]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -58,7 +54,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search..."
+            placeholder={t('search_searchPlaceholder')}
             className="search-input"
           />
           {showReplace && (
@@ -67,7 +63,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
               value={replacement}
               onChange={(e) => setReplacement(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Replace with..."
+              placeholder={t('search_replacePlaceholder')}
               className="search-input"
             />
           )}
@@ -80,7 +76,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
               checked={options.caseSensitive}
               onChange={(e) => setOptions({ ...options, caseSensitive: e.target.checked })}
             />
-            <span>Match Case</span>
+            <span>{t('search_caseSensitive')}</span>
           </label>
           <label className="search-option">
             <input
@@ -88,7 +84,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
               checked={options.useRegex}
               onChange={(e) => setOptions({ ...options, useRegex: e.target.checked })}
             />
-            <span>Regex</span>
+            <span>{t('search_regex')}</span>
           </label>
           <label className="search-option">
             <input
@@ -96,13 +92,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
               checked={options.wholeWord}
               onChange={(e) => setOptions({ ...options, wholeWord: e.target.checked })}
             />
-            <span>Whole Word</span>
+            <span>{t('search_wholeWord')}</span>
           </label>
         </div>
 
         <div className="search-actions">
-          <span className="search-count">
-            {results.length > 0 ? `${currentIndex + 1} / ${results.length}` : '0 / 0'}
+          <span className={`search-count ${isSearching ? 'searching' : ''}`}>
+            {isSearching ? t('search_searching') : (results.length > 0 ? `${currentIndex + 1} / ${results.length}` : '0 / 0')}
           </span>
           <button onClick={goToPrevious} disabled={results.length === 0} className="search-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -128,7 +124,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
                 </>
               )}
             </svg>
-            {showReplace ? 'Hide' : 'Replace'}
+            {showReplace ? t('search_hideReplace') : t('search_replace')}
           </button>
           {showReplace && (
             <>
@@ -138,7 +134,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
                   <line x1="4" y1="20" x2="21" y2="3" />
                   <polyline points="21 16 21 21 16 21" />
                 </svg>
-                Replace
+                {t('search_replace')}
               </button>
               <button onClick={replaceAll} disabled={results.length === 0} className="search-btn gap-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -147,7 +143,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onClose }) => {
                   <path d="M7 23l-4-4 4-4" />
                   <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                 </svg>
-                All
+                {t('search_replaceAll')}
               </button>
             </>
           )}

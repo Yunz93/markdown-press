@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '../../../hooks/useI18n';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { t } = useI18n();
   if (!isOpen) return null;
 
   const variantStyles = {
@@ -59,7 +61,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-            Cancel
+            {t('common_cancel')}
           </button>
           <button
             onClick={onConfirm}

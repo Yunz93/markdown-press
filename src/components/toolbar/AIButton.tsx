@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../hooks/useI18n';
 
 interface AIButtonProps {
   onClick: () => void;
@@ -11,11 +12,13 @@ export const AIButton: React.FC<AIButtonProps> = ({
   disabled = false,
   isLoading = false
 }) => {
+  const { t } = useI18n();
+
   return (
     <button
       onClick={onClick}
       disabled={disabled || isLoading}
-      title={isLoading ? 'AI Enhancing' : 'AI Enhance'}
+      title={isLoading ? t('ai_buttonLoading') : t('ai_button')}
       className={`
         inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-95
         ${isLoading

@@ -133,6 +133,7 @@ Notes:
 - `aliases` is kept as metadata only and is not used to build the publish URL
 - New-note metadata templates now include `slug`, `aliases`, `create_time`, and `update_time`
 - When a note is edited and saved, `update_time` is refreshed automatically if it exists in frontmatter
+- During publishing, regular Obsidian-style wiki links are converted into clickable Markdown links when the target note is already published (either with a saved `link`, or with `is_publish: true` and a resolvable blog URL)
 
 ## Build
 

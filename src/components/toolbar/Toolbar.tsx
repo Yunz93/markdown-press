@@ -2,6 +2,7 @@ import React from 'react';
 import { ViewMode, type ThemeMode } from '../../types';
 import { ViewModeToggle } from '../toolbar/ViewModeToggle';
 import { AIButton } from '../toolbar/AIButton';
+import { useI18n } from '../../hooks/useI18n';
 
 interface ToolbarProps {
   fileName: string;
@@ -34,6 +35,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onPublishBlog,
   onExportHtml
 }) => {
+  const { t } = useI18n();
   const isDark = themeMode === 'dark';
   const displayFileName = fileName.replace(/\.md$/i, '');
 
@@ -43,7 +45,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           onClick={onMenuClick}
           className="inline-flex h-8 w-8 items-center justify-center -ml-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
-          title={isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+          title={isSidebarOpen ? t('toolbar_hideSidebar') : t('toolbar_showSidebar')}
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -65,13 +67,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Saving...
+                    {t('toolbar_saving')}
                   </span>
                 )}
               </div>
             </>
           ) : (
-            <span className="text-gray-400 text-sm font-medium">No file selected</span>
+            <span className="text-gray-400 text-sm font-medium">{t('toolbar_noFileSelected')}</span>
           )}
         </div>
       </div>
@@ -80,7 +82,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           onClick={onToggleTheme}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={isDark ? t('toolbar_switchToLight') : t('toolbar_switchToDark')}
         >
           {isDark ? (
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -110,7 +112,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 onClick={onPublishBlog}
                 disabled={isPublishing}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                title={isPublishing ? 'Publishing Blog' : 'Publish Blog'}
+                title={isPublishing ? t('toolbar_publishingBlog') : t('toolbar_publishBlog')}
               >
                 {isPublishing ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -131,7 +133,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <button
                 onClick={onExportHtml}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                title="Export Preview HTML"
+                title={t('toolbar_exportHtml')}
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

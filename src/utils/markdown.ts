@@ -8,6 +8,7 @@ import { normalizeShikiLanguage } from './shikiLanguages';
 import { getMarkdownPressShikiTheme } from './shikiTheme';
 import { parseWikiLinkReference } from './wikiLinks';
 import type { ThemeMode } from '../types';
+import { LRUCache, hashContent } from './performance';
 
 interface MarkdownRenderOptions {
   highlighter?: any | null;
@@ -146,6 +147,10 @@ export function getMarkdownIt(): MarkdownIt {
 let currentHighlighter: any | null = null;
 let currentTheme: ThemeMode = 'light';
 
+// LRU Cache for markdown rendering results
+const markdownCache = new LRUCache<string, string>(30);
+const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
+
 function canUseShikiLanguage(highlighter: any | null, lang: string): boolean {
   if (!highlighter || !lang) return false;
 
@@ -229,20 +234,41 @@ export function useMarkdownRenderer(highlighter: any | null, themeMode: ThemeMod
   }, [themeMode]);
 }
 
+interface RenderCacheKey {
+  content: string;
+  highlighter: boolean;
+  themeMode: ThemeMode;
+}
+
+function createCacheKey(markdown: string, options: MarkdownRenderOptions): string {
+  return `${hashContent(markdown)}_${options.highlighter ? '1' : '0'}_${options.themeMode ?? 'light'}`;
+}
+
 /**
- * Render markdown to HTML with sanitization
+ * Render markdown to HTML with sanitization and caching
  */
 export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
+  // Check cache for non-large documents
+  const shouldCache = markdown.length <= MAX_CACHEABLE_LENGTH;
+
+  if (shouldCache) {
+    const cacheKey = createCacheKey(markdown, options);
+    const cached = markdownCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+  }
+
   const md = getMarkdownIt();
   const highlighter = options.highlighter ?? null;
   const themeMode = options.themeMode ?? 'light';
-  
+
   // Configure fence renderer with the highlighter
   configureFenceRenderer(md, highlighter, themeMode);
-  
+
   const env: MarkdownRenderEnv = {};
   const renderedHtml = md.render(markdown, env);
-  
+
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
@@ -268,14 +294,27 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
     ],
   });
 
-  if (!env.shikiBlocks?.length) {
-    return sanitizedHtml;
+  const result = env.shikiBlocks?.length
+    ? sanitizedHtml.replace(
+        /<div data-shiki-block="(\d+)"><\/div>/g,
+        (_match, blockIndex: string) => env.shikiBlocks?.[Number(blockIndex)] ?? ''
+      )
+    : sanitizedHtml;
+
+  // Store in cache
+  if (shouldCache) {
+    const cacheKey = createCacheKey(markdown, options);
+    markdownCache.set(cacheKey, result);
   }
 
-  return sanitizedHtml.replace(
-    /<div data-shiki-block="(\d+)"><\/div>/g,
-    (_match, blockIndex: string) => env.shikiBlocks?.[Number(blockIndex)] ?? ''
-  );
+  return result;
+}
+
+/**
+ * Clear the markdown render cache
+ */
+export function clearMarkdownCache(): void {
+  markdownCache.clear();
 }
 
 /**

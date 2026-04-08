@@ -151,7 +151,7 @@ npm run tauri:dev
 
 `GitHub Token` 需要使用 Fine-grained Personal Access Token，并为目标仓库开启 `Contents: Read and write` 权限。
 
-当前版本优先处理图片类附件与标准 Markdown 图片引用；如果文章里包含 Obsidian 风格的普通 wiki 链接，建议在发布前先改成普通链接或纯文本。
+发布时会继续处理图片类附件与标准 Markdown 图片引用；对于 Obsidian 风格的普通 wiki 链接，如果目标笔记已经发布（存在 `link`，或 `is_publish: true` 且可推导出博客地址），会自动转换成可点击跳转的普通链接。
 
 ## 构建发布
 

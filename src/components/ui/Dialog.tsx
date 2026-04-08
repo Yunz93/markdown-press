@@ -94,7 +94,7 @@ export const Dialog: React.FC<DialogProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Close dialog"
+              aria-label="关闭对话框"
             >
               <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -136,8 +136,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = '确定',
+  cancelText = '取消',
   variant = 'info'
 }) => {
   const handleConfirm = useCallback(() => {
@@ -202,8 +202,8 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   label,
   placeholder = '',
   defaultValue = '',
-  submitText = 'OK',
-  cancelText = 'Cancel'
+  submitText = '确定',
+  cancelText = '取消'
 }) => {
   const [value, setValue] = React.useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);

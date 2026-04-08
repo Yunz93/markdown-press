@@ -8,14 +8,16 @@ import {
   normalizeBlogRepoUrl,
   normalizeBlogSiteUrl,
 } from '../../utils/blogRepo';
+import { useI18n } from '../../hooks/useI18n';
+import { type TranslationKey } from '../../utils/i18n';
 
-function formatAutoSaveInterval(intervalMs: number): string {
+function formatAutoSaveInterval(intervalMs: number, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
   if (intervalMs < 60000) {
-    return `${Math.round(intervalMs / 1000)}s`;
+    return t('settings_seconds', { count: Math.round(intervalMs / 1000) });
   }
 
   const minutes = intervalMs / 60000;
-  return Number.isInteger(minutes) ? `${minutes}min` : `${minutes.toFixed(1)}min`;
+  return t('settings_minutes', { count: Number.isInteger(minutes) ? minutes : minutes.toFixed(1) });
 }
 
 interface SettingsModalProps {
@@ -25,7 +27,7 @@ interface SettingsModalProps {
   onUpdateSettings: (updates: Partial<AppSettings>) => void;
 }
 
-type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai';
+type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai' | 'interface';
 
 interface TabConfig {
   id: SettingsTab;
@@ -33,63 +35,98 @@ interface TabConfig {
   icon: React.FC<{ size: number }>;
 }
 
-const tabs: TabConfig[] = [
-  { id: 'editor', label: 'Editor', icon: (props) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="4 7 4 4 20 4 20 7" />
-      <line x1="9" y1="20" x2="15" y2="20" />
-      <line x1="12" y1="4" x2="12" y2="20" />
-    </svg>
-  )},
-  { id: 'ai', label: 'AI Enhance', icon: (props) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z" />
-    </svg>
-  )},
-  { id: 'metadata', label: 'Metadata', icon: (props) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-      <line x1="7" y1="7" x2="7.01" y2="7" />
-    </svg>
-  )},
-  { id: 'shortcuts', label: 'Shortcuts', icon: (props) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <line x1="6" y1="8" x2="6" y2="8" />
-      <line x1="10" y1="8" x2="10" y2="8" />
-      <line x1="14" y1="8" x2="14" y2="8" />
-      <line x1="18" y1="8" x2="18" y2="8" />
-      <line x1="6" y1="12" x2="6" y2="12" />
-      <line x1="10" y1="12" x2="10" y2="12" />
-      <line x1="14" y1="12" x2="14" y2="12" />
-      <line x1="18" y1="12" x2="18" y2="12" />
-      <line x1="6" y1="16" x2="10" y2="16" />
-    </svg>
-  )},
-  { id: 'general', label: 'Publishing', icon: (props) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  )},
-];
+function getTabs(t: (key: TranslationKey, params?: Record<string, string | number>) => string): TabConfig[] {
+  return [
+    {
+      id: 'interface',
+      label: t('settings_tab_interface'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'editor',
+      label: t('settings_tab_editor'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="4 7 4 4 20 4 20 7" />
+          <line x1="9" y1="20" x2="15" y2="20" />
+          <line x1="12" y1="4" x2="12" y2="20" />
+        </svg>
+      ),
+    },
+    {
+      id: 'ai',
+      label: t('settings_tab_ai'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'metadata',
+      label: t('settings_tab_metadata'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+          <line x1="7" y1="7" x2="7.01" y2="7" />
+        </svg>
+      ),
+    },
+    {
+      id: 'shortcuts',
+      label: t('settings_tab_shortcuts'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <line x1="6" y1="8" x2="6" y2="8" />
+          <line x1="10" y1="8" x2="10" y2="8" />
+          <line x1="14" y1="8" x2="14" y2="8" />
+          <line x1="18" y1="8" x2="18" y2="8" />
+          <line x1="6" y1="12" x2="6" y2="12" />
+          <line x1="10" y1="12" x2="10" y2="12" />
+          <line x1="14" y1="12" x2="14" y2="12" />
+          <line x1="18" y1="12" x2="18" y2="12" />
+          <line x1="6" y1="16" x2="10" y2="16" />
+        </svg>
+      ),
+    },
+    {
+      id: 'general',
+      label: t('settings_tab_publishing'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3v18" />
+          <path d="M5 8l7-5 7 5" />
+          <path d="M5 16l7 5 7-5" />
+        </svg>
+      ),
+    },
+  ];
+}
 
-const shortcutLabels: Record<string, string> = {
-  save: 'Save File',
-  toggleView: 'Toggle View Mode',
-  aiAnalyze: 'AI Enhance',
-  search: 'Search',
-  sidebarSearch: 'Sidebar Search',
-  settings: 'Open Settings',
-  toggleOutline: 'Toggle Outline',
-  toggleSidebar: 'Toggle Sidebar',
-  newNote: 'New Note',
-  newFolder: 'New Folder',
-  closeTab: 'Close Tab',
-  openKnowledgeBase: 'Open Knowledge Base',
-  exportHtml: 'Export HTML',
-};
+function getShortcutLabels(t: (key: TranslationKey, params?: Record<string, string | number>) => string): Record<string, string> {
+  return {
+    save: t('settings_saveFile'),
+    toggleView: t('settings_toggleView'),
+    aiAnalyze: t('settings_aiEnhance'),
+    search: t('settings_search'),
+    sidebarSearch: t('settings_sidebarSearch'),
+    settings: t('settings_openSettings'),
+    toggleOutline: t('settings_toggleOutline'),
+    toggleSidebar: t('settings_toggleSidebar'),
+    newNote: t('settings_newNote'),
+    newFolder: t('settings_newFolder'),
+    closeTab: t('settings_closeTab'),
+    openKnowledgeBase: t('settings_openKnowledgeBase'),
+    exportHtml: t('settings_exportHtml'),
+  };
+}
 
 type ShortcutGroupId = 'workspace' | 'editing' | 'search' | 'panels';
 
@@ -109,51 +146,52 @@ interface ShortcutGroupConfig {
   items: ShortcutItemConfig[];
 }
 
-const shortcutGroups: ShortcutGroupConfig[] = [
+function getShortcutGroups(t: (key: TranslationKey, params?: Record<string, string | number>) => string): ShortcutGroupConfig[] {
+  return [
   {
     id: 'workspace',
-    label: 'Workspace',
-    description: 'Core app actions and view switching.',
+    label: t('settings_workspace'),
+    description: t('settings_workspaceDesc'),
     items: [
       {
         id: 'save',
-        label: 'Save File',
-        description: 'Save the current note to disk.',
+        label: t('settings_saveFile'),
+        description: t('settings_saveFileDesc'),
         editable: true,
         settingKey: 'save',
       },
       {
         id: 'toggleView',
-        label: 'Toggle View Mode',
-        description: 'Cycle through Editor, Split, and Preview modes.',
+        label: t('settings_toggleView'),
+        description: t('settings_toggleViewDesc'),
         editable: true,
         settingKey: 'toggleView',
       },
       {
         id: 'toggleOutline',
-        label: 'Toggle Outline',
-        description: 'Show or hide the document outline panel when available.',
+        label: t('settings_toggleOutline'),
+        description: t('settings_toggleOutlineDesc'),
         editable: true,
         settingKey: 'toggleOutline',
       },
       {
         id: 'toggleSidebar',
-        label: 'Toggle Sidebar',
-        description: 'Show or hide the file sidebar.',
+        label: t('settings_toggleSidebar'),
+        description: t('settings_toggleSidebarDesc'),
         editable: true,
         settingKey: 'toggleSidebar',
       },
       {
         id: 'openKnowledgeBase',
-        label: 'Open Knowledge Base',
-        description: 'Switch to another local knowledge base folder.',
+        label: t('settings_openKnowledgeBase'),
+        description: t('settings_openKnowledgeBaseDesc'),
         editable: true,
         settingKey: 'openKnowledgeBase',
       },
       {
         id: 'openSettings',
-        label: 'Open Settings',
-        description: 'Open the settings dialog.',
+        label: t('settings_openSettings'),
+        description: t('settings_openSettingsDesc'),
         editable: true,
         settingKey: 'settings',
       },
@@ -161,105 +199,106 @@ const shortcutGroups: ShortcutGroupConfig[] = [
   },
   {
     id: 'editing',
-    label: 'Editing',
-    description: 'Writing and content-editing shortcuts.',
+    label: t('settings_editing'),
+    description: t('settings_editingDesc'),
     items: [
       {
         id: 'newNote',
-        label: 'New Note',
-        description: 'Create a new note at the vault root.',
+        label: t('settings_newNote'),
+        description: t('settings_newNoteDesc'),
         editable: true,
         settingKey: 'newNote',
       },
       {
         id: 'newFolder',
-        label: 'New Folder',
-        description: 'Create a new folder at the vault root.',
+        label: t('settings_newFolder'),
+        description: t('settings_newFolderDesc'),
         editable: true,
         settingKey: 'newFolder',
       },
       {
         id: 'closeTab',
-        label: 'Close Tab',
-        description: 'Close the current open tab.',
+        label: t('settings_closeTab'),
+        description: t('settings_closeTabDesc'),
         editable: true,
         settingKey: 'closeTab',
       },
       {
         id: 'aiAnalyze',
-        label: 'AI Enhance',
-        description: 'Run AI enhancement on the current note.',
+        label: t('settings_aiEnhance'),
+        description: t('settings_aiEnhanceDesc'),
         editable: true,
         settingKey: 'aiAnalyze',
       },
       {
         id: 'undo',
-        label: 'Undo',
-        description: 'Revert the most recent content change.',
+        label: t('settings_undo'),
+        description: t('settings_undoDesc'),
         shortcuts: ['Ctrl+Z'],
       },
       {
         id: 'redo',
-        label: 'Redo',
-        description: 'Reapply the last undone change.',
+        label: t('settings_redo'),
+        description: t('settings_redoDesc'),
         shortcuts: ['Ctrl+Shift+Z'],
       },
     ],
   },
   {
     id: 'search',
-    label: 'Search',
-    description: 'Open search and navigate between matches.',
+    label: t('settings_search'),
+    description: t('settings_searchDesc'),
     items: [
       {
         id: 'search',
-        label: 'Open Search',
-        description: 'Open the in-note search panel.',
+        label: t('settings_openSearch'),
+        description: t('settings_openSearchDesc'),
         editable: true,
         settingKey: 'search',
       },
       {
         id: 'sidebarSearch',
-        label: 'Sidebar Search',
-        description: 'Open the sidebar and focus the file search field.',
+        label: t('settings_sidebarSearch'),
+        description: t('settings_sidebarSearchDesc'),
         editable: true,
         settingKey: 'sidebarSearch',
       },
       {
         id: 'nextMatch',
-        label: 'Next Match',
-        description: 'Jump to the next search result in the search panel.',
+        label: t('settings_nextMatch'),
+        description: t('settings_nextMatchDesc'),
         shortcuts: ['Enter'],
       },
       {
         id: 'previousMatch',
-        label: 'Previous Match',
-        description: 'Jump to the previous search result in the search panel.',
+        label: t('settings_previousMatch'),
+        description: t('settings_previousMatchDesc'),
         shortcuts: ['Shift+Enter'],
       },
     ],
   },
   {
     id: 'panels',
-    label: 'Panels & Dialogs',
-    description: 'Dismiss transient UI such as search, dialogs, and menus.',
+    label: t('settings_panelsAndDialogs'),
+    description: t('settings_panelsAndDialogsDesc'),
     items: [
       {
         id: 'closePanel',
-        label: 'Close Active Panel',
-        description: 'Close the active search panel, dialog, or context menu.',
+        label: t('settings_closeActivePanel'),
+        description: t('settings_closeActivePanelDesc'),
         shortcuts: ['Escape'],
       },
       {
         id: 'exportHtml',
-        label: 'Export HTML',
-        description: 'Export the current preview as a standalone HTML document.',
+        label: t('settings_exportHtml'),
+        description: t('settings_exportHtmlDesc'),
         editable: true,
         settingKey: 'exportHtml',
       },
     ],
   },
 ];
+}
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -267,6 +306,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings
 }) => {
+  const { t, language } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>('editor');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
@@ -287,6 +327,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     search: true,
     panels: true,
   });
+  const tabs = getTabs(t);
+  const shortcutLabels = getShortcutLabels(t);
+  const shortcutGroups = getShortcutGroups(t);
 
   // Normalize shortcut input to standard format (e.g., "Ctrl+S")
   const normalizeShortcut = (input: string): string => {
@@ -295,8 +338,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     let key = '';
 
     for (const part of parts) {
-      if (part === 'ctrl' || part === 'meta' || part === 'command') {
+      if (part === 'ctrl' || part === 'control') {
         modifiers.push('Ctrl');
+      } else if (part === 'meta' || part === 'cmd' || part === 'command') {
+        modifiers.push('Cmd');
       } else if (part === 'shift') {
         modifiers.push('Shift');
       } else if (part === 'alt' || part === 'option') {
@@ -336,12 +381,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setAvailableModels((prev) => ({ ...prev, [provider]: models }));
       setModelLoadMessage({
         type: 'success',
-        text: models.length > 0 ? `已加载 ${models.length} 个${provider === 'gemini' ? ' Gemini' : ' OpenAI'}模型。` : '接口已返回，但没有筛到可用模型。',
+        text: models.length > 0
+          ? t('settings_modelsLoaded', { count: models.length, provider: provider === 'gemini' ? 'Gemini ' : 'OpenAI ' })
+          : t('settings_noAvailableModels'),
       });
     } catch (error) {
       setModelLoadMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : '加载模型列表失败。',
+        text: error instanceof Error ? error.message : t('settings_modelLoadFailed'),
       });
     } finally {
       setIsLoadingModels((prev) => ({ ...prev, [provider]: false }));
@@ -394,7 +441,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Sidebar */}
         <div className="w-56 bg-gray-50/50 dark:bg-black/20 border-r border-gray-200/50 dark:border-white/5 flex flex-col p-3 gap-1 shrink-0">
           <div className="px-3 py-4 mb-2">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Settings</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('settings_title')}</h2>
           </div>
 
           {tabs.map(tab => (
@@ -420,12 +467,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'ai' && (
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">AI Content Enhancement</h3>
-                  <p className="text-sm text-gray-500 mb-6">Choose an AI provider for full-note enhancement and for right-click wiki generation on selected fields.</p>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{t('settings_aiContentEnhance')}</h3>
+                  <p className="text-sm text-gray-500 mb-6">{t('settings_aiContentEnhanceDesc')}</p>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Provider</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_aiProvider')}</label>
                       <select
                         value={settings.aiProvider}
                         onChange={(e) => onUpdateSettings({ aiProvider: e.target.value as AppSettings['aiProvider'] })}
@@ -439,13 +486,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {settings.aiProvider === 'gemini' && (
                       <>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini API Key</label>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_geminiApiKey')}</label>
                           <div className="relative">
                             <input
                               type={showApiKey ? 'text' : 'password'}
                               value={settings.geminiApiKey || ''}
                               onChange={(e) => onUpdateSettings({ geminiApiKey: e.target.value })}
-                              placeholder="Paste your API key here..."
+                              placeholder={t('settings_apiKeyPaste')}
                               className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                             />
                             <button
@@ -463,11 +510,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               )}
                             </button>
                           </div>
-                          <p className="text-[10px] text-gray-400">Stored locally only. Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>.</p>
+                          <p className="text-[10px] text-gray-400">{t('settings_localOnlyGoogle')} <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>。</p>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-3">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Gemini Model</label>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_geminiModel')}</label>
                             <button
                               type="button"
                               onClick={() => {
@@ -476,7 +523,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               disabled={isLoadingModels.gemini}
                               className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 disabled:opacity-60"
                             >
-                              {isLoadingModels.gemini ? '加载中…' : '加载模型列表'}
+                              {isLoadingModels.gemini ? t('settings_loadingModels') : t('settings_loadModelList')}
                             </button>
                           </div>
                           <select
@@ -495,7 +542,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 );
                               })}
                           </select>
-                          <p className="text-[10px] text-gray-400">请选择列表中的 Gemini 模型。</p>
+                          <p className="text-[10px] text-gray-400">{t('settings_pickGeminiModel')}</p>
                         </div>
                       </>
                     )}
@@ -503,18 +550,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {settings.aiProvider === 'codex' && (
                       <>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI API Base URL</label>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_openaiBaseUrl')}</label>
                           <input
                             type="text"
                             value={settings.codexApiBaseUrl || 'https://api.openai.com/v1'}
                             onChange={(e) => onUpdateSettings({ codexApiBaseUrl: e.target.value })}
-                            placeholder="https://api.openai.com/v1"
+                            placeholder={t('settings_openaiBaseUrlExample')}
                             className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                           />
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-3">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI Model</label>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_openaiModel')}</label>
                             <button
                               type="button"
                               onClick={() => {
@@ -523,7 +570,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               disabled={isLoadingModels.codex}
                               className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 disabled:opacity-60"
                             >
-                              {isLoadingModels.codex ? '加载中…' : '加载模型列表'}
+                              {isLoadingModels.codex ? t('settings_loadingModels') : t('settings_loadModelList')}
                             </button>
                           </div>
                           <select
@@ -542,16 +589,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 );
                               })}
                           </select>
-                          <p className="text-[10px] text-gray-400">请选择列表中的 OpenAI 模型。</p>
+                          <p className="text-[10px] text-gray-400">{t('settings_pickOpenAIModel')}</p>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI API Key</label>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_openaiApiKey')}</label>
                           <div className="relative">
                             <input
                               type={showOpenAIApiKey ? 'text' : 'password'}
                               value={settings.codexApiKey || ''}
                               onChange={(e) => onUpdateSettings({ codexApiKey: e.target.value })}
-                              placeholder="Paste your OpenAI API key here..."
+                              placeholder={t('settings_openaiApiKeyPaste')}
                               className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                             />
                             <button
@@ -569,7 +616,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               )}
                             </button>
                           </div>
-                          <p className="text-[10px] text-gray-400">Stored locally only. Use a standard OpenAI API key for this provider.</p>
+                          <p className="text-[10px] text-gray-400">{t('settings_openaiApiKeyLocalOnly')}</p>
                         </div>
                       </>
                     )}
@@ -588,12 +635,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'editor' && (
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Typography</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_typography')}</h3>
 
                   <div className="space-y-5">
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Font Size</label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_fontSize')}</label>
                         <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.fontSize}px</span>
                       </div>
                       <input
@@ -608,7 +655,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Word Wrap</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_wordWrap')}</label>
                       <button
                         onClick={() => onUpdateSettings({ ...settings, wordWrap: !settings.wordWrap })}
                         className={`w-10 h-6 rounded-full transition-colors duration-200 relative ${
@@ -628,91 +675,91 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">English Font</label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_englishFont')}</label>
                         <input
                           type="text"
                           value={settings.englishFontFamily}
                           onChange={(e) => onUpdateSettings({ ...settings, englishFontFamily: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Used primarily for Latin letters, numbers, and symbols.</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_englishFontDesc')}</p>
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Chinese Font</label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_chineseFont')}</label>
                         <input
                           type="text"
                           value={settings.chineseFontFamily}
                           onChange={(e) => onUpdateSettings({ ...settings, chineseFontFamily: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Default is the bundled LXGW WenKai font, shipped with the app for consistent Chinese rendering.</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_chineseFontDesc')}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Attachments</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_attachments')}</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Resource Folder</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_resourceFolder')}</label>
                       <input
                         type="text"
                         value={settings.resourceFolder}
                         onChange={(e) => onUpdateSettings({ ...settings, resourceFolder: e.target.value })}
-                        placeholder="resources"
+                        placeholder={t('settings_resourceFolderPlaceholder')}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Clipboard images are saved into this folder inside the current knowledge base.
+                        {t('settings_resourceFolderDesc')}
                       </p>
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Attachment Paste Format</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_attachmentPasteFormat')}</label>
                       <select
                         value={settings.attachmentPasteFormat}
                         onChange={(e) => onUpdateSettings({ ...settings, attachmentPasteFormat: e.target.value as AppSettings['attachmentPasteFormat'] })}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
                       >
-                        <option value="obsidian">Obsidian: ![[path/to/image.png]]</option>
-                        <option value="markdown">Markdown: ![](&lt;path/to/image.png&gt;)</option>
+                        <option value="obsidian">{t('settings_attachmentFormatObsidian')}</option>
+                        <option value="markdown">{t('settings_attachmentFormatMarkdown')}</option>
                       </select>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Choose whether pasted image attachments use Obsidian embeds or standard Markdown image syntax.
+                        {t('settings_attachmentPasteFormatDesc')}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Lists</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_lists')}</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Ordered List Numbering</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_orderedListMode')}</label>
                       <select
                         value={settings.orderedListMode}
                         onChange={(e) => onUpdateSettings({ ...settings, orderedListMode: e.target.value as AppSettings['orderedListMode'] })}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
                       >
-                        <option value="strict">Strict (Typora): renumber lists automatically</option>
-                        <option value="loose">Loose (Obsidian): preserve existing numbers</option>
+                        <option value="strict">{t('settings_orderedListStrict')}</option>
+                        <option value="loose">{t('settings_orderedListLoose')}</option>
                       </select>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Controls whether indent/outdent and ordered-list commands automatically normalize numbering.
+                        {t('settings_orderedListModeDesc')}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Auto-Save</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_autoSave')}</h3>
                   <div className="space-y-4">
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-Save Interval</label>
-                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{formatAutoSaveInterval(settings.autoSaveInterval)}</span>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_autoSaveInterval')}</label>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{formatAutoSaveInterval(settings.autoSaveInterval, t)}</span>
                       </div>
                       <input
                         type="range"
@@ -724,12 +771,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
                       />
                       <div className="flex justify-between mt-1 text-xs text-gray-400">
-                        <span>5s</span>
-                        <span>30min</span>
+                        <span>{t('settings_seconds', { count: 5 })}</span>
+                        <span>{t('settings_minutes', { count: 30 })}</span>
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Changes are automatically saved to disk after the specified delay.
+                      {t('settings_autoSaveDesc')}
                     </p>
                   </div>
                 </div>
@@ -742,8 +789,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Metadata Templates</h3>
-                      <p className="text-xs text-gray-500 mt-1">Properties added to frontmatter when creating new files.</p>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('settings_metadataTemplate')}</h3>
+                      <p className="text-xs text-gray-500 mt-1">{t('settings_metadataTemplateDesc')}</p>
                     </div>
                     <button
                       onClick={handleAddMetadata}
@@ -753,7 +800,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
-                      Add Field
+                      {t('settings_addField')}
                     </button>
                   </div>
 
@@ -778,7 +825,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       >
                         <button
                           type="button"
-                          title="Drag to reorder"
+                          title={t('settings_dragToReorder')}
                           className="p-2 text-gray-400 cursor-grab active:cursor-grabbing hover:text-gray-600 dark:hover:text-gray-200"
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -794,17 +841,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="text"
                           value={field.key}
                           onChange={(e) => handleUpdateMetadata(idx, { key: e.target.value })}
-                          placeholder="Key (e.g., tags)"
-                          className="flex-1 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
+                          placeholder={t('settings_metadataKeyPlaceholder')}
+                          className="w-28 shrink-0 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
                         />
                         <span className="text-gray-400">:</span>
                         <input
                           type="text"
                           value={field.defaultValue}
                           onChange={(e) => handleUpdateMetadata(idx, { defaultValue: e.target.value })}
-                          placeholder="Value (e.g., draft)"
-                          className="flex-1 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
-                          title="Use {now} for current date"
+                          placeholder={t('settings_metadataValuePlaceholder')}
+                          className="flex-1 min-w-0 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
+                          title={t('settings_metadataNowHint')}
                         />
                         <button
                           onClick={() => handleRemoveMetadata(idx)}
@@ -822,7 +869,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                     </svg>
-                    <span>Tip: drag to reorder. Use <code className="bg-gray-100 dark:bg-white/10 px-1 rounded text-gray-600 dark:text-gray-300">{'{now}'}</code> for a date and <code className="bg-gray-100 dark:bg-white/10 px-1 rounded text-gray-600 dark:text-gray-300">{'{now:datetime}'}</code> for a timestamp. `status` is editorial only; publishing is controlled by `is_publish`.</span>
+                    <span>{t('settings_metadataTip', { now: '{now}', nowDatetime: '{now:datetime}' })}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Interface Tab */}
+            {activeTab === 'interface' && (
+              <div className="space-y-6 animate-fade-in-02s">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_interface')}</h3>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_languageLabel')}</label>
+                    <select
+                      value={language}
+                      onChange={(e) => {
+                        const nextLanguage = e.target.value as AppSettings['language'];
+                        onUpdateSettings({ language: nextLanguage });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                    >
+                      <option value="zh-CN">{t('common_simplifiedChinese')}</option>
+                      <option value="en">{t('common_english')}</option>
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_interfaceDesc')}</p>
                   </div>
                 </div>
               </div>
@@ -832,11 +903,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'general' && (
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Simple Blog</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_publishingTitle')}</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Blog Repository URL
+                        {t('settings_blogRepoUrl')}
                       </label>
                       <input
                         type="text"
@@ -848,7 +919,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onUpdateSettings({ blogRepoUrl: normalized });
                           }
                         }}
-                        placeholder="https://github.com/you/bxyz-blog"
+                        placeholder={t('settings_blogRepoUrlPlaceholder')}
                         className={`w-full px-3 py-2 border text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl ${
                           isValidOrEmptyBlogRepoUrl(settings.blogRepoUrl)
                             ? 'border-gray-200 dark:border-white/10'
@@ -856,28 +927,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }`}
                       />
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Paste the GitHub repository address for your deployed `simple-blog` site. Publishing writes to this repository through the GitHub API and then triggers a new deployment from Git.
+                        {t('settings_blogRepoUrlDesc')}
                       </p>
                       {settings.blogRepoUrl && !isValidOrEmptyBlogRepoUrl(settings.blogRepoUrl) && (
                         <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
                           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                           </svg>
-                          Use a GitHub repository like `https://github.com/owner/repo`, `git@github.com:owner/repo.git`, or `owner/repo`.
+                          {t('settings_blogRepoUrlInvalid')}
                         </p>
                       )}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        GitHub Token
+                        {t('settings_githubToken')}
                       </label>
                       <div className="relative">
                         <input
                           type={showGithubToken ? 'text' : 'password'}
                           value={settings.blogGithubToken ?? ''}
                           onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
-                          placeholder="github_pat_..."
+                          placeholder="github_pat_xxx..."
                           autoComplete="off"
                           spellCheck={false}
                           className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl font-mono"
@@ -886,7 +957,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="button"
                           onClick={() => setShowGithubToken((value) => !value)}
                           className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                          title={showGithubToken ? 'Hide GitHub token' : 'Show GitHub token'}
+                          title={showGithubToken ? t('settings_hideToken') : t('settings_showToken')}
                         >
                           {showGithubToken ? (
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -902,16 +973,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </button>
                       </div>
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Required. Publishing now uses the GitHub API only, so this token must be set before the publish action can run.
+                        {t('settings_githubTokenDesc')}
                       </p>
                       <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Use a Fine-grained Personal Access Token with repository <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">Contents: Read and write</code>. The token is stored locally on this device.
+                        {t('settings_githubTokenPermission')}
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Blog Site URL
+                        {t('settings_blogSiteUrl')}
                       </label>
                       <input
                         type="text"
@@ -923,7 +994,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onUpdateSettings({ blogSiteUrl: normalized });
                           }
                         }}
-                        placeholder="https://your-blog.com"
+                        placeholder={t('settings_blogSiteUrlPlaceholder')}
                         className={`w-full px-3 py-2 border text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl ${
                           isValidOrEmptyBlogSiteUrl(settings.blogSiteUrl)
                             ? 'border-gray-200 dark:border-white/10'
@@ -931,21 +1002,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }`}
                       />
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        This is the public site prefix used to write back the article `link`, for example `https://your-blog.com` or `your-blog.vercel.app`.
+                        {t('settings_blogSiteUrlDesc')}
                       </p>
                       {settings.blogSiteUrl && !isValidOrEmptyBlogSiteUrl(settings.blogSiteUrl) && (
                         <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
                           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                           </svg>
-                          Use a public URL like `https://your-blog.com` or `your-blog.vercel.app`.
+                          {t('settings_blogSiteUrlInvalid')}
                         </p>
                       )}
                     </div>
 
                     <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
                       <p>
-                        Start with{' '}
+                        {t('settings_publishGuide1').split('simple-blog')[0]}
                         <a
                           href="https://github.com/Yunz93/simple-blog"
                           target="_blank"
@@ -954,25 +1025,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         >
                           simple-blog
                         </a>
-                        , deploy it, then paste the GitHub repository that your deployed blog uses here.
+                        {t('settings_publishGuide1').split('simple-blog')[1]}
                       </p>
                       <p className="mt-2">
-                        If you deployed through Vercel, open the project dashboard and look for the connected Git repository. Copy that repository URL, for example `https://github.com/owner/repo`, and use it as the publish target.
+                        {t('settings_publishGuide2')}
                       </p>
                       <p className="mt-2">
-                        Also fill in your public blog domain here. After a successful publish, markdown-press will automatically write the final article URL back into the note&apos;s frontmatter `link`.
+                        {t('settings_publishGuide3')}
                       </p>
                       <p className="mt-2">
-                        Publish semantics: `title` defaults to the current file name, `aliases` defaults to `title`, and `slug` controls the final blog URL. If `slug` is empty, publishing will fall back to `title`.
+                        {t('settings_publishGuide4')}
                       </p>
                       <p className="mt-2">
-                        `status` is not used to decide whether a note is published. Publishing writes `is_publish: true`, so `status` can stay focused on your draft or review workflow.
+                        {t('settings_publishGuide5')}
                       </p>
                     </div>
 
                     {!isTauriEnvironment() && (
                       <p className="rounded-xl border border-yellow-200/70 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-200">
-                        One-click publishing is available in the desktop app.
+                        {t('settings_desktopPublishOnly')}
                       </p>
                     )}
                   </div>
@@ -984,9 +1055,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'shortcuts' && (
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Key Bindings</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{t('settings_shortcutsTitle')}</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                    Shortcuts are grouped by workflow. Editable shortcuts can be changed here; built-in shortcuts are shown for reference.
+                    {t('settings_shortcutsIntro')}
                   </p>
 
                   <div className="space-y-3">
@@ -1042,7 +1113,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                           </span>
                                           {item.editable && (
                                             <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                              Custom
+                                              {t('settings_shortcutsEditable')}
                                             </span>
                                           )}
                                         </div>
@@ -1094,7 +1165,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Done
+              {t('common_done')}
             </button>
           </div>
         </div>

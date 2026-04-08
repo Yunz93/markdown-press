@@ -6,6 +6,7 @@ import { generateFrontmatter, parseFrontmatter } from '../utils/frontmatter';
 import { parseMetadataTemplateValue } from '../utils/metadataFields';
 import { type Frontmatter } from '../types';
 import { getFileSystem } from '../types/filesystem';
+import { localizeKnownError, t } from '../utils/i18n';
 
 function getFrontmatterBlockLength(content: string): number {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
@@ -158,7 +159,7 @@ export function useAIAnalyze() {
     try {
       ensureAIConfiguration(settings);
     } catch (error) {
-      showNotification(error instanceof Error ? error.message : 'Please configure AI settings first.', 'error');
+      showNotification(error instanceof Error ? localizeKnownError(settings.language, error.message) : t(settings.language, 'notifications_aiConfigFirst'), 'error');
       setSettingsOpen(true);
       return;
     }
@@ -190,10 +191,10 @@ export function useAIAnalyze() {
       const newContent = `${frontmatterBlock}${optimizedBody}\n`;
 
       setContent(newContent);
-      showNotification('Content enhanced with AI!', 'success');
+      showNotification(t(settings.language, 'notifications_aiEnhanced'), 'success');
     } catch (error) {
       console.error('AI analysis failed:', error);
-      showNotification('Failed to analyze content. Please check your AI settings and try again.', 'error');
+      showNotification(t(settings.language, 'notifications_aiEnhanceFailed'), 'error');
     } finally {
       setAnalyzing(false);
     }
@@ -214,14 +215,14 @@ export function useAIAnalyze() {
     try {
       ensureAIConfiguration(settings);
     } catch (error) {
-      showNotification(error instanceof Error ? error.message : 'Please configure AI settings first.', 'error');
+      showNotification(error instanceof Error ? localizeKnownError(settings.language, error.message) : t(settings.language, 'notifications_aiConfigFirst'), 'error');
       setSettingsOpen(true);
       return null;
     }
 
     const targetFolder = getParentPath(currentFilePath) || rootFolderPath || undefined;
     if (!targetFolder) {
-      showNotification('No knowledge base folder is available for creating the wiki file.', 'error');
+      showNotification(t(settings.language, 'notifications_noKnowledgeBaseForWiki'), 'error');
       return null;
     }
 
@@ -257,11 +258,11 @@ export function useAIAnalyze() {
         throw new Error('Failed to create the wiki file.');
       }
 
-      showNotification(`Wiki created: ${newFile.name}`, 'success');
+      showNotification(t(settings.language, 'notifications_wikiCreated', { name: newFile.name }), 'success');
       return `[[${wikiTarget}|${selectedText}]]`;
     } catch (error) {
       console.error('AI wiki generation failed:', error);
-      showNotification('Failed to generate wiki article. Please check your AI settings and try again.', 'error');
+      showNotification(t(settings.language, 'notifications_wikiCreateFailed'), 'error');
       return null;
     } finally {
       setAnalyzing(false);

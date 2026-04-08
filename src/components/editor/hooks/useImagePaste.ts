@@ -8,6 +8,8 @@ import { useCallback } from 'react';
 import type { EditorView } from '@codemirror/view';
 import type { AttachmentPasteFormat } from '../../../types';
 import { getFileSystem } from '../../../types/filesystem';
+import { useAppStore } from '../../../store/appStore';
+import { t } from '../../../utils/i18n';
 
 export interface UseImagePasteOptions {
   rootFolderPath?: string | null;
@@ -89,8 +91,9 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePasteRetur
   } = options;
 
   const handlePastedImage = useCallback(async (file: File, view: EditorView): Promise<boolean> => {
+    const language = useAppStore.getState().settings.language;
     if (!rootFolderPath) {
-      showNotification('Open a knowledge base before pasting images.', 'error');
+      showNotification(t(language, 'notifications_openKnowledgeBaseBeforePastingImage'), 'error');
       return false;
     }
 
@@ -117,11 +120,11 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePasteRetur
         scrollIntoView: true,
       });
 
-      showNotification(`Image pasted to ${sanitizedResourceFolder}`, 'success');
+      showNotification(t(language, 'notifications_imagePastedTo', { folder: sanitizedResourceFolder }), 'success');
       return true;
     } catch (error) {
       console.error('Failed to paste image attachment:', error);
-      showNotification('Failed to paste image attachment.', 'error');
+      showNotification(t(language, 'notifications_pasteImageFailed'), 'error');
       return false;
     }
   }, [rootFolderPath, currentFilePath, resourceFolder, attachmentPasteFormat, writeBinaryFile, refreshFileTree, showNotification]);

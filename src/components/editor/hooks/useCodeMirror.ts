@@ -71,7 +71,7 @@ export interface UseCodeMirrorReturn {
 export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorReturn {
   const {
     content,
-    placeholder = 'Type here...',
+    placeholder = '在此输入...',
     wordWrap = true,
     orderedListMode = 'strict',
     onChange,

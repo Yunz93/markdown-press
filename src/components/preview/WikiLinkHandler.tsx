@@ -3,6 +3,7 @@ import { parseWikiLinkReference } from '../../utils/wikiLinks';
 import { resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { isImageAttachment, isMarkdownNote, isPdfAttachment } from './previewUtils';
 import { warmPreviewImage, resolvePreviewSource } from '../../utils/previewImageCache';
+import { useI18n } from '../../hooks/useI18n';
 
 interface WikiLinkHandlerProps {
   target: string;
@@ -78,6 +79,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   themeMode = 'light',
   highlighter,
 }) => {
+  const { t } = useI18n();
   const [resolved, setResolved] = React.useState<{
     type: 'image' | 'pdf' | 'note' | 'file';
     path: string;
@@ -167,7 +169,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   }, [target, currentFilePath, attachmentResolverContext, fileContents, content, readFile, label]);
 
   if (loading) {
-    return <span className="text-gray-400">Loading...</span>;
+    return <span className="text-gray-400">{t('preview_loading')}</span>;
   }
 
   if (error || !resolved) {
@@ -232,10 +234,10 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
       href="#"
       data-attachment-path={resolved.path}
       data-attachment-name={resolved.name}
-      title={`Double-click to reveal ${resolved.name}`}
+      title={`${t('preview_doubleClickReveal')}: ${resolved.name}`}
     >
       <span className="preview-attachment-file-name">{label || resolved.name}</span>
-      <span className="preview-attachment-file-hint">Double-click to reveal in Finder</span>
+      <span className="preview-attachment-file-hint">{t('preview_doubleClickReveal')}</span>
     </a>
   );
 };

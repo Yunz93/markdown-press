@@ -6,6 +6,7 @@ import { PreviewPane, type PreviewPaneHandle } from './PreviewPane';
 import { WritingStatsDisplay } from '../stats/WritingStatsDisplay';
 import { throttle } from '../../utils/throttle';
 import type { PaneDensity } from './paneLayout';
+import { useI18n } from '../../hooks/useI18n';
 
 interface SplitViewProps {
   highlighter?: any;
@@ -28,6 +29,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   contentDensity,
   onToggleOutline
 }) => {
+  const { t } = useI18n();
   const MIN_SPLIT_PANE_WIDTH = 360;
   const { viewMode } = useAppStore();
   const activeTabId = useAppStore((state) => state.activeTabId);
@@ -176,7 +178,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
                 <button
                   onClick={onToggleOutline}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-gray-200/50 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/20 transition-colors"
-                  title="Toggle Outline (Ctrl+O)"
+                  title={t('split_toggleOutline')}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="8" y1="6" x2="21" y2="6" />
@@ -186,7 +188,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
                     <circle cx="4" cy="12" r="2" fill="currentColor" />
                     <circle cx="4" cy="18" r="2" fill="currentColor" />
                   </svg>
-                  <span className="hidden sm:inline">{isOutlineOpen ? 'Hide Outline' : 'Show Outline'}</span>
+                  <span className="hidden sm:inline">{isOutlineOpen ? t('split_hideOutline') : t('split_showOutline')}</span>
                 </button>
               </div>
             )}
