@@ -145,6 +145,7 @@ html[data-app-booting="true"] *::after {
   tab-size: 2;
   color: #1f2937;
   caret-color: transparent;
+  font-family: var(--editor-font-family);
 }
 
 .editor-pane-layout .cm-content[contenteditable="true"] {
@@ -1057,6 +1058,8 @@ html[data-app-booting="true"] *::after {
   line-height: 1.95;
   overflow-wrap: anywhere;
   word-break: break-word;
+  font-family: var(--editor-font-family) !important;
+  font-size: var(--editor-font-size);
 }
 
 .preview-pane-document-compact.markdown-body {
@@ -1075,6 +1078,8 @@ html[data-app-booting="true"] *::after {
   margin: 0;
   padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
   color: #0f172a;
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
   word-break: break-word;

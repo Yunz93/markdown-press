@@ -111,7 +111,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
-  }) as React.CSSProperties, [layoutMetrics]);
+    '--editor-font-family': fontFamily,
+    '--editor-font-size': `${settings.fontSize}px`,
+  }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
 
   // Pane width tracking
   useLayoutEffect(() => {
@@ -534,7 +536,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
             ) : previewFileType === 'html' ? (
               <div
                 className="preview-html-document editor-pane-width-constrained mx-auto w-full"
-                style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderer.requiresAsyncEnhancement ? renderer.enhancedBodyHtml : renderer.sanitizedHtmlPreview }}
               />
             ) : previewFileType === 'unsupported' ? (
@@ -544,7 +545,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
             ) : (
               <article
                 className={`markdown-body preview-pane-document ${isWindows ? 'preview-pane-document-windows' : ''} ${isCompact ? 'preview-pane-document-compact' : ''} ${hasActiveFile ? '' : 'h-full'}`}
-                style={{ fontFamily, fontSize: `${settings.fontSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderer.requiresAsyncEnhancement ? renderer.enhancedBodyHtml : renderer.parsedContent.bodyHTML }}
               />
             )}

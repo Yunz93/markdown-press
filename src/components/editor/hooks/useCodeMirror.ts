@@ -299,7 +299,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     };
   }, [editorElementReady, placeholder, wordWrap, orderedListMode, compartments.wrap, compartments.placeholder, compartments.keymap]);
 
-  // Sync external content changes
+  // Sync external content changes (only when not typing)
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -307,6 +307,12 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     const safeContent = content || '';
     const currentContent = view.state.doc.toString();
     if (currentContent === safeContent) return;
+
+    // Don't sync if the editor is focused (user is typing)
+    // This prevents cursor jumping when content changes come from user input
+    if (view.hasFocus) {
+      return;
+    }
 
     isSyncingContentRef.current = true;
     const anchor = Math.min(view.state.selection.main.anchor, safeContent.length);

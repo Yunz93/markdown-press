@@ -44,9 +44,16 @@ async function resolveBundledFontUrl(): Promise<string> {
   try {
     // Import the font with ?url to get the processed URL
     const fontUrl = await import('../assets/fonts/LXGWWenKai-Regular.ttf?url').then(m => m.default);
-    cachedFontUrl = fontUrl;
+    // Ensure URL is absolute for dev mode compatibility
+    if (fontUrl && !fontUrl.startsWith('http') && !fontUrl.startsWith('/')) {
+      cachedFontUrl = new URL(fontUrl, window.location.href).href;
+    } else {
+      cachedFontUrl = fontUrl;
+    }
+    console.log('[fontSettings] Resolved dev font URL:', cachedFontUrl);
     return cachedFontUrl;
-  } catch {
+  } catch (error) {
+    console.warn('[fontSettings] Failed to resolve dev font URL:', error);
     // Fallback to relative path
     cachedFontUrl = './assets/LXGWWenKai-Regular.ttf';
     return cachedFontUrl;

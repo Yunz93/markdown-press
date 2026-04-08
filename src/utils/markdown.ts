@@ -136,6 +136,7 @@ let baseFenceRenderer: MarkdownIt['renderer']['rules']['fence'] | null = null;
 export function getMarkdownIt(): MarkdownIt {
   if (!mdInstance) {
     mdInstance = createMarkdownIt();
+    // Store the original markdown-it fence renderer (before any Shiki wrapping)
     baseFenceRenderer = mdInstance.renderer.rules.fence || null;
   }
   return mdInstance;
@@ -159,12 +160,20 @@ function canUseShikiLanguage(highlighter: any | null, lang: string): boolean {
 }
 
 function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMode: ThemeMode = 'light') {
-  // Update current highlighter reference
+  // Always update current highlighter reference for the latest instance
   currentHighlighter = highlighter;
   currentTheme = themeMode;
   
-  const baseFence = baseFenceRenderer || md.renderer.rules.fence;
+  // Get the base fence renderer - this should be the original markdown-it fence renderer
+  // We avoid using the current md.renderer.rules.fence to prevent wrapping ourselves
+  const baseFence = baseFenceRenderer;
 
+  // Create a local reference to the highlighter for this render call
+  // This ensures we use the correct highlighter even in build mode
+  const localHighlighter = highlighter;
+  const localThemeMode = themeMode;
+
+  // Always update the fence renderer to ensure it has access to the latest highlighter
   md.renderer.rules.fence = (tokens, idx, options, env: MarkdownRenderEnv, self) => {
     const token = tokens[idx];
     const rawLang = token.info.trim().split(/\s+/)[0] || '';
@@ -176,18 +185,29 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
         : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
     }
 
-    // Use the most recent highlighter reference
-    const activeHighlighter = currentHighlighter || highlighter;
+    // Use the local highlighter reference for this specific render call
+    // This is more reliable than the module-level variable in build mode
+    const activeHighlighter = localHighlighter ?? currentHighlighter;
+    const activeThemeMode = localThemeMode ?? currentTheme;
     
     if (activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
       try {
-        const activeTheme = getMarkdownPressShikiTheme(currentTheme);
+        const activeTheme = getMarkdownPressShikiTheme(activeThemeMode);
         const shikiHtml = activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme });
         const shikiBlocks = env.shikiBlocks ?? (env.shikiBlocks = []);
         const blockIndex = shikiBlocks.push(shikiHtml) - 1;
         return `<div data-shiki-block="${blockIndex}"></div>`;
       } catch (error) {
         console.warn(`Shiki failed for ${lang}:`, error);
+        // Log detailed error in build mode
+        if (typeof window !== 'undefined') {
+          console.warn('[Shiki Error Details]', {
+            lang,
+            theme: getMarkdownPressShikiTheme(activeThemeMode),
+            hasHighlighter: !!activeHighlighter,
+            highlighterMethods: Object.keys(activeHighlighter || {}),
+          });
+        }
       }
     }
 
@@ -214,10 +234,15 @@ export function useMarkdownRenderer(highlighter: any | null, themeMode: ThemeMod
  */
 export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
   const md = getMarkdownIt();
-  configureFenceRenderer(md, options.highlighter ?? null, options.themeMode ?? 'light');
+  const highlighter = options.highlighter ?? null;
+  const themeMode = options.themeMode ?? 'light';
+  
+  // Configure fence renderer with the highlighter
+  configureFenceRenderer(md, highlighter, themeMode);
+  
   const env: MarkdownRenderEnv = {};
   const renderedHtml = md.render(markdown, env);
-
+  
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
     ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
