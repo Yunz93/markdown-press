@@ -1,0 +1,525 @@
+import type { OrderedListMode } from '../types';
+
+const MARKDOWN_FILE_REGEX = /\.(md|markdown)$/i;
+const FENCE_MARKER_REGEX = /^(\s*)(`{3,}|~{3,})/;
+const CJK_CHARACTER = '\\p{Script=Han}';
+const ASCII_WORD = '[A-Za-z0-9]+(?:[A-Za-z0-9._+-]*[A-Za-z0-9]+)?';
+const INLINE_MARKER = '[_*~]+';
+const PROTECTED_TOKEN_PREFIX = '\uE000';
+const PROTECTED_TOKEN_SUFFIX = '\uE001';
+
+type MarkdownLineKind =
+  | 'blank'
+  | 'paragraph'
+  | 'heading'
+  | 'headingUnderline'
+  | 'thematicBreak'
+  | 'list'
+  | 'blockquote'
+  | 'indentedCode'
+  | 'table'
+  | 'htmlComment'
+  | 'linkDefinition'
+  | 'footnoteDefinition';
+
+interface MarkdownFormatOptions {
+  orderedListMode?: OrderedListMode;
+}
+
+function splitFrontmatter(content: string): { frontmatter: string; body: string } {
+  const match = content.match(/^---\n[\s\S]*?\n---(?:\n|$)/);
+  if (!match) {
+    return { frontmatter: '', body: content };
+  }
+
+  return {
+    frontmatter: match[0].trimEnd(),
+    body: content.slice(match[0].length),
+  };
+}
+
+function trimOuterBlankLines(lines: string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+
+  while (start < end && lines[start].trim() === '') {
+    start += 1;
+  }
+
+  while (end > start && lines[end - 1].trim() === '') {
+    end -= 1;
+  }
+
+  return lines.slice(start, end);
+}
+
+function protectInlineCode(line: string): { text: string; tokens: string[] } {
+  const tokens: string[] = [];
+  let result = '';
+  let cursor = 0;
+
+  while (cursor < line.length) {
+    const markerStart = line.indexOf('`', cursor);
+    if (markerStart === -1) {
+      result += line.slice(cursor);
+      break;
+    }
+
+    result += line.slice(cursor, markerStart);
+
+    let markerEnd = markerStart;
+    while (markerEnd < line.length && line[markerEnd] === '`') {
+      markerEnd += 1;
+    }
+
+    const marker = line.slice(markerStart, markerEnd);
+    const closingIndex = line.indexOf(marker, markerEnd);
+    if (closingIndex === -1) {
+      result += marker;
+      cursor = markerEnd;
+      continue;
+    }
+
+    const protectedToken = line.slice(markerStart, closingIndex + marker.length);
+    const placeholder = `${PROTECTED_TOKEN_PREFIX}${tokens.length}${PROTECTED_TOKEN_SUFFIX}`;
+    tokens.push(protectedToken);
+    result += placeholder;
+    cursor = closingIndex + marker.length;
+  }
+
+  return { text: result, tokens };
+}
+
+function protectPattern(line: string, tokens: string[], pattern: RegExp): string {
+  return line.replace(pattern, (match) => {
+    const placeholder = `${PROTECTED_TOKEN_PREFIX}${tokens.length}${PROTECTED_TOKEN_SUFFIX}`;
+    tokens.push(match);
+    return placeholder;
+  });
+}
+
+function protectMarkdownSyntax(line: string): { text: string; tokens: string[] } {
+  const inlineCodeProtected = protectInlineCode(line);
+  let text = inlineCodeProtected.text;
+  const tokens = [...inlineCodeProtected.tokens];
+
+  text = protectPattern(text, tokens, /!?\[\[[^\]\n]+\]\]/g);
+  text = protectPattern(text, tokens, /!?\[[^\]\n]*\]\([^) \n][^)\n]*\)/g);
+  text = protectPattern(text, tokens, /<[^>\n]+>/g);
+
+  return { text, tokens };
+}
+
+function restoreMarkdownSyntax(line: string, tokens: string[]): string {
+  return line.replace(/\uE000(\d+)\uE001/g, (_, index) => tokens[Number(index)] ?? '');
+}
+
+function applyChineseEnglishSpacing(line: string): string {
+  const { text, tokens } = protectMarkdownSyntax(line);
+  const cjkToAscii = new RegExp(`(${CJK_CHARACTER})(${ASCII_WORD})`, 'gu');
+  const asciiToCjk = new RegExp(`(${ASCII_WORD})(${CJK_CHARACTER})`, 'gu');
+  const cjkToMarkerAscii = new RegExp(`(${CJK_CHARACTER})(${INLINE_MARKER})(${ASCII_WORD})`, 'gu');
+  const asciiMarkerToCjk = new RegExp(`(${ASCII_WORD})(${INLINE_MARKER})(${CJK_CHARACTER})`, 'gu');
+
+  const spaced = text
+    .replace(cjkToMarkerAscii, '$1 $2$3')
+    .replace(asciiMarkerToCjk, '$1$2 $3')
+    .replace(cjkToAscii, '$1 $2')
+    .replace(asciiToCjk, '$1 $2');
+
+  return restoreMarkdownSyntax(spaced, tokens);
+}
+
+function isAtxHeading(line: string): boolean {
+  return /^\s{0,3}#{1,6}\s+\S/.test(line);
+}
+
+function isSetextHeadingUnderline(line: string): boolean {
+  return /^\s{0,3}(?:=+|-+)\s*$/.test(line);
+}
+
+function isThematicBreak(line: string): boolean {
+  return /^\s{0,3}(?:(?:-\s*){3,}|(?:_\s*){3,}|(?:\*\s*){3,})$/.test(line);
+}
+
+function isListItem(line: string): boolean {
+  return /^\s{0,3}(?:[-+*]|\d+[.)])\s+\S/.test(line);
+}
+
+function isBlockquote(line: string): boolean {
+  return /^\s{0,3}>\s?/.test(line);
+}
+
+function isIndentedCode(line: string): boolean {
+  return /^(?: {4,}|\t)/.test(line);
+}
+
+function isHtmlCommentLine(line: string): boolean {
+  return /^\s*<!--.*-->\s*$/.test(line);
+}
+
+function isLinkDefinition(line: string): boolean {
+  return /^\s{0,3}\[[^\]\n]+\]:\s*\S/.test(line);
+}
+
+function isFootnoteDefinition(line: string): boolean {
+  return /^\s{0,3}\[\^[^\]\n]+\]:\s*\S?/.test(line);
+}
+
+function isTableSeparator(line: string): boolean {
+  return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+}
+
+function isPotentialTableRow(line: string): boolean {
+  return /^\s*\|?.+\|.+\|?\s*$/.test(line);
+}
+
+function normalizeAtxHeading(line: string): string {
+  const match = line.match(/^(\s{0,3})(#{1,6})\s*(.*?)\s*(?:#+\s*)?$/);
+  if (!match) return line;
+
+  const [, indent, hashes, rawContent] = match;
+  const content = rawContent.trim();
+  return content ? `${indent}${hashes} ${content}` : `${indent}${hashes}`;
+}
+
+function normalizeUnorderedList(line: string): string {
+  return line.replace(/^(\s{0,3})[*+]\s+/, '$1- ');
+}
+
+function normalizeOrderedList(line: string): string {
+  return line.replace(/^(\s{0,3})(\d+)[\.)]\s+/, '$1$2. ');
+}
+
+function normalizeTaskList(line: string): string {
+  return line.replace(/^(\s{0,3})-\s+\[([ xX])\]\s+/, (_, indent: string, checked: string) => {
+    const marker = checked.toLowerCase() === 'x' ? 'x' : ' ';
+    return `${indent}- [${marker}] `;
+  });
+}
+
+function normalizeBlockquote(line: string): string {
+  const match = line.match(/^(\s{0,3})(>+)(.*)$/);
+  if (!match) return line;
+
+  const [, indent, markers, rest] = match;
+  const normalizedRest = rest.trimStart();
+  return normalizedRest ? `${indent}${markers} ${normalizedRest}` : `${indent}${markers}`;
+}
+
+function normalizeThematicBreak(line: string): string {
+  const indent = line.match(/^(\s{0,3})/)?.[1] ?? '';
+  return `${indent}---`;
+}
+
+function normalizeLinkDefinition(line: string): string {
+  return line.replace(/^(\s{0,3}\[[^\]\n]+\]:)\s*/, '$1 ');
+}
+
+function normalizeFootnoteDefinition(line: string): string {
+  return line.replace(/^(\s{0,3}\[\^[^\]\n]+\]:)\s*/, '$1 ');
+}
+
+function getOrderedListInfo(line: string): { indentLength: number; number: number } | null {
+  const match = line.match(/^(\s{0,3})(\d+)[\.)]\s+/);
+  if (!match) return null;
+  return {
+    indentLength: match[1].length,
+    number: Number(match[2]),
+  };
+}
+
+function isTableLine(line: string, previousNonBlankLine: string | null): boolean {
+  if (isTableSeparator(line)) {
+    return Boolean(previousNonBlankLine && isPotentialTableRow(previousNonBlankLine));
+  }
+
+  if (!isPotentialTableRow(line)) {
+    return false;
+  }
+
+  return Boolean(previousNonBlankLine && (isTableSeparator(previousNonBlankLine) || isPotentialTableRow(previousNonBlankLine)));
+}
+
+function classifyMarkdownLine(line: string, previousNonBlankLine: string | null): MarkdownLineKind {
+  if (line.trim() === '') return 'blank';
+  if (isHtmlCommentLine(line)) return 'htmlComment';
+  if (isFootnoteDefinition(line)) return 'footnoteDefinition';
+  if (isLinkDefinition(line)) return 'linkDefinition';
+  if (
+    previousNonBlankLine &&
+    isSetextHeadingUnderline(line) &&
+    !isAtxHeading(previousNonBlankLine) &&
+    !isThematicBreak(previousNonBlankLine) &&
+    !isListItem(previousNonBlankLine) &&
+    !isBlockquote(previousNonBlankLine) &&
+    !isIndentedCode(previousNonBlankLine)
+  ) {
+    return 'headingUnderline';
+  }
+  if (isAtxHeading(line)) return 'heading';
+  if (isThematicBreak(line)) return 'thematicBreak';
+  if (isTableLine(line, previousNonBlankLine)) return 'table';
+  if (isListItem(line)) return 'list';
+  if (isBlockquote(line)) return 'blockquote';
+  if (isIndentedCode(line)) return 'indentedCode';
+  return 'paragraph';
+}
+
+function shouldInsertBlankLineBetween(previousKind: MarkdownLineKind, currentKind: MarkdownLineKind): boolean {
+  if (previousKind === 'blank' || currentKind === 'blank') {
+    return false;
+  }
+
+  if (previousKind === 'heading' || previousKind === 'headingUnderline') {
+    return true;
+  }
+
+  if (currentKind === 'heading' || currentKind === 'thematicBreak') {
+    return true;
+  }
+
+  if (previousKind === 'thematicBreak') {
+    return true;
+  }
+
+  if (previousKind === 'list' && currentKind !== 'list') {
+    return true;
+  }
+
+  if (currentKind === 'list' && previousKind !== 'list') {
+    return true;
+  }
+
+  if (previousKind === 'table' && currentKind !== 'table') {
+    return true;
+  }
+
+  if (currentKind === 'table' && previousKind !== 'table') {
+    return true;
+  }
+
+  if (previousKind === 'blockquote' && currentKind !== 'blockquote') {
+    return true;
+  }
+
+  if (currentKind === 'blockquote' && previousKind !== 'blockquote') {
+    return true;
+  }
+
+  if (previousKind === 'indentedCode' && currentKind !== 'indentedCode') {
+    return true;
+  }
+
+  if (currentKind === 'indentedCode' && previousKind !== 'indentedCode') {
+    return true;
+  }
+
+  if (previousKind === 'htmlComment' || currentKind === 'htmlComment') {
+    return true;
+  }
+
+  if (previousKind === 'linkDefinition' && currentKind !== 'linkDefinition') {
+    return true;
+  }
+
+  if (currentKind === 'linkDefinition' && previousKind !== 'linkDefinition') {
+    return true;
+  }
+
+  if (previousKind === 'footnoteDefinition' && currentKind !== 'footnoteDefinition') {
+    return true;
+  }
+
+  if (currentKind === 'footnoteDefinition' && previousKind !== 'footnoteDefinition') {
+    return true;
+  }
+
+  return false;
+}
+
+function normalizeMarkdownLine(
+  line: string,
+  kind: MarkdownLineKind,
+  orderedListCounters: Map<number, number>,
+  orderedListMode: OrderedListMode
+): string {
+  switch (kind) {
+    case 'heading':
+      return normalizeAtxHeading(line);
+    case 'thematicBreak':
+      return normalizeThematicBreak(line);
+    case 'list': {
+      const orderedInfo = getOrderedListInfo(line);
+      if (orderedInfo) {
+        const normalized = normalizeOrderedList(line);
+
+        if (orderedListMode !== 'strict') {
+          return normalized;
+        }
+
+        for (const indentLength of [...orderedListCounters.keys()]) {
+          if (indentLength > orderedInfo.indentLength) {
+            orderedListCounters.delete(indentLength);
+          }
+        }
+
+        const nextNumber = (orderedListCounters.get(orderedInfo.indentLength) ?? 0) + 1;
+        orderedListCounters.set(orderedInfo.indentLength, nextNumber);
+        return normalized.replace(/^(\s{0,3})\d+\.\s+/, `$1${nextNumber}. `);
+      }
+
+      orderedListCounters.clear();
+      return normalizeTaskList(normalizeUnorderedList(line));
+    }
+    case 'blockquote':
+      return normalizeBlockquote(line);
+    case 'linkDefinition':
+      orderedListCounters.clear();
+      return normalizeLinkDefinition(line);
+    case 'footnoteDefinition':
+      orderedListCounters.clear();
+      return normalizeFootnoteDefinition(line);
+    default:
+      orderedListCounters.clear();
+      return line;
+  }
+}
+
+function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions): string[] {
+  const output: string[] = [];
+  let previousNonBlankLine: string | null = null;
+  let previousKind: MarkdownLineKind = 'blank';
+  const orderedListCounters = new Map<number, number>();
+
+  for (const line of lines) {
+    const currentKind = classifyMarkdownLine(line, previousNonBlankLine);
+
+    if (currentKind === 'blank') {
+      if (output.length > 0 && output[output.length - 1] !== '') {
+        output.push('');
+      }
+      orderedListCounters.clear();
+      continue;
+    }
+
+    if (shouldInsertBlankLineBetween(previousKind, currentKind) && output[output.length - 1] !== '') {
+      output.push('');
+    }
+
+    const normalizedLine = normalizeMarkdownLine(
+      line,
+      currentKind,
+      orderedListCounters,
+      options.orderedListMode ?? 'strict'
+    );
+    output.push(normalizedLine);
+    previousNonBlankLine = normalizedLine;
+    previousKind = currentKind;
+  }
+
+  return trimOuterBlankLines(output);
+}
+
+function formatTextSegment(segment: string, options: MarkdownFormatOptions): string {
+  const normalizedLines = trimOuterBlankLines(segment.split('\n'));
+  const spacedLines: string[] = [];
+  let previousBlank = false;
+
+  for (const rawLine of normalizedLines) {
+    const trimmedRight = rawLine.replace(/[ \t]+$/g, '');
+    if (trimmedRight.trim() === '') {
+      if (!previousBlank && spacedLines.length > 0) {
+        spacedLines.push('');
+      }
+      previousBlank = true;
+      continue;
+    }
+
+    previousBlank = false;
+
+    if (/^( {4,}|\t)/.test(trimmedRight)) {
+      spacedLines.push(trimmedRight);
+      continue;
+    }
+
+    spacedLines.push(applyChineseEnglishSpacing(trimmedRight));
+  }
+
+  return normalizeBlockSpacing(spacedLines, options).join('\n');
+}
+
+function isClosingFence(line: string, fenceMarker: string): boolean {
+  const match = line.match(FENCE_MARKER_REGEX);
+  return Boolean(match && match[2][0] === fenceMarker[0] && match[2].length >= fenceMarker.length);
+}
+
+function formatMarkdownBody(body: string, options: MarkdownFormatOptions): string {
+  const lines = body.split('\n');
+  const output: string[] = [];
+  let textBuffer: string[] = [];
+  let codeBuffer: string[] = [];
+  let fenceMarker = '';
+
+  const flushTextBuffer = () => {
+    if (textBuffer.length === 0) return;
+    const formatted = formatTextSegment(textBuffer.join('\n'), options);
+    if (formatted) {
+      output.push(formatted);
+    }
+    textBuffer = [];
+  };
+
+  const flushCodeBuffer = () => {
+    if (codeBuffer.length === 0) return;
+    output.push(codeBuffer.join('\n'));
+    codeBuffer = [];
+  };
+
+  for (const line of lines) {
+    if (fenceMarker) {
+      codeBuffer.push(line.replace(/[ \t]+$/g, ''));
+      if (isClosingFence(line, fenceMarker)) {
+        flushCodeBuffer();
+        fenceMarker = '';
+      }
+      continue;
+    }
+
+    const fenceMatch = line.match(FENCE_MARKER_REGEX);
+    if (fenceMatch) {
+      flushTextBuffer();
+      fenceMarker = fenceMatch[2];
+      codeBuffer.push(line.replace(/[ \t]+$/g, ''));
+      continue;
+    }
+
+    textBuffer.push(line);
+  }
+
+  flushTextBuffer();
+  flushCodeBuffer();
+
+  return output.join('\n\n').trim();
+}
+
+export function isMarkdownDocumentPath(path: string | null | undefined): boolean {
+  return Boolean(path && MARKDOWN_FILE_REGEX.test(path));
+}
+
+export function formatMarkdownForSave(content: string, options: MarkdownFormatOptions = {}): string {
+  const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+  const normalized = content.replace(/\r\n/g, '\n');
+  const { frontmatter, body } = splitFrontmatter(normalized);
+  const formattedBody = formatMarkdownBody(body, options);
+
+  let result = frontmatter;
+  if (frontmatter && formattedBody) {
+    result = `${frontmatter}\n\n${formattedBody}`;
+  } else if (!frontmatter) {
+    result = formattedBody;
+  }
+
+  const withTrailingNewline = result ? `${result.replace(/\n+$/g, '')}\n` : '';
+  return withTrailingNewline.replace(/\n/g, lineEnding);
+}

@@ -55,6 +55,7 @@ export const defaultSettings: AppSettings = {
   aiProvider: 'gemini',
   fontSize: 15,
   wordWrap: true,
+  formatMarkdownOnManualSave: false,
   englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,
   chineseFontFamily: DEFAULT_CHINESE_FONT_FAMILY,
   resourceFolder: 'resources',

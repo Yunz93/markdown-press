@@ -285,7 +285,7 @@ const App: React.FC = () => {
   useGlobalKeyboardShortcuts(
     async () => {
       if (currentFilePath) {
-        await forceSave();
+        await forceSave(undefined, { formatBeforeSave: settings.formatMarkdownOnManualSave });
         showNotification(t('app_saved'), 'success');
       }
     },

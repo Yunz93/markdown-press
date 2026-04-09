@@ -308,12 +308,6 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     const currentContent = view.state.doc.toString();
     if (currentContent === safeContent) return;
 
-    // Don't sync if the editor is focused (user is typing)
-    // This prevents cursor jumping when content changes come from user input
-    if (view.hasFocus) {
-      return;
-    }
-
     isSyncingContentRef.current = true;
     const anchor = Math.min(view.state.selection.main.anchor, safeContent.length);
     const head = Math.min(view.state.selection.main.head, safeContent.length);

@@ -33,7 +33,7 @@ function findFileInTree(nodes: import('../types').FileNode[], id: string): impor
  * Extracted from App.tsx.
  */
 export function useExportActions(
-  forceSave: (contentOverride?: string) => Promise<boolean>,
+  forceSave: (contentOverride?: string, options?: { formatBeforeSave?: boolean }) => Promise<boolean>,
   highlighter?: any | null
 ) {
   const {

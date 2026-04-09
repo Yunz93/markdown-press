@@ -4,6 +4,7 @@ import { getFileSystem } from '../types/filesystem';
 import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import { refreshDocumentUpdateTime } from '../utils/metadataFields';
 import { t } from '../utils/i18n';
+import { formatMarkdownForSave, isMarkdownDocumentPath } from '../utils/markdownFormat';
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -17,6 +18,10 @@ interface SaveState {
   lastSavedAt: Date | null;
   error: string | null;
   retryCount: number;
+}
+
+interface ForceSaveOptions {
+  formatBeforeSave?: boolean;
 }
 
 /**
@@ -79,18 +84,22 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   }, [activeTabId]);
 
   // Execute save operation with retry logic
-  const executeSave = useCallback(async (retryCount = 0): Promise<boolean> => {
+  const executeSave = useCallback(async (retryCount = 0, options?: ForceSaveOptions): Promise<boolean> => {
     const currentContent = contentRef.current;
     const currentPath = pathRef.current;
 
     if (!currentPath || !activeTabId) return false;
 
+    const preparedContent = options?.formatBeforeSave && isMarkdownDocumentPath(currentPath)
+      ? formatMarkdownForSave(currentContent, { orderedListMode: settings.orderedListMode })
+      : currentContent;
+
     // Check if content has changed
-    if (currentContent === lastSavedContentRef.current) {
+    if (preparedContent === lastSavedContentRef.current) {
       return true; // No changes to save
     }
 
-    const contentToSave = refreshDocumentUpdateTime(currentContent);
+    const contentToSave = refreshDocumentUpdateTime(preparedContent);
 
     // Prevent concurrent saves
     if (isSavingRef.current) {
@@ -138,7 +147,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         await new Promise(resolve => setTimeout(resolve, retryDelayMs * Math.pow(2, retryCount)));
 
         isSavingRef.current = false;
-        return executeSave(retryCount + 1);
+        return executeSave(retryCount + 1, options);
       }
 
       // Max retries exceeded
@@ -189,7 +198,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   }, [content, enabled, activeTabId, currentFilePath, effectiveDebounceMs, executeSave]);
 
   // Force save function (for manual save)
-  const forceSave = useCallback(async (contentOverride?: string): Promise<boolean> => {
+  const forceSave = useCallback(async (contentOverride?: string, options?: ForceSaveOptions): Promise<boolean> => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
@@ -198,7 +207,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       contentRef.current = contentOverride;
     }
 
-    return executeSave();
+    return executeSave(0, options);
   }, [executeSave]);
 
   // Get save state

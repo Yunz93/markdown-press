@@ -91,6 +91,7 @@ export interface AppSettings {
   aiProvider: AIProvider;
   fontSize: number;
   wordWrap: boolean;
+  formatMarkdownOnManualSave: boolean;
   englishFontFamily: string;
   chineseFontFamily: string;
   resourceFolder: string;
