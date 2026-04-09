@@ -30,6 +30,24 @@ export interface AppState extends
   EditorActions,
   UIActions {}
 
+const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'geminiApiKey', 'codexApiKey'] as const;
+
+function stripSensitiveSettings(settings: Record<string, unknown>): Record<string, unknown> {
+  const sanitized = { ...settings };
+  SENSITIVE_SETTING_KEYS.forEach((key) => {
+    delete sanitized[key];
+  });
+  return sanitized;
+}
+
+function sanitizeSettingsForPersistence(settings: AppSettings): AppSettings {
+  const sanitized = { ...settings };
+  SENSITIVE_SETTING_KEYS.forEach((key) => {
+    delete sanitized[key];
+  });
+  return sanitized;
+}
+
 function resolvePersistedBlogRepoUrl(persistedSettings: Record<string, unknown>): string {
   if (typeof persistedSettings.blogRepoUrl === 'string') {
     const normalized = normalizeBlogRepoUrl(persistedSettings.blogRepoUrl);
@@ -74,8 +92,6 @@ function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) 
   const persistedCodexModel = typeof persistedSettings.codexModel === 'string'
     ? persistedSettings.codexModel.trim()
     : '';
-  const hasCodexApiKey = typeof persistedSettings.codexApiKey === 'string'
-    && persistedSettings.codexApiKey.trim().length > 0;
 
   if (persistedProvider === 'codex' || persistedProvider === 'gemini') {
     return {
@@ -87,7 +103,7 @@ function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) 
     };
   }
 
-  if (hasCodexApiKey || (!persistedCodexModel && looksLikeOpenAIModel(persistedGeminiModel))) {
+  if (!persistedCodexModel && looksLikeOpenAIModel(persistedGeminiModel)) {
     return {
       aiProvider: 'codex',
       codexModel: persistedCodexModel || persistedGeminiModel || defaultSettings.codexModel,
@@ -151,9 +167,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'markdown-press-settings',
-      partialize: (state) => ({ settings: (state as any).settings }),
+      partialize: (state) => ({ settings: sanitizeSettingsForPersistence((state as any).settings) }),
       merge: (persistedState, currentState) => {
-        const persistedSettings = (persistedState as any)?.settings ?? {};
+        const persistedSettings = stripSensitiveSettings((persistedState as any)?.settings ?? {});
         const persistedChineseFontFamily = typeof persistedSettings.chineseFontFamily === 'string'
           ? persistedSettings.chineseFontFamily.trim()
           : '';
@@ -235,6 +251,7 @@ export function useEditorStore(): EditorState & EditorActions {
     viewMode: state.viewMode,
     fileHistories: state.fileHistories,
     setContent: state.setContent,
+    setContentForFile: state.setContentForFile,
     setViewMode: state.setViewMode,
     undo: state.undo,
     redo: state.redo,

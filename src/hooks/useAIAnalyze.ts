@@ -143,8 +143,9 @@ function buildGeneratedWikiContent(options: {
 export function useAIAnalyze() {
   const {
     settings,
+    activeTabId,
     setAnalyzing,
-    setContent,
+    setContentForFile,
     showNotification,
     setSettingsOpen,
     currentFilePath,
@@ -154,7 +155,7 @@ export function useAIAnalyze() {
   const { createFile } = useFileSystem();
 
   const handleAIAnalyze = useCallback(async () => {
-    if (!content) return;
+    if (!content || !activeTabId) return;
 
     try {
       ensureAIConfiguration(settings);
@@ -190,7 +191,7 @@ export function useAIAnalyze() {
       const optimizedBody = (result.optimizedMarkdown || body).trim();
       const newContent = `${frontmatterBlock}${optimizedBody}\n`;
 
-      setContent(newContent);
+      setContentForFile(activeTabId, newContent);
       showNotification(t(settings.language, 'notifications_aiEnhanced'), 'success');
     } catch (error) {
       console.error('AI analysis failed:', error);
@@ -198,7 +199,7 @@ export function useAIAnalyze() {
     } finally {
       setAnalyzing(false);
     }
-  }, [content, settings, setAnalyzing, setContent, showNotification, setSettingsOpen]);
+  }, [activeTabId, content, settings, setAnalyzing, setContentForFile, showNotification, setSettingsOpen]);
 
   const handleGenerateWikiFromSelection = useCallback(async (selection: {
     text: string;

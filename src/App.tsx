@@ -22,12 +22,14 @@ import { TabBar } from './components/tabs/TabBar';
 import { PromptDialog } from './components/ui/Dialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
+import { isTauriEnvironment } from './types/filesystem';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
+import { migrateLegacySensitiveSettings } from './services/secureSettingsService';
 import type { PaneDensity } from './components/editor/paneLayout';
 import { useI18n } from './hooks/useI18n';
 
@@ -74,6 +76,7 @@ const App: React.FC = () => {
     activeHeadingId,
     closeTab,
     setContent,
+    setContentForFile,
     setCurrentFilePath,
     setSidebarOpen,
     setSettingsOpen,
@@ -136,8 +139,29 @@ const App: React.FC = () => {
     )
   ));
   const autoOpenAttemptedRef = React.useRef(false);
+  const secureSettingsReadyRef = React.useRef(false);
   const mainContentRef = useRef<HTMLElement | null>(null);
   const [isRestoringKnowledgeBase, setIsRestoringKnowledgeBase] = useState(false);
+
+  useEffect(() => {
+    if (!settingsHydrated || secureSettingsReadyRef.current) return;
+    secureSettingsReadyRef.current = true;
+
+    let cancelled = false;
+
+    void migrateLegacySensitiveSettings(settings)
+      .then((secureSettings) => {
+        if (cancelled) return;
+        updateSettings(secureSettings);
+      })
+      .catch((error) => {
+        console.error('Failed to load secure settings:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsHydrated, settings, updateSettings]);
 
   // Auto-open last knowledge base after hydration
   useEffect(() => {
@@ -145,7 +169,7 @@ const App: React.FC = () => {
     autoOpenAttemptedRef.current = true;
 
     const lastKnowledgeBase = settings.lastKnowledgeBasePath;
-    if (!lastKnowledgeBase || rootFolderPath) {
+    if (!lastKnowledgeBase || rootFolderPath || isTauriEnvironment()) {
       setIsRestoringKnowledgeBase(false);
       return;
     }
@@ -285,7 +309,10 @@ const App: React.FC = () => {
   useGlobalKeyboardShortcuts(
     async () => {
       if (currentFilePath) {
-        await forceSave(undefined, { formatBeforeSave: settings.formatMarkdownOnManualSave });
+        await forceSave(undefined, {
+          formatBeforeSave: settings.formatMarkdownOnManualSave,
+          trigger: 'manual',
+        });
         showNotification(t('app_saved'), 'success');
       }
     },
@@ -330,8 +357,13 @@ const App: React.FC = () => {
   }, [activeTabId, content, setActiveHeadingId, viewMode]);
 
   const handleContentChange = useCallback((newContent: string) => {
-    setContent(newContent);
-  }, [setContent]);
+    if (!activeTabId) {
+      setContent(newContent);
+      return;
+    }
+
+    setContentForFile(activeTabId, newContent);
+  }, [activeTabId, setContent, setContentForFile]);
 
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
     setSidebarWidth(clamp(nextWidth, LAYOUT.SIDEBAR.MIN_WIDTH, LAYOUT.SIDEBAR.MAX_WIDTH));
@@ -361,7 +393,7 @@ const App: React.FC = () => {
     settingsHydrated &&
     !rootFolderPath &&
     files.length === 0 &&
-    !hasKnowledgeBaseHistory;
+    (!hasKnowledgeBaseHistory || isTauriEnvironment());
   const shouldShowStartupLoading = isRestoringKnowledgeBase;
   const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
   const responsiveOutlineWidth = Math.min(

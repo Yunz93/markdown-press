@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const port = process.env.PORT || 8080;
+const documentRoot = path.resolve(__dirname);
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -21,12 +22,27 @@ const mimeTypes = {
 const server = http.createServer((req, res) => {
   console.log(`${req.method} ${req.url}`);
 
-  // Clean URL params
   const urlPath = req.url.split('?')[0];
-  let filePath = '.' + urlPath;
-  
-  if (filePath === './') {
-    filePath = './index.html';
+  let decodedPath;
+
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    res.writeHead(400);
+    res.end('Invalid request path');
+    return;
+  }
+
+  const normalizedRequestPath = path.posix.normalize(decodedPath.replace(/\\/g, '/'));
+  const requestedPath = normalizedRequestPath === '/' ? '/index.html' : normalizedRequestPath;
+  const relativePath = requestedPath.replace(/^\/+/, '');
+  const filePath = path.resolve(documentRoot, relativePath);
+
+  const isWithinDocumentRoot = filePath === documentRoot || filePath.startsWith(`${documentRoot}${path.sep}`);
+  if (!isWithinDocumentRoot) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
   }
 
   // Helper to serve file with fallback logic
@@ -36,7 +52,7 @@ const server = http.createServer((req, res) => {
         if (fallback) fallback();
         else {
             // SPA Fallback: serve index.html for 404s
-            fs.readFile('./index.html', (err2, indexContent) => {
+            fs.readFile(path.join(documentRoot, 'index.html'), (err2, indexContent) => {
                 if (err2) {
                     res.writeHead(500);
                     res.end('Error loading index.html');
@@ -57,13 +73,13 @@ const server = http.createServer((req, res) => {
   const extname = String(path.extname(filePath)).toLowerCase();
   
   // If no extension, try to resolve as module (.tsx, .ts, .js)
-  if (!extname && filePath !== './index.html') {
+  if (!extname && filePath !== path.join(documentRoot, 'index.html')) {
       const extensions = ['.tsx', '.ts', '.js', '.jsx'];
       
       const tryNextExt = (i) => {
           if (i >= extensions.length) {
               // No matching extension found, treat as SPA route (fallback to index.html)
-              serveFile('./index.html', 'text/html', null);
+              serveFile(path.join(documentRoot, 'index.html'), 'text/html', null);
               return;
           }
           const ext = extensions[i];

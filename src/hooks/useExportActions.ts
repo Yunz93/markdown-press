@@ -33,7 +33,10 @@ function findFileInTree(nodes: import('../types').FileNode[], id: string): impor
  * Extracted from App.tsx.
  */
 export function useExportActions(
-  forceSave: (contentOverride?: string, options?: { formatBeforeSave?: boolean }) => Promise<boolean>,
+  forceSave: (
+    contentOverride?: string,
+    options?: { formatBeforeSave?: boolean; trigger?: 'auto' | 'manual' | 'system' }
+  ) => Promise<boolean>,
   highlighter?: any | null
 ) {
   const {
@@ -41,7 +44,7 @@ export function useExportActions(
     activeTabId,
     rootFolderPath,
     settings,
-    setContent,
+    setContentForFile,
     setPublishing,
     showNotification,
   } = useAppStore();
@@ -194,7 +197,7 @@ export function useExportActions(
       };
       const nextContent = `${generateFrontmatter(merged)}${body}`;
 
-      setContent(nextContent);
+      setContentForFile(activeTabId, nextContent);
       const saved = await forceSave(nextContent);
       if (!saved) {
         showNotification(t(settings.language, 'notifications_saveBeforePublishFailed'), 'error');
@@ -248,7 +251,7 @@ export function useExportActions(
     } finally {
       setPublishing(false);
     }
-  }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContent, setPublishing, settings.blogGithubToken, settings.blogRepoUrl, settings.blogSiteUrl, showNotification]);
+  }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContentForFile, setPublishing, settings.blogGithubToken, settings.blogRepoUrl, settings.blogSiteUrl, showNotification]);
 
   return { handleExportToHtml, handlePublishBlog };
 }

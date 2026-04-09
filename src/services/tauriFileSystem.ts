@@ -71,6 +71,10 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
+  private async registerAllowedPath(path: string, recursive: boolean): Promise<void> {
+    await invoke('register_allowed_path', { path, recursive });
+  }
+
   static getInstance(): TauriFileSystem {
     if (!TauriFileSystem.instance) {
       TauriFileSystem.instance = new TauriFileSystem();
@@ -136,7 +140,11 @@ export class TauriFileSystem implements IFileSystem {
         multiple: false,
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
       });
-      return (selected as string) || null;
+      const path = (selected as string) || null;
+      if (path) {
+        await this.registerAllowedPath(path, false);
+      }
+      return path;
     } catch (error) {
       console.error('Failed to open file:', error);
       return null;
@@ -150,9 +158,14 @@ export class TauriFileSystem implements IFileSystem {
     try {
       const selected = await open({
         directory: true,
-        multiple: false
+        multiple: false,
+        recursive: true,
       });
-      return (selected as string) || null;
+      const path = (selected as string) || null;
+      if (path) {
+        await this.registerAllowedPath(path, true);
+      }
+      return path;
     } catch (error) {
       console.error('Failed to open directory:', error);
       return null;
@@ -211,6 +224,7 @@ export class TauriFileSystem implements IFileSystem {
           await writeTextFile(savePath, prepared);
           this.captureFileFormat(savePath, prepared);
           this.invalidateObjectUrl(savePath);
+          await this.registerAllowedPath(savePath, false);
           return savePath;
         }
         return null;
@@ -306,30 +320,7 @@ export class TauriFileSystem implements IFileSystem {
    */
   async revealInExplorer(path: string): Promise<void> {
     try {
-      const { Command } = await import('@tauri-apps/plugin-shell');
-      // Use osascript to tell Finder to reveal the file on macOS
-      const isMac = navigator.platform.toLowerCase().includes('mac');
-      const isWin = navigator.platform.toLowerCase().includes('win');
-
-      if (isMac) {
-        // macOS: Use AppleScript to reveal in Finder
-        const escapedPath = path.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        const cmd = Command.create('osascript', [
-          '-e',
-          `tell application "Finder" to reveal POSIX file "${escapedPath}"`,
-          '-e',
-          'tell application "Finder" to activate'
-        ]);
-        await cmd.execute();
-      } else if (isWin) {
-        // Windows: Use explorer /select
-        const cmd = Command.create('explorer', ['/select,', path]);
-        await cmd.execute();
-      } else {
-        // Linux: Open the containing folder
-        const cmd = Command.create('xdg-open', [await dirname(path)]);
-        await cmd.execute();
-      }
+      await invoke('reveal_in_explorer', { path });
     } catch (error) {
       console.error('Failed to reveal in explorer:', error);
       throw error;

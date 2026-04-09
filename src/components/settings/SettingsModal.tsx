@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
 import { fetchAvailableModels, type ModelOption } from '../../services/modelCatalogService';
+import { persistSecureSetting, type SensitiveSettingKey } from '../../services/secureSettingsService';
 import {
   isValidOrEmptyBlogRepoUrl,
   isValidOrEmptyBlogSiteUrl,
@@ -10,6 +11,7 @@ import {
 } from '../../utils/blogRepo';
 import { useI18n } from '../../hooks/useI18n';
 import { type TranslationKey } from '../../utils/i18n';
+import { useAppStore } from '../../store/appStore';
 
 function formatAutoSaveInterval(intervalMs: number, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
   if (intervalMs < 60000) {
@@ -307,6 +309,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings
 }) => {
   const { t, language } = useI18n();
+  const showNotification = useAppStore((state) => state.showNotification);
   const [activeTab, setActiveTab] = useState<SettingsTab>('editor');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
@@ -361,6 +364,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!normalized) return;
     onUpdateSettings({
       shortcuts: { ...settings.shortcuts, [key]: normalized }
+    });
+  };
+
+  const handleSecureSettingChange = (key: SensitiveSettingKey, value: string) => {
+    onUpdateSettings({ [key]: value } as Partial<AppSettings>);
+    void persistSecureSetting(key, value).catch((error) => {
+      console.error(`Failed to persist secure setting ${key}:`, error);
+      showNotification(
+        language === 'zh-CN' ? '安全保存密钥失败。' : 'Failed to securely save the secret.',
+        'error'
+      );
     });
   };
 
@@ -491,7 +505,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <input
                               type={showApiKey ? 'text' : 'password'}
                               value={settings.geminiApiKey || ''}
-                              onChange={(e) => onUpdateSettings({ geminiApiKey: e.target.value })}
+                              onChange={(e) => handleSecureSettingChange('geminiApiKey', e.target.value)}
                               placeholder={t('settings_apiKeyPaste')}
                               className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                             />
@@ -597,7 +611,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <input
                               type={showOpenAIApiKey ? 'text' : 'password'}
                               value={settings.codexApiKey || ''}
-                              onChange={(e) => onUpdateSettings({ codexApiKey: e.target.value })}
+                              onChange={(e) => handleSecureSettingChange('codexApiKey', e.target.value)}
                               placeholder={t('settings_openaiApiKeyPaste')}
                               className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
                             />
@@ -971,7 +985,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <input
                           type={showGithubToken ? 'text' : 'password'}
                           value={settings.blogGithubToken ?? ''}
-                          onChange={(e) => onUpdateSettings({ blogGithubToken: e.target.value })}
+                          onChange={(e) => handleSecureSettingChange('blogGithubToken', e.target.value)}
                           placeholder="github_pat_xxx..."
                           autoComplete="off"
                           spellCheck={false}

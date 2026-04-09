@@ -22,6 +22,7 @@ interface SaveState {
 
 interface ForceSaveOptions {
   formatBeforeSave?: boolean;
+  trigger?: 'auto' | 'manual' | 'system';
 }
 
 /**
@@ -90,7 +91,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
     if (!currentPath || !activeTabId) return false;
 
-    const preparedContent = options?.formatBeforeSave && isMarkdownDocumentPath(currentPath)
+    const shouldFormatBeforeSave = options?.trigger === 'manual'
+      && options.formatBeforeSave === true
+      && isMarkdownDocumentPath(currentPath);
+
+    const preparedContent = shouldFormatBeforeSave
       ? formatMarkdownForSave(currentContent, { orderedListMode: settings.orderedListMode })
       : currentContent;
 
@@ -187,7 +192,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
     // Set new timer
     timerRef.current = setTimeout(() => {
-      executeSave();
+      void executeSave(0, { trigger: 'auto' });
     }, effectiveDebounceMs);
 
     return () => {

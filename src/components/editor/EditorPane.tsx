@@ -108,6 +108,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   const content = useAppStore(selectContent);
   const {
     setContent,
+    setContentForFile,
     settings,
     isSaving,
     activeTabId,
@@ -150,8 +151,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       onContentChange(nextContent);
       return;
     }
-    setContent(nextContent);
-  }, [onContentChange, setContent]);
+
+    if (!activeTabId) {
+      setContent(nextContent);
+      return;
+    }
+
+    setContentForFile(activeTabId, nextContent);
+  }, [activeTabId, onContentChange, setContent, setContentForFile]);
 
   // WikiLinks hook
   const wikiLinks = useWikiLinks({

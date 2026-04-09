@@ -139,8 +139,6 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const mermaidTimerRef = useRef<number | null>(null);
   const enhancedBodyHtmlRef = useRef(enhancedBodyHtml);
-  const previewIdentityRef = useRef<string | null>(null);
-
   useEffect(() => {
     enhancedBodyHtmlRef.current = enhancedBodyHtml;
   }, [enhancedBodyHtml]);
@@ -156,32 +154,20 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     if (!isMarkdownPreview && !isHtmlPreview) {
       setEnhancedBodyHtml('');
       enhancedBodyHtmlRef.current = '';
-      previewIdentityRef.current = null;
       return;
     }
-
-    const previewIdentity = [
-      activeTabId ?? '',
-      currentFilePath ?? '',
-      isMarkdownPreview ? 'markdown' : 'html',
-    ].join('::');
-    const previewChanged = previewIdentityRef.current !== previewIdentity;
-    previewIdentityRef.current = previewIdentity;
 
     if (!basePreviewHtml || typeof DOMParser === 'undefined') {
       setEnhancedBodyHtml(basePreviewHtml);
       return;
     }
 
-    if (!requiresAsyncEnhancement) {
-      if (basePreviewHtml !== enhancedBodyHtmlRef.current) {
-        setEnhancedBodyHtml(basePreviewHtml);
-      }
-      return;
+    if (basePreviewHtml !== enhancedBodyHtmlRef.current) {
+      setEnhancedBodyHtml(basePreviewHtml);
     }
 
-    if (previewChanged && basePreviewHtml !== enhancedBodyHtmlRef.current) {
-      setEnhancedBodyHtml(basePreviewHtml);
+    if (!requiresAsyncEnhancement) {
+      return;
     }
 
     let cancelled = false;

@@ -1,15 +1,18 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use keyring::Entry;
 use reqwest::Client;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const SAMPLE_NOTES_STATE_FILE: &str = ".markdown-press-sample-notes-state.json";
@@ -18,6 +21,10 @@ const LEGACY_SAMPLE_NOTES_RENAMES: [(&str, &str); 1] =
     [("02-Obsidian-内联语法.md", "02-Obsidian-内联语法示例.md")];
 const GITHUB_API_CONNECT_TIMEOUT_SECS: u64 = 10;
 const GITHUB_API_REQUEST_TIMEOUT_SECS: u64 = 30;
+const SECURE_SETTINGS_SERVICE: &str = "com.bxyz.markdown-press";
+const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
+const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
+const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
 
 fn publish_log(message: impl AsRef<str>) {
     let now = SystemTime::now()
@@ -180,13 +187,102 @@ struct GitHubApiErrorResponse {
     message: String,
 }
 
+#[derive(Debug, Clone)]
+struct AllowedPathEntry {
+    path: PathBuf,
+    recursive: bool,
+}
+
+#[derive(Debug, Default)]
+struct SecurityState {
+    allowed_paths: Mutex<Vec<AllowedPathEntry>>,
+}
+
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SecureSettingsResult {
+    blog_github_token: Option<String>,
+    gemini_api_key: Option<String>,
+    codex_api_key: Option<String>,
+}
+
+fn canonicalize_existing_path(path: &str) -> Result<PathBuf, String> {
+    fs::canonicalize(path).map_err(|e| format!("Failed to resolve path {}: {}", path, e))
+}
+
+fn is_path_allowed(state: &SecurityState, path: &Path) -> Result<bool, String> {
+    let allowed_paths = state
+        .allowed_paths
+        .lock()
+        .map_err(|_| "Failed to acquire security state lock.".to_string())?;
+
+    Ok(allowed_paths.iter().any(|entry| {
+        if entry.recursive {
+            path == entry.path || path.starts_with(&entry.path)
+        } else {
+            path == entry.path
+        }
+    }))
+}
+
+fn ensure_path_allowed(state: &SecurityState, path: &Path) -> Result<(), String> {
+    if is_path_allowed(state, path)? {
+        return Ok(());
+    }
+
+    Err(format!(
+        "Access denied for path outside the authorized workspace: {}",
+        path.display()
+    ))
+}
+
+fn secure_entry(key: &str) -> Result<Entry, String> {
+    Entry::new(SECURE_SETTINGS_SERVICE, key)
+        .map_err(|e| format!("Failed to initialize secure storage entry for {}: {}", key, e))
+}
+
+fn read_secure_secret(key: &str) -> Result<Option<String>, String> {
+    match secure_entry(key)?.get_password() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("Failed to read secure secret {}: {}", key, e)),
+    }
+}
+
+fn write_secure_secret(key: &str, value: Option<&str>) -> Result<(), String> {
+    let entry = secure_entry(key)?;
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(secret) => entry
+            .set_password(secret)
+            .map_err(|e| format!("Failed to store secure secret {}: {}", key, e)),
+        None => match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(format!("Failed to clear secure secret {}: {}", key, e)),
+        },
+    }
+}
+
+fn resolve_secret_key(key: &str) -> Option<&'static str> {
+    match key {
+        SECRET_KEY_BLOG_GITHUB_TOKEN => Some(SECRET_KEY_BLOG_GITHUB_TOKEN),
+        SECRET_KEY_GEMINI_API_KEY => Some(SECRET_KEY_GEMINI_API_KEY),
+        SECRET_KEY_CODEX_API_KEY => Some(SECRET_KEY_CODEX_API_KEY),
+        _ => None,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(SecurityState::default())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            get_secure_settings,
+            set_secure_secret,
+            register_allowed_path,
+            reveal_in_explorer,
             copy_sample_notes,
             publish_simple_blog
         ])
@@ -207,8 +303,102 @@ pub fn run() {
 #[tauri::command]
 async fn publish_simple_blog(
     request: PublishSimpleBlogRequest,
+    security_state: tauri::State<'_, SecurityState>,
 ) -> Result<PublishSimpleBlogResult, String> {
+    validate_publish_request_access(security_state.inner(), &request)?;
     publish_remote_simple_blog(&request).await
+}
+
+#[tauri::command]
+fn get_secure_settings() -> Result<SecureSettingsResult, String> {
+    Ok(SecureSettingsResult {
+        blog_github_token: read_secure_secret(SECRET_KEY_BLOG_GITHUB_TOKEN)?,
+        gemini_api_key: read_secure_secret(SECRET_KEY_GEMINI_API_KEY)?,
+        codex_api_key: read_secure_secret(SECRET_KEY_CODEX_API_KEY)?,
+    })
+}
+
+#[tauri::command]
+fn set_secure_secret(key: String, value: Option<String>) -> Result<(), String> {
+    let Some(secret_key) = resolve_secret_key(&key) else {
+        return Err(format!("Unsupported secure setting key: {}", key));
+    };
+
+    write_secure_secret(secret_key, value.as_deref())
+}
+
+#[tauri::command]
+fn register_allowed_path(
+    path: String,
+    recursive: bool,
+    security_state: tauri::State<'_, SecurityState>,
+) -> Result<(), String> {
+    let canonical = canonicalize_existing_path(&path)?;
+    let mut allowed_paths = security_state
+        .allowed_paths
+        .lock()
+        .map_err(|_| "Failed to acquire security state lock.".to_string())?;
+
+    if let Some(existing) = allowed_paths.iter_mut().find(|entry| entry.path == canonical) {
+        existing.recursive = existing.recursive || recursive;
+        return Ok(());
+    }
+
+    allowed_paths.push(AllowedPathEntry {
+        path: canonical,
+        recursive,
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn reveal_in_explorer(
+    path: String,
+    security_state: tauri::State<'_, SecurityState>,
+) -> Result<(), String> {
+    let canonical = canonicalize_existing_path(&path)?;
+    ensure_path_allowed(security_state.inner(), &canonical)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let status = Command::new("open")
+            .arg("-R")
+            .arg(&canonical)
+            .status()
+            .map_err(|e| format!("Failed to reveal path in Finder: {}", e))?;
+        if !status.success() {
+            return Err(format!("Finder failed to reveal path: {}", canonical.display()));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let status = Command::new("explorer")
+            .arg(format!("/select,{}", canonical.display()))
+            .status()
+            .map_err(|e| format!("Failed to reveal path in Explorer: {}", e))?;
+        if !status.success() {
+            return Err(format!("Explorer failed to reveal path: {}", canonical.display()));
+        }
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let parent = canonical.parent().unwrap_or(&canonical);
+        let status = Command::new("xdg-open")
+            .arg(parent)
+            .status()
+            .map_err(|e| format!("Failed to reveal path in file manager: {}", e))?;
+        if !status.success() {
+            return Err(format!(
+                "File manager failed to reveal path: {}",
+                canonical.display()
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 async fn publish_remote_simple_blog(
@@ -235,13 +425,29 @@ async fn publish_remote_simple_blog(
     publish_remote_simple_blog_via_github_api(request, &remote_repo, &repo_slug, &token).await
 }
 
+fn validate_publish_request_access(
+    security_state: &SecurityState,
+    request: &PublishSimpleBlogRequest,
+) -> Result<(), String> {
+    for asset in &request.assets {
+        let source_path = canonicalize_existing_path(&asset.source_path)?;
+        ensure_path_allowed(security_state, &source_path)?;
+    }
+
+    Ok(())
+}
+
 /// Copy sample notes from resources to the target directory
 #[tauri::command]
 async fn copy_sample_notes(
     app_handle: tauri::AppHandle,
     target_dir: String,
+    security_state: tauri::State<'_, SecurityState>,
 ) -> Result<CopySampleNotesResult, String> {
     use tauri::Manager;
+
+    let target_root = canonicalize_existing_path(&target_dir)?;
+    ensure_path_allowed(security_state.inner(), &target_root)?;
 
     // Get the resource directory
     let resource_dir = app_handle
@@ -253,7 +459,6 @@ async fn copy_sample_notes(
         .map_err(|e| format!("Failed to resolve sample notes resource directory: {}", e))?;
 
     let source = Path::new(&resource_dir);
-    let target_root = Path::new(&target_dir);
     let target = target_root.join(SAMPLE_NOTES_FOLDER_NAME);
 
     println!("[copy_sample_notes] Source: {:?}", source);
@@ -907,8 +1112,7 @@ async fn build_github_tree_entries(
         .iter()
         .map(|file| file.relative_path.to_string_lossy().replace('\\', "/"))
         .collect();
-    let desired_path_set: std::collections::BTreeSet<&str> =
-        desired_paths.iter().map(String::as_str).collect();
+    let desired_path_set: BTreeSet<&str> = desired_paths.iter().map(String::as_str).collect();
     let asset_directory_relative_path =
         sanitize_relative_path(&request.asset_directory_relative_path)?;
     let asset_directory_prefix = format!(

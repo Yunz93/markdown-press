@@ -25,6 +25,7 @@ export interface EditorState {
  */
 export interface EditorActions {
   setContent: (content: string, skipHistory?: boolean) => void;
+  setContentForFile: (fileId: string, content: string, skipHistory?: boolean) => void;
   setViewMode: (mode: ViewMode) => void;
   undo: () => void;
   redo: () => void;
@@ -63,43 +64,53 @@ export function createEditorSlice(
   set: (fn: (state: EditorState & EditorSliceContext) => Partial<EditorState & EditorSliceContext>) => void,
   get: () => EditorState & EditorActions & EditorSliceContext
 ): EditorState & EditorActions {
+  const buildContentUpdate = (
+    state: EditorState & EditorSliceContext,
+    fileId: string | null,
+    content: string,
+    skipHistory: boolean
+  ): Partial<EditorState & EditorSliceContext> => {
+    if (!fileId) return {};
+
+    const current = state.fileContents[fileId] ?? '';
+
+    if (skipHistory) {
+      return {
+        fileContents: { ...state.fileContents, [fileId]: content },
+      };
+    }
+
+    if (current === content) return {};
+
+    const existingHistory = state.fileHistories[fileId] || { past: [], future: [], maxHistory: 100 };
+    const newPast = [...existingHistory.past, current];
+    const trimmedPast = newPast.length > existingHistory.maxHistory
+      ? newPast.slice(-existingHistory.maxHistory)
+      : newPast;
+
+    return {
+      fileContents: { ...state.fileContents, [fileId]: content },
+      fileHistories: {
+        ...state.fileHistories,
+        [fileId]: {
+          ...existingHistory,
+          past: trimmedPast,
+          future: [],
+        },
+      },
+    };
+  };
+
   return {
     ...initialEditorState,
 
-    setContent: (content, skipHistory = false) => set((state) => {
-      const { activeTabId, fileContents } = state;
-      if (!activeTabId) return {};
+    setContent: (content, skipHistory = false) => set((state) => (
+      buildContentUpdate(state, state.activeTabId, content, skipHistory)
+    )),
 
-      const current = fileContents[activeTabId] ?? '';
-
-      if (skipHistory) {
-        return {
-          fileContents: { ...fileContents, [activeTabId]: content },
-        };
-      }
-
-      // Don't add to history if content is the same
-      if (current === content) return {};
-
-      // Get or create history for this file
-      const existingHistory = state.fileHistories[activeTabId] || { past: [], future: [], maxHistory: 100 };
-      const newPast = [...existingHistory.past, current];
-      const trimmedPast = newPast.length > existingHistory.maxHistory
-        ? newPast.slice(-existingHistory.maxHistory)
-        : newPast;
-
-      return {
-        fileContents: { ...fileContents, [activeTabId]: content },
-        fileHistories: {
-          ...state.fileHistories,
-          [activeTabId]: {
-            ...existingHistory,
-            past: trimmedPast,
-            future: [],
-          },
-        },
-      };
-    }),
+    setContentForFile: (fileId, content, skipHistory = false) => set((state) => (
+      buildContentUpdate(state, fileId, content, skipHistory)
+    )),
 
     setViewMode: (mode) => set(() => ({ viewMode: mode })),
 

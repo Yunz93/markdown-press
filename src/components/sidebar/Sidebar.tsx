@@ -157,17 +157,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [searchFocusRequestKey]);
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   const sidebarSurfaceStyle = useMemo(
     () =>
       ({
