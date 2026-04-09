@@ -166,6 +166,12 @@ html[data-app-booting="true"] *::after {
   color: inherit;
 }
 
+.editor-pane-layout .cm-announced {
+  position: fixed !important;
+  top: -10000px !important;
+  left: -10000px !important;
+}
+
 .editor-pane-layout .cm-markdown-list-line::before {
   content: "";
   position: absolute;

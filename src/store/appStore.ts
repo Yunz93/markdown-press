@@ -113,15 +113,26 @@ function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
     ...persistedShortcuts,
   };
 
-  if (
-    persistedShortcuts.settings === undefined ||
-    persistedShortcuts.settings === 'Ctrl+,' ||
-    persistedShortcuts.settings === 'Cmd+,' ||
-    persistedShortcuts.settings === 'Command+,' ||
-    persistedShortcuts.settings === 'Meta+,'
-  ) {
-    mergedShortcuts.settings = defaultSettings.shortcuts.settings;
-  }
+  const defaultShortcutMigrations: Partial<Record<keyof typeof mergedShortcuts, string[]>> = {
+    toggleView: ['Ctrl+E'],
+    search: ['Ctrl+F'],
+    sidebarSearch: ['Ctrl+Shift+F'],
+    settings: ['Ctrl+,', 'Cmd+,', 'Command+,', 'Meta+,'],
+    toggleOutline: ['Ctrl+O'],
+    toggleSidebar: ['Ctrl+B'],
+    toggleTheme: ['Ctrl+T'],
+    openKnowledgeBase: ['Ctrl+Shift+O'],
+    exportHtml: ['Ctrl+Shift+E'],
+  };
+
+  (Object.keys(defaultShortcutMigrations) as Array<keyof typeof mergedShortcuts>).forEach((key) => {
+    const persistedValue = persistedShortcuts[key];
+    const legacyValues = defaultShortcutMigrations[key] ?? [];
+
+    if (persistedValue === undefined || (typeof persistedValue === 'string' && legacyValues.includes(persistedValue))) {
+      mergedShortcuts[key] = defaultSettings.shortcuts[key];
+    }
+  });
 
   return mergedShortcuts;
 }

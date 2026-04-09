@@ -26,6 +26,11 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   'search',
   'sidebarSearch',
   'settings',
+  'toggleOutline',
+  'toggleSidebar',
+  'toggleTheme',
+  'openKnowledgeBase',
+  'exportHtml',
   'closeTab',
 ]);
 
@@ -129,8 +134,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
         continue;
       }
 
-      // Skip global shortcuts when typing in editable elements (editor, input, etc.)
-      // This prevents conflicts with editor shortcuts (Ctrl+B for bold, Ctrl+I for italic, etc.)
+      // Only block shortcuts that should stay local to text inputs.
       if (isEditableTarget(event.target) && !entry.allowInEditable) {
         continue;
       }
@@ -165,8 +169,8 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
   const handleKeyDown = useShortcutListener(options, null);
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
 }
 
@@ -183,7 +187,7 @@ export function useGlobalKeyboardShortcuts(
   });
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
 }
