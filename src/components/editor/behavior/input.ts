@@ -9,6 +9,7 @@ import type { StateCommand } from '@codemirror/state';
 import type { OrderedListMode } from '../../../types';
 import {
   isInsideFencedCode,
+  isInsideFrontmatter,
   replaceCurrentLine,
   parseStructuredLine,
   isEmptyListItem,
@@ -16,6 +17,7 @@ import {
   insertText,
   looksLikeUrl,
   LIST_INDENT_UNIT,
+  getIndentUnit,
 } from './core';
 import { buildQuotePrefix, buildQuoteRaw } from './quotes';
 import { parseListItem } from '../nestedListBehavior';
@@ -28,6 +30,43 @@ import {
 import { updateSelectedLines, getLeadingIndent, removeIndentUnit } from './core';
 import { indentLess } from '@codemirror/commands';
 import type { EditorView } from '@codemirror/view';
+
+function handleFrontmatterEnter({ state, dispatch }: Parameters<StateCommand>[0]): boolean {
+  const main = state.selection.main;
+  const line = state.doc.lineAt(main.from);
+  const text = line.text;
+
+  const yamlListMatch = text.match(/^(\s*)-\s*(.*)$/);
+  if (yamlListMatch && main.from === line.to) {
+    const [, indent, content] = yamlListMatch;
+    const nextIndent = `${indent}- `;
+    const insert = content.trim() === '' ? '\n' : `\n${nextIndent}`;
+    const cursorOffset = insert === '\n' ? 1 : insert.length;
+
+    dispatch(state.update({
+      changes: { from: main.from, insert },
+      selection: { anchor: main.from + cursorOffset },
+      scrollIntoView: true,
+      userEvent: 'input',
+    }));
+    return true;
+  }
+
+  const yamlKeyMatch = text.match(/^(\s*[^:#\n][^:\n]*):\s*$/);
+  if (yamlKeyMatch && main.from === line.to) {
+    const [, keyPrefix] = yamlKeyMatch;
+    const insert = `\n${getLeadingIndent(keyPrefix)}${getIndentUnit(state)}`;
+    dispatch(state.update({
+      changes: { from: main.from, insert },
+      selection: { anchor: main.from + insert.length },
+      scrollIntoView: true,
+      userEvent: 'input',
+    }));
+    return true;
+  }
+
+  return insertNewlineAndIndent({ state, dispatch });
+}
 
 // ==================== 智能 Enter 处理 ====================
 
@@ -42,6 +81,10 @@ export const handleSmartEnter: StateCommand = ({ state, dispatch }): boolean => 
   // 代码块内使用默认行为
   if (isInsideFencedCode(state, main.from)) {
     return insertNewlineAndIndent({ state, dispatch });
+  }
+
+  if (isInsideFrontmatter(state, main.from)) {
+    return handleFrontmatterEnter({ state, dispatch });
   }
 
   const line = state.doc.lineAt(main.from);
@@ -104,6 +147,10 @@ export const handleSmartBackspace: StateCommand = ({ state, dispatch }): boolean
     return false;
   }
 
+  if (isInsideFrontmatter(state, main.from)) {
+    return false;
+  }
+
   const line = state.doc.lineAt(main.from);
   const structured = parseStructuredLine(line.text);
 
@@ -142,6 +189,7 @@ export function createHandleSmartTab(orderedListMode: OrderedListMode): StateCom
     const line = state.doc.lineAt(state.selection.main.from);
     const structured = parseStructuredLine(line.text);
     const insideFencedCode = isInsideFencedCode(state, state.selection.main.from);
+    const insideFrontmatter = isInsideFrontmatter(state, state.selection.main.from);
 
     // 代码块内处理
     if (insideFencedCode) {
@@ -152,6 +200,21 @@ export function createHandleSmartTab(orderedListMode: OrderedListMode): StateCom
       const changes = state.changeByRange((range) => ({
         changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
         range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
+      }));
+
+      dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
+      return true;
+    }
+
+    if (insideFrontmatter) {
+      if (hasExpandedSelection) {
+        return updateSelectedLines(state, dispatch, (lineText) => `${getIndentUnit(state)}${lineText}`);
+      }
+
+      const indentUnit = getIndentUnit(state);
+      const changes = state.changeByRange((range) => ({
+        changes: { from: range.from, to: range.to, insert: indentUnit },
+        range: EditorSelection.cursor(range.from + indentUnit.length),
       }));
 
       dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
@@ -186,6 +249,7 @@ export function createHandleSmartShiftTab(orderedListMode: OrderedListMode): Sta
     const line = state.doc.lineAt(state.selection.main.from);
     const structured = parseStructuredLine(line.text);
     const insideFencedCode = isInsideFencedCode(state, state.selection.main.from);
+    const insideFrontmatter = isInsideFrontmatter(state, state.selection.main.from);
 
     // 代码块内处理
     if (insideFencedCode) {
@@ -195,6 +259,13 @@ export function createHandleSmartShiftTab(orderedListMode: OrderedListMode): Sta
       });
 
       return handled || indentLess({ state, dispatch });
+    }
+
+    if (insideFrontmatter) {
+      return updateSelectedLines(state, dispatch, (lineText) => {
+        const indent = getLeadingIndent(lineText);
+        return `${removeIndentUnit(indent, getIndentUnit(state))}${lineText.slice(indent.length)}`;
+      });
     }
 
     // 列表处理 - 使用新逻辑

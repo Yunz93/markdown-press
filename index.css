@@ -31,6 +31,10 @@
   scrollbar-width: none;
 }
 
+.preview-scroll-container {
+  overflow-anchor: none;
+}
+
 .editor-pane-layout::-webkit-scrollbar,
 .preview-scroll-container::-webkit-scrollbar,
 .editor-pane-layout .cm-scroller::-webkit-scrollbar {
@@ -137,7 +141,7 @@ html[data-app-booting="true"] *::after {
   max-width: 100%;
   min-height: calc(100vh - 12rem);
   box-sizing: border-box;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom) !important;
+  padding: var(--pane-content-top) var(--pane-content-px) var(--editor-content-bottom, var(--pane-content-bottom)) !important;
   outline: none;
   white-space: pre;
   word-wrap: normal;
@@ -1046,6 +1050,14 @@ html[data-app-booting="true"] *::after {
   padding-bottom: 0 !important;
 }
 
+.preview-pane-properties-textarea {
+  display: block;
+  resize: vertical;
+  min-height: calc(1.4em + 0.5rem);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .preview-pane-sheet {
   min-height: calc(100vh - 12rem);
 }
@@ -1059,7 +1071,7 @@ html[data-app-booting="true"] *::after {
   min-width: 0;
   max-width: none;
   margin: 0;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
+  padding: var(--pane-content-top) var(--pane-content-px) var(--preview-content-bottom, var(--pane-content-bottom));
   color: #312e81;
   line-height: 1.95;
   overflow-wrap: anywhere;
@@ -1082,7 +1094,7 @@ html[data-app-booting="true"] *::after {
   min-width: 0;
   max-width: none;
   margin: 0;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
+  padding: var(--pane-content-top) var(--pane-content-px) var(--preview-content-bottom, var(--pane-content-bottom));
   color: #0f172a;
   font-family: var(--editor-font-family);
   font-size: var(--editor-font-size);
@@ -1117,8 +1129,8 @@ html[data-app-booting="true"] *::after {
 .preview-pane-document.markdown-body .preview-note-embed,
 .preview-pane-document.markdown-body img,
 .preview-pane-document.markdown-body iframe {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 240px;
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
 }
 
 .preview-pane-document.preview-pane-document-windows.markdown-body pre,

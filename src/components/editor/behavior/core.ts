@@ -151,6 +151,36 @@ export function isInsideFencedCode(state: EditorState, position: number): boolea
   return stack.length > 0;
 }
 
+export function getFrontmatterRange(state: EditorState): { from: number; to: number; closingLineNumber: number } | null {
+  const { doc } = state;
+  if (doc.lines === 0 || doc.line(1).text.trim() !== '---') {
+    return null;
+  }
+
+  for (let lineNumber = 2; lineNumber <= doc.lines; lineNumber += 1) {
+    const line = doc.line(lineNumber);
+    if (line.text.trim() === '---') {
+      return {
+        from: doc.line(1).from,
+        to: line.to,
+        closingLineNumber: lineNumber,
+      };
+    }
+  }
+
+  return null;
+}
+
+export function isInsideFrontmatter(state: EditorState, position: number): boolean {
+  const range = getFrontmatterRange(state);
+  if (!range) {
+    return false;
+  }
+
+  const lineNumber = state.doc.lineAt(position).number;
+  return lineNumber > 1 && lineNumber < range.closingLineNumber;
+}
+
 // ==================== 列映射工具 ====================
 
 export function mapColumnAfterLineUpdate(oldText: string, newText: string, column: number): number {

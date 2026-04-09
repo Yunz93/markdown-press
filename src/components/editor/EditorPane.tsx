@@ -89,6 +89,11 @@ function findWikiLinkNearPosition(text: string, pos: number) {
   return null;
 }
 
+function getEditorScrollPercentage(scrollTop: number, maxScrollTop: number): number {
+  if (maxScrollTop <= 0) return 0;
+  return Math.min(Math.max(scrollTop / maxScrollTop, 0), 1);
+}
+
 interface HoverPreviewState {
   preview: WikiLinkPreviewData;
   x: number;
@@ -242,6 +247,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     onContextMenu: handleSelectionContextMenu,
   });
 
+  const setEditorContainer = useCallback((element: HTMLDivElement | null) => {
+    editorRootRef.current = element;
+    codeMirror.editorRef(element);
+  }, [codeMirror.editorRef]);
+
   const handleGenerateWikiClick = useCallback(async () => {
     const menuState = selectionMenu;
     const view = codeMirror.view;
@@ -291,6 +301,52 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     };
   }, [codeMirror.view, scrollSync]);
 
+  useEffect(() => {
+    const view = codeMirror.view;
+    if (!view || !onScroll) return;
+
+    const scrollElements = new Set<HTMLElement>([view.scrollDOM]);
+    const scroller = editorRootRef.current?.querySelector<HTMLElement>('.cm-scroller');
+    if (scroller) {
+      scrollElements.add(scroller);
+    }
+    let frameId: number | null = null;
+    let lastPercentage = -1;
+
+    const handleNativeScroll = () => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        let activeScrollElement: HTMLElement | null = null;
+        for (const element of scrollElements) {
+          if (element.scrollHeight - element.clientHeight > 0) {
+            activeScrollElement = element;
+            break;
+          }
+        }
+        if (!activeScrollElement) return;
+        const maxScrollTop = activeScrollElement.scrollHeight - activeScrollElement.clientHeight;
+        const nextPercentage = getEditorScrollPercentage(activeScrollElement.scrollTop, maxScrollTop);
+        if (Math.abs(nextPercentage - lastPercentage) <= 0.001) return;
+        lastPercentage = nextPercentage;
+        onScroll(nextPercentage);
+      });
+    };
+
+    scrollElements.forEach((element) => {
+      element.addEventListener('scroll', handleNativeScroll, { passive: true });
+    });
+
+    return () => {
+      scrollElements.forEach((element) => {
+        element.removeEventListener('scroll', handleNativeScroll);
+      });
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [codeMirror.view, onScroll]);
+
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
     cancelScrollSync: scrollSync.cancelScrollSync,
@@ -333,6 +389,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
+    '--editor-content-bottom': `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
     '--editor-font-family': fontFamily,
     '--editor-font-size': `${settings.fontSize}px`,
     '--editor-line-height': String(EDITOR_LINE_HEIGHT),
@@ -516,7 +573,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
         <div className="editor-pane-scroll h-full overflow-hidden">
           <div className="editor-pane-frame h-full w-full">
             <div className="editor-pane-sheet h-full w-full">
-              <div ref={codeMirror.editorRef} className="editor-pane-codemirror h-full w-full" />
+              <div ref={setEditorContainer} className="editor-pane-codemirror h-full w-full" />
             </div>
           </div>
         </div>

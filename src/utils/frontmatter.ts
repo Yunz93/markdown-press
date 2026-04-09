@@ -84,9 +84,10 @@ function normalizeFrontmatterValue(value: unknown): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value
-      .filter((item) => item !== null && item !== undefined)
-      .map((item) => normalizeFrontmatterValue(item));
+    // Preserve empty YAML list items while the user is editing frontmatter.
+    // Auto-save may round-trip frontmatter to refresh timestamps; filtering
+    // null/undefined here would delete a just-created `- ` placeholder line.
+    return value.map((item) => normalizeFrontmatterValue(item));
   }
 
   if (value && typeof value === 'object') {
@@ -165,7 +166,12 @@ export function updateFrontmatter(
   const frontmatterBlock = generateFrontmatter(mergedFrontmatter);
 
   if (frontmatterBlock) {
-    return frontmatterBlock + parsed.body;
+    const match = content.match(FRONTMATTER_REGEX);
+    const rawBody = match
+      ? content.slice(match[0].length).replace(/^\r?\n/, '')
+      : content.replace(/^\r?\n/, '');
+
+    return frontmatterBlock + rawBody;
   }
 
   return content;

@@ -35,18 +35,15 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
+  const [editorScrollPercentage, setEditorScrollPercentage] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorPaneRef = useRef<EditorPaneHandle | null>(null);
   const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
 
-  const handleEditorScroll = useCallback((p: number) => {
+  const handleEditorScroll = useCallback((percentage: number) => {
     if (viewMode !== ViewMode.SPLIT) return;
-    previewPaneRef.current?.syncScrollTo(p);
-  }, [viewMode]);
-
-  const handlePreviewScroll = useCallback((p: number) => {
-    if (viewMode !== ViewMode.SPLIT) return;
-    editorPaneRef.current?.syncScrollTo(p);
+    setEditorScrollPercentage(percentage);
+    previewPaneRef.current?.syncScrollTo(percentage);
   }, [viewMode]);
 
   const handleMouseDown = useCallback(() => {
@@ -163,7 +160,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
               ref={previewPaneRef}
               highlighter={highlighter}
               density={contentDensity}
-              onScroll={handlePreviewScroll}
+              syncedPercentage={viewMode === ViewMode.SPLIT ? editorScrollPercentage : null}
             />
           </div>
         )}

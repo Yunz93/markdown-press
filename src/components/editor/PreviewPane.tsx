@@ -15,26 +15,32 @@ import { useFileSystem } from '../../hooks/useFileSystem';
 import { getCompositeFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
 import { throttle } from '../../utils/throttle';
-import { useThrottledResize, processInBatches } from '../../utils/performance';
+import { useThrottledResize } from '../../utils/performance';
 import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
-import { resolveAttachmentTarget } from '../../utils/attachmentResolver';
-import { createAttachmentResolverContext } from '../../utils/attachmentResolver';
+import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
-import { parseFrontmatter } from '../../utils/frontmatter';
+import { parseFrontmatter, updateFrontmatter } from '../../utils/frontmatter';
 import { isWindowsPlatform } from '../../utils/platform';
-import type { FileNode } from '../../types';
+import type { FileNode, Frontmatter } from '../../types';
 import { useI18n } from '../../hooks/useI18n';
 
 interface PreviewPaneProps {
   highlighter?: any;
   onScroll?: (percentage: number) => void;
   density?: PaneDensity;
+  syncedPercentage?: number | null;
 }
 
 export interface PreviewPaneHandle {
   cancelScrollSync: () => void;
   syncScrollTo: (percentage: number) => void;
+}
+
+function syncPreviewContainerScroll(element: HTMLElement, percentage: number): void {
+  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+  if (maxScrollTop <= 0) return;
+  element.scrollTop = maxScrollTop * Math.min(Math.max(percentage, 0), 1);
 }
 
 // Helper functions
@@ -76,13 +82,57 @@ function getPreviewFileType(filePath: string | null | undefined): 'markdown' | '
   return 'unsupported';
 }
 
+type FrontmatterValue = Frontmatter[keyof Frontmatter];
+
+function formatFrontmatterDraft(value: FrontmatterValue): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? '')).join('\n');
+  }
+
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value);
+}
+
+function parseFrontmatterDraftValue(rawValue: string, originalValue: FrontmatterValue): FrontmatterValue {
+  if (Array.isArray(originalValue)) {
+    const items = (rawValue.includes('\n') ? rawValue.split(/\r?\n/) : rawValue.split(','))
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return items;
+  }
+
+  if (typeof originalValue === 'number') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return null;
+    const parsedNumber = Number(trimmed);
+    return Number.isNaN(parsedNumber) ? rawValue : parsedNumber;
+  }
+
+  if (typeof originalValue === 'boolean') {
+    const normalized = rawValue.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    return rawValue;
+  }
+
+  if (originalValue === null) {
+    return rawValue === '' ? null : rawValue;
+  }
+
+  return rawValue;
+}
+
 export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   highlighter,
   onScroll,
-  density = 'comfortable' as PaneDensity
+  density = 'comfortable' as PaneDensity,
+  syncedPercentage = null,
 }, ref) => {
   const { t } = useI18n();
-  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
+  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId, setContent } = useAppStore();
   const content = useAppStore(selectContent);
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -122,6 +172,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     '--pane-content-px': `${layoutMetrics.contentPaddingX}px`,
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
+    '--preview-content-bottom': `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
     '--editor-font-family': fontFamily,
     '--editor-font-size': `${settings.fontSize}px`,
   }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
@@ -176,9 +227,15 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     syncScrollTo: (percentage: number) => {
       const element = previewRef.current;
       if (!element) return;
-      scroll.syncScrollTo(element, percentage);
+      syncPreviewContainerScroll(element, percentage);
     },
   }), [scroll]);
+
+  useEffect(() => {
+    const element = previewRef.current;
+    if (!element || syncedPercentage === null) return;
+    syncPreviewContainerScroll(element, syncedPercentage);
+  }, [syncedPercentage]);
 
   // Handle scroll events
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -266,63 +323,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     }, 100); // Increased delay for better batching
     return () => window.clearTimeout(timer);
   }, [renderer.enhancedBodyHtml, isMarkdownPreview, settings.themeMode]);
-
-  // Warm preview images - optimized batch processing
-  useEffect(() => {
-    if (!isMarkdownPreview) return;
-    const container = previewRef.current;
-    if (!container) return;
-
-    const images = Array.from(container.querySelectorAll('article.markdown-body img'));
-
-    // Skip if too many images (performance protection)
-    if (images.length > 100) {
-      console.warn(`[PreviewPane] Too many images (${images.length}), skipping eager warmup`);
-      return;
-    }
-
-    // Process images in batches with controlled concurrency
-    const abortController = new AbortController();
-
-    processInBatches(
-      images,
-      async (image) => {
-        if (abortController.signal.aborted) return;
-
-        const imgElement = image as HTMLImageElement;
-        if (imgElement.getAttribute('data-preview-warmed') === 'true') return;
-
-        const originalSrc = imgElement.getAttribute('data-original-src') || imgElement.getAttribute('src');
-        if (!originalSrc) return;
-
-        try {
-          const cachedSrc = await warmPreviewImage(originalSrc, currentFilePath || undefined);
-          if (abortController.signal.aborted || !imgElement.isConnected || !cachedSrc) return;
-
-          if (imgElement.getAttribute('data-original-src') !== originalSrc) {
-            imgElement.setAttribute('data-original-src', originalSrc);
-          }
-          if (imgElement.getAttribute('src') !== cachedSrc) {
-            imgElement.setAttribute('src', cachedSrc);
-            imgElement.src = cachedSrc;
-          }
-          imgElement.setAttribute('data-preview-warmed', 'true');
-        } catch (error) {
-          console.warn('Failed to warm preview image:', originalSrc, error);
-        }
-      },
-      5, // batch size
-      (completed, total) => {
-        if (completed % 20 === 0) {
-          console.log(`[PreviewPane] Warming images: ${completed}/${total}`);
-        }
-      }
-    );
-
-    return () => {
-      abortController.abort();
-    };
-  }, [currentFilePath, renderer.enhancedBodyHtml, isMarkdownPreview]);
 
   // Asset preview (image/PDF)
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
@@ -451,6 +451,106 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const { frontmatter } = parseFrontmatter(content);
     return frontmatter;
   }, [content, isMarkdownPreview]);
+  const frontmatterEntries = useMemo(() => (
+    parsedFrontmatter ? Object.entries(parsedFrontmatter) as Array<[string, FrontmatterValue]> : []
+  ), [parsedFrontmatter]);
+
+  const [propertyDrafts, setPropertyDrafts] = useState<Record<string, string>>({});
+  const [editingPropertyKey, setEditingPropertyKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!parsedFrontmatter) {
+      setPropertyDrafts({});
+      setEditingPropertyKey(null);
+      return;
+    }
+
+    setPropertyDrafts((previousDrafts) => {
+      const nextDrafts: Record<string, string> = {};
+
+      frontmatterEntries.forEach(([key, value]) => {
+        if (key === editingPropertyKey && key in previousDrafts) {
+          nextDrafts[key] = previousDrafts[key];
+          return;
+        }
+
+        nextDrafts[key] = formatFrontmatterDraft(value);
+      });
+
+      return nextDrafts;
+    });
+  }, [editingPropertyKey, frontmatterEntries, parsedFrontmatter]);
+
+  useEffect(() => {
+    if (editingPropertyKey && (!parsedFrontmatter || !(editingPropertyKey in parsedFrontmatter))) {
+      setEditingPropertyKey(null);
+    }
+  }, [editingPropertyKey, parsedFrontmatter]);
+
+  const commitPropertyDraft = useCallback((key: string, rawDraft?: string) => {
+    if (!parsedFrontmatter || !(key in parsedFrontmatter)) return;
+
+    const currentValue = parsedFrontmatter[key] as FrontmatterValue;
+    const nextDraft = rawDraft ?? propertyDrafts[key] ?? '';
+
+    if (nextDraft === formatFrontmatterDraft(currentValue)) {
+      return;
+    }
+
+    const nextContent = updateFrontmatter(content, {
+      [key]: parseFrontmatterDraftValue(nextDraft, currentValue),
+    });
+
+    if (nextContent !== content) {
+      setContent(nextContent);
+    }
+  }, [content, parsedFrontmatter, propertyDrafts, setContent]);
+
+  const handlePropertyChange = useCallback((key: string, value: string) => {
+    setPropertyDrafts((previousDrafts) => {
+      if (previousDrafts[key] === value) {
+        return previousDrafts;
+      }
+
+      return {
+        ...previousDrafts,
+        [key]: value,
+      };
+    });
+  }, []);
+
+  const handlePropertyFocus = useCallback((key: string) => {
+    setEditingPropertyKey(key);
+  }, []);
+
+  const handlePropertyBlur = useCallback((key: string) => {
+    commitPropertyDraft(key);
+    setEditingPropertyKey((currentKey) => (currentKey === key ? null : currentKey));
+  }, [commitPropertyDraft]);
+
+  const handlePropertyKeyDown = useCallback((
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+    key: string
+  ) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      commitPropertyDraft(key, event.currentTarget.value);
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      const originalValue = parsedFrontmatter?.[key] as FrontmatterValue | undefined;
+
+      setPropertyDrafts((previousDrafts) => ({
+        ...previousDrafts,
+        [key]: formatFrontmatterDraft(originalValue),
+      }));
+
+      event.currentTarget.blur();
+    }
+  }, [commitPropertyDraft, parsedFrontmatter]);
 
   return (
       <div
@@ -475,29 +575,38 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                 <span>{t('preview_properties')}</span>
               </div>
               <div className="p-2 table w-full">
-                {Object.entries(parsedFrontmatter).map(([key, value]) => (
+                {frontmatterEntries.map(([key, value]) => (
                   <div key={key} className="table-row hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                     <div className="preview-pane-properties-cell table-cell py-1.5 px-2 w-32 text-gray-500 dark:text-gray-400 font-medium align-top">
                       {key}
                     </div>
                     <div className="preview-pane-properties-cell table-cell py-1.5 px-2 text-gray-800 dark:text-gray-200 align-top">
-                      {key === 'link' && typeof value === 'string' && isExternalLink(value) && isValidExternalUrl(value) ? (
-                        <a
-                          href={value}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex max-w-full break-all py-0.5 text-accent-DEFAULT underline underline-offset-2 hover:opacity-80"
-                        >
-                          {value}
-                        </a>
-                      ) : (
-                        <input
-                          type="text"
-                          value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
-                          readOnly
-                          className="preview-pane-properties-input w-full bg-transparent border-none focus:ring-0 py-0.5"
-                        />
-                      )}
+                      {key === 'link'
+                        && typeof value === 'string'
+                        && isExternalLink(propertyDrafts[key] ?? value)
+                        && isValidExternalUrl(propertyDrafts[key] ?? value) ? (
+                          <a
+                            href={propertyDrafts[key] ?? value}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex max-w-full break-all py-0.5 text-accent-DEFAULT underline underline-offset-2 hover:opacity-80"
+                          >
+                            {propertyDrafts[key] ?? value}
+                          </a>
+                        ) : (
+                          <div className="flex items-start gap-2">
+                            <textarea
+                              value={propertyDrafts[key] ?? formatFrontmatterDraft(value)}
+                              rows={Math.min(Math.max((propertyDrafts[key] ?? formatFrontmatterDraft(value)).split('\n').length, 1), 8)}
+                              spellCheck={false}
+                              onFocus={() => handlePropertyFocus(key)}
+                              onChange={(event) => handlePropertyChange(key, event.target.value)}
+                              onBlur={() => handlePropertyBlur(key)}
+                              onKeyDown={(event) => handlePropertyKeyDown(event, key)}
+                              className="preview-pane-properties-input preview-pane-properties-textarea w-full bg-transparent border-none focus:ring-0 py-0.5"
+                            />
+                          </div>
+                        )}
                     </div>
                   </div>
                 ))}

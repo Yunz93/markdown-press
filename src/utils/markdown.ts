@@ -118,7 +118,9 @@ const createMarkdownIt = () => {
   const defaultImageRenderer = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    token.attrSet('decoding', 'async');
+    token.attrSet('decoding', 'sync');
+    token.attrSet('loading', 'eager');
+    token.attrSet('fetchpriority', 'high');
 
     if (defaultImageRenderer) {
       return defaultImageRenderer(tokens, idx, options, env, self);

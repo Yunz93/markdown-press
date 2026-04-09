@@ -5,12 +5,18 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { isWindowsPlatform } from '../../../utils/platform';
 
-const DEFAULT_SCROLL_THRESHOLD = 5;
-const WINDOWS_SCROLL_THRESHOLD = 12;
+const DEFAULT_SCROLL_THRESHOLD = 1;
 const DEFAULT_SCROLL_EMIT_THRESHOLD = 0.001;
-const WINDOWS_SCROLL_EMIT_THRESHOLD = 0.0025;
+const SYNC_SETTLE_THRESHOLD = 0.25;
+const SYNC_MIN_DURATION_MS = 16;
+const SYNC_MAX_DURATION_MS = 140;
+const SYNC_PIXELS_PER_MS = 8;
+
+function getNormalizedScrollPercentage(scrollTop: number, scrollHeight: number): number {
+  if (scrollHeight <= 0) return 0;
+  return Math.min(Math.max(scrollTop / scrollHeight, 0), 1);
+}
 
 export interface UsePreviewScrollOptions {
   onScroll?: (percentage: number) => void;
@@ -37,14 +43,13 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
+  const syncStartScrollTopRef = useRef(0);
+  const syncStartTimeRef = useRef(0);
+  const syncDurationRef = useRef(SYNC_MIN_DURATION_MS);
+  const syncedElementRef = useRef<HTMLElement | null>(null);
   const unlockAnimationFrameRef = useRef<number | null>(null);
-  const useImmediateSyncRef = useRef(isWindowsPlatform());
-  const scrollThresholdRef = useRef(
-    useImmediateSyncRef.current ? WINDOWS_SCROLL_THRESHOLD : DEFAULT_SCROLL_THRESHOLD
-  );
-  const emitThresholdRef = useRef(
-    useImmediateSyncRef.current ? WINDOWS_SCROLL_EMIT_THRESHOLD : DEFAULT_SCROLL_EMIT_THRESHOLD
-  );
+  const scrollThresholdRef = useRef(DEFAULT_SCROLL_THRESHOLD);
+  const emitThresholdRef = useRef(DEFAULT_SCROLL_EMIT_THRESHOLD);
 
   useEffect(() => {
     onScrollRef.current = onScroll;
@@ -71,6 +76,8 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
       unlockAnimationFrameRef.current = null;
     }
     syncTargetScrollTopRef.current = null;
+    syncStartTimeRef.current = 0;
+    syncedElementRef.current = null;
     isSyncingScroll.current = false;
   }, []);
 
@@ -89,39 +96,57 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   const animateSyncedScroll = useCallback((element: HTMLElement, targetScrollTop: number) => {
     const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
     const clampedTarget = Math.min(Math.max(targetScrollTop, 0), maxScrollTop);
-    syncTargetScrollTopRef.current = clampedTarget;
+    const currentScrollTop = element.scrollTop;
 
-    const commitScroll = () => {
+    syncedElementRef.current = element;
+    syncTargetScrollTopRef.current = clampedTarget;
+    syncStartScrollTopRef.current = currentScrollTop;
+    syncStartTimeRef.current = 0;
+    syncDurationRef.current = Math.min(
+      SYNC_MAX_DURATION_MS,
+      Math.max(SYNC_MIN_DURATION_MS, Math.abs(clampedTarget - currentScrollTop) / SYNC_PIXELS_PER_MS)
+    );
+    isSyncingScroll.current = true;
+
+    if (syncAnimationFrameRef.current !== null) return;
+
+    const step = (timestamp: number) => {
+      const activeElement = syncedElementRef.current;
       const target = syncTargetScrollTopRef.current;
 
-      if (!element || target === null) {
+      if (!activeElement || activeElement !== element || target === null) {
+        syncAnimationFrameRef.current = null;
         syncTargetScrollTopRef.current = null;
+        syncStartTimeRef.current = 0;
+        syncedElementRef.current = null;
         isSyncingScroll.current = false;
         return;
       }
 
-      element.scrollTop = target;
-      syncTargetScrollTopRef.current = null;
-      scheduleSyncUnlock();
+      if (syncStartTimeRef.current === 0) {
+        syncStartTimeRef.current = timestamp;
+      }
+
+      const start = syncStartScrollTopRef.current;
+      const duration = syncDurationRef.current;
+      const progress = Math.min(1, (timestamp - syncStartTimeRef.current) / duration);
+      const nextScrollTop = start + ((target - start) * progress);
+
+      if (Math.abs(target - nextScrollTop) <= SYNC_SETTLE_THRESHOLD || progress >= 1) {
+        activeElement.scrollTop = target;
+        syncAnimationFrameRef.current = null;
+        syncTargetScrollTopRef.current = null;
+        syncStartTimeRef.current = 0;
+        syncedElementRef.current = null;
+        scheduleSyncUnlock();
+        return;
+      }
+
+      activeElement.scrollTop = nextScrollTop;
+      syncAnimationFrameRef.current = requestAnimationFrame(step);
     };
 
-    isSyncingScroll.current = true;
-
-    if (useImmediateSyncRef.current) {
-      if (syncAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(syncAnimationFrameRef.current);
-        syncAnimationFrameRef.current = null;
-      }
-      commitScroll();
-      return;
-    }
-
-    if (syncAnimationFrameRef.current !== null) return;
-
-    syncAnimationFrameRef.current = requestAnimationFrame(() => {
-      syncAnimationFrameRef.current = null;
-      commitScroll();
-    });
+    syncAnimationFrameRef.current = requestAnimationFrame(step);
   }, [scheduleSyncUnlock]);
 
   // Sync scroll to percentage
@@ -130,6 +155,7 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
     if (scrollHeight <= 0) return;
 
     const targetScroll = scrollHeight * percentage;
+
     if (Math.abs(element.scrollTop - targetScroll) <= scrollThresholdRef.current) return;
     animateSyncedScroll(element, targetScroll);
   }, [animateSyncedScroll]);
@@ -139,10 +165,10 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
     const onScrollCallback = onScrollRef.current;
     if (!onScrollCallback || isSyncingScroll.current) return;
 
-    const scrollHeight = element.scrollHeight - element.clientHeight;
-    if (scrollHeight <= 0) return;
-
-    const percentage = element.scrollTop / scrollHeight;
+    const percentage = getNormalizedScrollPercentage(
+      element.scrollTop,
+      element.scrollHeight - element.clientHeight
+    );
 
     if (Math.abs(percentage - lastScrollPercentage.current) <= emitThresholdRef.current) return;
 

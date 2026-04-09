@@ -104,7 +104,9 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       return true; // No changes to save
     }
 
-    const contentToSave = refreshDocumentUpdateTime(preparedContent);
+    const contentToSave = options?.trigger === 'auto'
+      ? preparedContent
+      : refreshDocumentUpdateTime(preparedContent);
 
     // Prevent concurrent saves
     if (isSavingRef.current) {

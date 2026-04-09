@@ -68,6 +68,15 @@ function hasWikiEmbedsInHtml(html: string): boolean {
   return html.includes('data-wiki-embed="true"') || html.includes('class="markdown-link markdown-embed"');
 }
 
+function configurePreviewImageElement(image: HTMLImageElement, src: string, originalSrc: string): void {
+  image.setAttribute('src', src);
+  image.setAttribute('data-original-src', originalSrc);
+  image.setAttribute('data-preview-warmed', 'true');
+  image.setAttribute('decoding', 'sync');
+  image.setAttribute('loading', 'eager');
+  image.setAttribute('fetchpriority', 'high');
+}
+
 export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePreviewRendererReturn {
   const {
     content,
@@ -95,7 +104,6 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     if (!content) return { frontmatter: null, bodyHTML: '' };
 
     const { frontmatter, body } = parseFrontmatter(content);
-
     try {
       const bodyHTML = hydrateCachedPreviewImageSources(
         renderMarkdown(body, { highlighter, themeMode }),
@@ -193,15 +201,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
         try {
           const warmedSrc = await warmPreviewImage(previewTarget, currentFilePath || undefined);
-          image.setAttribute('src', warmedSrc);
-          image.setAttribute('data-preview-warmed', 'true');
+          configurePreviewImageElement(image, warmedSrc, previewTarget);
         } catch {
-          image.setAttribute('src', previewTarget);
-          image.removeAttribute('data-preview-warmed');
+          configurePreviewImageElement(image, previewTarget, previewTarget);
         }
-
-        image.setAttribute('data-original-src', previewTarget);
-        image.setAttribute('decoding', 'async');
       } catch (error) {
         console.warn('Failed to process image:', error);
       }
@@ -307,7 +310,6 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             const image = parsed.createElement('img');
             image.className = 'preview-attachment-image';
             image.alt = label || resolvedTarget.name;
-            image.setAttribute('data-original-src', resolvedTarget.path);
             if (embedWidth) image.style.width = `${embedWidth}px`;
             if (embedHeight) {
               image.style.height = `${embedHeight}px`;
@@ -315,9 +317,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             }
 
             try {
-              image.src = await warmPreviewImage(resolvedTarget.path, currentFilePath || undefined);
+              const warmedSrc = await warmPreviewImage(resolvedTarget.path, currentFilePath || undefined);
+              configurePreviewImageElement(image, warmedSrc, resolvedTarget.path);
             } catch {
-              image.src = resolvedTarget.path;
+              configurePreviewImageElement(image, resolvedTarget.path, resolvedTarget.path);
             }
 
             embed.replaceWith(image);
