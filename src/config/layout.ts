@@ -8,7 +8,7 @@ import { ViewMode } from '../types';
 export const LAYOUT = {
   /** Sidebar dimensions and constraints */
   SIDEBAR: {
-    DEFAULT_WIDTH: 288,
+    DEFAULT_WIDTH: 240,
     MIN_WIDTH: 240,
     MAX_WIDTH: 420,
     RESPONSIVE_MIN_WIDTH: 160,

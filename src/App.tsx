@@ -22,7 +22,7 @@ import { TabBar } from './components/tabs/TabBar';
 import { PromptDialog } from './components/ui/Dialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
-import { isTauriEnvironment } from './types/filesystem';
+import { isTauriEnvironment, waitForTauri } from './types/filesystem';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
@@ -112,6 +112,7 @@ const App: React.FC = () => {
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
+  const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
@@ -145,23 +146,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!settingsHydrated || secureSettingsReadyRef.current) return;
-    secureSettingsReadyRef.current = true;
 
     let cancelled = false;
 
-    void migrateLegacySensitiveSettings(settings)
-      .then((secureSettings) => {
-        if (cancelled) return;
-        updateSettings(secureSettings);
-      })
+    void (async () => {
+      // Tauri globals can be injected slightly after hydration on app startup.
+      if (!isTauriEnvironment()) {
+        await waitForTauri(3000);
+      }
+
+      if (cancelled) return;
+
+      const secureSettings = await migrateLegacySensitiveSettings(useAppStore.getState().settings);
+
+      if (cancelled) return;
+      secureSettingsReadyRef.current = true;
+      updateSettings(secureSettings);
+    })()
       .catch((error) => {
+        if (cancelled) return;
+        secureSettingsReadyRef.current = true;
         console.error('Failed to load secure settings:', error);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [settingsHydrated, settings, updateSettings]);
+  }, [settingsHydrated, updateSettings]);
 
   // Auto-open last knowledge base after hydration
   useEffect(() => {
@@ -322,6 +333,11 @@ const App: React.FC = () => {
       onSidebarSearch: () => {
         setSidebarOpen(true);
         setSidebarSearchRequestKey((prev) => prev + 1);
+      },
+      onLocateCurrentFile: () => {
+        if (!activeTabId) return;
+        setSidebarOpen(true);
+        setSidebarLocateRequestKey((prev) => prev + 1);
       },
       onOpenSettings: () => setSettingsOpen(true),
       onToggleOutline: () => setIsOutlineOpen((prev) => !prev),
@@ -498,6 +514,7 @@ const App: React.FC = () => {
         onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
         isOpen={isSidebarOpen}
         searchFocusRequestKey={sidebarSearchRequestKey}
+        locateCurrentFileRequestKey={sidebarLocateRequestKey}
         width={responsiveSidebarWidth}
         onWidthChange={handleSidebarWidthChange}
         onClose={() => setSidebarOpen(false)}

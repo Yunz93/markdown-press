@@ -60,6 +60,7 @@ export interface ShortcutConfig {
   aiAnalyze: string;
   search: string;
   sidebarSearch: string;
+  locateCurrentFile: string;
   settings: string;
   toggleOutline: string;
   toggleSidebar: string;
@@ -105,6 +106,7 @@ export interface AppSettings {
   codexApiBaseUrl?: string;
   codexApiKey?: string;
   codexModel?: string;
+  aiSystemPrompt?: string;
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;

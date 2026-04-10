@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AIAnalysisResult, AIWikiGenerationResult } from "../types";
+import { resolveAISystemPrompt } from './aiPrompts';
 
 // Singleton instance - API key is not stored in a Map to avoid memory caching issues
 let aiInstance: GoogleGenAI | null = null;
@@ -59,7 +60,8 @@ function isRetryableError(error: any): boolean {
 export const analyzeContent = async (
   content: string,
   apiKey: string,
-  modelName: string = "gemini-2.0-flash-exp"
+  modelName: string = "gemini-2.0-flash-exp",
+  systemPrompt?: string
 ): Promise<AIAnalysisResult> => {
   if (!apiKey) {
     throw new Error("Gemini API key is required");
@@ -89,6 +91,7 @@ export const analyzeContent = async (
     apiKey,
     modelName,
     prompt,
+    systemPrompt,
     schema: {
       type: Type.OBJECT,
       properties: {
@@ -109,6 +112,7 @@ interface GeminiJsonRequest {
   apiKey: string;
   modelName?: string;
   prompt: string;
+  systemPrompt?: string;
   schema: Record<string, unknown>;
 }
 
@@ -116,6 +120,7 @@ export async function generateGeminiJson<T>({
   apiKey,
   modelName = "gemini-2.0-flash-exp",
   prompt,
+  systemPrompt,
   schema,
 }: GeminiJsonRequest): Promise<T> {
   if (!apiKey) {
@@ -136,6 +141,7 @@ export async function generateGeminiJson<T>({
         model: modelName || "gemini-2.0-flash-exp",
         contents: prompt,
         config: {
+          systemInstruction: resolveAISystemPrompt(systemPrompt),
           responseMimeType: "application/json",
           responseSchema: schema
         }
@@ -171,12 +177,14 @@ export async function generateGeminiJson<T>({
 export async function generateGeminiWikiArticle(
   prompt: string,
   apiKey: string,
-  modelName: string = "gemini-2.0-flash-exp"
+  modelName: string = "gemini-2.0-flash-exp",
+  systemPrompt?: string
 ): Promise<AIWikiGenerationResult> {
   return generateGeminiJson<AIWikiGenerationResult>({
     apiKey,
     modelName,
     prompt,
+    systemPrompt,
     schema: {
       type: Type.OBJECT,
       properties: {

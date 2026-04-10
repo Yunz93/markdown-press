@@ -1,5 +1,6 @@
 import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
+import { DEFAULT_AI_SYSTEM_PROMPT } from '../services/aiPrompts';
 import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
 
@@ -69,12 +70,14 @@ export const defaultSettings: AppSettings = {
   codexApiBaseUrl: 'https://api.openai.com/v1',
   codexApiKey: '',
   codexModel: 'gpt-5.2-codex',
+  aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
   shortcuts: {
     save: 'Ctrl+S',
     toggleView: 'Cmd+Shift+V',
     aiAnalyze: 'Ctrl+J',
     search: 'Cmd+Shift+F',
     sidebarSearch: 'Cmd+Shift+S',
+    locateCurrentFile: 'Cmd+Shift+L',
     settings: 'Cmd+Shift+0',
     toggleOutline: 'Cmd+Shift+O',
     toggleSidebar: 'Cmd+Shift+B',

@@ -1,4 +1,5 @@
 import type { AIAnalysisResult, AIWikiGenerationResult, AppSettings } from '../types';
+import { resolveAISystemPrompt } from './aiPrompts';
 
 interface CodexResponseContent {
   type?: string;
@@ -71,6 +72,7 @@ export async function generateCodexJson<T>(
     },
     body: JSON.stringify({
       model: settings.codexModel?.trim() || 'gpt-5.2-codex',
+      instructions: resolveAISystemPrompt(settings.aiSystemPrompt),
       input: `${prompt}\n\nReturn JSON only.`,
       reasoning: {
         effort: 'medium',

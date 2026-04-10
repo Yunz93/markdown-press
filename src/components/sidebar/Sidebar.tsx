@@ -51,9 +51,27 @@ export interface SidebarProps {
   onSwitchKnowledgeBase: () => void;
   isOpen: boolean;
   searchFocusRequestKey?: number;
+  locateCurrentFileRequestKey?: number;
   width: number;
   onWidthChange: (width: number) => void;
   onClose: () => void;
+}
+
+function findNodePath(nodes: FileNode[], targetId: string): FileNode[] | null {
+  for (const node of nodes) {
+    if (node.id === targetId) {
+      return [node];
+    }
+
+    if (node.children?.length) {
+      const childPath = findNodePath(node.children, targetId);
+      if (childPath) {
+        return [node, ...childPath];
+      }
+    }
+  }
+
+  return null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -76,6 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSwitchKnowledgeBase,
   isOpen,
   searchFocusRequestKey = 0,
+  locateCurrentFileRequestKey = 0,
   width,
   onWidthChange,
   onClose,
@@ -88,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sidebarRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showTrash, setShowTrash] = useState(false);
+  const [locatedFileId, setLocatedFileId] = useState<string | null>(null);
 
   const trashItems = useMemo(() => getTrashItems(files), [files]);
 
@@ -156,6 +176,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       searchInputRef.current?.focus();
     }
   }, [searchFocusRequestKey]);
+
+  useEffect(() => {
+    if (locateCurrentFileRequestKey <= 0 || !activeFileId) return;
+
+    setSearchQuery('');
+    setShowTrash(false);
+    setLocatedFileId(activeFileId);
+  }, [activeFileId, locateCurrentFileRequestKey, setSearchQuery]);
+
+  const locatedPathIds = useMemo(() => {
+    if (!locatedFileId) return new Set<string>();
+
+    const path = findNodePath(files, locatedFileId);
+    if (!path) return new Set<string>();
+
+    return new Set(
+      path
+        .filter((node) => node.type === 'folder')
+        .map((node) => node.id)
+    );
+  }, [files, locatedFileId]);
 
   const sidebarSurfaceStyle = useMemo(
     () =>
@@ -361,6 +402,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onContextMenu={openContextMenu}
                   onMoveNode={onMoveNode}
                   forceExpanded={hasSearchQuery}
+                  expandedPathIds={locatedPathIds}
+                  locateRequestKey={locateCurrentFileRequestKey}
                 />
               ))}
             </div>

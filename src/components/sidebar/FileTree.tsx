@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { FileNode } from '../../types';
 
 const AUTO_EXPAND_ON_DRAG_MS = 420;
@@ -11,6 +11,8 @@ interface FileTreeItemProps {
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
   forceExpanded?: boolean;
+  expandedPathIds?: Set<string>;
+  locateRequestKey?: number;
 }
 
 export const FileTreeItem: React.FC<FileTreeItemProps> = ({
@@ -20,12 +22,15 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   onSelect,
   onContextMenu,
   onMoveNode,
-  forceExpanded = false
+  forceExpanded = false,
+  expandedPathIds,
+  locateRequestKey = 0,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const autoExpandTimerRef = React.useRef<number | null>(null);
+  const autoExpandTimerRef = useRef<number | null>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
 
   const isFolder = node.type === 'folder';
   const isDropTarget = !node.isTrash;
@@ -118,12 +123,28 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   }, [clearAutoExpandTimer]);
 
   const isActive = node.id === activeId;
+  const isInLocatedPath = Boolean(expandedPathIds?.has(node.id));
+
+  useEffect(() => {
+    if (locateRequestKey <= 0 || !isFolder || !isInLocatedPath) return;
+    setExpanded(true);
+  }, [isFolder, isInLocatedPath, locateRequestKey]);
+
+  useEffect(() => {
+    if (locateRequestKey <= 0 || !isActive) return;
+
+    itemRef.current?.scrollIntoView({
+      block: 'center',
+      behavior: 'smooth',
+    });
+  }, [isActive, locateRequestKey]);
 
   const showChildren = isFolder && (expanded || forceExpanded) && node.children;
 
   return (
     <div className="select-none">
       <div
+        ref={itemRef}
         className={`
           group flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm font-medium border border-transparent
           ${isActive
@@ -193,6 +214,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
                 onContextMenu={onContextMenu}
                 onMoveNode={onMoveNode}
                 forceExpanded={forceExpanded}
+                expandedPathIds={expandedPathIds}
+                locateRequestKey={locateRequestKey}
               />
             ))}
         </div>

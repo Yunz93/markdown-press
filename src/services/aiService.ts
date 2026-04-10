@@ -91,7 +91,8 @@ export async function analyzeMarkdownWithProvider(
   return analyzeContent(
     content,
     settings.geminiApiKey || '',
-    settings.geminiModel || 'gemini-2.0-flash-exp'
+    settings.geminiModel || 'gemini-2.0-flash-exp',
+    settings.aiSystemPrompt
   );
 }
 
@@ -115,6 +116,7 @@ export async function generateWikiFromSelectionWithProvider(
   return generateGeminiWikiArticle(
     prompt,
     settings.geminiApiKey || '',
-    settings.geminiModel || 'gemini-2.0-flash-exp'
+    settings.geminiModel || 'gemini-2.0-flash-exp',
+    settings.aiSystemPrompt
   );
 }

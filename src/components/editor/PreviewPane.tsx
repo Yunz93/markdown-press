@@ -125,6 +125,21 @@ function parseFrontmatterDraftValue(rawValue: string, originalValue: Frontmatter
   return rawValue;
 }
 
+function getFrontmatterDisplayItems(value: FrontmatterValue): string[] {
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean);
+    return items.length > 0 ? items : [''];
+  }
+
+  if (value === null || value === undefined) {
+    return [''];
+  }
+
+  return [String(value)];
+}
+
 export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   highlighter,
   onScroll,
@@ -593,6 +608,21 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                           >
                             {propertyDrafts[key] ?? value}
                           </a>
+                        ) : Array.isArray(value) && editingPropertyKey !== key ? (
+                          <button
+                            type="button"
+                            onClick={() => handlePropertyFocus(key)}
+                            className="preview-pane-properties-multi-value w-full text-left"
+                          >
+                            {getFrontmatterDisplayItems(value).map((item, index) => (
+                              <span
+                                key={`${key}-${index}-${item}`}
+                                className={`preview-pane-properties-multi-value-item ${item ? '' : 'is-empty'}`}
+                              >
+                                {item || '\u2014'}
+                              </span>
+                            ))}
+                          </button>
                         ) : (
                           <div className="flex items-start gap-2">
                             <textarea

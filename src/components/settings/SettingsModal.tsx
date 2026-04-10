@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
+import { DEFAULT_AI_SYSTEM_PROMPT } from '../../services/aiPrompts';
 import { fetchAvailableModels, type ModelOption } from '../../services/modelCatalogService';
 import { persistSecureSetting, type SensitiveSettingKey } from '../../services/secureSettingsService';
 import {
@@ -119,6 +120,7 @@ function getShortcutLabels(t: (key: TranslationKey, params?: Record<string, stri
     aiAnalyze: t('settings_aiEnhance'),
     search: t('settings_search'),
     sidebarSearch: t('settings_sidebarSearch'),
+    locateCurrentFile: t('settings_locateCurrentFile'),
     settings: t('settings_openSettings'),
     toggleOutline: t('settings_toggleOutline'),
     toggleSidebar: t('settings_toggleSidebar'),
@@ -189,6 +191,13 @@ function getShortcutGroups(t: (key: TranslationKey, params?: Record<string, stri
         description: t('settings_openKnowledgeBaseDesc'),
         editable: true,
         settingKey: 'openKnowledgeBase',
+      },
+      {
+        id: 'locateCurrentFile',
+        label: t('settings_locateCurrentFile'),
+        description: t('settings_locateCurrentFileDesc'),
+        editable: true,
+        settingKey: 'locateCurrentFile',
       },
       {
         id: 'openSettings',
@@ -640,6 +649,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {modelLoadMessage.text}
                       </p>
                     )}
+
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_systemPrompt')}</label>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateSettings({ aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT })}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
+                        >
+                          {t('settings_resetDefaultPrompt')}
+                        </button>
+                      </div>
+                      <textarea
+                        value={settings.aiSystemPrompt || DEFAULT_AI_SYSTEM_PROMPT}
+                        onChange={(e) => onUpdateSettings({ aiSystemPrompt: e.target.value })}
+                        placeholder={t('settings_systemPromptPlaceholder')}
+                        rows={10}
+                        spellCheck={false}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono resize-y min-h-[220px]"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_systemPromptDesc')}</p>
+                    </div>
                   </div>
                 </div>
               </div>

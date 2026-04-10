@@ -21,6 +21,7 @@ import {
   EditorView,
   keymap,
   placeholder as cmPlaceholder,
+  tooltips,
   type ViewUpdate,
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
@@ -178,6 +179,10 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
               activateOnTyping: true,
               override: [customCompletion],
               maxRenderedOptions: 40,
+              tooltipClass: () => 'editor-autocomplete-panel',
+            }),
+            tooltips({
+              parent: editorRef.current.ownerDocument.body,
             }),
             indentUnit.of(LIST_INDENT_UNIT),
             markdown({ codeLanguages: resolveEditorCodeLanguage }),

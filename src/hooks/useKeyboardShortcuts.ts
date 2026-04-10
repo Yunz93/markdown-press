@@ -8,6 +8,7 @@ interface UseKeyboardShortcutsOptions {
   onAIAnalyze?: () => void;
   onSearch?: () => void;
   onSidebarSearch?: () => void;
+  onLocateCurrentFile?: () => void;
   onOpenSettings?: () => void;
   onToggleOutline?: () => void;
   onToggleSidebar?: () => void;
@@ -25,6 +26,7 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   'aiAnalyze',
   'search',
   'sidebarSearch',
+  'locateCurrentFile',
   'settings',
   'toggleOutline',
   'toggleSidebar',
@@ -118,6 +120,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
       aiAnalyze: options.onAIAnalyze,
       search: options.onSearch,
       sidebarSearch: options.onSidebarSearch,
+      locateCurrentFile: options.onLocateCurrentFile,
       settings: options.onOpenSettings,
       toggleOutline: options.onToggleOutline,
       toggleSidebar: options.onToggleSidebar,
@@ -147,6 +150,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
     options.onAIAnalyze,
     options.onCloseTab,
     options.onExportHtml,
+    options.onLocateCurrentFile,
     options.onNewFolder,
     options.onNewNote,
     options.onOpenKnowledgeBase,
