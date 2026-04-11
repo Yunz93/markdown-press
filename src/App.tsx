@@ -30,6 +30,7 @@ import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimu
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
 import { migrateLegacySensitiveSettings } from './services/secureSettingsService';
+import { findUnusedAttachments } from './utils/attachmentCleanup';
 import type { PaneDensity } from './components/editor/paneLayout';
 import { useI18n } from './hooks/useI18n';
 
@@ -62,6 +63,7 @@ const App: React.FC = () => {
   const { t } = useI18n();
   const {
     files,
+    openTabs,
     rootFolderPath,
     activeTabId,
     currentFilePath,
@@ -72,6 +74,7 @@ const App: React.FC = () => {
     isAnalyzing,
     isPublishing,
     settings,
+    fileContents,
     outlineHeadings,
     activeHeadingId,
     closeTab,
@@ -87,7 +90,7 @@ const App: React.FC = () => {
 
   const content = useAppStore(selectContent);
 
-  const { openDirectory, openKnowledgeBase, readFile, watchFile } = useFileSystem();
+  const { openDirectory, openKnowledgeBase, readFile, moveToTrash, refreshFileTree, watchFile } = useFileSystem();
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
@@ -180,7 +183,7 @@ const App: React.FC = () => {
     autoOpenAttemptedRef.current = true;
 
     const lastKnowledgeBase = settings.lastKnowledgeBasePath;
-    if (!lastKnowledgeBase || rootFolderPath || isTauriEnvironment()) {
+    if (!lastKnowledgeBase || rootFolderPath) {
       setIsRestoringKnowledgeBase(false);
       return;
     }
@@ -400,6 +403,99 @@ const App: React.FC = () => {
   const handleSwitchKnowledgeBase = useCallback(async () => {
     await openDirectory();
   }, [openDirectory]);
+
+  const handleCleanupUnusedAttachments = useCallback(async () => {
+    if (!rootFolderPath) {
+      showNotification(t('notifications_noKnowledgeBaseOpened'), 'error');
+      return;
+    }
+
+    try {
+      const scanResult = await findUnusedAttachments({
+        files,
+        rootFolderPath,
+        resourceFolder: settings.resourceFolder,
+        fileContentOverrides: fileContents,
+      });
+
+      if (scanResult.unusedAttachments.length === 0) {
+        showNotification(t('notifications_noUnusedAttachmentsFound'), 'success');
+        return;
+      }
+
+      const unusedPaths = new Set(scanResult.unusedAttachments.map((file) => file.path));
+      let movedCount = 0;
+
+      for (const attachment of scanResult.unusedAttachments) {
+        const movedPath = await moveToTrash(attachment, {
+          silent: true,
+          skipRefresh: true,
+        });
+
+        if (movedPath) {
+          movedCount += 1;
+        } else {
+          console.error('Failed to move unused attachment to trash:', attachment.path);
+        }
+      }
+
+      if (movedCount > 0) {
+        openTabs
+          .filter((tabId) => unusedPaths.has(tabId))
+          .forEach((tabId) => closeTab(tabId));
+        await refreshFileTree();
+      }
+
+      if (movedCount === scanResult.unusedAttachments.length) {
+        showNotification(
+          t('notifications_unusedAttachmentsRemoved', { count: movedCount }),
+          'success'
+        );
+        return;
+      }
+
+      if (movedCount > 0) {
+        showNotification(
+          t('notifications_unusedAttachmentsPartiallyRemoved', {
+            deleted: movedCount,
+            failed: scanResult.unusedAttachments.length - movedCount,
+          }),
+          'error'
+        );
+        return;
+      }
+
+      showNotification(t('notifications_removeUnusedAttachmentsFailed'), 'error');
+    } catch (error) {
+      console.error('Failed to cleanup unused attachments:', error);
+      showNotification(t('notifications_removeUnusedAttachmentsFailed'), 'error');
+    }
+  }, [
+    closeTab,
+    fileContents,
+    files,
+    moveToTrash,
+    openTabs,
+    refreshFileTree,
+    rootFolderPath,
+    settings.resourceFolder,
+    showNotification,
+    t,
+  ]);
+
+  useEffect(() => {
+    const handleCleanupShortcut = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (event.code !== 'Minus') return;
+      if (!event.metaKey || !event.shiftKey || event.ctrlKey || event.altKey) return;
+
+      event.preventDefault();
+      void handleCleanupUnusedAttachments();
+    };
+
+    window.addEventListener('keydown', handleCleanupShortcut, true);
+    return () => window.removeEventListener('keydown', handleCleanupShortcut, true);
+  }, [handleCleanupUnusedAttachments]);
 
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const notification = useAppStore(state => state.notification);

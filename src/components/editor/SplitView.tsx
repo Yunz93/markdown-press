@@ -110,6 +110,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
   const showEditor = viewMode === ViewMode.EDITOR || viewMode === ViewMode.SPLIT;
   const showPreview = viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT;
+  const activePaneKey = activeTabId ?? 'no-active-tab';
 
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
@@ -127,6 +128,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             }}
           >
             <EditorPane
+              key={`editor-${activePaneKey}`}
               ref={editorPaneRef}
               highlighter={highlighter}
               density={contentDensity}
@@ -157,6 +159,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             }}
           >
             <PreviewPane
+              key={`preview-${activePaneKey}`}
               ref={previewPaneRef}
               highlighter={highlighter}
               density={contentDensity}

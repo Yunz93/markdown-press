@@ -96,6 +96,7 @@ export interface AppSettings {
   englishFontFamily: string;
   chineseFontFamily: string;
   resourceFolder: string;
+  trashFolder: string;
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
   blogRepoUrl: string;

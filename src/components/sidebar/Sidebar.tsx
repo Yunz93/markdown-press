@@ -74,6 +74,48 @@ function findNodePath(nodes: FileNode[], targetId: string): FileNode[] | null {
   return null;
 }
 
+function normalizeSlashes(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+function getRelativePathFromKnowledgeBase(path: string, rootPath: string): string {
+  const normalizedPath = normalizeSlashes(path);
+  const normalizedRoot = normalizeSlashes(rootPath).replace(/\/+$/, '');
+
+  if (normalizedPath === normalizedRoot) {
+    return '';
+  }
+
+  const rootPrefix = `${normalizedRoot}/`;
+  if (normalizedPath.startsWith(rootPrefix)) {
+    return normalizedPath.slice(rootPrefix.length);
+  }
+
+  return normalizedPath;
+}
+
+async function writeToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   files,
   activeFileId,
@@ -103,13 +145,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { readFile } = useFileSystem();
   const fileContents = useAppStore((state) => state.fileContents);
   const themeMode = useAppStore((state) => state.settings.themeMode);
+  const trashFolder = useAppStore((state) => state.settings.trashFolder);
+  const showNotification = useAppStore((state) => state.showNotification);
 
   const sidebarRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [locatedFileId, setLocatedFileId] = useState<string | null>(null);
 
-  const trashItems = useMemo(() => getTrashItems(files), [files]);
+  const trashItems = useMemo(() => getTrashItems(files, trashFolder), [files, trashFolder]);
 
   // Hooks
   const { handleResizeStart } = useSidebarResize({ onWidthChange });
@@ -206,6 +250,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }) as React.CSSProperties,
     [themeMode, width]
   );
+
+  const handleCopyRelativePath = useCallback(async (node: FileNode) => {
+    if (!currentKnowledgeBasePath) {
+      showNotification(t('notifications_noKnowledgeBaseOpened'), 'error');
+      return;
+    }
+
+    const relativePath = getRelativePathFromKnowledgeBase(node.path, currentKnowledgeBasePath);
+    if (!relativePath) {
+      showNotification(t('notifications_copyRelativePathFailed'), 'error');
+      return;
+    }
+
+    try {
+      await writeToClipboard(relativePath);
+      showNotification(t('notifications_relativePathCopied', { path: relativePath }), 'success');
+    } catch (error) {
+      console.error('Failed to copy relative path:', relativePath, error);
+      showNotification(t('notifications_copyRelativePathFailed'), 'error');
+    }
+  }, [currentKnowledgeBasePath, showNotification, t]);
 
   return (
     <>
@@ -521,7 +586,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )
           }
           onDelete={() => openDeleteDialog(contextMenu.node)}
-                  onReveal={() => onReveal(contextMenu.node.path)}
+          onCopyRelativePath={() => { void handleCopyRelativePath(contextMenu.node); }}
+          onReveal={() => onReveal(contextMenu.node.path)}
           onCreateFile={() =>
             openNewFileDialog(
               contextMenu.node.type === 'folder' ? contextMenu.node : undefined,

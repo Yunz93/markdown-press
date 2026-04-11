@@ -60,12 +60,144 @@ function isPdfAttachment(fileName: string): boolean {
   return /\.pdf$/i.test(fileName);
 }
 
+function isVideoAttachment(fileName: string): boolean {
+  return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
+}
+
 function isHtmlDocument(fileName: string): boolean {
   return /\.html?$/i.test(fileName);
 }
 
 function hasWikiEmbedsInHtml(html: string): boolean {
   return html.includes('data-wiki-embed="true"') || html.includes('class="markdown-link markdown-embed"');
+}
+
+function hasEmbeddableMediaLinksInHtml(html: string): boolean {
+  return /href="https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|youtube-nocookie\.com|bilibili\.com|player\.bilibili\.com)\//i.test(html);
+}
+
+interface ExternalVideoEmbed {
+  provider: 'youtube' | 'bilibili';
+  src: string;
+  title: string;
+}
+
+function resolveYouTubeEmbed(url: URL): ExternalVideoEmbed | null {
+  const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
+  let videoId = '';
+
+  if (hostname === 'youtu.be') {
+    videoId = url.pathname.split('/').filter(Boolean)[0] ?? '';
+  } else if (hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+    if (url.pathname === '/watch') {
+      videoId = url.searchParams.get('v') ?? '';
+    } else if (url.pathname.startsWith('/shorts/')) {
+      videoId = url.pathname.split('/')[2] ?? '';
+    } else if (url.pathname.startsWith('/embed/')) {
+      videoId = url.pathname.split('/')[2] ?? '';
+    }
+  } else if (hostname === 'youtube-nocookie.com' && url.pathname.startsWith('/embed/')) {
+    videoId = url.pathname.split('/')[2] ?? '';
+  }
+
+  if (!videoId) return null;
+
+  const embedUrl = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+  const start = url.searchParams.get('t') ?? url.searchParams.get('start');
+  if (start) {
+    embedUrl.searchParams.set('start', start.replace(/s$/i, ''));
+  }
+
+  return {
+    provider: 'youtube',
+    src: embedUrl.toString(),
+    title: 'YouTube video',
+  };
+}
+
+function resolveBilibiliEmbed(url: URL): ExternalVideoEmbed | null {
+  const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
+
+  if (hostname === 'player.bilibili.com' && url.pathname === '/player.html') {
+    return {
+      provider: 'bilibili',
+      src: url.toString(),
+      title: 'Bilibili video',
+    };
+  }
+
+  if (!hostname.endsWith('bilibili.com')) {
+    return null;
+  }
+
+  const match = url.pathname.match(/\/video\/((?:BV[\w]+)|(?:av\d+))/i);
+  if (!match) return null;
+
+  const rawId = match[1];
+  const embedUrl = new URL('https://player.bilibili.com/player.html');
+
+  if (/^BV/i.test(rawId)) {
+    embedUrl.searchParams.set('bvid', rawId);
+  } else {
+    embedUrl.searchParams.set('aid', rawId.replace(/^av/i, ''));
+  }
+
+  const page = url.searchParams.get('p');
+  if (page) {
+    embedUrl.searchParams.set('page', page);
+  }
+
+  return {
+    provider: 'bilibili',
+    src: embedUrl.toString(),
+    title: 'Bilibili video',
+  };
+}
+
+function resolveExternalVideoEmbed(rawUrl: string): ExternalVideoEmbed | null {
+  try {
+    const url = new URL(rawUrl);
+    return resolveYouTubeEmbed(url) ?? resolveBilibiliEmbed(url);
+  } catch {
+    return null;
+  }
+}
+
+function buildIframeEmbed(document: Document, embed: ExternalVideoEmbed): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = `preview-external-video-embed is-${embed.provider}`;
+
+  const frame = document.createElement('iframe');
+  frame.className = 'preview-external-video-frame';
+  frame.src = embed.src;
+  frame.title = embed.title;
+  frame.loading = 'lazy';
+  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.allowFullscreen = true;
+  frame.setAttribute(
+    'allow',
+    'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+  );
+
+  wrapper.appendChild(frame);
+  return wrapper;
+}
+
+function normalizeExistingIframe(frame: HTMLIFrameElement): void {
+  frame.classList.add('preview-external-video-frame');
+  if (!frame.getAttribute('loading')) {
+    frame.setAttribute('loading', 'lazy');
+  }
+  if (!frame.getAttribute('referrerpolicy')) {
+    frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  }
+  if (!frame.getAttribute('allow')) {
+    frame.setAttribute(
+      'allow',
+      'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+    );
+  }
+  frame.setAttribute('allowfullscreen', 'true');
 }
 
 function configurePreviewImageElement(image: HTMLImageElement, src: string, originalSrc: string): void {
@@ -139,13 +271,21 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   );
 
   const requiresAsyncEnhancement = useMemo(
-    () => Boolean(basePreviewHtml) && (basePreviewHtml.includes('<img') || hasWikiEmbeds),
+    () => Boolean(basePreviewHtml) && (
+      basePreviewHtml.includes('<img')
+      || basePreviewHtml.includes('<video')
+      || basePreviewHtml.includes('<source')
+      || basePreviewHtml.includes('<iframe')
+      || hasWikiEmbeds
+      || hasEmbeddableMediaLinksInHtml(basePreviewHtml)
+    ),
     [basePreviewHtml, hasWikiEmbeds]
   );
 
   const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => basePreviewHtml);
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const mermaidTimerRef = useRef<number | null>(null);
+  const basePreviewHtmlRef = useRef(basePreviewHtml);
   const enhancedBodyHtmlRef = useRef(enhancedBodyHtml);
   useEffect(() => {
     enhancedBodyHtmlRef.current = enhancedBodyHtml;
@@ -166,11 +306,14 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     }
 
     if (!basePreviewHtml || typeof DOMParser === 'undefined') {
+      basePreviewHtmlRef.current = basePreviewHtml;
       setEnhancedBodyHtml(basePreviewHtml);
       return;
     }
 
-    if (basePreviewHtml !== enhancedBodyHtmlRef.current) {
+    const basePreviewHtmlChanged = basePreviewHtml !== basePreviewHtmlRef.current;
+    if (basePreviewHtmlChanged) {
+      basePreviewHtmlRef.current = basePreviewHtml;
       setEnhancedBodyHtml(basePreviewHtml);
     }
 
@@ -187,6 +330,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
           ? Array.from(parsed.body.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
           : [];
         const markdownImages = Array.from(parsed.body.querySelectorAll<HTMLImageElement>('img'));
+        const markdownVideos = Array.from(parsed.body.querySelectorAll<HTMLVideoElement>('video'));
+        const markdownSources = Array.from(parsed.body.querySelectorAll<HTMLSourceElement>('source[src]'));
+        const iframes = Array.from(parsed.body.querySelectorAll<HTMLIFrameElement>('iframe'));
+        const anchorParagraphs = Array.from(parsed.body.querySelectorAll<HTMLParagraphElement>('p'));
 
         // Process images
         await Promise.all(markdownImages.map(async (image) => {
@@ -197,18 +344,92 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             const resolvedAttachment = !hasUriScheme(originalSrc)
               ? await resolveAttachmentTarget(attachmentResolverContext, originalSrc)
               : null;
-        const previewTarget = resolvedAttachment?.path ?? originalSrc;
+            const previewTarget = resolvedAttachment?.path ?? originalSrc;
+            const resolvedName = resolvedAttachment?.name ?? previewTarget.split(/[\\/]/).pop() ?? previewTarget;
 
-        try {
-          const warmedSrc = await warmPreviewImage(previewTarget, currentFilePath || undefined);
-          configurePreviewImageElement(image, warmedSrc, previewTarget);
-        } catch {
-          configurePreviewImageElement(image, previewTarget, previewTarget);
-        }
-      } catch (error) {
-        console.warn('Failed to process image:', error);
-      }
-      }));
+            if (isVideoAttachment(resolvedName)) {
+              const video = parsed.createElement('video');
+              video.className = 'preview-attachment-video';
+              video.controls = true;
+              video.playsInline = true;
+              video.preload = 'metadata';
+              video.src = await resolvePreviewSource(previewTarget, currentFilePath || undefined);
+              image.replaceWith(video);
+              return;
+            }
+
+            try {
+              const warmedSrc = await warmPreviewImage(previewTarget, currentFilePath || undefined);
+              configurePreviewImageElement(image, warmedSrc, previewTarget);
+            } catch {
+              configurePreviewImageElement(image, previewTarget, previewTarget);
+            }
+          } catch (error) {
+            console.warn('Failed to process image:', error);
+          }
+        }));
+
+        await Promise.all(markdownVideos.map(async (video) => {
+          try {
+            video.classList.add('preview-attachment-video');
+            video.controls = true;
+            video.playsInline = true;
+            if (!video.getAttribute('preload')) {
+              video.preload = 'metadata';
+            }
+
+            const originalSrc = video.getAttribute('src')?.trim();
+            if (!originalSrc || hasUriScheme(originalSrc)) {
+              return;
+            }
+
+            const resolvedTarget = await resolveAttachmentTarget(attachmentResolverContext, originalSrc);
+            const previewTarget = resolvedTarget?.path ?? originalSrc;
+            video.src = await resolvePreviewSource(previewTarget, currentFilePath || undefined);
+          } catch (error) {
+            console.warn('Failed to process video:', error);
+          }
+        }));
+
+        await Promise.all(markdownSources.map(async (source) => {
+          try {
+            const originalSrc = source.getAttribute('src')?.trim();
+            if (!originalSrc || hasUriScheme(originalSrc)) {
+              return;
+            }
+
+            const resolvedTarget = await resolveAttachmentTarget(attachmentResolverContext, originalSrc);
+            const previewTarget = resolvedTarget?.path ?? originalSrc;
+            source.src = await resolvePreviewSource(previewTarget, currentFilePath || undefined);
+          } catch (error) {
+            console.warn('Failed to process video source:', error);
+          }
+        }));
+
+        iframes.forEach((frame) => {
+          const src = frame.getAttribute('src')?.trim();
+          if (!src) return;
+          if (!resolveExternalVideoEmbed(src)) return;
+          normalizeExistingIframe(frame);
+        });
+
+        anchorParagraphs.forEach((paragraph) => {
+          const meaningfulChildren = Array.from(paragraph.childNodes).filter((node) => (
+            node.nodeType !== Node.TEXT_NODE || node.textContent?.trim()
+          ));
+          if (meaningfulChildren.length !== 1) return;
+
+          const anchor = meaningfulChildren[0];
+          if (!(anchor instanceof HTMLAnchorElement)) return;
+
+          const href = anchor.getAttribute('href')?.trim();
+          if (!href) return;
+
+          const externalVideo = resolveExternalVideoEmbed(href);
+          if (!externalVideo) return;
+
+          paragraph.replaceWith(buildIframeEmbed(parsed, externalVideo));
+        });
 
       if (embeds.length === 0) {
         if (!cancelled) {
@@ -327,6 +548,25 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             return;
           }
 
+          if (isVideoAttachment(resolvedTarget.name)) {
+            const video = parsed.createElement('video');
+            video.className = 'preview-attachment-video';
+            video.controls = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+            if (embedWidth) video.style.width = `${embedWidth}px`;
+            if (embedHeight) video.style.height = `${embedHeight}px`;
+
+            try {
+              video.src = await resolvePreviewSource(resolvedTarget.path, currentFilePath || undefined);
+              embed.replaceWith(video);
+            } catch {
+              embed.className = 'preview-attachment-file preview-attachment-file-missing';
+              embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
+            }
+            return;
+          }
+
           // PDF embed
           if (isPdfAttachment(resolvedTarget.name)) {
             const pdfFrame = parsed.createElement('iframe');
@@ -376,7 +616,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       }
     } catch (error) {
       console.error('Preview renderer error:', error);
-      if (!cancelled) {
+      if (!cancelled && basePreviewHtmlChanged) {
         setEnhancedBodyHtml(basePreviewHtml);
       }
     }})();

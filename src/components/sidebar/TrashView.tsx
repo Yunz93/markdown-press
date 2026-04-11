@@ -18,6 +18,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
   onContextMenu
 }) => {
   const { t } = useI18n();
+
   if (trashItems.length === 0) {
     return (
       <div className="px-3 py-2 text-xs italic text-gray-400 text-center">
@@ -43,7 +44,21 @@ export const TrashView: React.FC<TrashViewProps> = ({
           className="group flex items-center justify-between rounded px-2 py-1.5 text-xs text-gray-600 hover:bg-black/[0.04] dark:text-gray-300 dark:hover:bg-[#161e2a]"
           onContextMenu={(e) => onContextMenu?.(e, node)}
         >
-          <span className="truncate flex-1 pr-2">{node.name}</span>
+          <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
+            <span className="shrink-0 text-gray-400">
+              {node.type === 'folder' ? (
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+              ) : (
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                  <polyline points="13 2 13 9 20 9" />
+                </svg>
+              )}
+            </span>
+            <span className="truncate flex-1">{node.name}</span>
+          </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
             <button
               onClick={() => onRestore(node)}

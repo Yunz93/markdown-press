@@ -27,7 +27,6 @@ import {
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { indentUnit, syntaxHighlighting } from '@codemirror/language';
-import { debounce } from '../../../utils/throttle';
 import { resolveEditorCodeLanguage } from '../../../utils/editorCodeLanguages';
 import {
   createMarkdownKeyBindings,
@@ -41,11 +40,6 @@ import {
   markdownListDecorations,
 } from '../decorations';
 import type { OrderedListMode } from '../../../types';
-
-// Debounced update callback to prevent excessive re-renders
-const createDebouncedUpdate = (callback: (content: string) => void, delay: number = 16) => {
-  return debounce(callback, delay);
-};
 
 export interface UseCodeMirrorOptions {
   content: string;
@@ -87,9 +81,11 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const viewRef = useRef<EditorView | null>(null);
   const [viewReady, setViewReady] = useState(false);
   const [editorElementReady, setEditorElementReady] = useState(false);
+  const changeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isApplyingOrderedNormalizationRef = useRef(false);
   const normalizationTimeoutRef = useRef<number | null>(null);
   const completionSourceRef = useRef(completionSource);
+  const onChangeRef = useRef(onChange);
   const onScrollRef = useRef(onScroll);
   const onPasteImageRef = useRef(onPasteImage);
   const onWikiLinkStartRef = useRef(onWikiLinkStart);
@@ -125,12 +121,12 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     }
   }, []);
 
-  // Create debounced onChange
-  const debouncedOnChangeRef = useRef(createDebouncedUpdate(onChange, 16));
-
-  // Update debounced callback when onChange changes
   useEffect(() => {
-    debouncedOnChangeRef.current = createDebouncedUpdate(onChange, 16);
+    onChangeRef.current = onChange;
+    if (changeTimeoutRef.current) {
+      clearTimeout(changeTimeoutRef.current);
+      changeTimeoutRef.current = null;
+    }
   }, [onChange]);
 
   useEffect(() => {
@@ -266,7 +262,15 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
 
               // Trigger content change
               if (!isSyncingContentRef.current) {
-                debouncedOnChangeRef.current(update.state.doc.toString());
+                if (changeTimeoutRef.current) {
+                  clearTimeout(changeTimeoutRef.current);
+                }
+
+                const nextContent = update.state.doc.toString();
+                changeTimeoutRef.current = setTimeout(() => {
+                  onChangeRef.current(nextContent);
+                  changeTimeoutRef.current = null;
+                }, 16);
               }
 
               // Auto-trigger completion for wiki links
@@ -295,6 +299,10 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     }
 
     return () => {
+      if (changeTimeoutRef.current) {
+        clearTimeout(changeTimeoutRef.current);
+        changeTimeoutRef.current = null;
+      }
       if (normalizationTimeoutRef.current) {
         clearTimeout(normalizationTimeoutRef.current);
       }

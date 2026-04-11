@@ -4,6 +4,8 @@ import { basename, dirname, join } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 import type { FileNode } from '../types';
 import type { IFileSystem } from '../types/filesystem';
+import { useAppStore } from '../store/appStore';
+import { sanitizeTrashFolder } from '../utils/trashFolder';
 
 /**
  * Supported file extensions
@@ -13,8 +15,6 @@ const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bm
 const DOCUMENT_EXTENSIONS = ['.pdf'];
 const HTML_EXTENSIONS = ['.html', '.htm'];
 const CONFIG_EXTENSIONS = ['.json', '.yaml', '.yml', '.toml'];
-const TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
-
 type LineEnding = '\n' | '\r\n';
 
 interface FileFormatState {
@@ -306,7 +306,7 @@ export class TauriFileSystem implements IFileSystem {
    */
   async deleteFile(path: string): Promise<void> {
     try {
-      await remove(path, { recursive: true });
+      await invoke('delete_path_recursively', { path });
       this.fileFormatStates.delete(path);
       this.invalidateObjectUrl(path);
     } catch (error) {
@@ -361,13 +361,13 @@ export class TauriFileSystem implements IFileSystem {
       const normalizedDirPath = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
       const normalizedRootPath = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
       const isAtRoot = normalizedDirPath === normalizedRootPath;
+      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
 
       for (const entry of entries) {
         if (!entry.name) continue;
-        const isTrashDirectory = entry.isDirectory && isAtRoot && TRASH_DIRECTORY_NAMES.has(entry.name);
+        const isTrashDirectory = entry.isDirectory && isAtRoot && entry.name === trashFolder;
         const nodeInTrash = inTrash || isTrashDirectory;
         if (!this.showHiddenFiles && entry.name.startsWith('.') && !isTrashDirectory && !inTrash) continue;
-        if (isTrashDirectory && !inTrash) continue;
 
         const fullPath = await join(dirPath, entry.name);
         const ext = entry.name.toLowerCase();

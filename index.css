@@ -1252,6 +1252,18 @@ html[data-app-booting="true"] *::after {
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
+.preview-pane-document.markdown-body .preview-attachment-video,
+.preview-pane-video-player {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 75vh;
+  margin: 1rem 0;
+  border-radius: 1rem;
+  background: #000;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
 .preview-pane-document.markdown-body .preview-attachment-pdf {
   display: block;
   width: 100%;
@@ -1261,6 +1273,25 @@ html[data-app-booting="true"] *::after {
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.preview-pane-document.markdown-body .preview-external-video-embed {
+  width: 100%;
+  max-width: 100%;
+  margin: 1rem 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.preview-pane-document.markdown-body .preview-external-video-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
 }
 
 .preview-pane-document.markdown-body .preview-attachment-file {

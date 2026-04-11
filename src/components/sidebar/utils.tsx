@@ -1,23 +1,26 @@
 import type { FileNode } from '../../types';
 import React from 'react';
+import { DEFAULT_TRASH_FOLDER, getTrashDepth as getConfiguredTrashDepth, isTrashRootName, sanitizeTrashFolder } from '../../utils/trashFolder';
 
-const TRASH_ROOT_NAMES = new Set(['.trash', '_markdown_press_trash']);
-
-const getTrashDepth = (path: string): number => {
+function hasValidTrashContainer(path: string, trashFolder: string): boolean {
   const segments = path.split(/[\\/]+/).filter(Boolean);
-  const trashIndex = Math.max(
-    segments.lastIndexOf('.trash'),
-    segments.lastIndexOf('_markdown_press_trash')
-  );
-  if (trashIndex < 0) return -1;
-  return segments.length - trashIndex - 1;
-};
+  const trashIndex = segments.lastIndexOf(sanitizeTrashFolder(trashFolder));
+  if (trashIndex < 0) return false;
 
-export const getTrashItems = (nodes: FileNode[]): FileNode[] => {
+  const containerName = segments[trashIndex + 1];
+  return /^\d+__.+$/.test(containerName ?? '');
+}
+
+export const getTrashItems = (nodes: FileNode[], trashFolder: string = DEFAULT_TRASH_FOLDER): FileNode[] => {
   const trash: FileNode[] = [];
+  const normalizedTrashFolder = sanitizeTrashFolder(trashFolder);
   const collect = (items: FileNode[]) => {
     for (const node of items) {
-      if (node.isTrash && getTrashDepth(node.path) === 2) {
+      if (
+        node.isTrash &&
+        getConfiguredTrashDepth(node.path, normalizedTrashFolder) === 2 &&
+        hasValidTrashContainer(node.path, normalizedTrashFolder)
+      ) {
         trash.push(node);
       }
       if (node.children) {
@@ -30,18 +33,22 @@ export const getTrashItems = (nodes: FileNode[]): FileNode[] => {
   return trash.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 };
 
-export const isTrashRootNode = (node: FileNode): boolean =>
-  node.type === 'folder' && TRASH_ROOT_NAMES.has(node.name);
+export const isTrashRootNode = (node: FileNode, trashFolder: string = DEFAULT_TRASH_FOLDER): boolean =>
+  node.type === 'folder' && isTrashRootName(node.name, trashFolder);
 
 export const normalizeSearchTarget = (name: string): string =>
   name.replace(/\.md$/i, '').toLowerCase();
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-export const filterNodesByFileName = (nodes: FileNode[], query: string): FileNode[] => {
+export const filterNodesByFileName = (
+  nodes: FileNode[],
+  query: string,
+  trashFolder: string = DEFAULT_TRASH_FOLDER
+): FileNode[] => {
   if (!query.trim()) {
     return nodes
-      .filter((node) => !node.isTrash && !isTrashRootNode(node))
+      .filter((node) => !node.isTrash && !isTrashRootNode(node, trashFolder))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   }
 
@@ -49,10 +56,10 @@ export const filterNodesByFileName = (nodes: FileNode[], query: string): FileNod
 
   return nodes
     .reduce<FileNode[]>((acc, node) => {
-      if (node.isTrash || isTrashRootNode(node)) return acc;
+      if (node.isTrash || isTrashRootNode(node, trashFolder)) return acc;
 
       if (node.type === 'folder') {
-        const filteredChildren = filterNodesByFileName(node.children ?? [], normalizedQuery);
+        const filteredChildren = filterNodesByFileName(node.children ?? [], normalizedQuery, trashFolder);
         if (filteredChildren.length > 0) {
           acc.push({
             ...node,

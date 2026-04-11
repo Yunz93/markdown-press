@@ -5,10 +5,9 @@ import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
 import { ViewMode } from '../types';
 import type { FileNode } from '../types';
 import { localizeKnownError, t } from '../utils/i18n';
+import { DEFAULT_TRASH_FOLDER, sanitizeTrashFolder } from '../utils/trashFolder';
+import { isTauriEnvironment } from '../types/filesystem';
 
-const PRIMARY_TRASH_DIR_NAME = '.trash';
-const LEGACY_TRASH_DIR_NAMES = ['_markdown_press_trash'] as const;
-const TRASH_DIR_NAMES = [PRIMARY_TRASH_DIR_NAME, ...LEGACY_TRASH_DIR_NAMES] as const;
 const TRASH_ROOT_MARKER = '__root__';
 function getPathSeparator(path: string): '/' | '\\' {
   return path.includes('\\') ? '\\' : '/';
@@ -91,6 +90,28 @@ function joinPathSegments(basePath: string, ...segments: string[]): string {
   return segments.filter(Boolean).reduce((acc, segment) => joinPath(acc, segment), basePath);
 }
 
+async function registerTauriAllowedPath(path: string, recursive: boolean): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('register_allowed_path', { path, recursive });
+}
+
+async function registerTauriAllowedPathIfExists(path: string, recursive: boolean): Promise<void> {
+  try {
+    await registerTauriAllowedPath(path, recursive);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes('No such file or directory')
+      || message.includes('cannot find the path specified')
+      || message.includes('Failed to resolve path')
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
 function getRelativePathFromRoot(path: string, rootPath: string): string {
   const normalizedPath = normalizePath(path);
   const normalizedRoot = normalizePath(rootPath);
@@ -108,10 +129,11 @@ function getParentRelativePath(relativePath: string): string {
   return parts.slice(0, -1).join('/');
 }
 
-function isPathInTrash(path: string, rootPath: string): boolean {
+function isPathInTrash(path: string, rootPath: string, trashFolder: string): boolean {
   const normalizedPath = normalizePath(path);
   const normalizedRoot = normalizePath(rootPath);
-  return TRASH_DIR_NAMES.some((trashDirName) =>
+  const trashDirName = sanitizeTrashFolder(trashFolder);
+  return (
     normalizedPath === `${normalizedRoot}/${trashDirName}` ||
     normalizedPath.startsWith(`${normalizedRoot}/${trashDirName}/`)
   );
@@ -124,67 +146,60 @@ function createTrashContainerName(parentRelativePath: string): string {
 
 function parseTrashPathInfo(
   path: string,
-  rootPath: string
+  rootPath: string,
+  trashFolder: string
 ): { trashDirName: string; containerName: string; originalRelativePath: string } | null {
   const normalizedPath = normalizePath(path);
   const normalizedRoot = normalizePath(rootPath);
-  for (const trashDirName of TRASH_DIR_NAMES) {
-    const trashPrefix = `${normalizedRoot}/${trashDirName}/`;
-    if (!normalizedPath.startsWith(trashPrefix)) continue;
+  const trashDirName = sanitizeTrashFolder(trashFolder);
+  const trashPrefix = `${normalizedRoot}/${trashDirName}/`;
+  if (!normalizedPath.startsWith(trashPrefix)) return null;
 
-    const remainder = normalizedPath.slice(trashPrefix.length);
-    const parts = remainder.split('/').filter(Boolean);
-    if (parts.length < 2) return null;
+  const remainder = normalizedPath.slice(trashPrefix.length);
+  const parts = remainder.split('/').filter(Boolean);
+  if (parts.length < 2) return null;
 
-    const [containerName, ...itemParts] = parts;
-    const match = containerName.match(/^\d+__(.+)$/);
-    const encodedParent = match?.[1];
-    let parentRelativePath = '';
-    if (encodedParent) {
-      try {
-        const decoded = decodeURIComponent(encodedParent);
-        parentRelativePath = decoded === TRASH_ROOT_MARKER ? '' : decoded;
-      } catch {
-        parentRelativePath = '';
-      }
+  const [containerName, ...itemParts] = parts;
+  const match = containerName.match(/^\d+__(.+)$/);
+  const encodedParent = match?.[1];
+  let parentRelativePath = '';
+  if (encodedParent) {
+    try {
+      const decoded = decodeURIComponent(encodedParent);
+      parentRelativePath = decoded === TRASH_ROOT_MARKER ? '' : decoded;
+    } catch {
+      parentRelativePath = '';
     }
-
-    const originalRelativePath = [
-      ...parentRelativePath.split('/').filter(Boolean),
-      ...itemParts
-    ].join('/');
-
-    return {
-      trashDirName,
-      containerName,
-      originalRelativePath
-    };
   }
 
-  return null;
+  const originalRelativePath = [
+    ...parentRelativePath.split('/').filter(Boolean),
+    ...itemParts
+  ].join('/');
+
+  return {
+    trashDirName,
+    containerName,
+    originalRelativePath
+  };
 }
 
-async function ensureTrashRootDirectory(fs: Awaited<ReturnType<typeof getFileSystem>>, rootPath: string): Promise<{
+async function ensureTrashRootDirectory(
+  fs: Awaited<ReturnType<typeof getFileSystem>>,
+  rootPath: string,
+  trashFolder: string
+): Promise<{
   trashDirName: string;
   trashRootPath: string;
 }> {
-  let lastError: unknown = null;
-
-  for (const trashDirName of TRASH_DIR_NAMES) {
-    const trashRootPath = joinPath(rootPath, trashDirName);
-
-    try {
-      await fs.createDirectory(trashRootPath);
-      return {
-        trashDirName,
-        trashRootPath
-      };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Unable to prepare trash directory');
+  const trashDirName = sanitizeTrashFolder(trashFolder || DEFAULT_TRASH_FOLDER);
+  const trashRootPath = joinPath(rootPath, trashDirName);
+  await registerTauriAllowedPath(trashRootPath, true);
+  await fs.createDirectory(trashRootPath);
+  return {
+    trashDirName,
+    trashRootPath
+  };
 }
 
 /**
@@ -310,6 +325,17 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const dirPath = path || await fs.openDirectory();
       if (dirPath) {
+        await withErrorHandling(
+          () => registerTauriAllowedPath(dirPath, true),
+          'Failed to register knowledge base scope'
+        );
+
+        const trashRootPath = joinPath(dirPath, sanitizeTrashFolder(settings.trashFolder));
+        await withErrorHandling(
+          () => registerTauriAllowedPathIfExists(trashRootPath, true),
+          'Failed to register trash directory scope'
+        );
+
         const shouldInitializeSampleNotes =
           !options?.skipSampleNotes &&
           !!fs.copySampleNotes &&
@@ -361,7 +387,7 @@ export function useFileSystem() {
       handleFileSystemError(error, 'Failed to open knowledge base');
       return null;
     }
-  }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata, initializeSampleNotes]);
+  }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata, initializeSampleNotes, settings.trashFolder]);
 
   /**
    * Backward-compatible alias used by existing UI call sites.
@@ -553,7 +579,8 @@ export function useFileSystem() {
   const deleteFile = useCallback(async (file: FileNode): Promise<void> => {
     try {
       const rootPath = useAppStore.getState().rootFolderPath;
-      const parsedTrashInfo = rootPath ? parseTrashPathInfo(file.path, rootPath) : null;
+      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
+      const parsedTrashInfo = rootPath ? parseTrashPathInfo(file.path, rootPath, trashFolder) : null;
       const fs = await getFileSystem();
       await withErrorHandling(
         () => fs.deleteFile(file.path),
@@ -585,28 +612,43 @@ export function useFileSystem() {
   /**
    * Move a file/folder to trash (soft delete)
    */
-  const moveToTrash = useCallback(async (file: FileNode): Promise<string | null> => {
+  const moveToTrash = useCallback(async (
+    file: FileNode,
+    options?: { silent?: boolean; skipRefresh?: boolean }
+  ): Promise<string | null> => {
     try {
       const rootPath = useAppStore.getState().rootFolderPath;
+      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
       if (!rootPath) {
-        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
+        if (!options?.silent) {
+          showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
+        }
         return null;
       }
 
-      if (isPathInTrash(file.path, rootPath)) {
-        showNotification(t(settings.language, 'notifications_itemAlreadyInTrash'), 'error');
+      if (isPathInTrash(file.path, rootPath, trashFolder)) {
+        if (!options?.silent) {
+          showNotification(t(settings.language, 'notifications_itemAlreadyInTrash'), 'error');
+        }
         return null;
       }
 
       const fs = await getFileSystem();
       if (!fs.moveFile) {
-        showNotification(t(settings.language, 'notifications_moveToTrashUnsupported'), 'error');
+        if (!options?.silent) {
+          showNotification(t(settings.language, 'notifications_moveToTrashUnsupported'), 'error');
+        }
         return null;
       }
 
       const { trashRootPath } = await withErrorHandling(
-        () => ensureTrashRootDirectory(fs, rootPath),
+        () => ensureTrashRootDirectory(fs, rootPath, trashFolder),
         'Failed to create trash directory'
+      );
+
+      await withErrorHandling(
+        () => registerTauriAllowedPath(trashRootPath, true),
+        'Failed to register trash directory scope'
       );
 
       const relativePath = getRelativePathFromRoot(file.path, rootPath);
@@ -624,11 +666,17 @@ export function useFileSystem() {
         'Failed to move item to trash'
       );
 
-      await refreshFileTree();
-      showNotification(t(settings.language, 'notifications_movedToTrash'), 'success');
+      if (!options?.skipRefresh) {
+        await refreshFileTree();
+      }
+      if (!options?.silent) {
+        showNotification(t(settings.language, 'notifications_movedToTrash'), 'success');
+      }
       return movedPath;
     } catch (error) {
-      handleFileSystemError(error, 'Failed to move item to trash');
+      if (!options?.silent) {
+        handleFileSystemError(error, 'Failed to move item to trash');
+      }
       return null;
     }
   }, [showNotification, refreshFileTree, handleFileSystemError]);
@@ -639,12 +687,13 @@ export function useFileSystem() {
   const restoreFromTrash = useCallback(async (file: FileNode): Promise<string | null> => {
     try {
       const rootPath = useAppStore.getState().rootFolderPath;
+      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
       if (!rootPath) {
         showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
         return null;
       }
 
-      const parsed = parseTrashPathInfo(file.path, rootPath);
+      const parsed = parseTrashPathInfo(file.path, rootPath, trashFolder);
       if (!parsed) {
         showNotification(t(settings.language, 'notifications_invalidTrashItemPath'), 'error');
         return null;

@@ -10,6 +10,15 @@ const LEGACY_DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'date modified', defaultValue: '{now}' },
 ];
 
+const LEGACY_DEFAULT_METADATA_FIELDS_WITH_SECONDS: MetadataField[] = [
+  { key: 'category', defaultValue: '' },
+  { key: 'tags', defaultValue: '[]' },
+  { key: 'status', defaultValue: 'draft' },
+  { key: 'is_publish', defaultValue: 'false' },
+  { key: 'date created', defaultValue: '{now:datetime}' },
+  { key: 'date modified', defaultValue: '{now:datetime}' },
+];
+
 const RENAMED_LEGACY_DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'category', defaultValue: '' },
   { key: 'tags', defaultValue: '[]' },
@@ -19,6 +28,15 @@ const RENAMED_LEGACY_DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'update_time', defaultValue: '{now}' },
 ];
 
+const RENAMED_LEGACY_DEFAULT_METADATA_FIELDS_WITH_SECONDS: MetadataField[] = [
+  { key: 'category', defaultValue: '' },
+  { key: 'tags', defaultValue: '[]' },
+  { key: 'status', defaultValue: 'draft' },
+  { key: 'is_publish', defaultValue: 'false' },
+  { key: 'create_time', defaultValue: '{now:datetime}' },
+  { key: 'update_time', defaultValue: '{now:datetime}' },
+];
+
 export const DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'category', defaultValue: '' },
   { key: 'tags', defaultValue: '[]' },
@@ -26,7 +44,7 @@ export const DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'slug', defaultValue: '' },
   { key: 'aliases', defaultValue: '' },
   { key: 'is_publish', defaultValue: 'false' },
-  { key: 'create_time', defaultValue: '{now}' },
+  { key: 'create_time', defaultValue: '{now:datetime}' },
   { key: 'update_time', defaultValue: '{now:datetime}' },
 ];
 
@@ -71,6 +89,24 @@ function renameLegacyMetadataKey(key: string): string {
   return key;
 }
 
+function shouldUseDateTimePrecision(key: string): boolean {
+  const normalizedKey = key.trim().toLowerCase();
+  return normalizedKey === 'create_time'
+    || normalizedKey === 'date created'
+    || normalizedKey === 'date_created'
+    || normalizedKey === 'created_at'
+    || AUTO_REFRESH_UPDATE_TIME_KEYS.has(normalizedKey);
+}
+
+function normalizeMetadataDefaultValue(key: string, defaultValue: string): string {
+  const trimmedDefaultValue = defaultValue.trim();
+  if (trimmedDefaultValue === '{now}' && shouldUseDateTimePrecision(key)) {
+    return '{now:datetime}';
+  }
+
+  return defaultValue;
+}
+
 function normalizeTimestampValue(value: unknown, key: string): string {
   const now = new Date();
   const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -91,7 +127,7 @@ function normalizeTimestampValue(value: unknown, key: string): string {
     return formatLocalDateTime(now, ' ');
   }
 
-  return key === 'update_time' ? formatLocalDateTime(now, ' ') : formatLocalDate(now);
+  return shouldUseDateTimePrecision(key) ? formatLocalDateTime(now, ' ') : formatLocalDate(now);
 }
 
 export function parseMetadataTemplateValue(rawValue: string): string | string[] | number | boolean {
@@ -133,12 +169,18 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
 
       return {
         key,
-        defaultValue: typeof rawDefaultValue === 'string' ? rawDefaultValue : String(rawDefaultValue ?? ''),
+        defaultValue: normalizeMetadataDefaultValue(
+          key,
+          typeof rawDefaultValue === 'string' ? rawDefaultValue : String(rawDefaultValue ?? '')
+        ),
       };
     })
     .filter((field): field is MetadataField => Boolean(field));
 
-  if (fieldsMatch(rawFields, LEGACY_DEFAULT_METADATA_FIELDS)) {
+  if (
+    fieldsMatch(rawFields, LEGACY_DEFAULT_METADATA_FIELDS)
+    || fieldsMatch(rawFields, LEGACY_DEFAULT_METADATA_FIELDS_WITH_SECONDS)
+  ) {
     return cloneMetadataFields(DEFAULT_METADATA_FIELDS);
   }
 
@@ -150,7 +192,7 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
 
       return {
         key,
-        defaultValue: field.defaultValue,
+        defaultValue: normalizeMetadataDefaultValue(key, field.defaultValue),
       };
     })
     .filter((field): field is MetadataField => Boolean(field));
@@ -167,7 +209,10 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
     dedupedFields.push(field);
   }
 
-  if (fieldsMatch(dedupedFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS)) {
+  if (
+    fieldsMatch(dedupedFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS)
+    || fieldsMatch(dedupedFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS_WITH_SECONDS)
+  ) {
     return cloneMetadataFields(DEFAULT_METADATA_FIELDS);
   }
 

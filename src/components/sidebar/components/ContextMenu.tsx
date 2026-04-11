@@ -10,6 +10,7 @@ export interface ContextMenuProps {
   onClose: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onCopyRelativePath: () => void;
   onReveal: () => void;
   onCreateFile: () => void;
   onCreateFolder: () => void;
@@ -25,6 +26,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
   onRename,
   onDelete,
+  onCopyRelativePath,
   onReveal,
   onCreateFile,
   onCreateFolder,
@@ -167,6 +169,26 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
             {t('context_rename')}
+          </button>
+
+          <button
+            onClick={() => {
+              onCopyRelativePath();
+              onClose();
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group mx-1.5 w-[calc(100%-12px)]"
+          >
+            <svg
+              className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            {t('context_copyRelativePath')}
           </button>
 
           <button

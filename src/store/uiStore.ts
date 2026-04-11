@@ -3,6 +3,8 @@ import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../services/aiPrompts';
 import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
+import { normalizeTrashFolder } from '../utils/trashFolder';
+import { getPreferredShortcutModifierToken } from '../utils/shortcuts';
 
 let notificationTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -51,6 +53,8 @@ export interface UIActions {
 /**
  * Default settings
  */
+const primaryShortcutModifier = getPreferredShortcutModifierToken();
+
 export const defaultSettings: AppSettings = {
   language: 'zh-CN',
   aiProvider: 'gemini',
@@ -60,6 +64,7 @@ export const defaultSettings: AppSettings = {
   englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,
   chineseFontFamily: DEFAULT_CHINESE_FONT_FAMILY,
   resourceFolder: 'resources',
+  trashFolder: '.trash',
   attachmentPasteFormat: 'obsidian',
   orderedListMode: 'strict',
   blogRepoUrl: '',
@@ -72,9 +77,9 @@ export const defaultSettings: AppSettings = {
   codexModel: 'gpt-5.2-codex',
   aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
   shortcuts: {
-    save: 'Ctrl+S',
+    save: `${primaryShortcutModifier}+S`,
     toggleView: 'Cmd+Shift+V',
-    aiAnalyze: 'Ctrl+J',
+    aiAnalyze: `${primaryShortcutModifier}+J`,
     search: 'Cmd+Shift+F',
     sidebarSearch: 'Cmd+Shift+S',
     locateCurrentFile: 'Cmd+Shift+L',
@@ -82,9 +87,9 @@ export const defaultSettings: AppSettings = {
     toggleOutline: 'Cmd+Shift+O',
     toggleSidebar: 'Cmd+Shift+B',
     toggleTheme: 'Cmd+Shift+T',
-    newNote: 'Ctrl+N',
-    newFolder: 'Ctrl+Shift+N',
-    closeTab: 'Ctrl+W',
+    newNote: `${primaryShortcutModifier}+N`,
+    newFolder: `${primaryShortcutModifier}+Shift+N`,
+    closeTab: `${primaryShortcutModifier}+W`,
     openKnowledgeBase: 'Cmd+Shift+K',
     exportHtml: 'Cmd+Shift+H',
   },
@@ -139,6 +144,7 @@ export function createUISlice(
         ...settings,
         language: normalizeLanguage(settings.language),
         themeMode: normalizeThemeMode(settings.themeMode),
+        trashFolder: normalizeTrashFolder(settings.trashFolder),
       }
     })),
 
@@ -150,6 +156,7 @@ export function createUISlice(
           ...updates,
           language: normalizeLanguage(updates.language ?? state.settings.language),
           themeMode: normalizeThemeMode(updates.themeMode ?? state.settings.themeMode),
+          trashFolder: normalizeTrashFolder(updates.trashFolder ?? state.settings.trashFolder),
         }
       };
     }),

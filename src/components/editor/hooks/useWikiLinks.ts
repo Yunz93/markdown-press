@@ -9,7 +9,6 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 import type { Completion, CompletionContext, CompletionSource } from '@codemirror/autocomplete';
-import type { EditorView } from '@codemirror/view';
 import type { FileNode } from '../../../types';
 import { renderMarkdown } from '../../../utils/markdown';
 import {
@@ -96,7 +95,13 @@ export function useWikiLinks(options: UseWikiLinksOptions): UseWikiLinksReturn {
         displayLabel: fileLabel,
         type: 'file',
         detail: displayPath === fileLabel ? 'Knowledge base note' : displayPath,
-        apply: insertPath,
+        apply: (view, _completion, from, to) => {
+          const suffix = view.state.doc.sliceString(to, to + 2) === ']]' ? '' : ']]';
+          view.dispatch({
+            changes: { from, to, insert: `${insertPath}${suffix}` },
+            selection: { anchor: from + insertPath.length + suffix.length },
+          });
+        },
         boost: insertPath.includes('/') ? 0 : 1,
       };
     });

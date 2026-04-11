@@ -20,7 +20,7 @@ import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImage
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
-import { parseFrontmatter, updateFrontmatter } from '../../utils/frontmatter';
+import { parseFrontmatter } from '../../utils/frontmatter';
 import { isWindowsPlatform } from '../../utils/platform';
 import type { FileNode, Frontmatter } from '../../types';
 import { useI18n } from '../../hooks/useI18n';
@@ -69,13 +69,18 @@ function isPdfAttachment(fileName: string): boolean {
   return /\.pdf$/i.test(fileName);
 }
 
+function isVideoAttachment(fileName: string): boolean {
+  return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
+}
+
 function isHtmlDocument(fileName: string): boolean {
   return /\.html?$/i.test(fileName);
 }
 
-function getPreviewFileType(filePath: string | null | undefined): 'markdown' | 'image' | 'pdf' | 'html' | 'unsupported' {
+function getPreviewFileType(filePath: string | null | undefined): 'markdown' | 'image' | 'video' | 'pdf' | 'html' | 'unsupported' {
   if (!filePath) return 'markdown';
   if (isImageAttachment(filePath)) return 'image';
+  if (isVideoAttachment(filePath)) return 'video';
   if (isPdfAttachment(filePath)) return 'pdf';
   if (isHtmlDocument(filePath)) return 'html';
   if (isMarkdownNote(filePath)) return 'markdown';
@@ -83,47 +88,6 @@ function getPreviewFileType(filePath: string | null | undefined): 'markdown' | '
 }
 
 type FrontmatterValue = Frontmatter[keyof Frontmatter];
-
-function formatFrontmatterDraft(value: FrontmatterValue): string {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item ?? '')).join('\n');
-  }
-
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  return String(value);
-}
-
-function parseFrontmatterDraftValue(rawValue: string, originalValue: FrontmatterValue): FrontmatterValue {
-  if (Array.isArray(originalValue)) {
-    const items = (rawValue.includes('\n') ? rawValue.split(/\r?\n/) : rawValue.split(','))
-      .map((item) => item.trim())
-      .filter(Boolean);
-    return items;
-  }
-
-  if (typeof originalValue === 'number') {
-    const trimmed = rawValue.trim();
-    if (!trimmed) return null;
-    const parsedNumber = Number(trimmed);
-    return Number.isNaN(parsedNumber) ? rawValue : parsedNumber;
-  }
-
-  if (typeof originalValue === 'boolean') {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized === 'true') return true;
-    if (normalized === 'false') return false;
-    return rawValue;
-  }
-
-  if (originalValue === null) {
-    return rawValue === '' ? null : rawValue;
-  }
-
-  return rawValue;
-}
 
 function getFrontmatterDisplayItems(value: FrontmatterValue): string[] {
   if (Array.isArray(value)) {
@@ -147,7 +111,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   syncedPercentage = null,
 }, ref) => {
   const { t } = useI18n();
-  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId, setContent } = useAppStore();
+  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -339,7 +303,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     return () => window.clearTimeout(timer);
   }, [renderer.enhancedBodyHtml, isMarkdownPreview, settings.themeMode]);
 
-  // Asset preview (image/PDF)
+  // Asset preview (image/video/PDF)
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   
   useEffect(() => {
@@ -470,102 +434,19 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     parsedFrontmatter ? Object.entries(parsedFrontmatter) as Array<[string, FrontmatterValue]> : []
   ), [parsedFrontmatter]);
 
-  const [propertyDrafts, setPropertyDrafts] = useState<Record<string, string>>({});
-  const [editingPropertyKey, setEditingPropertyKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!parsedFrontmatter) {
-      setPropertyDrafts({});
-      setEditingPropertyKey(null);
-      return;
-    }
-
-    setPropertyDrafts((previousDrafts) => {
-      const nextDrafts: Record<string, string> = {};
-
-      frontmatterEntries.forEach(([key, value]) => {
-        if (key === editingPropertyKey && key in previousDrafts) {
-          nextDrafts[key] = previousDrafts[key];
-          return;
-        }
-
-        nextDrafts[key] = formatFrontmatterDraft(value);
-      });
-
-      return nextDrafts;
-    });
-  }, [editingPropertyKey, frontmatterEntries, parsedFrontmatter]);
-
-  useEffect(() => {
-    if (editingPropertyKey && (!parsedFrontmatter || !(editingPropertyKey in parsedFrontmatter))) {
-      setEditingPropertyKey(null);
-    }
-  }, [editingPropertyKey, parsedFrontmatter]);
-
-  const commitPropertyDraft = useCallback((key: string, rawDraft?: string) => {
-    if (!parsedFrontmatter || !(key in parsedFrontmatter)) return;
-
-    const currentValue = parsedFrontmatter[key] as FrontmatterValue;
-    const nextDraft = rawDraft ?? propertyDrafts[key] ?? '';
-
-    if (nextDraft === formatFrontmatterDraft(currentValue)) {
-      return;
-    }
-
-    const nextContent = updateFrontmatter(content, {
-      [key]: parseFrontmatterDraftValue(nextDraft, currentValue),
-    });
-
-    if (nextContent !== content) {
-      setContent(nextContent);
-    }
-  }, [content, parsedFrontmatter, propertyDrafts, setContent]);
-
-  const handlePropertyChange = useCallback((key: string, value: string) => {
-    setPropertyDrafts((previousDrafts) => {
-      if (previousDrafts[key] === value) {
-        return previousDrafts;
-      }
-
-      return {
-        ...previousDrafts,
-        [key]: value,
-      };
-    });
-  }, []);
-
-  const handlePropertyFocus = useCallback((key: string) => {
-    setEditingPropertyKey(key);
-  }, []);
-
-  const handlePropertyBlur = useCallback((key: string) => {
-    commitPropertyDraft(key);
-    setEditingPropertyKey((currentKey) => (currentKey === key ? null : currentKey));
-  }, [commitPropertyDraft]);
-
-  const handlePropertyKeyDown = useCallback((
-    event: React.KeyboardEvent<HTMLTextAreaElement>,
-    key: string
-  ) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      event.preventDefault();
-      commitPropertyDraft(key, event.currentTarget.value);
-      event.currentTarget.blur();
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      const originalValue = parsedFrontmatter?.[key] as FrontmatterValue | undefined;
-
-      setPropertyDrafts((previousDrafts) => ({
-        ...previousDrafts,
-        [key]: formatFrontmatterDraft(originalValue),
-      }));
-
-      event.currentTarget.blur();
-    }
-  }, [commitPropertyDraft, parsedFrontmatter]);
+  // Keep hook order stable after the property editor was removed.
+  const [_propertyDrafts] = useState<Record<string, string>>({});
+  const [_editingPropertyKey] = useState<string | null>(null);
+  useEffect(() => {}, [frontmatterEntries, parsedFrontmatter]);
+  useEffect(() => {}, [parsedFrontmatter]);
+  const _commitPropertyDraft = useCallback((_key: string, _rawDraft?: string) => {}, []);
+  const _handlePropertyChange = useCallback((_key: string, _value: string) => {}, []);
+  const _handlePropertyFocus = useCallback((_key: string) => {}, []);
+  const _handlePropertyBlur = useCallback((_key: string) => {}, []);
+  const _handlePropertyKeyDown = useCallback((
+    _event: React.KeyboardEvent<HTMLTextAreaElement>,
+    _key: string
+  ) => {}, []);
 
   return (
       <div
@@ -592,28 +473,24 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
               <div className="p-2 table w-full">
                 {frontmatterEntries.map(([key, value]) => (
                   <div key={key} className="table-row hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                    <div className="preview-pane-properties-cell table-cell py-1.5 px-2 w-32 text-gray-500 dark:text-gray-400 font-medium align-top">
+                    <div className="preview-pane-properties-cell table-cell py-1.5 px-2 w-32 whitespace-nowrap text-gray-500 dark:text-gray-400 font-medium align-top">
                       {key}
                     </div>
                     <div className="preview-pane-properties-cell table-cell py-1.5 px-2 text-gray-800 dark:text-gray-200 align-top">
                       {key === 'link'
                         && typeof value === 'string'
-                        && isExternalLink(propertyDrafts[key] ?? value)
-                        && isValidExternalUrl(propertyDrafts[key] ?? value) ? (
+                        && isExternalLink(value)
+                        && isValidExternalUrl(value) ? (
                           <a
-                            href={propertyDrafts[key] ?? value}
+                            href={value}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex max-w-full break-all py-0.5 text-accent-DEFAULT underline underline-offset-2 hover:opacity-80"
                           >
-                            {propertyDrafts[key] ?? value}
+                            {value}
                           </a>
-                        ) : Array.isArray(value) && editingPropertyKey !== key ? (
-                          <button
-                            type="button"
-                            onClick={() => handlePropertyFocus(key)}
-                            className="preview-pane-properties-multi-value w-full text-left"
-                          >
+                        ) : Array.isArray(value) ? (
+                          <div className="preview-pane-properties-multi-value">
                             {getFrontmatterDisplayItems(value).map((item, index) => (
                               <span
                                 key={`${key}-${index}-${item}`}
@@ -622,19 +499,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                                 {item || '\u2014'}
                               </span>
                             ))}
-                          </button>
+                          </div>
                         ) : (
-                          <div className="flex items-start gap-2">
-                            <textarea
-                              value={propertyDrafts[key] ?? formatFrontmatterDraft(value)}
-                              rows={Math.min(Math.max((propertyDrafts[key] ?? formatFrontmatterDraft(value)).split('\n').length, 1), 8)}
-                              spellCheck={false}
-                              onFocus={() => handlePropertyFocus(key)}
-                              onChange={(event) => handlePropertyChange(key, event.target.value)}
-                              onBlur={() => handlePropertyBlur(key)}
-                              onKeyDown={(event) => handlePropertyKeyDown(event, key)}
-                              className="preview-pane-properties-input preview-pane-properties-textarea w-full bg-transparent border-none focus:ring-0 py-0.5"
-                            />
+                          <div className="preview-pane-properties-static whitespace-pre-wrap break-words py-0.5">
+                            {getFrontmatterDisplayItems(value)[0] || '\u2014'}
                           </div>
                         )}
                     </div>
@@ -653,6 +521,16 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                   className="preview-attachment-image max-h-[75vh] w-auto"
                 />
               </div>
+            ) : previewFileType === 'video' && assetPreviewSrc ? (
+              <div className="editor-pane-width-constrained mx-auto w-full py-6">
+                <video
+                  src={assetPreviewSrc}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="preview-pane-video-player w-full"
+                />
+              </div>
             ) : previewFileType === 'pdf' && assetPreviewSrc ? (
               <div className="editor-pane-width-constrained mx-auto w-full py-3">
                 <iframe
@@ -662,7 +540,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                   className="h-[78vh] w-full rounded-2xl bg-white dark:bg-black/30"
                 />
               </div>
-            ) : previewFileType === 'image' || previewFileType === 'pdf' ? (
+            ) : previewFileType === 'image' || previewFileType === 'video' || previewFileType === 'pdf' ? (
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
                 {t('preview_loading')}
               </div>

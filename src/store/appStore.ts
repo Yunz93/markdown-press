@@ -13,6 +13,8 @@ import {
 } from '../utils/fontSettings';
 import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
 import { normalizeMetadataFields } from '../utils/metadataFields';
+import { normalizeTrashFolder } from '../utils/trashFolder';
+import { normalizeShortcutConfigForPlatform } from '../utils/shortcuts';
 
 // Re-export types from slice stores
 export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
@@ -150,7 +152,7 @@ function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
     }
   });
 
-  return mergedShortcuts;
+  return normalizeShortcutConfigForPlatform(mergedShortcuts);
 }
 
 /**
@@ -190,6 +192,7 @@ export const useAppStore = create<AppState>()(
           ...resolvedAISettings,
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
+          trashFolder: normalizeTrashFolder(persistedSettings.trashFolder ?? defaultSettings.trashFolder),
           metadataFields: normalizeMetadataFields(persistedSettings.metadataFields),
           shortcuts: resolvePersistedShortcuts(persistedSettings),
         };

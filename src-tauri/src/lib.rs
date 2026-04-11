@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri_plugin_fs::FsExt;
 
 const SAMPLE_NOTES_STATE_FILE: &str = ".markdown-press-sample-notes-state.json";
 const SAMPLE_NOTES_FOLDER_NAME: &str = "示例笔记";
@@ -210,6 +211,24 @@ fn canonicalize_existing_path(path: &str) -> Result<PathBuf, String> {
     fs::canonicalize(path).map_err(|e| format!("Failed to resolve path {}: {}", path, e))
 }
 
+fn canonicalize_scope_path(path: &str) -> Result<PathBuf, String> {
+    match fs::canonicalize(path) {
+        Ok(canonical) => Ok(canonical),
+        Err(_) => {
+            let candidate = PathBuf::from(path);
+            let parent = candidate
+                .parent()
+                .ok_or_else(|| format!("Failed to resolve path {}: missing parent directory", path))?;
+            let canonical_parent = fs::canonicalize(parent)
+                .map_err(|e| format!("Failed to resolve path {}: {}", path, e))?;
+            let file_name = candidate
+                .file_name()
+                .ok_or_else(|| format!("Failed to resolve path {}: missing final path segment", path))?;
+            Ok(canonical_parent.join(file_name))
+        }
+    }
+}
+
 fn is_path_allowed(state: &SecurityState, path: &Path) -> Result<bool, String> {
     let allowed_paths = state
         .allowed_paths
@@ -282,6 +301,7 @@ pub fn run() {
             get_secure_settings,
             set_secure_secret,
             register_allowed_path,
+            delete_path_recursively,
             reveal_in_explorer,
             copy_sample_notes,
             publish_simple_blog
@@ -331,9 +351,22 @@ fn set_secure_secret(key: String, value: Option<String>) -> Result<(), String> {
 fn register_allowed_path(
     path: String,
     recursive: bool,
+    app: tauri::AppHandle,
     security_state: tauri::State<'_, SecurityState>,
 ) -> Result<(), String> {
-    let canonical = canonicalize_existing_path(&path)?;
+    let canonical = canonicalize_scope_path(&path)?;
+    let fs_scope = app.fs_scope();
+
+    if canonical.is_dir() {
+        fs_scope
+            .allow_directory(&canonical, recursive)
+            .map_err(|e| format!("Failed to register fs scope for directory: {}", e))?;
+    } else {
+        fs_scope
+            .allow_file(&canonical)
+            .map_err(|e| format!("Failed to register fs scope for file: {}", e))?;
+    }
+
     let mut allowed_paths = security_state
         .allowed_paths
         .lock()
@@ -348,6 +381,25 @@ fn register_allowed_path(
         path: canonical,
         recursive,
     });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_path_recursively(
+    path: String,
+    security_state: tauri::State<'_, SecurityState>,
+) -> Result<(), String> {
+    let canonical = canonicalize_existing_path(&path)?;
+    ensure_path_allowed(security_state.inner(), &canonical)?;
+
+    if canonical.is_dir() {
+        fs::remove_dir_all(&canonical)
+            .map_err(|e| format!("Failed to delete directory {}: {}", canonical.display(), e))?;
+    } else {
+        fs::remove_file(&canonical)
+            .map_err(|e| format!("Failed to delete file {}: {}", canonical.display(), e))?;
+    }
 
     Ok(())
 }

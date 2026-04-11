@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { FileNode } from '../../../types';
+import { useAppStore } from '../../../store/appStore';
+import { isTrashRootName, sanitizeTrashFolder } from '../../../utils/trashFolder';
 
 const isMarkdownFile = (fileName: string): boolean => /\.(md|markdown)$/i.test(fileName);
+
+const isTrashRootNode = (node: FileNode): boolean =>
+  node.type === 'folder' && isTrashRootName(node.name, sanitizeTrashFolder(useAppStore.getState().settings.trashFolder));
 
 export interface SidebarSearchSnippet {
   line: number;
@@ -99,6 +104,7 @@ export function useSidebarSearch(
   const [searchResults, setSearchResults] = useState<SidebarSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const contentCacheRef = useRef<Map<string, string | undefined>>(new Map());
+  const trashFolder = useAppStore((state) => state.settings.trashFolder);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -115,16 +121,19 @@ export function useSidebarSearch(
       });
     };
 
+    const normalizedTrashFolder = sanitizeTrashFolder(trashFolder);
+    const visibleFiles = files.filter((node) => !node.isTrash && !isTrashRootName(node.name, normalizedTrashFolder));
+
     if (!normalizedQuery) {
-      return sortNodes(files);
+      return sortNodes(visibleFiles);
     }
 
-    const filtered = files.filter((file) =>
+    const filtered = visibleFiles.filter((file) =>
       file.name.toLowerCase().includes(normalizedQuery) ||
       normalizeSearchTarget(file.name).includes(normalizedQuery)
     );
     return sortNodes(filtered);
-  }, [files, normalizedQuery]);
+  }, [files, normalizedQuery, trashFolder]);
 
   const hasSearchQuery = normalizedQuery.length > 0;
   const hasVisibleFiles = filteredFiles.length > 0;

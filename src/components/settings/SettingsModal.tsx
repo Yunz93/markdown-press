@@ -13,6 +13,11 @@ import {
 import { useI18n } from '../../hooks/useI18n';
 import { type TranslationKey } from '../../utils/i18n';
 import { useAppStore } from '../../store/appStore';
+import {
+  formatShortcutForDisplay,
+  getPreferredShortcutModifierToken,
+  normalizeShortcutForPlatform,
+} from '../../utils/shortcuts';
 
 function formatAutoSaveInterval(intervalMs: number, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
   if (intervalMs < 60000) {
@@ -306,6 +311,12 @@ function getShortcutGroups(t: (key: TranslationKey, params?: Record<string, stri
         editable: true,
         settingKey: 'exportHtml',
       },
+      {
+        id: 'cleanupUnusedAttachments',
+        label: t('settings_cleanupUnusedAttachments'),
+        description: t('settings_cleanupUnusedAttachmentsDesc'),
+        shortcuts: ['Cmd+Shift+-'],
+      },
     ],
   },
 ];
@@ -348,12 +359,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const parts = input.toLowerCase().split('+').map(p => p.trim());
     const modifiers: string[] = [];
     let key = '';
+    const preferredModifier = getPreferredShortcutModifierToken();
 
     for (const part of parts) {
       if (part === 'ctrl' || part === 'control') {
-        modifiers.push('Ctrl');
+        modifiers.push(preferredModifier);
       } else if (part === 'meta' || part === 'cmd' || part === 'command') {
-        modifiers.push('Cmd');
+        modifiers.push(preferredModifier);
       } else if (part === 'shift') {
         modifiers.push('Shift');
       } else if (part === 'alt' || part === 'option') {
@@ -365,7 +377,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     if (!key) return '';
-    return [...modifiers, key].join('+');
+    return normalizeShortcutForPlatform([...modifiers, key].join('+'));
   };
 
   const handleShortcutChange = (key: string, value: string) => {
@@ -758,6 +770,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {t('settings_resourceFolderDesc')}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_trashFolder')}</label>
+                      <input
+                        type="text"
+                        value={settings.trashFolder}
+                        onChange={(e) => onUpdateSettings({ ...settings, trashFolder: e.target.value })}
+                        placeholder={t('settings_trashFolderPlaceholder')}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {t('settings_trashFolderDesc')}
                       </p>
                     </div>
 
@@ -1194,7 +1220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                       {item.editable && item.settingKey ? (
                                         <input
                                           type="text"
-                                          value={editableValue}
+                                          value={formatShortcutForDisplay(editableValue)}
                                           onChange={(e) => handleShortcutChange(item.settingKey, e.target.value)}
                                           aria-label={shortcutLabels[item.settingKey] || item.label}
                                           className="w-28 shrink-0 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-2.5 py-1.5 text-center font-mono text-xs uppercase tracking-wide text-gray-700 dark:text-gray-200 outline-none focus:border-accent-DEFAULT"
@@ -1206,7 +1232,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                               key={shortcut}
                                               className="inline-flex items-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-[11px] font-mono text-gray-600 dark:text-gray-300"
                                             >
-                                              {shortcut}
+                                              {formatShortcutForDisplay(shortcut)}
                                             </span>
                                           ))}
                                         </div>

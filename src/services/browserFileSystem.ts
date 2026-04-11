@@ -1,5 +1,7 @@
 import type { FileNode } from '../types';
 import type { IFileSystem } from '../types/filesystem';
+import { useAppStore } from '../store/appStore';
+import { sanitizeTrashFolder } from '../utils/trashFolder';
 
 /**
  * Browser File System using File System Access API
@@ -12,7 +14,6 @@ export class BrowserFileSystem implements IFileSystem {
   private objectUrlPromises: Map<string, Promise<string>> = new Map();
   private objectUrls: Map<string, string> = new Map();
   private rootPath: string = '';
-  private static readonly TRASH_DIRECTORY_NAMES = new Set(['.trash', '_markdown_press_trash']);
   private static readonly IMAGE_FILE_REGEX = /\.(png|jpe?g|gif|svg|webp|bmp)$/i;
   private static readonly PDF_FILE_REGEX = /\.pdf$/i;
   private static readonly HTML_FILE_REGEX = /\.html?$/i;
@@ -329,15 +330,12 @@ export class BrowserFileSystem implements IFileSystem {
       const normalizedDirPath = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
       const normalizedRootPath = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
       const isAtRoot = normalizedDirPath === normalizedRootPath;
+      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
 
       for await (const [name, entry] of (dirHandle as any).entries()) {
         const fullPath = `${dirPath}/${name}`;
-        const isTrashDirectory = entry.kind === 'directory' && isAtRoot && BrowserFileSystem.TRASH_DIRECTORY_NAMES.has(name);
+        const isTrashDirectory = entry.kind === 'directory' && isAtRoot && name === trashFolder;
         const nodeInTrash = inTrash || isTrashDirectory;
-
-        if (isTrashDirectory && !inTrash) {
-          continue;
-        }
 
         if (
           entry.kind === 'file'
