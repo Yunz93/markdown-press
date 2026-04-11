@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../../services/aiPrompts';
@@ -36,6 +36,10 @@ interface SettingsModalProps {
 }
 
 type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai' | 'interface';
+type SecureSaveState = {
+  type: 'saving' | 'saved' | 'error';
+  message: string;
+};
 
 interface TabConfig {
   id: SettingsTab;
@@ -334,6 +338,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
   const [showGithubToken, setShowGithubToken] = useState(false);
+  const [secureSaveStates, setSecureSaveStates] = useState<Partial<Record<SensitiveSettingKey, SecureSaveState>>>({});
   const [draggingMetadataIndex, setDraggingMetadataIndex] = useState<number | null>(null);
   const [availableModels, setAvailableModels] = useState<Record<'gemini' | 'codex', ModelOption[]>>({
     gemini: [],
@@ -353,6 +358,84 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const tabs = getTabs(t);
   const shortcutLabels = getShortcutLabels(t);
   const shortcutGroups = getShortcutGroups(t);
+  const secureSaveRequestIdRef = useRef<Record<SensitiveSettingKey, number>>({
+    blogGithubToken: 0,
+    geminiApiKey: 0,
+    codexApiKey: 0,
+  });
+  const secureSaveResetTimerRef = useRef<Partial<Record<SensitiveSettingKey, number>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(secureSaveResetTimerRef.current).forEach((timerId) => {
+        if (typeof timerId === 'number') {
+          window.clearTimeout(timerId);
+        }
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, onClose]);
+
+  const setSecureSaveState = (key: SensitiveSettingKey, state: SecureSaveState | null) => {
+    setSecureSaveStates((prev) => {
+      if (!state) {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      return { ...prev, [key]: state };
+    });
+  };
+
+  const scheduleSecureSaveStateClear = (key: SensitiveSettingKey, requestId: number) => {
+    const previousTimer = secureSaveResetTimerRef.current[key];
+    if (typeof previousTimer === 'number') {
+      window.clearTimeout(previousTimer);
+    }
+
+    secureSaveResetTimerRef.current[key] = window.setTimeout(() => {
+      if (secureSaveRequestIdRef.current[key] !== requestId) {
+        return;
+      }
+      delete secureSaveResetTimerRef.current[key];
+      setSecureSaveState(key, null);
+    }, 2200);
+  };
+
+  const renderSecureSaveState = (key: SensitiveSettingKey) => {
+    const state = secureSaveStates[key];
+    if (!state) return null;
+
+    const colorClass = state.type === 'error'
+      ? 'text-red-500'
+      : state.type === 'saved'
+        ? 'text-green-600 dark:text-green-400'
+        : 'text-gray-500 dark:text-gray-400';
+
+    return (
+      <p className={`text-[10px] ${colorClass}`}>
+        {state.message}
+      </p>
+    );
+  };
 
   // Normalize shortcut input to standard format (e.g., "Ctrl+S")
   const normalizeShortcut = (input: string): string => {
@@ -389,14 +472,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSecureSettingChange = (key: SensitiveSettingKey, value: string) => {
+    secureSaveRequestIdRef.current[key] += 1;
+    const requestId = secureSaveRequestIdRef.current[key];
+    const previousTimer = secureSaveResetTimerRef.current[key];
+    if (typeof previousTimer === 'number') {
+      window.clearTimeout(previousTimer);
+      delete secureSaveResetTimerRef.current[key];
+    }
+
     onUpdateSettings({ [key]: value } as Partial<AppSettings>);
-    void persistSecureSetting(key, value).catch((error) => {
-      console.error(`Failed to persist secure setting ${key}:`, error);
-      showNotification(
-        language === 'zh-CN' ? '安全保存密钥失败。' : 'Failed to securely save the secret.',
-        'error'
-      );
-    });
+    setSecureSaveState(key, { type: 'saving', message: t('settings_secureSaving') });
+
+    void persistSecureSetting(key, value)
+      .then(() => {
+        if (secureSaveRequestIdRef.current[key] !== requestId) {
+          return;
+        }
+
+        setSecureSaveState(key, { type: 'saved', message: t('settings_secureSaved') });
+        scheduleSecureSaveStateClear(key, requestId);
+      })
+      .catch((error) => {
+        if (secureSaveRequestIdRef.current[key] !== requestId) {
+          return;
+        }
+
+        console.error(`Failed to persist secure setting ${key}:`, error);
+        const detail = error instanceof Error ? error.message : String(error);
+        setSecureSaveState(key, {
+          type: 'error',
+          message: language === 'zh-CN'
+            ? `安全保存失败：${detail}`
+            : `Secure save failed: ${detail}`,
+        });
+        showNotification(
+          language === 'zh-CN'
+            ? `安全保存密钥失败：${detail}`
+            : `Failed to securely save the secret: ${detail}`,
+          'error'
+        );
+      });
   };
 
   const toggleShortcutGroup = (groupId: ShortcutGroupId) => {
@@ -546,6 +661,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </button>
                           </div>
                           <p className="text-[10px] text-gray-400">{t('settings_localOnlyGoogle')} <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>。</p>
+                          {renderSecureSaveState('geminiApiKey')}
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-3">
@@ -652,6 +768,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </button>
                           </div>
                           <p className="text-[10px] text-gray-400">{t('settings_openaiApiKeyLocalOnly')}</p>
+                          {renderSecureSaveState('codexApiKey')}
                         </div>
                       </>
                     )}
@@ -1073,6 +1190,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                         {t('settings_githubTokenPermission')}
                       </p>
+                      {renderSecureSaveState('blogGithubToken')}
                     </div>
 
                     <div>

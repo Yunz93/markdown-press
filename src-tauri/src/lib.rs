@@ -1,4 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use keyring::credential::CredentialPersistence;
+use keyring::default as keyring_default;
 use keyring::Entry;
 use reqwest::Client;
 use reqwest::Method;
@@ -256,6 +258,15 @@ fn ensure_path_allowed(state: &SecurityState, path: &Path) -> Result<(), String>
 }
 
 fn secure_entry(key: &str) -> Result<Entry, String> {
+    let persistence = keyring_default::default_credential_builder().persistence();
+    if !matches!(persistence, CredentialPersistence::UntilDelete | CredentialPersistence::UntilReboot)
+    {
+        return Err(
+            "Secure storage backend is not persistent. This build is not using the native system keychain."
+                .to_string(),
+        );
+    }
+
     Entry::new(SECURE_SETTINGS_SERVICE, key)
         .map_err(|e| format!("Failed to initialize secure storage entry for {}: {}", key, e))
 }

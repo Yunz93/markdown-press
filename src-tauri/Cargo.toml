@@ -25,7 +25,7 @@ serde = { version = "1.0", features = ["derive"] }
 sha1 = "0.10"
 sha2 = "0.10"
 log = "0.4"
-keyring = "3"
+keyring = { version = "3", features = ["apple-native"] }
 tauri = { version = "2.10.0", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-fs = "2"
