@@ -176,7 +176,10 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   useEffect(() => {
     if (matches.length > 0) {
       const match = matches[currentMatchIndex];
-      focusEditorRangeByOffset(match.index, match.index + match.length, { alignTopRatio: 0.3 });
+      focusEditorRangeByOffset(match.index, match.index + match.length, {
+        alignTopRatio: 0.3,
+        focus: false,
+      });
     }
   }, [matches, currentMatchIndex]);
 

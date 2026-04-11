@@ -63,6 +63,34 @@ export interface UseCodeMirrorReturn {
   setOrderedListMode: (mode: OrderedListMode) => void;
 }
 
+function getDocumentReplacementRange(currentContent: string, nextContent: string) {
+  let prefixLength = 0;
+  const maxPrefixLength = Math.min(currentContent.length, nextContent.length);
+  while (
+    prefixLength < maxPrefixLength
+    && currentContent.charCodeAt(prefixLength) === nextContent.charCodeAt(prefixLength)
+  ) {
+    prefixLength += 1;
+  }
+
+  let currentSuffixLength = currentContent.length;
+  let nextSuffixLength = nextContent.length;
+  while (
+    currentSuffixLength > prefixLength
+    && nextSuffixLength > prefixLength
+    && currentContent.charCodeAt(currentSuffixLength - 1) === nextContent.charCodeAt(nextSuffixLength - 1)
+  ) {
+    currentSuffixLength -= 1;
+    nextSuffixLength -= 1;
+  }
+
+  return {
+    from: prefixLength,
+    to: currentSuffixLength,
+    insert: nextContent.slice(prefixLength, nextSuffixLength),
+  };
+}
+
 export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorReturn {
   const {
     content,
@@ -84,6 +112,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const changeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isApplyingOrderedNormalizationRef = useRef(false);
   const normalizationTimeoutRef = useRef<number | null>(null);
+  const restoreScrollFrameRef = useRef<number | null>(null);
   const completionSourceRef = useRef(completionSource);
   const onChangeRef = useRef(onChange);
   const onScrollRef = useRef(onScroll);
@@ -306,6 +335,10 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       if (normalizationTimeoutRef.current) {
         clearTimeout(normalizationTimeoutRef.current);
       }
+      if (restoreScrollFrameRef.current !== null) {
+        cancelAnimationFrame(restoreScrollFrameRef.current);
+        restoreScrollFrameRef.current = null;
+      }
       viewRef.current?.destroy();
       viewRef.current = null;
       setViewReady(false);
@@ -321,14 +354,40 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     const currentContent = view.state.doc.toString();
     if (currentContent === safeContent) return;
 
-    isSyncingContentRef.current = true;
-    const anchor = Math.min(view.state.selection.main.anchor, safeContent.length);
-    const head = Math.min(view.state.selection.main.head, safeContent.length);
+    if (restoreScrollFrameRef.current !== null) {
+      cancelAnimationFrame(restoreScrollFrameRef.current);
+      restoreScrollFrameRef.current = null;
+    }
 
+    const scrollDom = view.scrollDOM;
+    const previousScrollTop = scrollDom.scrollTop;
+    const previousScrollLeft = scrollDom.scrollLeft;
+    const shouldRestoreFocus = view.hasFocus;
+    const replacement = getDocumentReplacementRange(currentContent, safeContent);
+
+    isSyncingContentRef.current = true;
     view.dispatch({
-      changes: { from: 0, to: currentContent.length, insert: safeContent },
-      selection: { anchor, head },
+      changes: replacement,
     });
+
+    const restoreScrollPosition = () => {
+      const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
+      const maxScrollLeft = Math.max(0, scrollDom.scrollWidth - scrollDom.clientWidth);
+      scrollDom.scrollTo({
+        top: Math.min(previousScrollTop, maxScrollTop),
+        left: Math.min(previousScrollLeft, maxScrollLeft),
+      });
+    };
+
+    restoreScrollPosition();
+    restoreScrollFrameRef.current = requestAnimationFrame(() => {
+      restoreScrollFrameRef.current = null;
+      restoreScrollPosition();
+      if (shouldRestoreFocus && !view.hasFocus) {
+        view.focus();
+      }
+    });
+
     isSyncingContentRef.current = false;
   }, [content]);
 

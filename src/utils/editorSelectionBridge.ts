@@ -4,6 +4,7 @@ let activeEditorView: EditorView | null = null;
 
 interface FocusOptions {
   alignTopRatio?: number;
+  focus?: boolean;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -31,11 +32,14 @@ export function focusEditorRangeByOffset(
   const docLength = view.state.doc.length;
   const anchor = clamp(start, 0, docLength);
   const head = clamp(end, 0, docLength);
+  const shouldFocus = options?.focus ?? true;
 
-  view.focus();
+  if (shouldFocus) {
+    view.focus();
+  }
   view.dispatch({
     selection: { anchor, head },
-    scrollIntoView: true,
+    scrollIntoView: shouldFocus,
   });
 
   const alignTopRatio = clamp(options?.alignTopRatio ?? 0.3, 0, 1);

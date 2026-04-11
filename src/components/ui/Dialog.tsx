@@ -48,7 +48,7 @@ export const Dialog: React.FC<DialogProps> = ({
   // Restore focus on close
   useEffect(() => {
     if (!isOpen && previousActiveElement.current) {
-      previousActiveElement.current.focus();
+      previousActiveElement.current.focus({ preventScroll: true });
     }
   }, [isOpen]);
 
