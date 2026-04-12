@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
 import { useFileSystem } from './useFileSystem';
 import { analyzeMarkdownWithProvider, ensureAIConfiguration, generateWikiFromSelectionWithProvider } from '../services/aiService';
+import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
 import { generateFrontmatter, parseFrontmatter } from '../utils/frontmatter';
 import { parseMetadataTemplateValue } from '../utils/metadataFields';
 import { type Frontmatter } from '../types';
@@ -156,11 +157,12 @@ export function useAIAnalyze() {
 
   const handleAIAnalyze = useCallback(async () => {
     if (!content || !activeTabId) return;
+    const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
 
     try {
-      ensureAIConfiguration(settings);
+      ensureAIConfiguration(hydratedSettings);
     } catch (error) {
-      showNotification(error instanceof Error ? localizeKnownError(settings.language, error.message) : t(settings.language, 'notifications_aiConfigFirst'), 'error');
+      showNotification(error instanceof Error ? localizeKnownError(hydratedSettings.language, error.message) : t(hydratedSettings.language, 'notifications_aiConfigFirst'), 'error');
       setSettingsOpen(true);
       return;
     }
@@ -168,7 +170,7 @@ export function useAIAnalyze() {
     setAnalyzing(true);
     try {
       const { frontmatter: existingFrontmatter, body } = parseFrontmatter(content);
-      const result = await analyzeMarkdownWithProvider(body, settings);
+      const result = await analyzeMarkdownWithProvider(body, hydratedSettings);
       const today = new Date().toISOString().split('T')[0];
 
       const aiFields: Partial<Frontmatter> = {
@@ -192,14 +194,14 @@ export function useAIAnalyze() {
       const newContent = `${frontmatterBlock}${optimizedBody}\n`;
 
       setContentForFile(activeTabId, newContent);
-      showNotification(t(settings.language, 'notifications_aiEnhanced'), 'success');
+      showNotification(t(hydratedSettings.language, 'notifications_aiEnhanced'), 'success');
     } catch (error) {
       console.error('AI analysis failed:', error);
-      showNotification(t(settings.language, 'notifications_aiEnhanceFailed'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_aiEnhanceFailed'), 'error');
     } finally {
       setAnalyzing(false);
     }
-  }, [activeTabId, content, settings, setAnalyzing, setContentForFile, showNotification, setSettingsOpen]);
+  }, [activeTabId, content, setAnalyzing, setContentForFile, showNotification, setSettingsOpen]);
 
   const handleGenerateWikiFromSelection = useCallback(async (selection: {
     text: string;
@@ -212,18 +214,19 @@ export function useAIAnalyze() {
     if (!selectedText) {
       return null;
     }
+    const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
 
     try {
-      ensureAIConfiguration(settings);
+      ensureAIConfiguration(hydratedSettings);
     } catch (error) {
-      showNotification(error instanceof Error ? localizeKnownError(settings.language, error.message) : t(settings.language, 'notifications_aiConfigFirst'), 'error');
+      showNotification(error instanceof Error ? localizeKnownError(hydratedSettings.language, error.message) : t(hydratedSettings.language, 'notifications_aiConfigFirst'), 'error');
       setSettingsOpen(true);
       return null;
     }
 
     const targetFolder = getParentPath(currentFilePath) || rootFolderPath || undefined;
     if (!targetFolder) {
-      showNotification(t(settings.language, 'notifications_noKnowledgeBaseForWiki'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_noKnowledgeBaseForWiki'), 'error');
       return null;
     }
 
@@ -240,7 +243,7 @@ export function useAIAnalyze() {
         documentTitle,
         currentFileName,
         isFrontmatterSelection: selection.to <= getFrontmatterBlockLength(content),
-      }, settings);
+      }, hydratedSettings);
 
       const targetFileName = await resolveUniqueWikiFileName(result.title || selectedText, targetFolder);
       const wikiTarget = stripMarkdownExtension(targetFileName);
@@ -251,7 +254,7 @@ export function useAIAnalyze() {
         selectedText,
         markdown: result.markdown || '',
         sourceWikiTarget,
-        metadataFields: settings.metadataFields,
+        metadataFields: hydratedSettings.metadataFields,
       });
 
       const newFile = await createFile(targetFileName, nextFileContent, targetFolder);
@@ -259,16 +262,16 @@ export function useAIAnalyze() {
         throw new Error('Failed to create the wiki file.');
       }
 
-      showNotification(t(settings.language, 'notifications_wikiCreated', { name: newFile.name }), 'success');
+      showNotification(t(hydratedSettings.language, 'notifications_wikiCreated', { name: newFile.name }), 'success');
       return `[[${wikiTarget}|${selectedText}]]`;
     } catch (error) {
       console.error('AI wiki generation failed:', error);
-      showNotification(t(settings.language, 'notifications_wikiCreateFailed'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_wikiCreateFailed'), 'error');
       return null;
     } finally {
       setAnalyzing(false);
     }
-  }, [content, settings, currentFilePath, rootFolderPath, setAnalyzing, showNotification, setSettingsOpen, createFile]);
+  }, [content, currentFilePath, rootFolderPath, setAnalyzing, showNotification, setSettingsOpen, createFile]);
 
   return {
     handleAIAnalyze,

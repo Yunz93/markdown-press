@@ -3,7 +3,7 @@ import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../../services/aiPrompts';
 import { fetchAvailableModels, type ModelOption } from '../../services/modelCatalogService';
-import { persistSecureSetting, type SensitiveSettingKey } from '../../services/secureSettingsService';
+import { hydrateSensitiveSettingsIntoStore, persistSecureSetting, type SensitiveSettingKey } from '../../services/secureSettingsService';
 import {
   isValidOrEmptyBlogRepoUrl,
   isValidOrEmptyBlogSiteUrl,
@@ -394,6 +394,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    void hydrateSensitiveSettingsIntoStore().catch((error) => {
+      console.error('Failed to hydrate sensitive settings for modal:', error);
+    });
+  }, [isOpen]);
+
   const setSecureSaveState = (key: SensitiveSettingKey, state: SecureSaveState | null) => {
     setSecureSaveStates((prev) => {
       if (!state) {
@@ -527,7 +535,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       setModelLoadMessage(null);
       setIsLoadingModels((prev) => ({ ...prev, [provider]: true }));
-      const models = await fetchAvailableModels(provider, settings);
+      await hydrateSensitiveSettingsIntoStore();
+      const latestSettings = useAppStore.getState().settings;
+      const models = await fetchAvailableModels(provider, latestSettings);
       setAvailableModels((prev) => ({ ...prev, [provider]: models }));
       setModelLoadMessage({
         type: 'success',

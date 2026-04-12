@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
+import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
 import { generateFrontmatter, parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
 import { downloadHtml, exportToHtml } from '../utils/export';
 import { type Frontmatter } from '../types';
@@ -141,50 +142,52 @@ export function useExportActions(
   }, [activeTabId, content, files, fontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
+    const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+
     if (!activeTabId) {
-      showNotification(t(settings.language, 'notifications_noFileToPublish'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_noFileToPublish'), 'error');
       return;
     }
 
     if (!isTauriEnvironment()) {
-      showNotification(t(settings.language, 'notifications_desktopPublishOnly'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_desktopPublishOnly'), 'error');
       return;
     }
 
-    if (!settings.blogRepoUrl.trim()) {
-      showNotification(t(settings.language, 'notifications_setBlogRepoFirst'), 'error');
+    if (!hydratedSettings.blogRepoUrl.trim()) {
+      showNotification(t(hydratedSettings.language, 'notifications_setBlogRepoFirst'), 'error');
       return;
     }
 
-    if (!isValidBlogRepoUrl(settings.blogRepoUrl)) {
-      showNotification(t(settings.language, 'notifications_setValidBlogRepoFirst'), 'error');
+    if (!isValidBlogRepoUrl(hydratedSettings.blogRepoUrl)) {
+      showNotification(t(hydratedSettings.language, 'notifications_setValidBlogRepoFirst'), 'error');
       return;
     }
 
-    if (!settings.blogSiteUrl.trim()) {
-      showNotification(t(settings.language, 'notifications_setBlogSiteFirst'), 'error');
+    if (!hydratedSettings.blogSiteUrl.trim()) {
+      showNotification(t(hydratedSettings.language, 'notifications_setBlogSiteFirst'), 'error');
       return;
     }
 
-    if (!isValidBlogSiteUrl(settings.blogSiteUrl)) {
-      showNotification(t(settings.language, 'notifications_setValidBlogSiteFirst'), 'error');
+    if (!isValidBlogSiteUrl(hydratedSettings.blogSiteUrl)) {
+      showNotification(t(hydratedSettings.language, 'notifications_setValidBlogSiteFirst'), 'error');
       return;
     }
 
-    if (!settings.blogGithubToken?.trim()) {
-      showNotification(t(settings.language, 'notifications_setGithubTokenFirst'), 'error');
+    if (!hydratedSettings.blogGithubToken?.trim()) {
+      showNotification(t(hydratedSettings.language, 'notifications_setGithubTokenFirst'), 'error');
       return;
     }
 
     const currentContent = useAppStore.getState().fileContents[activeTabId];
     if (!currentContent) {
-      showNotification(t(settings.language, 'notifications_noContentToPublish'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_noContentToPublish'), 'error');
       return;
     }
 
     const activeFile = findFileInTree(files, activeTabId);
     if (!activeFile) {
-      showNotification(t(settings.language, 'notifications_noFileToPublish'), 'error');
+      showNotification(t(hydratedSettings.language, 'notifications_noFileToPublish'), 'error');
       return;
     }
 
@@ -200,7 +203,7 @@ export function useExportActions(
       setContentForFile(activeTabId, nextContent);
       const saved = await forceSave(nextContent);
       if (!saved) {
-        showNotification(t(settings.language, 'notifications_saveBeforePublishFailed'), 'error');
+        showNotification(t(hydratedSettings.language, 'notifications_saveBeforePublishFailed'), 'error');
         return;
       }
 
@@ -208,7 +211,7 @@ export function useExportActions(
 
       const prepared = await prepareSimpleBlogPublish({
         files,
-        blogSiteUrl: normalizeBlogSiteUrl(settings.blogSiteUrl),
+        blogSiteUrl: normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
         rootFolderPath,
         currentFilePath: activeFile.path,
         markdownContent: contentToPublish,
@@ -216,8 +219,8 @@ export function useExportActions(
 
       await invokePublishWithTimeout({
         request: {
-          blogRepoUrl: normalizeBlogRepoUrl(settings.blogRepoUrl),
-          blogGithubToken: settings.blogGithubToken?.trim() || null,
+          blogRepoUrl: normalizeBlogRepoUrl(hydratedSettings.blogRepoUrl),
+          blogGithubToken: hydratedSettings.blogGithubToken?.trim() || null,
           postRelativePath: prepared.postRelativePath,
           assetDirectoryRelativePath: prepared.assetDirectoryRelativePath,
           markdownContent: prepared.markdownContent,
@@ -226,13 +229,13 @@ export function useExportActions(
       });
 
       const publishedUrl = buildSimpleBlogPostUrl(
-        normalizeBlogSiteUrl(settings.blogSiteUrl),
+        normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
         contentToPublish,
         prepared.postRelativePath
       );
 
       if (!publishedUrl) {
-        showNotification(t(settings.language, 'notifications_publishUrlBuildFailed'), 'error');
+        showNotification(t(hydratedSettings.language, 'notifications_publishUrlBuildFailed'), 'error');
         return;
       }
 
@@ -241,17 +244,17 @@ export function useExportActions(
         return;
       }
 
-      showNotification(t(settings.language, 'notifications_publishSuccess'), 'success');
+      showNotification(t(hydratedSettings.language, 'notifications_publishSuccess'), 'success');
     } catch (error) {
       console.error('Failed to publish blog:', error);
       const message = error instanceof Error
-        ? localizeKnownError(settings.language, error.message)
-        : t(settings.language, 'notifications_publishFailed');
+        ? localizeKnownError(hydratedSettings.language, error.message)
+        : t(hydratedSettings.language, 'notifications_publishFailed');
       showNotification(message, 'error');
     } finally {
       setPublishing(false);
     }
-  }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContentForFile, setPublishing, settings.blogGithubToken, settings.blogRepoUrl, settings.blogSiteUrl, showNotification]);
+  }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContentForFile, setPublishing, showNotification]);
 
   return { handleExportToHtml, handlePublishBlog };
 }

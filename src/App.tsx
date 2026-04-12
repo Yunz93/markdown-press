@@ -22,15 +22,14 @@ import { TabBar } from './components/tabs/TabBar';
 import { PromptDialog } from './components/ui/Dialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
-import { isTauriEnvironment, waitForTauri } from './types/filesystem';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces } from './utils/fontSettings';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
-import { migrateLegacySensitiveSettings } from './services/secureSettingsService';
 import { findUnusedAttachments } from './utils/attachmentCleanup';
+import { traceStartup } from './utils/startupTrace';
 import type { PaneDensity } from './components/editor/paneLayout';
 import { useI18n } from './hooks/useI18n';
 
@@ -104,13 +103,41 @@ const App: React.FC = () => {
   useThemeSync(settings.themeMode);
 
   useEffect(() => {
-    ensureDynamicFontFaces(settings).then(() => {
-      // After fonts are loaded, notify editor to refresh
-      if (typeof document !== 'undefined') {
-        document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
-      }
+    traceStartup('Dynamic font load started', {
+      englishFontFamily: settings.englishFontFamily,
+      chineseFontFamily: settings.chineseFontFamily,
     });
+
+    ensureDynamicFontFaces(settings)
+      .then(() => {
+        traceStartup('Dynamic font load completed');
+        // After fonts are loaded, notify editor to refresh
+        if (typeof document !== 'undefined') {
+          document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
+        }
+      })
+      .catch((error) => {
+        traceStartup('Dynamic font load failed', error instanceof Error ? error.message : String(error));
+      });
   }, [settings.englishFontFamily, settings.chineseFontFamily]);
+
+  useEffect(() => {
+    traceStartup('App mounted');
+  }, []);
+
+  useEffect(() => {
+    traceStartup('Store hydration state changed', { hydrated: settingsHydrated });
+  }, [settingsHydrated]);
+
+  useEffect(() => {
+    traceStartup('Workspace state changed', {
+      hydrated: settingsHydrated,
+      rootFolderPath,
+      fileCount: files.length,
+      activeTabId,
+      currentFilePath,
+    });
+  }, [activeTabId, currentFilePath, files.length, rootFolderPath, settingsHydrated]);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
@@ -142,62 +169,12 @@ const App: React.FC = () => {
       LAYOUT.OUTLINE.MAX_WIDTH
     )
   ));
-  const autoOpenAttemptedRef = React.useRef(false);
-  const secureSettingsReadyRef = React.useRef(false);
   const mainContentRef = useRef<HTMLElement | null>(null);
-  const [isRestoringKnowledgeBase, setIsRestoringKnowledgeBase] = useState(false);
-
-  useEffect(() => {
-    if (!settingsHydrated || secureSettingsReadyRef.current) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      // Tauri globals can be injected slightly after hydration on app startup.
-      if (!isTauriEnvironment()) {
-        await waitForTauri(3000);
-      }
-
-      if (cancelled) return;
-
-      const secureSettings = await migrateLegacySensitiveSettings(useAppStore.getState().settings);
-
-      if (cancelled) return;
-      secureSettingsReadyRef.current = true;
-      updateSettings(secureSettings);
-    })()
-      .catch((error) => {
-        if (cancelled) return;
-        secureSettingsReadyRef.current = true;
-        console.error('Failed to load secure settings:', error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [settingsHydrated, updateSettings]);
-
-  // Auto-open last knowledge base after hydration
-  useEffect(() => {
-    if (!settingsHydrated || autoOpenAttemptedRef.current) return;
-    autoOpenAttemptedRef.current = true;
-
-    const lastKnowledgeBase = settings.lastKnowledgeBasePath;
-    if (!lastKnowledgeBase || rootFolderPath) {
-      setIsRestoringKnowledgeBase(false);
-      return;
-    }
-
-    setIsRestoringKnowledgeBase(true);
-    void openKnowledgeBase(lastKnowledgeBase, { silentSuccess: true })
-      .finally(() => {
-        setIsRestoringKnowledgeBase(false);
-      });
-  }, [settingsHydrated, settings.lastKnowledgeBasePath, rootFolderPath, openKnowledgeBase]);
 
   useEffect(() => {
     if (!settingsHydrated || typeof document === 'undefined') return;
 
+    traceStartup('Boot flag cleared');
     const frame = window.requestAnimationFrame(() => {
       document.documentElement.removeAttribute('data-app-booting');
     });
@@ -500,13 +477,13 @@ const App: React.FC = () => {
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const notification = useAppStore(state => state.notification);
   const currentKnowledgeBaseName = useMemo(() => getPathBasename(rootFolderPath), [rootFolderPath]);
-  const hasKnowledgeBaseHistory = (settings.knowledgeBases?.length || 0) > 0;
+  // Show onboarding when no knowledge base is open
+  // Note: In browser mode, we always show onboarding if no KB is open,
+  // because auto-restore is not supported (File System Access API permissions don't persist)
   const shouldShowKnowledgeBaseOnboarding =
     settingsHydrated &&
     !rootFolderPath &&
-    files.length === 0 &&
-    (!hasKnowledgeBaseHistory || isTauriEnvironment());
-  const shouldShowStartupLoading = isRestoringKnowledgeBase;
+    files.length === 0;
   const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
   const responsiveOutlineWidth = Math.min(
     outlineWidth,
@@ -531,33 +508,6 @@ const App: React.FC = () => {
     (isSidebarOpen && mainContentWidth < 1500) ||
     isOutlineVisible
   ) ? 'compact' : 'comfortable';
-
-  if (shouldShowStartupLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6">
-        <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
-              M
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold">{t('app_restoringWorkspace')}</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {t('app_restoringWorkspaceDesc')}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/90 dark:bg-black/20 px-4 py-3">
-            <svg className="h-5 w-5 animate-spin text-gray-500 dark:text-gray-300" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V1a11 11 0 00-7.78 18.78l2.12-2.12A8 8 0 014 12z" />
-            </svg>
-            <span className="text-sm text-gray-600 dark:text-gray-300">{t('app_openingKnowledgeBase')}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (shouldShowKnowledgeBaseOnboarding) {
     return (

@@ -139,7 +139,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const newMetrics = getPaneLayoutMetrics(width, density);
     metricsRef.current = newMetrics;
     setLayoutMetrics(newMetrics);
-  }, 100);
+  }, 16);
 
   // Pane layout style - memoized with stable deps
   const layoutStyle = useMemo(() => ({

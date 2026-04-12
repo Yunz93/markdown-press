@@ -50,6 +50,20 @@ fn publish_log(message: impl AsRef<str>) {
     }
 }
 
+fn startup_log(message: impl AsRef<str>) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let line = format!(
+        "[startup][{}.{:03}] {}",
+        now.as_secs(),
+        now.subsec_millis(),
+        message.as_ref()
+    );
+    println!("{}", line);
+    log::info!("{}", line);
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CopySampleNotesResult {
@@ -309,6 +323,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            trace_startup,
             get_secure_settings,
             set_secure_secret,
             register_allowed_path,
@@ -329,6 +344,12 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn trace_startup(event: String) -> Result<(), String> {
+    startup_log(event);
+    Ok(())
 }
 
 #[tauri::command]

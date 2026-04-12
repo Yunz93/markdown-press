@@ -31,6 +31,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
 }) => {
   const { t } = useI18n();
   const MIN_SPLIT_PANE_WIDTH = 360;
+  const PANE_TRANSITION = 'width 280ms cubic-bezier(0.22, 1, 0.36, 1)';
+  const DIVIDER_TRANSITION = 'left 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)';
   const { viewMode } = useAppStore();
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
@@ -39,12 +41,12 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorPaneRef = useRef<EditorPaneHandle | null>(null);
   const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
+  const previousViewModeRef = useRef(viewMode);
+  const transitionSyncTimerRef = useRef<number | null>(null);
 
   const handleEditorScroll = useCallback((percentage: number) => {
-    if (viewMode !== ViewMode.SPLIT) return;
     setEditorScrollPercentage(percentage);
-    previewPaneRef.current?.syncScrollTo(percentage);
-  }, [viewMode]);
+  }, []);
 
   const handleMouseDown = useCallback(() => {
     setIsResizing(true);
@@ -108,9 +110,72 @@ export const SplitView: React.FC<SplitViewProps> = ({
     previewPaneRef.current?.cancelScrollSync();
   }, [viewMode]);
 
-  const showEditor = viewMode === ViewMode.EDITOR || viewMode === ViewMode.SPLIT;
-  const showPreview = viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT;
+  useEffect(() => {
+    return () => {
+      if (transitionSyncTimerRef.current !== null) {
+        window.clearTimeout(transitionSyncTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const previousViewMode = previousViewModeRef.current;
+    previousViewModeRef.current = viewMode;
+
+    if (previousViewMode === viewMode) return;
+
+    const syncAfterTransition = (sync: () => void) => {
+      sync();
+      if (transitionSyncTimerRef.current !== null) {
+        window.clearTimeout(transitionSyncTimerRef.current);
+      }
+      transitionSyncTimerRef.current = window.setTimeout(() => {
+        sync();
+        transitionSyncTimerRef.current = null;
+      }, 220);
+    };
+
+    if (viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT) {
+      syncAfterTransition(() => {
+        previewPaneRef.current?.syncScrollTo(editorScrollPercentage);
+      });
+      return;
+    }
+  }, [editorScrollPercentage, viewMode]);
+
+  const isSplitView = viewMode === ViewMode.SPLIT;
+  const editorWidth = isSplitView ? splitRatio : 100;
+  const previewWidth = isSplitView ? 100 - splitRatio : 100;
+  const editorActive = viewMode !== ViewMode.PREVIEW;
+  const previewActive = viewMode !== ViewMode.EDITOR;
   const activePaneKey = activeTabId ?? 'no-active-tab';
+
+  const hiddenPaneStyle: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    overflow: 'hidden',
+  };
+
+  const editorPaneStyle: React.CSSProperties = editorActive
+    ? {
+        width: `${editorWidth}%`,
+        pointerEvents: 'auto',
+        transition: isResizing || !isSplitView ? 'none' : PANE_TRANSITION,
+        willChange: isResizing || !isSplitView ? 'auto' : 'width',
+      }
+    : hiddenPaneStyle;
+
+  const previewPaneStyle: React.CSSProperties = previewActive
+    ? {
+        width: `${previewWidth}%`,
+        pointerEvents: 'auto',
+        transition: isResizing || !isSplitView ? 'none' : PANE_TRANSITION,
+        willChange: isResizing || !isSplitView ? 'auto' : 'width',
+      }
+    : hiddenPaneStyle;
 
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
@@ -119,54 +184,51 @@ export const SplitView: React.FC<SplitViewProps> = ({
         className="flex-1 overflow-hidden relative flex flex-row"
         style={{ pointerEvents: isResizing ? 'none' : 'auto' }}
       >
-        {showEditor && (
-          <div
-            className="h-full min-w-0 flex flex-col relative"
-            style={{
-              width: viewMode === ViewMode.SPLIT ? `${splitRatio}%` : '100%',
-              // Modern flat UI - no borders
-            }}
-          >
-            <EditorPane
-              key={`editor-${activePaneKey}`}
-              ref={editorPaneRef}
-              highlighter={highlighter}
-              density={contentDensity}
-              onContentChange={onContentChange}
-              onScroll={handleEditorScroll}
-              onGenerateWikiFromSelection={onGenerateWikiFromSelection}
-            />
-          </div>
-        )}
+        <div
+          aria-hidden={!editorActive}
+          className="h-full min-w-0 overflow-hidden flex flex-col relative"
+          style={editorPaneStyle}
+        >
+          <EditorPane
+            key={`editor-${activePaneKey}`}
+            ref={editorPaneRef}
+            highlighter={highlighter}
+            density={contentDensity}
+            onContentChange={onContentChange}
+            onScroll={handleEditorScroll}
+            onGenerateWikiFromSelection={onGenerateWikiFromSelection}
+          />
+        </div>
 
-        {viewMode === ViewMode.SPLIT && (
-          <>
-            <div
-              className="w-1 hover:bg-accent-DEFAULT/50 cursor-col-resize z-10 absolute h-full flex items-center justify-center"
-              style={{ left: `${splitRatio}%`, transform: 'translateX(-50%)' }}
-              onMouseDown={handleMouseDown}
-            >
-              <div className="h-8 w-1 rounded-full bg-gray-300 dark:bg-gray-600 opacity-0 hover:opacity-100 transition-opacity" />
-            </div>
-          </>
-        )}
+        <div
+          className="w-1 hover:bg-accent-DEFAULT/50 z-10 absolute h-full flex items-center justify-center"
+          style={{
+            left: `${editorWidth}%`,
+            opacity: isSplitView ? 1 : 0,
+            transform: `translateX(-50%) scaleY(${isSplitView ? 1 : 0.9})`,
+            pointerEvents: isSplitView ? 'auto' : 'none',
+            cursor: isSplitView ? 'col-resize' : 'default',
+            transition: isResizing ? 'none' : DIVIDER_TRANSITION,
+            willChange: isResizing ? 'auto' : 'left, opacity, transform',
+          }}
+          onMouseDown={isSplitView ? handleMouseDown : undefined}
+        >
+          <div className="h-8 w-1 rounded-full bg-gray-300 dark:bg-gray-600 opacity-0 hover:opacity-100 transition-opacity" />
+        </div>
 
-        {showPreview && (
-          <div
-            className="h-full min-w-0 overflow-hidden transition-colors"
-            style={{
-              width: viewMode === ViewMode.SPLIT ? `${100 - splitRatio}%` : '100%',
-            }}
-          >
-            <PreviewPane
-              key={`preview-${activePaneKey}`}
-              ref={previewPaneRef}
-              highlighter={highlighter}
-              density={contentDensity}
-              syncedPercentage={viewMode === ViewMode.SPLIT ? editorScrollPercentage : null}
-            />
-          </div>
-        )}
+        <div
+          aria-hidden={!previewActive}
+          className="h-full min-w-0 overflow-hidden transition-colors"
+          style={previewPaneStyle}
+        >
+          <PreviewPane
+            key={`preview-${activePaneKey}`}
+            ref={previewPaneRef}
+            highlighter={highlighter}
+            density={contentDensity}
+            syncedPercentage={viewMode === ViewMode.SPLIT ? editorScrollPercentage : null}
+          />
+        </div>
       </div>
 
       {activeTabId && (

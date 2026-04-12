@@ -1,5 +1,6 @@
 import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import type { AppSettings } from '../types';
+import { useAppStore } from '../store/appStore';
 import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
 
 const SETTINGS_STORAGE_KEY = 'markdown-press-settings';
@@ -17,6 +18,7 @@ interface SecureSettingsPayload {
 }
 
 const secureWriteQueue = new Map<SensitiveSettingKey, Promise<void>>();
+let secureHydrationPromise: Promise<Partial<SensitiveSettings>> | null = null;
 
 function normalizeSecretValue(value: string | null | undefined): string {
   return typeof value === 'string' ? value : '';
@@ -173,4 +175,22 @@ export async function migrateLegacySensitiveSettings(
 
   scrubSensitiveSettingsFromLocalStorage();
   return next;
+}
+
+export async function hydrateSensitiveSettingsIntoStore(
+  settings: AppSettings = useAppStore.getState().settings
+): Promise<AppSettings> {
+  if (!secureHydrationPromise) {
+    secureHydrationPromise = migrateLegacySensitiveSettings(settings)
+      .then((secureSettings) => {
+        useAppStore.getState().updateSettings(secureSettings);
+        return secureSettings;
+      })
+      .finally(() => {
+        secureHydrationPromise = null;
+      });
+  }
+
+  await secureHydrationPromise;
+  return useAppStore.getState().settings;
 }
