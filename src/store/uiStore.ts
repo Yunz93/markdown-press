@@ -1,7 +1,7 @@
 import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../services/aiPrompts';
-import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY } from '../utils/fontSettings';
+import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY, DEFAULT_UI_FONT_FAMILY } from '../utils/fontSettings';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
 import { normalizeTrashFolder } from '../utils/trashFolder';
 import { getPreferredShortcutModifierToken } from '../utils/shortcuts';
@@ -58,7 +58,9 @@ const primaryShortcutModifier = getPreferredShortcutModifierToken();
 export const defaultSettings: AppSettings = {
   language: 'zh-CN',
   aiProvider: 'gemini',
-  fontSize: 15,
+  uiFontFamily: DEFAULT_UI_FONT_FAMILY,
+  uiFontSize: 18,
+  fontSize: 16,
   wordWrap: true,
   formatMarkdownOnManualSave: false,
   englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,

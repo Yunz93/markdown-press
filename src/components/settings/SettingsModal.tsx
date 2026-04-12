@@ -3,6 +3,7 @@ import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../../services/aiPrompts';
 import { fetchAvailableModels, type ModelOption } from '../../services/modelCatalogService';
+import { listAvailableSystemFontFamilies } from '../../services/systemFontService';
 import { hydrateSensitiveSettingsIntoStore, persistSecureSetting, type SensitiveSettingKey } from '../../services/secureSettingsService';
 import {
   isValidOrEmptyBlogRepoUrl,
@@ -10,6 +11,15 @@ import {
   normalizeBlogRepoUrl,
   normalizeBlogSiteUrl,
 } from '../../utils/blogRepo';
+import {
+  DEFAULT_CHINESE_FONT_FAMILY,
+  DEFAULT_ENGLISH_FONT_FAMILY,
+  DEFAULT_UI_FONT_FAMILY,
+  getResolvedChineseFontFamily,
+  getResolvedEnglishFontFamily,
+  buildUiFontFamily,
+  getResolvedUiFontFamily,
+} from '../../utils/fontSettings';
 import { useI18n } from '../../hooks/useI18n';
 import { type TranslationKey } from '../../utils/i18n';
 import { useAppStore } from '../../store/appStore';
@@ -349,6 +359,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     codex: false,
   });
   const [modelLoadMessage, setModelLoadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [availableSystemFonts, setAvailableSystemFonts] = useState<string[]>([]);
+  const [isLoadingSystemFonts, setIsLoadingSystemFonts] = useState(false);
   const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<Record<ShortcutGroupId, boolean>>({
     workspace: true,
     editing: true,
@@ -397,9 +409,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    void hydrateSensitiveSettingsIntoStore().catch((error) => {
-      console.error('Failed to hydrate sensitive settings for modal:', error);
-    });
+    let cancelled = false;
+    setIsLoadingSystemFonts(true);
+
+    void listAvailableSystemFontFamilies()
+      .then((fontFamilies) => {
+        if (cancelled) return;
+        setAvailableSystemFonts(fontFamilies);
+      })
+      .catch((error) => {
+        console.error('Failed to load available system fonts:', error);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoadingSystemFonts(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   const setSecureSaveState = (key: SensitiveSettingKey, state: SecureSaveState | null) => {
@@ -592,8 +620,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onUpdateSettings({ metadataFields: newFields });
   };
 
+  const currentUiFontValue = settings.uiFontFamily?.trim() || DEFAULT_UI_FONT_FAMILY;
+  const currentEnglishFontValue = settings.englishFontFamily?.trim() || DEFAULT_ENGLISH_FONT_FAMILY;
+  const currentChineseFontValue = settings.chineseFontFamily?.trim() || DEFAULT_CHINESE_FONT_FAMILY;
+
+  const uiFontOptions = [
+    {
+      label: t('settings_uiFontBundledOption'),
+      value: DEFAULT_UI_FONT_FAMILY,
+    },
+    ...availableSystemFonts.map((fontFamily) => ({
+      label: fontFamily,
+      value: buildUiFontFamily(fontFamily),
+    })),
+  ].filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
+
+  if (!uiFontOptions.some((option) => option.value === currentUiFontValue)) {
+    uiFontOptions.unshift({
+      label: t('settings_uiFontCurrentOption'),
+      value: currentUiFontValue,
+    });
+  }
+
+  const englishFontOptions = [
+    {
+      label: t('settings_englishFontDefaultOption'),
+      value: DEFAULT_ENGLISH_FONT_FAMILY,
+    },
+    ...availableSystemFonts.map((fontFamily) => ({
+      label: fontFamily,
+      value: fontFamily,
+    })),
+  ].filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
+
+  if (!englishFontOptions.some((option) => option.value === currentEnglishFontValue)) {
+    englishFontOptions.unshift({
+      label: t('settings_uiFontCurrentOption'),
+      value: currentEnglishFontValue,
+    });
+  }
+
+  const chineseFontOptions = [
+    {
+      label: t('settings_chineseFontBundledOption'),
+      value: DEFAULT_CHINESE_FONT_FAMILY,
+    },
+    ...availableSystemFonts.map((fontFamily) => ({
+      label: fontFamily,
+      value: fontFamily,
+    })),
+  ].filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
+
+  if (!chineseFontOptions.some((option) => option.value === currentChineseFontValue)) {
+    chineseFontOptions.unshift({
+      label: t('settings_uiFontCurrentOption'),
+      value: currentChineseFontValue,
+    });
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-fade-in-02s">
+    <div className="ui-scaled fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-fade-in-02s">
       <div
         className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-scale-in flex h-[600px] max-h-[90vh] border border-gray-200/50 dark:border-white/10"
         onClick={(e) => e.stopPropagation()}
@@ -860,24 +946,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="space-y-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_englishFont')}</label>
-                        <input
-                          type="text"
-                          value={settings.englishFontFamily}
+                        <select
+                          value={currentEnglishFontValue}
                           onChange={(e) => onUpdateSettings({ ...settings, englishFontFamily: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
-                        />
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                        >
+                          {englishFontOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_englishFontDesc')}</p>
+                        <div
+                          className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                          style={{ fontFamily: getResolvedEnglishFontFamily(settings) }}
+                        >
+                          {t('settings_englishFontPreview')}
+                        </div>
                       </div>
 
                       <div>
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_chineseFont')}</label>
-                        <input
-                          type="text"
-                          value={settings.chineseFontFamily}
+                        <select
+                          value={currentChineseFontValue}
                           onChange={(e) => onUpdateSettings({ ...settings, chineseFontFamily: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-sans"
-                        />
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                        >
+                          {chineseFontOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_chineseFontDesc')}</p>
+                        <div
+                          className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                          style={{ fontFamily: getResolvedChineseFontFamily(settings) }}
+                        >
+                          {t('settings_chineseFontPreview')}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1102,20 +1210,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-6 animate-fade-in-02s">
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_interface')}</h3>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_languageLabel')}</label>
-                    <select
-                      value={language}
-                      onChange={(e) => {
-                        const nextLanguage = e.target.value as AppSettings['language'];
-                        onUpdateSettings({ language: nextLanguage });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
-                    >
-                      <option value="zh-CN">{t('common_simplifiedChinese')}</option>
-                      <option value="en">{t('common_english')}</option>
-                    </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_interfaceDesc')}</p>
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_languageLabel')}</label>
+                      <select
+                        value={language}
+                        onChange={(e) => {
+                          const nextLanguage = e.target.value as AppSettings['language'];
+                          onUpdateSettings({ language: nextLanguage });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                      >
+                        <option value="zh-CN">{t('common_simplifiedChinese')}</option>
+                        <option value="en">{t('common_english')}</option>
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_interfaceDesc')}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_uiFont')}</label>
+                        {isLoadingSystemFonts && (
+                          <span className="text-[11px] text-gray-400">{t('common_loading')}</span>
+                        )}
+                      </div>
+                      <select
+                        value={currentUiFontValue}
+                        onChange={(e) => onUpdateSettings({ uiFontFamily: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                      >
+                        {uiFontOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_uiFontDesc')}</p>
+                      <div
+                        className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                        style={{ fontFamily: getResolvedUiFontFamily(settings) }}
+                      >
+                        {t('settings_uiFontPreview')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_uiFontSize')}</label>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.uiFontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="12"
+                        max="22"
+                        step="1"
+                        value={settings.uiFontSize}
+                        onChange={(e) => onUpdateSettings({ uiFontSize: parseInt(e.target.value, 10) })}
+                        className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
+                      />
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('settings_uiFontSizeDesc')}</p>
+                    </div>
                   </div>
                 </div>
               </div>

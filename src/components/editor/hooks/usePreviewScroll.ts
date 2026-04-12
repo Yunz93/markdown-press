@@ -4,7 +4,7 @@
  * 处理预览面板的滚动同步功能
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 const DEFAULT_SCROLL_THRESHOLD = 1;
 const DEFAULT_SCROLL_EMIT_THRESHOLD = 0.001;
@@ -28,7 +28,7 @@ export interface UsePreviewScrollReturn {
   // 取消同步
   cancelScrollSync: () => void;
   // 同步到百分比
-  syncScrollTo: (element: HTMLElement, percentage: number) => void;
+  syncScrollTo: (element: HTMLElement, percentage: number, options?: { immediate?: boolean }) => void;
   // 检查是否正在同步
   isSyncing: () => boolean;
 }
@@ -39,8 +39,6 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
   const onScrollRef = useRef(onScroll);
-  const emitAnimationFrameRef = useRef<number | null>(null);
-  const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
   const syncStartScrollTopRef = useRef(0);
@@ -58,9 +56,6 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (emitAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(emitAnimationFrameRef.current);
-      }
       cancelScrollSync();
     };
   }, []);
@@ -150,15 +145,20 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   }, [scheduleSyncUnlock]);
 
   // Sync scroll to percentage
-  const syncScrollTo = useCallback((element: HTMLElement, percentage: number) => {
+  const syncScrollTo = useCallback((element: HTMLElement, percentage: number, options?: { immediate?: boolean }) => {
     const scrollHeight = element.scrollHeight - element.clientHeight;
     if (scrollHeight <= 0) return;
 
     const targetScroll = scrollHeight * percentage;
 
     if (Math.abs(element.scrollTop - targetScroll) <= scrollThresholdRef.current) return;
+    if (options?.immediate) {
+      cancelScrollSync();
+      element.scrollTop = targetScroll;
+      return;
+    }
     animateSyncedScroll(element, targetScroll);
-  }, [animateSyncedScroll]);
+  }, [animateSyncedScroll, cancelScrollSync]);
 
   // Handle scroll event
   const handleScroll = useCallback((element: HTMLElement) => {
@@ -173,27 +173,17 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
     if (Math.abs(percentage - lastScrollPercentage.current) <= emitThresholdRef.current) return;
 
     lastScrollPercentage.current = percentage;
-    pendingEmittedPercentageRef.current = percentage;
-
-    if (emitAnimationFrameRef.current !== null) return;
-
-    emitAnimationFrameRef.current = requestAnimationFrame(() => {
-      emitAnimationFrameRef.current = null;
-      const pendingPercentage = pendingEmittedPercentageRef.current;
-      pendingEmittedPercentageRef.current = null;
-      const latestOnScroll = onScrollRef.current;
-      if (pendingPercentage === null || !latestOnScroll) return;
-      latestOnScroll(pendingPercentage);
-    });
+    // Emit immediately for lower latency
+    onScrollCallback(percentage);
   }, []);
 
   // Check if currently syncing
   const isSyncing = useCallback(() => isSyncingScroll.current, []);
 
-  return {
+  return useMemo(() => ({
     handleScroll,
     cancelScrollSync,
     syncScrollTo,
     isSyncing,
-  };
+  }), [cancelScrollSync, handleScroll, isSyncing, syncScrollTo]);
 }

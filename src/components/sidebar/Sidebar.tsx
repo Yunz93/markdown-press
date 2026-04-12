@@ -285,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ref={sidebarRef}
         style={sidebarSurfaceStyle}
         className={`
-          sidebar-shell
+          sidebar-shell ui-scaled
           fixed md:relative z-30 h-full w-72 md:flex-shrink-0 flex flex-col overflow-hidden
           transition-[transform,width,opacity] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
           ${
@@ -398,13 +398,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <button
                       onClick={() => void handleSearchResultSelect(file)}
-                      className="flex w-full items-start justify-between gap-3 text-left"
+                      className="flex w-full min-w-0 items-start justify-between gap-3 text-left"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
                           {highlightSearchText(file.name.replace(/\.md$/i, ''), searchQuery)}
                         </div>
-                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{file.path}</div>
+                        <div
+                          className="truncate text-xs text-gray-500 dark:text-gray-400"
+                          title={file.path}
+                        >
+                          {file.path}
+                        </div>
                       </div>
                       {filenameMatched && (
                         <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
@@ -419,12 +424,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <button
                             key={`${file.id}-${snippet.start}-${index}`}
                             onClick={() => void handleSearchResultSelect(file, snippet)}
-                            className="w-full rounded-xl border border-gray-200/70 bg-white/55 px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/70 dark:border-white/10 dark:bg-[#0f151f] dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10"
+                            className="w-full min-w-0 rounded-xl border border-gray-200/70 bg-white/55 px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/70 dark:border-white/10 dark:bg-[#0f151f] dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10"
                           >
                             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                               {t('sidebar_paragraphAroundLine', { line: snippet.line })}
                             </div>
-                            <div className="text-sm leading-6 text-gray-700 dark:text-gray-200">
+                            <div className="min-w-0 overflow-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-gray-700 dark:text-gray-200">
                               {highlightSearchText(snippet.text, searchQuery)}
                             </div>
                           </button>

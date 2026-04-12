@@ -37,16 +37,19 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
-  const [editorScrollPercentage, setEditorScrollPercentage] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorPaneRef = useRef<EditorPaneHandle | null>(null);
   const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
   const previousViewModeRef = useRef(viewMode);
-  const transitionSyncTimerRef = useRef<number | null>(null);
-
-  const handleEditorScroll = useCallback((percentage: number) => {
-    setEditorScrollPercentage(percentage);
-  }, []);
+  const [visualMode, setVisualMode] = useState<ViewMode>(viewMode);
+  const editorScrollPercentageRef = useRef(0);
+  const previewScrollPercentageRef = useRef(0);
+  const transitionResyncTimerRef = useRef<number | null>(null);
+  const scrollPositionsRef = useRef<Record<string, {
+    editor: number;
+    preview: number;
+    lastViewMode: ViewMode;
+  }>>({});
 
   const handleMouseDown = useCallback(() => {
     setIsResizing(true);
@@ -104,78 +107,137 @@ export const SplitView: React.FC<SplitViewProps> = ({
     return () => resizeObserver.disconnect();
   }, [viewMode]);
 
+  const isSplitModeRef = useRef(viewMode === ViewMode.SPLIT);
+  
+  // Keep ref in sync with current view mode
   useEffect(() => {
-    if (viewMode === ViewMode.SPLIT) return;
-    editorPaneRef.current?.cancelScrollSync();
-    previewPaneRef.current?.cancelScrollSync();
+    isSplitModeRef.current = viewMode === ViewMode.SPLIT;
+  }, [viewMode]);
+
+  // Handle editor scroll - sync to preview in split mode
+  // Using ref to avoid re-creating callback and reduce latency
+  const handleEditorScroll = useCallback((percentage: number) => {
+    editorScrollPercentageRef.current = percentage;
+    if (viewMode !== ViewMode.PREVIEW) {
+      previewScrollPercentageRef.current = percentage;
+    }
+    if (isSplitModeRef.current) {
+      previewPaneRef.current?.syncScrollTo(percentage, { immediate: true });
+    }
+  }, [viewMode]);
+
+  const handlePreviewScroll = useCallback((percentage: number) => {
+    previewScrollPercentageRef.current = percentage;
+  }, []);
+
+  const syncVisiblePanesToAnchor = useCallback((anchorPercentage: number) => {
+    if (transitionResyncTimerRef.current !== null) {
+      window.clearTimeout(transitionResyncTimerRef.current);
+      transitionResyncTimerRef.current = null;
+    }
+
+    if (viewMode !== ViewMode.PREVIEW) {
+      editorPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
+    }
+
+    if (viewMode !== ViewMode.EDITOR) {
+      previewPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
+    }
+
+    transitionResyncTimerRef.current = window.setTimeout(() => {
+      transitionResyncTimerRef.current = null;
+
+      if (viewMode !== ViewMode.PREVIEW) {
+        editorPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
+      }
+
+      if (viewMode !== ViewMode.EDITOR) {
+        previewPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
+      }
+    }, 320);
+  }, [viewMode]);
+
+  const saveActiveTabScrollState = useCallback((tabId: string | null) => {
+    if (!tabId) return;
+    scrollPositionsRef.current[tabId] = {
+      editor: editorScrollPercentageRef.current,
+      preview: previewScrollPercentageRef.current,
+      lastViewMode: viewMode,
+    };
   }, [viewMode]);
 
   useEffect(() => {
     return () => {
-      if (transitionSyncTimerRef.current !== null) {
-        window.clearTimeout(transitionSyncTimerRef.current);
+      if (transitionResyncTimerRef.current !== null) {
+        window.clearTimeout(transitionResyncTimerRef.current);
       }
+      saveActiveTabScrollState(activeTabId);
     };
-  }, []);
+  }, [activeTabId, saveActiveTabScrollState]);
 
+  useEffect(() => {
+    if (!activeTabId) return;
+
+    const savedState = scrollPositionsRef.current[activeTabId] ?? {
+      editor: 0,
+      preview: 0,
+      lastViewMode: ViewMode.SPLIT,
+    };
+    const anchorPercentage = savedState.lastViewMode === ViewMode.PREVIEW
+      ? savedState.preview
+      : savedState.editor;
+
+    editorScrollPercentageRef.current = anchorPercentage;
+    previewScrollPercentageRef.current = anchorPercentage;
+
+    const frameId = window.requestAnimationFrame(() => {
+      syncVisiblePanesToAnchor(anchorPercentage);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [activeTabId, syncVisiblePanesToAnchor]);
+
+  // Handle view mode changes
   useEffect(() => {
     const previousViewMode = previousViewModeRef.current;
     previousViewModeRef.current = viewMode;
 
+    setVisualMode(viewMode);
     if (previousViewMode === viewMode) return;
 
-    const syncAfterTransition = (sync: () => void) => {
-      sync();
-      if (transitionSyncTimerRef.current !== null) {
-        window.clearTimeout(transitionSyncTimerRef.current);
-      }
-      transitionSyncTimerRef.current = window.setTimeout(() => {
-        sync();
-        transitionSyncTimerRef.current = null;
-      }, 220);
-    };
+    const anchorPercentage = previousViewMode === ViewMode.PREVIEW
+      ? previewScrollPercentageRef.current
+      : editorScrollPercentageRef.current;
 
-    if (viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT) {
-      syncAfterTransition(() => {
-        previewPaneRef.current?.syncScrollTo(editorScrollPercentage);
-      });
-      return;
-    }
-  }, [editorScrollPercentage, viewMode]);
+    editorScrollPercentageRef.current = anchorPercentage;
+    previewScrollPercentageRef.current = anchorPercentage;
+    syncVisiblePanesToAnchor(anchorPercentage);
+  }, [syncVisiblePanesToAnchor, viewMode]);
 
-  const isSplitView = viewMode === ViewMode.SPLIT;
-  const editorWidth = isSplitView ? splitRatio : 100;
-  const previewWidth = isSplitView ? 100 - splitRatio : 100;
-  const editorActive = viewMode !== ViewMode.PREVIEW;
-  const previewActive = viewMode !== ViewMode.EDITOR;
+  const isSplitView = visualMode === ViewMode.SPLIT;
+  const editorWidth = visualMode === ViewMode.EDITOR ? 100 : visualMode === ViewMode.SPLIT ? splitRatio : 0;
+  const previewWidth = visualMode === ViewMode.PREVIEW ? 100 : visualMode === ViewMode.SPLIT ? 100 - splitRatio : 0;
+  const editorActive = editorWidth > 0;
+  const previewActive = previewWidth > 0;
   const activePaneKey = activeTabId ?? 'no-active-tab';
 
-  const hiddenPaneStyle: React.CSSProperties = {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    visibility: 'hidden',
-    pointerEvents: 'none',
-    overflow: 'hidden',
+  const editorPaneStyle: React.CSSProperties = {
+    width: `${editorWidth}%`,
+    opacity: editorActive ? 1 : 0,
+    pointerEvents: editorActive ? 'auto' : 'none',
+    transition: isResizing ? 'none' : `${PANE_TRANSITION}, opacity 180ms ease`,
+    willChange: isResizing ? 'auto' : 'width, opacity',
   };
 
-  const editorPaneStyle: React.CSSProperties = editorActive
-    ? {
-        width: `${editorWidth}%`,
-        pointerEvents: 'auto',
-        transition: isResizing || !isSplitView ? 'none' : PANE_TRANSITION,
-        willChange: isResizing || !isSplitView ? 'auto' : 'width',
-      }
-    : hiddenPaneStyle;
-
-  const previewPaneStyle: React.CSSProperties = previewActive
-    ? {
-        width: `${previewWidth}%`,
-        pointerEvents: 'auto',
-        transition: isResizing || !isSplitView ? 'none' : PANE_TRANSITION,
-        willChange: isResizing || !isSplitView ? 'auto' : 'width',
-      }
-    : hiddenPaneStyle;
+  const previewPaneStyle: React.CSSProperties = {
+    width: `${previewWidth}%`,
+    opacity: previewActive ? 1 : 0,
+    pointerEvents: previewActive ? 'auto' : 'none',
+    transition: isResizing ? 'none' : `${PANE_TRANSITION}, opacity 180ms ease`,
+    willChange: isResizing ? 'auto' : 'width, opacity',
+  };
 
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
@@ -226,7 +288,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             ref={previewPaneRef}
             highlighter={highlighter}
             density={contentDensity}
-            syncedPercentage={viewMode === ViewMode.SPLIT ? editorScrollPercentage : null}
+            onScroll={handlePreviewScroll}
           />
         </div>
       </div>

@@ -120,7 +120,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
     return (
       <div
         ref={panelRef}
-        className="outline-panel empty relative bg-transparent"
+        className="outline-panel ui-scaled empty relative bg-transparent"
         style={{ width: `${width}px` }}
       >
         <div className="outline-header">
@@ -141,7 +141,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
   return (
     <div
       ref={panelRef}
-      className={`outline-panel relative bg-transparent ${isCollapsed ? 'collapsed' : ''}`}
+      className={`outline-panel ui-scaled relative bg-transparent ${isCollapsed ? 'collapsed' : ''}`}
       style={{ width: `${width}px` }}
     >
       <div className="outline-header">

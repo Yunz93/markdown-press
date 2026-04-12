@@ -19,16 +19,11 @@ interface SecureSettingsPayload {
 
 const secureWriteQueue = new Map<SensitiveSettingKey, Promise<void>>();
 let secureHydrationPromise: Promise<Partial<SensitiveSettings>> | null = null;
+let secureSettingsCache: Partial<SensitiveSettings> | null = null;
+let hasLoadedSecureSettingsFromBackend = false;
 
 function normalizeSecretValue(value: string | null | undefined): string {
   return typeof value === 'string' ? value : '';
-}
-
-function getSecurePayloadValue(
-  payload: SecureSettingsPayload,
-  key: SensitiveSettingKey
-): string {
-  return normalizeSecretValue(payload[key]);
 }
 
 async function ensureSecureSettingsBackendReady(): Promise<boolean> {
@@ -107,13 +102,19 @@ export function scrubSensitiveSettingsFromLocalStorage(): void {
 export async function loadSecureSettings(): Promise<Partial<SensitiveSettings>> {
   scrubSensitiveSettingsFromLocalStorage();
 
+  if (hasLoadedSecureSettingsFromBackend && secureSettingsCache) {
+    return { ...secureSettingsCache };
+  }
+
   try {
     const payload = await invokeSecureSettingsCommand<SecureSettingsPayload>('get_secure_settings');
-    return {
+    secureSettingsCache = {
       blogGithubToken: normalizeSecretValue(payload.blogGithubToken),
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
     };
+    hasLoadedSecureSettingsFromBackend = true;
+    return { ...secureSettingsCache };
   } catch (error) {
     console.warn('Failed to load secure settings:', error);
     return {};
@@ -132,14 +133,10 @@ export async function persistSecureSetting(key: SensitiveSettingKey, value: stri
         key,
         value: trimmed ? trimmed : null,
       });
-
-      const stored = await invokeSecureSettingsCommand<SecureSettingsPayload>('get_secure_settings');
-      const persistedValue = getSecurePayloadValue(stored, key);
-      if (persistedValue !== trimmed) {
-        throw new Error(
-          `Secure setting verification failed for ${key}: expected ${trimmed ? 'a stored value' : 'an empty value'}, got ${persistedValue ? 'a different stored value' : 'an empty value'}.`
-        );
-      }
+      secureSettingsCache = {
+        ...(secureSettingsCache ?? {}),
+        [key]: trimmed,
+      };
     });
 
   secureWriteQueue.set(key, nextWrite);
@@ -180,9 +177,18 @@ export async function migrateLegacySensitiveSettings(
 export async function hydrateSensitiveSettingsIntoStore(
   settings: AppSettings = useAppStore.getState().settings
 ): Promise<AppSettings> {
+  if (hasLoadedSecureSettingsFromBackend) {
+    if (secureSettingsCache) {
+      useAppStore.getState().updateSettings(secureSettingsCache);
+    }
+    return useAppStore.getState().settings;
+  }
+
   if (!secureHydrationPromise) {
     secureHydrationPromise = migrateLegacySensitiveSettings(settings)
       .then((secureSettings) => {
+        secureSettingsCache = { ...secureSettings };
+        hasLoadedSecureSettingsFromBackend = true;
         useAppStore.getState().updateSettings(secureSettings);
         return secureSettings;
       })

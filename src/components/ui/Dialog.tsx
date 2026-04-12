@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useAppStore, defaultSettings } from '../../store/appStore';
 
 interface DialogProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const Dialog: React.FC<DialogProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const uiFontScale = useAppStore((state) => state.settings.uiFontSize / defaultSettings.uiFontSize);
 
   // Handle escape key
   useEffect(() => {
@@ -63,7 +65,8 @@ export const Dialog: React.FC<DialogProps> = ({
 
   const content = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="ui-scaled fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ '--ui-font-scale': `${uiFontScale}` } as React.CSSProperties}
       onClick={handleBackdropClick}
     >
       {/* Backdrop */}

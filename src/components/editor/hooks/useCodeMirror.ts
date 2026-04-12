@@ -43,6 +43,7 @@ import type { OrderedListMode } from '../../../types';
 
 export interface UseCodeMirrorOptions {
   content: string;
+  documentKey?: string | null;
   placeholder?: string;
   wordWrap?: boolean;
   orderedListMode?: OrderedListMode;
@@ -94,6 +95,7 @@ function getDocumentReplacementRange(currentContent: string, nextContent: string
 export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorReturn {
   const {
     content,
+    documentKey = null,
     placeholder = '在此输入...',
     wordWrap = true,
     orderedListMode = 'strict',
@@ -129,6 +131,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
 
   // Track if we're currently syncing content to avoid loops
   const isSyncingContentRef = useRef(false);
+  const previousDocumentKeyRef = useRef<string | null>(documentKey);
   
   // Track initial content for delayed initialization
   const initialContentRef = useRef(content || '');
@@ -352,7 +355,8 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
 
     const safeContent = content || '';
     const currentContent = view.state.doc.toString();
-    if (currentContent === safeContent) return;
+    const isDocumentSwitch = previousDocumentKeyRef.current !== documentKey;
+    if (currentContent === safeContent && !isDocumentSwitch) return;
 
     if (restoreScrollFrameRef.current !== null) {
       cancelAnimationFrame(restoreScrollFrameRef.current);
@@ -363,14 +367,20 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     const previousScrollTop = scrollDom.scrollTop;
     const previousScrollLeft = scrollDom.scrollLeft;
     const shouldRestoreFocus = view.hasFocus;
-    const replacement = getDocumentReplacementRange(currentContent, safeContent);
 
     isSyncingContentRef.current = true;
-    view.dispatch({
-      changes: replacement,
-    });
+    if (currentContent !== safeContent) {
+      const replacement = getDocumentReplacementRange(currentContent, safeContent);
+      view.dispatch({
+        changes: replacement,
+      });
+    }
 
     const restoreScrollPosition = () => {
+      if (isDocumentSwitch) {
+        scrollDom.scrollTo({ top: 0, left: 0 });
+        return;
+      }
       const maxScrollTop = Math.max(0, scrollDom.scrollHeight - scrollDom.clientHeight);
       const maxScrollLeft = Math.max(0, scrollDom.scrollWidth - scrollDom.clientWidth);
       scrollDom.scrollTo({
@@ -389,7 +399,8 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     });
 
     isSyncingContentRef.current = false;
-  }, [content]);
+    previousDocumentKeyRef.current = documentKey;
+  }, [content, documentKey]);
 
   // Update word wrap
   const setWordWrap = useCallback((enabled: boolean) => {

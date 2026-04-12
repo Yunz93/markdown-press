@@ -4,7 +4,7 @@
  * 处理编辑器滚动同步功能
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { EditorView } from '@codemirror/view';
 
 const DEFAULT_SCROLL_THRESHOLD = 5;
@@ -29,7 +29,7 @@ export interface UseScrollSyncReturn {
   // 取消同步
   cancelScrollSync: () => void;
   // 同步到指定百分比
-  syncScrollTo: (percentage: number) => void;
+  syncScrollTo: (percentage: number, options?: { immediate?: boolean }) => void;
   // 滚动事件处理器（用于传递给 CodeMirror）
   handleScroll: () => void;
 }
@@ -41,8 +41,6 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
   const isSyncingScroll = useRef(false);
   const lastScrollPercentage = useRef(0);
   const onScrollRef = useRef(onScroll);
-  const emitAnimationFrameRef = useRef<number | null>(null);
-  const pendingEmittedPercentageRef = useRef<number | null>(null);
   const syncAnimationFrameRef = useRef<number | null>(null);
   const syncTargetScrollTopRef = useRef<number | null>(null);
   const syncStartScrollTopRef = useRef(0);
@@ -60,9 +58,6 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
   // 清理动画帧
   useEffect(() => {
     return () => {
-      if (emitAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(emitAnimationFrameRef.current);
-      }
       cancelScrollSync();
     };
   }, []);
@@ -81,17 +76,8 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     if (Math.abs(percentage - lastScrollPercentage.current) <= emitThresholdRef.current) return;
 
     lastScrollPercentage.current = percentage;
-    pendingEmittedPercentageRef.current = percentage;
-
-    if (emitAnimationFrameRef.current !== null) return;
-
-    emitAnimationFrameRef.current = requestAnimationFrame(() => {
-      emitAnimationFrameRef.current = null;
-      const pendingPercentage = pendingEmittedPercentageRef.current;
-      pendingEmittedPercentageRef.current = null;
-      if (pendingPercentage === null) return;
-      onScrollCallback(pendingPercentage);
-    });
+    // Emit immediately for lower latency in split view sync
+    onScrollCallback(percentage);
   }, []);
 
   // 取消同步滚动
@@ -174,7 +160,7 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
   }, [scheduleSyncUnlock]);
 
   // 同步到指定百分比
-  const syncScrollTo = useCallback((percentage: number) => {
+  const syncScrollTo = useCallback((percentage: number, options?: { immediate?: boolean }) => {
     const view = viewRef.current;
     if (!view) return;
 
@@ -184,8 +170,15 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
 
     const targetScrollTop = maxScrollTop * percentage;
     if (Math.abs(scrollDom.scrollTop - targetScrollTop) <= scrollThresholdRef.current) return;
+    if (options?.immediate) {
+      cancelScrollSync();
+      isSyncingScroll.current = true;
+      scrollDom.scrollTop = targetScrollTop;
+      scheduleSyncUnlock();
+      return;
+    }
     animateSyncedScroll(scrollDom, targetScrollTop);
-  }, [animateSyncedScroll]);
+  }, [animateSyncedScroll, cancelScrollSync, scheduleSyncUnlock]);
 
   // 处理滚动事件
   const handleScroll = useCallback(() => {
@@ -199,10 +192,10 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     viewRef.current = view;
   }, []);
 
-  return {
+  return useMemo(() => ({
     registerView,
     cancelScrollSync,
     syncScrollTo,
     handleScroll,
-  };
+  }), [cancelScrollSync, handleScroll, registerView, syncScrollTo]);
 }

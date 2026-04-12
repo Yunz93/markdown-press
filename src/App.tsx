@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useAppStore, selectContent } from './store/appStore';
+import { useAppStore, selectContent, defaultSettings } from './store/appStore';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useViewMode } from './hooks/useViewMode';
 import { useSettings } from './hooks/useSettings';
@@ -24,7 +24,8 @@ import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
-import { ensureDynamicFontFaces } from './utils/fontSettings';
+import { ensureDynamicFontFaces, getResolvedUiFontFamily } from './utils/fontSettings';
+import { hydrateSensitiveSettingsIntoStore } from './services/secureSettingsService';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
@@ -101,6 +102,34 @@ const App: React.FC = () => {
   useUndoRedo();
 
   useThemeSync(settings.themeMode);
+
+  useEffect(() => {
+    if (!settingsHydrated || typeof window === 'undefined') return;
+
+    let cancelled = false;
+    const win = window;
+
+    const warmSecureSettings = () => {
+      if (cancelled) return;
+      void hydrateSensitiveSettingsIntoStore().catch((error) => {
+        console.warn('Failed to warm secure settings:', error);
+      });
+    };
+
+    if ('requestIdleCallback' in win) {
+      const idleId = win.requestIdleCallback(warmSecureSettings, { timeout: 1500 });
+      return () => {
+        cancelled = true;
+        win.cancelIdleCallback(idleId);
+      };
+    }
+
+    const timerId = setTimeout(warmSecureSettings, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timerId);
+    };
+  }, [settingsHydrated]);
 
   useEffect(() => {
     traceStartup('Dynamic font load started', {
@@ -361,6 +390,10 @@ const App: React.FC = () => {
     setContentForFile(activeTabId, newContent);
   }, [activeTabId, setContent, setContentForFile]);
 
+  const handleToolbarViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode, 'direct');
+  }, [setViewMode]);
+
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
     setSidebarWidth(clamp(nextWidth, LAYOUT.SIDEBAR.MIN_WIDTH, LAYOUT.SIDEBAR.MAX_WIDTH));
   }, []);
@@ -477,6 +510,10 @@ const App: React.FC = () => {
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const notification = useAppStore(state => state.notification);
   const currentKnowledgeBaseName = useMemo(() => getPathBasename(rootFolderPath), [rootFolderPath]);
+  const uiFontFamily = useMemo(() => getResolvedUiFontFamily(settings), [settings.uiFontFamily]);
+  const uiScaleStyle = useMemo(() => ({
+    '--ui-font-scale': `${settings.uiFontSize / defaultSettings.uiFontSize}`,
+  }) as React.CSSProperties, [settings.uiFontSize]);
   // Show onboarding when no knowledge base is open
   // Note: In browser mode, we always show onboarding if no KB is open,
   // because auto-restore is not supported (File System Access API permissions don't persist)
@@ -511,7 +548,10 @@ const App: React.FC = () => {
 
   if (shouldShowKnowledgeBaseOnboarding) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6">
+      <div
+        className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
+        style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
+      >
         <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
@@ -539,7 +579,10 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden text-sm">
+    <div
+      className="flex h-screen overflow-hidden text-sm"
+      style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
+    >
       <Sidebar
         files={files}
         activeFileId={activeTabId}
@@ -573,7 +616,7 @@ const App: React.FC = () => {
         <Toolbar
           fileName={activeFile?.name || ''}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
+          onViewModeChange={handleToolbarViewModeChange}
           onAIAnalyze={handleAIAnalyze}
           isAnalyzing={isAnalyzing}
           isSaving={isSaving}
@@ -632,7 +675,7 @@ const App: React.FC = () => {
       />
 
       {notification && (
-        <div className={`fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-50 animate-fade-in border glass ${
+        <div className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-50 animate-fade-in border glass ${
           notification.type === 'success'
             ? 'text-green-600 border-green-100 dark:border-green-900'
             : 'text-red-500 border-red-100 dark:border-red-900'

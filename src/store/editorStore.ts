@@ -17,6 +17,8 @@ export interface HistoryState {
  */
 export interface EditorState {
   viewMode: ViewMode;
+  lastNonSplitViewMode: ViewMode.EDITOR | ViewMode.PREVIEW;
+  lastViewModeChangeSource: 'direct' | 'toggle';
   fileHistories: Record<string, HistoryState>; // Per-file history
 }
 
@@ -26,7 +28,7 @@ export interface EditorState {
 export interface EditorActions {
   setContent: (content: string, skipHistory?: boolean) => void;
   setContentForFile: (fileId: string, content: string, skipHistory?: boolean) => void;
-  setViewMode: (mode: ViewMode) => void;
+  setViewMode: (mode: ViewMode, source?: 'direct' | 'toggle') => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -39,6 +41,8 @@ export interface EditorActions {
  */
 export const initialEditorState: EditorState = {
   viewMode: ViewMode.SPLIT,
+  lastNonSplitViewMode: ViewMode.EDITOR,
+  lastViewModeChangeSource: 'direct',
   fileHistories: {}, // Initialize as empty object, histories created per file
 };
 
@@ -112,7 +116,13 @@ export function createEditorSlice(
       buildContentUpdate(state, fileId, content, skipHistory)
     )),
 
-    setViewMode: (mode) => set(() => ({ viewMode: mode })),
+    setViewMode: (mode, source = 'direct') => set((state) => ({
+      viewMode: mode,
+      lastNonSplitViewMode: mode === ViewMode.SPLIT
+        ? state.lastNonSplitViewMode
+        : mode,
+      lastViewModeChangeSource: source,
+    })),
 
     undo: () => set((state) => {
       const { activeTabId, fileContents, fileHistories } = state;

@@ -48,6 +48,47 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root {
+  --ui-font-scale: 1;
+}
+
+.ui-scaled {
+  font-size: calc(1rem * var(--ui-font-scale));
+}
+
+.ui-scaled.text-xs,
+.ui-scaled .text-xs {
+  font-size: calc(0.75rem * var(--ui-font-scale));
+}
+
+.ui-scaled.text-sm,
+.ui-scaled .text-sm {
+  font-size: calc(0.875rem * var(--ui-font-scale));
+}
+
+.ui-scaled.text-base,
+.ui-scaled .text-base {
+  font-size: calc(1rem * var(--ui-font-scale));
+}
+
+.ui-scaled.text-lg,
+.ui-scaled .text-lg {
+  font-size: calc(1.125rem * var(--ui-font-scale));
+}
+
+.ui-scaled.text-xl,
+.ui-scaled .text-xl {
+  font-size: calc(1.25rem * var(--ui-font-scale));
+}
+
+.ui-scaled .text-\[10px\] {
+  font-size: calc(10px * var(--ui-font-scale));
+}
+
+.ui-scaled .text-\[11px\] {
+  font-size: calc(11px * var(--ui-font-scale));
+}
+
 html[data-app-booting="true"] *,
 html[data-app-booting="true"] *::before,
 html[data-app-booting="true"] *::after {
@@ -450,9 +491,16 @@ html[data-app-booting="true"] *::after {
   margin-bottom: 0;
 }
 
+.editor-pane-layout .cm-frontmatter-line {
+  padding-top: 0.16rem !important;
+  padding-bottom: 0.16rem !important;
+}
+
 .editor-pane-layout .cm-frontmatter-line,
 .editor-pane-layout .cm-frontmatter-line span {
   color: #475569 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.72 !important;
 }
 
 .editor-pane-layout .cm-frontmatter-mark,
@@ -1075,6 +1123,8 @@ html[data-app-booting="true"] *::after {
 
 .preview-pane-properties {
   border-radius: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.72;
 }
 
 .preview-pane-properties-header {
@@ -1084,8 +1134,8 @@ html[data-app-booting="true"] *::after {
 }
 
 .preview-pane-properties .table-cell {
-  padding-top: 0.25rem !important;
-  padding-bottom: 0.25rem !important;
+  padding-top: 0.16rem !important;
+  padding-bottom: 0.16rem !important;
   padding-left: 0.45rem !important;
   padding-right: 0.45rem !important;
 }
@@ -1122,7 +1172,7 @@ html[data-app-booting="true"] *::after {
   display: block;
   min-width: 0;
   padding: 0.1rem 0;
-  line-height: 1.45;
+  line-height: 1.72;
   overflow-wrap: anywhere;
   word-break: break-word;
 }

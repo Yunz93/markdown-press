@@ -7,7 +7,7 @@
  * - useWikiLinkNavigation: WikiLink 导航
  */
 
-import React, { forwardRef, useRef, useMemo, useImperativeHandle, useLayoutEffect, useCallback, useState, useEffect } from 'react';
+import React, { forwardRef, useRef, useMemo, useImperativeHandle, useLayoutEffect, useCallback, useState, useEffect, useDeferredValue } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { useFileOperations } from '../../hooks/useFileOperations';
@@ -34,7 +34,10 @@ interface PreviewPaneProps {
 
 export interface PreviewPaneHandle {
   cancelScrollSync: () => void;
-  syncScrollTo: (percentage: number) => void;
+  syncScrollTo: (percentage: number, options?: { immediate?: boolean }) => void;
+  getScrollPosition: () => { top: number; left: number };
+  restoreScrollPosition: (position: { top: number; left: number }) => void;
+  scrollToTop: () => void;
 }
 
 function syncPreviewContainerScroll(element: HTMLElement, percentage: number): void {
@@ -113,6 +116,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const { t } = useI18n();
   const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
+  const previewContent = useDeferredValue(content);
   const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
   const previewRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -127,8 +131,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const isMarkdownPreview = previewFileType === 'markdown';
   const isHtmlPreview = previewFileType === 'html';
   const flattenedHeadings = useMemo(() => (
-    isMarkdownPreview ? flattenHeadingNodes(parseHeadings(content)) : []
-  ), [content, isMarkdownPreview]);
+    isMarkdownPreview ? flattenHeadingNodes(parseHeadings(previewContent)) : []
+  ), [isMarkdownPreview, previewContent]);
 
   // Pane layout state - use ref to avoid re-render
   const [layoutMetrics, setLayoutMetrics] = useState(() => getPaneLayoutMetrics(0, density));
@@ -163,7 +167,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
   // Preview renderer hook
   const renderer = usePreviewRenderer({
-    content,
+    content: previewContent,
     currentFilePath,
     isMarkdownPreview,
     isHtmlPreview,
@@ -181,7 +185,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
   // WikiLink navigation hook
   const navigation = useWikiLinkNavigation({
-    content,
+    content: previewContent,
     currentFilePath,
     rootFolderPath,
     files,
@@ -203,18 +207,43 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
     cancelScrollSync: scroll.cancelScrollSync,
-    syncScrollTo: (percentage: number) => {
+    syncScrollTo: (percentage: number, options?: { immediate?: boolean }) => {
       const element = previewRef.current;
       if (!element) return;
-      syncPreviewContainerScroll(element, percentage);
+      scroll.syncScrollTo(element, percentage, options);
+    },
+    getScrollPosition: () => {
+      const element = previewRef.current;
+      return {
+        top: element?.scrollTop ?? 0,
+        left: element?.scrollLeft ?? 0,
+      };
+    },
+    restoreScrollPosition: (position: { top: number; left: number }) => {
+      const element = previewRef.current;
+      if (!element) return;
+      scroll.cancelScrollSync();
+      element.scrollTo(position);
+    },
+    scrollToTop: () => {
+      const element = previewRef.current;
+      if (!element) return;
+      element.scrollTo({ top: 0, behavior: 'auto' });
     },
   }), [scroll]);
 
   useEffect(() => {
     const element = previewRef.current;
     if (!element || syncedPercentage === null) return;
-    syncPreviewContainerScroll(element, syncedPercentage);
-  }, [syncedPercentage]);
+    scroll.syncScrollTo(element, syncedPercentage);
+  }, [scroll, syncedPercentage]);
+
+  useEffect(() => {
+    const element = previewRef.current;
+    if (!element) return;
+    element.scrollTo({ top: 0, left: 0 });
+    scroll.cancelScrollSync();
+  }, [activeTabId, scroll.cancelScrollSync]);
 
   // Handle scroll events
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -426,10 +455,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
   // Parse frontmatter for display
   const parsedFrontmatter = useMemo(() => {
-    if (!isMarkdownPreview || !content) return null;
-    const { frontmatter } = parseFrontmatter(content);
+    if (!isMarkdownPreview || !previewContent) return null;
+    const { frontmatter } = parseFrontmatter(previewContent);
     return frontmatter;
-  }, [content, isMarkdownPreview]);
+  }, [isMarkdownPreview, previewContent]);
   const frontmatterEntries = useMemo(() => (
     parsedFrontmatter ? Object.entries(parsedFrontmatter) as Array<[string, FrontmatterValue]> : []
   ), [parsedFrontmatter]);
@@ -465,7 +494,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
           {isMarkdownPreview && parsedFrontmatter && (
             <div
               className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata"
-              style={{ fontSize: `${settings.fontSize * 0.7}px` }}
             >
               <div className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
                 <span>{t('preview_properties')}</span>

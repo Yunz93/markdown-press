@@ -159,7 +159,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
   }
 
   return (
-    <div className="tab-bar min-w-0">
+    <div className="tab-bar ui-scaled min-w-0">
       <div className="tab-strip">
         {openTabs.map((fileId) => {
           const file = fileMap.get(fileId);

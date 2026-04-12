@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use keyring::credential::CredentialPersistence;
-use keyring::default as keyring_default;
-use keyring::Entry;
+use chacha20poly1305::aead::Aead;
+use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
+use rand::RngCore;
 use reqwest::Client;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
 const SAMPLE_NOTES_STATE_FILE: &str = ".markdown-press-sample-notes-state.json";
@@ -24,7 +25,9 @@ const LEGACY_SAMPLE_NOTES_RENAMES: [(&str, &str); 1] =
     [("02-Obsidian-内联语法.md", "02-Obsidian-内联语法示例.md")];
 const GITHUB_API_CONNECT_TIMEOUT_SECS: u64 = 10;
 const GITHUB_API_REQUEST_TIMEOUT_SECS: u64 = 30;
-const SECURE_SETTINGS_SERVICE: &str = "com.bxyz.markdown-press";
+const SECURE_SETTINGS_FILE_NAME: &str = "secure-settings.json";
+const SECURE_SETTINGS_KEY_FILE_NAME: &str = "secure-settings.key";
+const SECURE_SETTINGS_VERSION: u8 = 1;
 const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
 const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
@@ -223,6 +226,22 @@ struct SecureSettingsResult {
     codex_api_key: Option<String>,
 }
 
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SecureSettingsFile {
+    blog_github_token: Option<String>,
+    gemini_api_key: Option<String>,
+    codex_api_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EncryptedSecureSettingsFile {
+    version: u8,
+    nonce: String,
+    ciphertext: String,
+}
+
 fn canonicalize_existing_path(path: &str) -> Result<PathBuf, String> {
     fs::canonicalize(path).map_err(|e| format!("Failed to resolve path {}: {}", path, e))
 }
@@ -271,39 +290,261 @@ fn ensure_path_allowed(state: &SecurityState, path: &Path) -> Result<(), String>
     ))
 }
 
-fn secure_entry(key: &str) -> Result<Entry, String> {
-    let persistence = keyring_default::default_credential_builder().persistence();
-    if !matches!(persistence, CredentialPersistence::UntilDelete | CredentialPersistence::UntilReboot)
-    {
-        return Err(
-            "Secure storage backend is not persistent. This build is not using the native system keychain."
-                .to_string(),
-        );
-    }
-
-    Entry::new(SECURE_SETTINGS_SERVICE, key)
-        .map_err(|e| format!("Failed to initialize secure storage entry for {}: {}", key, e))
+fn normalize_secret_value(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
-fn read_secure_secret(key: &str) -> Result<Option<String>, String> {
-    match secure_entry(key)?.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(format!("Failed to read secure secret {}: {}", key, e)),
-    }
+#[cfg(unix)]
+fn set_private_permissions(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|e| {
+        format!(
+            "Failed to set permissions on secure settings file {}: {}",
+            path.display(),
+            e
+        )
+    })
 }
 
-fn write_secure_secret(key: &str, value: Option<&str>) -> Result<(), String> {
-    let entry = secure_entry(key)?;
-    match value.map(str::trim).filter(|value| !value.is_empty()) {
-        Some(secret) => entry
-            .set_password(secret)
-            .map_err(|e| format!("Failed to store secure secret {}: {}", key, e)),
-        None => match entry.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(format!("Failed to clear secure secret {}: {}", key, e)),
-        },
+#[cfg(not(unix))]
+fn set_private_permissions(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+fn secure_settings_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("Failed to resolve app config directory: {}", e))?;
+
+    fs::create_dir_all(&config_dir).map_err(|e| {
+        format!(
+            "Failed to create app config directory {}: {}",
+            config_dir.display(),
+            e
+        )
+    })?;
+
+    Ok(config_dir.join(SECURE_SETTINGS_FILE_NAME))
+}
+
+fn secure_settings_key_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("Failed to resolve app config directory: {}", e))?;
+
+    fs::create_dir_all(&config_dir).map_err(|e| {
+        format!(
+            "Failed to create app config directory {}: {}",
+            config_dir.display(),
+            e
+        )
+    })?;
+
+    Ok(config_dir.join(SECURE_SETTINGS_KEY_FILE_NAME))
+}
+
+fn load_or_create_secure_settings_key(app: &tauri::AppHandle) -> Result<[u8; 32], String> {
+    let path = secure_settings_key_path(app)?;
+
+    if path.exists() {
+        let encoded = fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read secure settings key {}: {}", path.display(), e))?;
+        let decoded = BASE64_STANDARD
+            .decode(encoded.trim())
+            .map_err(|e| format!("Failed to decode secure settings key {}: {}", path.display(), e))?;
+        let key: [u8; 32] = decoded.try_into().map_err(|_| {
+            format!(
+                "Secure settings key {} has invalid length; expected 32 bytes.",
+                path.display()
+            )
+        })?;
+        return Ok(key);
     }
+
+    let mut key = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut key);
+    let encoded = BASE64_STANDARD.encode(key);
+    let temp_path = path.with_extension("key.tmp");
+
+    fs::write(&temp_path, encoded).map_err(|e| {
+        format!(
+            "Failed to write secure settings key {}: {}",
+            temp_path.display(),
+            e
+        )
+    })?;
+    set_private_permissions(&temp_path)?;
+    fs::rename(&temp_path, &path).map_err(|e| {
+        format!(
+            "Failed to replace secure settings key {}: {}",
+            path.display(),
+            e
+        )
+    })?;
+
+    Ok(key)
+}
+
+fn encrypt_secure_settings(
+    app: &tauri::AppHandle,
+    settings: &SecureSettingsFile,
+) -> Result<EncryptedSecureSettingsFile, String> {
+    let key = load_or_create_secure_settings_key(app)?;
+    let cipher = XChaCha20Poly1305::new((&key).into());
+    let payload = serde_json::to_vec(settings)
+        .map_err(|e| format!("Failed to serialize secure settings: {}", e))?;
+    let mut nonce = [0u8; 24];
+    rand::rngs::OsRng.fill_bytes(&mut nonce);
+    let ciphertext = cipher
+        .encrypt(XNonce::from_slice(&nonce), payload.as_ref())
+        .map_err(|e| format!("Failed to encrypt secure settings: {}", e))?;
+
+    Ok(EncryptedSecureSettingsFile {
+        version: SECURE_SETTINGS_VERSION,
+        nonce: BASE64_STANDARD.encode(nonce),
+        ciphertext: BASE64_STANDARD.encode(ciphertext),
+    })
+}
+
+fn decrypt_secure_settings(
+    app: &tauri::AppHandle,
+    encrypted: EncryptedSecureSettingsFile,
+) -> Result<SecureSettingsFile, String> {
+    if encrypted.version != SECURE_SETTINGS_VERSION {
+        return Err(format!(
+            "Unsupported secure settings version: {}",
+            encrypted.version
+        ));
+    }
+
+    let key = load_or_create_secure_settings_key(app)?;
+    let nonce = BASE64_STANDARD
+        .decode(encrypted.nonce.trim())
+        .map_err(|e| format!("Failed to decode secure settings nonce: {}", e))?;
+    let nonce: [u8; 24] = nonce
+        .try_into()
+        .map_err(|_| "Secure settings nonce has invalid length.".to_string())?;
+    let ciphertext = BASE64_STANDARD
+        .decode(encrypted.ciphertext.trim())
+        .map_err(|e| format!("Failed to decode secure settings ciphertext: {}", e))?;
+    let cipher = XChaCha20Poly1305::new((&key).into());
+    let plaintext = cipher
+        .decrypt(XNonce::from_slice(&nonce), ciphertext.as_ref())
+        .map_err(|e| format!("Failed to decrypt secure settings: {}", e))?;
+
+    serde_json::from_slice(&plaintext)
+        .map_err(|e| format!("Failed to parse decrypted secure settings payload: {}", e))
+}
+
+fn read_secure_settings_file(app: &tauri::AppHandle) -> Result<SecureSettingsFile, String> {
+    let path = secure_settings_file_path(app)?;
+
+    if !path.exists() {
+        return Ok(SecureSettingsFile::default());
+    }
+
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read secure settings file {}: {}", path.display(), e))?;
+
+    if content.trim().is_empty() {
+        return Ok(SecureSettingsFile::default());
+    }
+
+    if let Ok(encrypted) = serde_json::from_str::<EncryptedSecureSettingsFile>(&content) {
+        return decrypt_secure_settings(app, encrypted);
+    }
+
+    if let Ok(plaintext) = serde_json::from_str::<SecureSettingsFile>(&content) {
+        // Migrate legacy plaintext storage to encrypted format on first successful read.
+        write_secure_settings_file(app, &plaintext)?;
+        return Ok(plaintext);
+    }
+
+    Err(format!(
+        "Failed to parse secure settings file {} as encrypted or plaintext JSON.",
+        path.display()
+    ))
+}
+
+fn write_secure_settings_file(
+    app: &tauri::AppHandle,
+    settings: &SecureSettingsFile,
+) -> Result<(), String> {
+    let path = secure_settings_file_path(app)?;
+    let has_secrets = settings.blog_github_token.is_some()
+        || settings.gemini_api_key.is_some()
+        || settings.codex_api_key.is_some();
+
+    if !has_secrets {
+        match fs::remove_file(&path) {
+            Ok(()) => return Ok(()),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => {
+                return Err(format!(
+                    "Failed to remove secure settings file {}: {}",
+                    path.display(),
+                    e
+                ))
+            }
+        }
+    }
+
+    let encrypted = encrypt_secure_settings(app, settings)?;
+    let serialized = serde_json::to_vec_pretty(&encrypted)
+        .map_err(|e| format!("Failed to serialize encrypted secure settings: {}", e))?;
+    let temp_path = path.with_extension("json.tmp");
+
+    fs::write(&temp_path, serialized).map_err(|e| {
+        format!(
+            "Failed to write secure settings temp file {}: {}",
+            temp_path.display(),
+            e
+        )
+    })?;
+
+    set_private_permissions(&temp_path)?;
+
+    fs::rename(&temp_path, &path).map_err(|e| {
+        format!(
+            "Failed to replace secure settings file {}: {}",
+            path.display(),
+            e
+        )
+    })
+}
+
+fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String>, String> {
+    let settings = read_secure_settings_file(app)?;
+    Ok(match key {
+        SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token,
+        SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
+        SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
+        _ => None,
+    })
+}
+
+fn write_secure_secret(
+    app: &tauri::AppHandle,
+    key: &str,
+    value: Option<&str>,
+) -> Result<(), String> {
+    let mut settings = read_secure_settings_file(app)?;
+    let normalized = normalize_secret_value(value);
+
+    match key {
+        SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token = normalized,
+        SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
+        SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
+        _ => return Err(format!("Unsupported secure setting key: {}", key)),
+    }
+
+    write_secure_settings_file(app, &settings)
 }
 
 fn resolve_secret_key(key: &str) -> Option<&'static str> {
@@ -326,6 +567,7 @@ pub fn run() {
             trace_startup,
             get_secure_settings,
             set_secure_secret,
+            list_system_fonts,
             register_allowed_path,
             delete_path_recursively,
             reveal_in_explorer,
@@ -362,21 +604,131 @@ async fn publish_simple_blog(
 }
 
 #[tauri::command]
-fn get_secure_settings() -> Result<SecureSettingsResult, String> {
+fn get_secure_settings(app: tauri::AppHandle) -> Result<SecureSettingsResult, String> {
     Ok(SecureSettingsResult {
-        blog_github_token: read_secure_secret(SECRET_KEY_BLOG_GITHUB_TOKEN)?,
-        gemini_api_key: read_secure_secret(SECRET_KEY_GEMINI_API_KEY)?,
-        codex_api_key: read_secure_secret(SECRET_KEY_CODEX_API_KEY)?,
+        blog_github_token: read_secure_secret(&app, SECRET_KEY_BLOG_GITHUB_TOKEN)?,
+        gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
+        codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
     })
 }
 
 #[tauri::command]
-fn set_secure_secret(key: String, value: Option<String>) -> Result<(), String> {
+fn set_secure_secret(app: tauri::AppHandle, key: String, value: Option<String>) -> Result<(), String> {
     let Some(secret_key) = resolve_secret_key(&key) else {
         return Err(format!("Unsupported secure setting key: {}", key));
     };
 
-    write_secure_secret(secret_key, value.as_deref())
+    write_secure_secret(&app, secret_key, value.as_deref())
+}
+
+#[tauri::command]
+fn list_system_fonts() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = Command::new("system_profiler")
+            .args(["SPFontsDataType", "-detailLevel", "mini", "-json"])
+            .output()
+            .map_err(|e| format!("Failed to query fonts from system_profiler: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "system_profiler failed with status {}",
+                output.status
+            ));
+        }
+
+        let payload: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .map_err(|e| format!("Failed to parse system font list JSON: {}", e))?;
+        let mut families = BTreeSet::new();
+
+        if let Some(items) = payload
+            .get("SPFontsDataType")
+            .and_then(|value| value.as_array())
+        {
+            for item in items {
+                if let Some(family) = item.get("family").and_then(|value| value.as_str()) {
+                    let trimmed = family.trim();
+                    if !trimmed.is_empty() {
+                        families.insert(trimmed.to_string());
+                    }
+                    continue;
+                }
+
+                if let Some(name) = item.get("_name").and_then(|value| value.as_str()) {
+                    let trimmed = name.trim();
+                    if !trimmed.is_empty() {
+                        families.insert(trimmed.to_string());
+                    }
+                }
+            }
+        }
+
+        return Ok(families.into_iter().collect());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts' | Select-Object -ExcludeProperty PS* | ConvertTo-Json -Compress",
+            ])
+            .output()
+            .map_err(|e| format!("Failed to query fonts from PowerShell: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!("PowerShell font query failed with status {}", output.status));
+        }
+
+        let payload: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .map_err(|e| format!("Failed to parse PowerShell font list JSON: {}", e))?;
+        let mut families = BTreeSet::new();
+
+        if let Some(map) = payload.as_object() {
+            for key in map.keys() {
+                let family = key
+                    .split('(')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .trim_end_matches(" & ")
+                    .trim();
+                if !family.is_empty() {
+                    families.insert(family.to_string());
+                }
+            }
+        }
+
+        return Ok(families.into_iter().collect());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let output = Command::new("fc-list")
+            .args([":", "family"])
+            .output()
+            .map_err(|e| format!("Failed to query fonts from fc-list: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!("fc-list failed with status {}", output.status));
+        }
+
+        let stdout = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Failed to decode fc-list output: {}", e))?;
+        let mut families = BTreeSet::new();
+
+        for line in stdout.lines() {
+            for family in line.split(',') {
+                let trimmed = family.trim();
+                if !trimmed.is_empty() {
+                    families.insert(trimmed.to_string());
+                }
+            }
+        }
+
+        return Ok(families.into_iter().collect());
+    }
 }
 
 #[tauri::command]

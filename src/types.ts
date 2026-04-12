@@ -90,6 +90,8 @@ export type OrderedListMode = 'strict' | 'loose';
 export interface AppSettings {
   language: AppLanguage;
   aiProvider: AIProvider;
+  uiFontFamily: string;
+  uiFontSize: number;
   fontSize: number;
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;

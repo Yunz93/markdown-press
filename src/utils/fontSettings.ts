@@ -2,7 +2,8 @@ import type { AppSettings } from '../types';
 
 const DYNAMIC_FONT_STYLE_ID = 'markdown-press-dynamic-font-faces';
 const LATIN_FONT_ALIAS = 'MarkdownPressLatin';
-const BUNDLED_CHINESE_FONT_NAMES = ['LXGW WenKai', '霞鹜文楷'];
+const BUNDLED_FONT_FILE_NAME = 'TsangerJinKai02-W04.ttf';
+const BUNDLED_FONT_NAMES = ['TsangerJinKai02-W04'];
 export type FontSettings = Pick<AppSettings, 'englishFontFamily' | 'chineseFontFamily'>;
 
 // Font URL cache
@@ -26,7 +27,7 @@ async function resolveBundledFontUrl(): Promise<string> {
       const { convertFileSrc } = await import('@tauri-apps/api/core');
       
       const resDir = await resourceDir();
-      const fontPath = `${resDir}fonts/LXGWWenKai-Regular.ttf`;
+      const fontPath = `${resDir}fonts/${BUNDLED_FONT_FILE_NAME}`;
       
       // Convert to a URL that can be loaded in the webview
       cachedFontUrl = convertFileSrc(fontPath);
@@ -35,7 +36,7 @@ async function resolveBundledFontUrl(): Promise<string> {
     } catch (error) {
       console.warn('[fontSettings] Failed to resolve Tauri font path:', error);
       // Fallback to relative path for resources
-      cachedFontUrl = './resources/fonts/LXGWWenKai-Regular.ttf';
+      cachedFontUrl = `./resources/fonts/${BUNDLED_FONT_FILE_NAME}`;
       return cachedFontUrl;
     }
   }
@@ -43,7 +44,7 @@ async function resolveBundledFontUrl(): Promise<string> {
   // For web build, use Vite's asset handling
   try {
     // Import the font with ?url to get the processed URL
-    const fontUrl = await import('../assets/fonts/LXGWWenKai-Regular.ttf?url').then(m => m.default);
+    const fontUrl = await import('../assets/fonts/TsangerJinKai02-W04.ttf?url').then(m => m.default);
     // Ensure URL is absolute for dev mode compatibility
     if (fontUrl && !fontUrl.startsWith('http') && !fontUrl.startsWith('/')) {
       cachedFontUrl = new URL(fontUrl, window.location.href).href;
@@ -55,7 +56,7 @@ async function resolveBundledFontUrl(): Promise<string> {
   } catch (error) {
     console.warn('[fontSettings] Failed to resolve dev font URL:', error);
     // Fallback to relative path
-    cachedFontUrl = './assets/LXGWWenKai-Regular.ttf';
+    cachedFontUrl = `./assets/${BUNDLED_FONT_FILE_NAME}`;
     return cachedFontUrl;
   }
 }
@@ -86,9 +87,11 @@ const GENERIC_FONT_FAMILIES = new Set([
   'fangsong',
 ]);
 
-export const DEFAULT_ENGLISH_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 export const LEGACY_DEFAULT_CHINESE_FONT_FAMILY = '"FZ XingHeiS-R-GB", "方正行黑简体", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
-export const DEFAULT_CHINESE_FONT_FAMILY = '"LXGW WenKai", "霞鹜文楷", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
+export const UI_FONT_FALLBACK_FAMILY = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+export const DEFAULT_ENGLISH_FONT_FAMILY = '"TsangerJinKai02-W04", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+export const DEFAULT_CHINESE_FONT_FAMILY = '"TsangerJinKai02-W04", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
+export const DEFAULT_UI_FONT_FAMILY = '"TsangerJinKai02-W04", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 function parseLocalFontNames(fontFamily: string): string[] {
   return fontFamily
@@ -110,6 +113,15 @@ function buildLocalFontSource(fontFamily: string): string {
   return localNames.map((name) => `local("${escapeFontName(name)}")`).join(', ');
 }
 
+function buildEnglishFontSource(fontFamily: string, bundledFontSrc: string): string {
+  const localSource = buildLocalFontSource(fontFamily);
+  if (!fontFamilyMentionsBundledChineseFont(fontFamily)) {
+    return localSource;
+  }
+
+  return `${localSource}, url("${bundledFontSrc}") format("truetype")`;
+}
+
 function normalizeFontFamily(fontFamily: string): string {
   return fontFamily
     .split(',')
@@ -126,27 +138,18 @@ function fontFamilyMentionsBundledChineseFont(fontFamily: string): boolean {
       .filter(Boolean)
   );
 
-  return BUNDLED_CHINESE_FONT_NAMES.some((name) => normalizedFontNames.has(name.toLowerCase()));
+  return BUNDLED_FONT_NAMES.some((name) => normalizedFontNames.has(name.toLowerCase()));
 }
 
 function buildBundledChineseFontFaces(bundledFontSrc: string): string {
-  const bundledSource = `${BUNDLED_CHINESE_FONT_NAMES
+  const bundledSource = `${BUNDLED_FONT_NAMES
     .map((name) => `local("${escapeFontName(name)}")`)
     .join(', ')}, url("${bundledFontSrc}") format("truetype")`;
 
-  return BUNDLED_CHINESE_FONT_NAMES.map((fontName) => `
+  return BUNDLED_FONT_NAMES.map((fontName) => `
 @font-face {
   font-family: "${escapeFontName(fontName)}";
   src: ${bundledSource};
-  unicode-range:
-    U+2E80-2EFF,
-    U+2F00-2FDF,
-    U+3000-303F,
-    U+31C0-31EF,
-    U+3400-4DBF,
-    U+4E00-9FFF,
-    U+F900-FAFF,
-    U+FF00-FFEF;
   font-display: swap;
 }
 `.trim()).join('\n\n');
@@ -162,6 +165,27 @@ export function getResolvedEnglishFontFamily(settings: Pick<AppSettings, 'englis
 
 export function getResolvedChineseFontFamily(settings: Pick<AppSettings, 'chineseFontFamily'>): string {
   return settings.chineseFontFamily?.trim() || DEFAULT_CHINESE_FONT_FAMILY;
+}
+
+export function buildUiFontFamily(primaryFontFamily: string): string {
+  const normalized = primaryFontFamily.trim();
+  if (!normalized) {
+    return DEFAULT_UI_FONT_FAMILY;
+  }
+
+  if (normalized.includes(',')) {
+    return normalized;
+  }
+
+  if (GENERIC_FONT_FAMILIES.has(normalized.toLowerCase())) {
+    return normalized;
+  }
+
+  return `"${escapeFontName(normalized)}", ${UI_FONT_FALLBACK_FAMILY}`;
+}
+
+export function getResolvedUiFontFamily(settings: Pick<AppSettings, 'uiFontFamily'>): string {
+  return buildUiFontFamily(settings.uiFontFamily?.trim() || DEFAULT_UI_FONT_FAMILY);
 }
 
 export function getCompositeFontFamily(
@@ -195,7 +219,7 @@ ${buildBundledChineseFontFaces(bundledChineseFontSrc)}
 
 @font-face {
   font-family: "${LATIN_FONT_ALIAS}";
-  src: ${buildLocalFontSource(englishFontFamily)};
+  src: ${buildEnglishFontSource(englishFontFamily, bundledChineseFontSrc)};
   unicode-range:
     U+0000-00FF,
     U+0100-024F,

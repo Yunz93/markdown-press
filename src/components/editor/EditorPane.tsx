@@ -34,7 +34,8 @@ interface EditorPaneProps {
 
 export interface EditorPaneHandle {
   cancelScrollSync: () => void;
-  syncScrollTo: (percentage: number) => void;
+  syncScrollTo: (percentage: number, options?: { immediate?: boolean }) => void;
+  scrollToTop: () => void;
 }
 
 const EDITOR_LINE_HEIGHT = 1.95;
@@ -87,11 +88,6 @@ function findWikiLinkNearPosition(text: string, pos: number) {
     if (match) return match;
   }
   return null;
-}
-
-function getEditorScrollPercentage(scrollTop: number, maxScrollTop: number): number {
-  if (maxScrollTop <= 0) return 0;
-  return Math.min(Math.max(scrollTop / maxScrollTop, 0), 1);
 }
 
 interface HoverPreviewState {
@@ -230,6 +226,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   // CodeMirror hook
   const codeMirror = useCodeMirror({
     content,
+    documentKey: activeTabId,
     placeholder: resolvedPlaceholder,
     wordWrap: settings.wordWrap,
     orderedListMode: settings.orderedListMode,
@@ -303,57 +300,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     };
   }, [codeMirror.view, scrollSync]);
 
-  useEffect(() => {
-    const view = codeMirror.view;
-    if (!view || !onScroll) return;
-
-    const scrollElements = new Set<HTMLElement>([view.scrollDOM]);
-    const scroller = editorRootRef.current?.querySelector<HTMLElement>('.cm-scroller');
-    if (scroller) {
-      scrollElements.add(scroller);
-    }
-    let frameId: number | null = null;
-    let lastPercentage = -1;
-
-    const handleNativeScroll = () => {
-      if (frameId !== null) return;
-      frameId = requestAnimationFrame(() => {
-        frameId = null;
-        let activeScrollElement: HTMLElement | null = null;
-        for (const element of scrollElements) {
-          if (element.scrollHeight - element.clientHeight > 0) {
-            activeScrollElement = element;
-            break;
-          }
-        }
-        if (!activeScrollElement) return;
-        const maxScrollTop = activeScrollElement.scrollHeight - activeScrollElement.clientHeight;
-        const nextPercentage = getEditorScrollPercentage(activeScrollElement.scrollTop, maxScrollTop);
-        if (Math.abs(nextPercentage - lastPercentage) <= 0.001) return;
-        lastPercentage = nextPercentage;
-        onScroll(nextPercentage);
-      });
-    };
-
-    scrollElements.forEach((element) => {
-      element.addEventListener('scroll', handleNativeScroll, { passive: true });
-    });
-
-    return () => {
-      scrollElements.forEach((element) => {
-        element.removeEventListener('scroll', handleNativeScroll);
-      });
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId);
-      }
-    };
-  }, [codeMirror.view, onScroll]);
-
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
     cancelScrollSync: scrollSync.cancelScrollSync,
     syncScrollTo: scrollSync.syncScrollTo,
-  }), [scrollSync]);
+    scrollToTop: () => {
+      const view = codeMirror.view;
+      if (view) {
+        view.scrollDOM.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    },
+  }), [scrollSync, codeMirror.view]);
 
   // Pane width tracking
   useLayoutEffect(() => {

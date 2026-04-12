@@ -36,10 +36,17 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   'closeTab',
 ]);
 
-function getNextViewMode(viewMode: ViewMode): ViewMode {
-  if (viewMode === ViewMode.EDITOR) return ViewMode.SPLIT;
-  if (viewMode === ViewMode.SPLIT) return ViewMode.PREVIEW;
-  return ViewMode.EDITOR;
+function getNextViewMode(
+  viewMode: ViewMode,
+  lastNonSplitViewMode: ViewMode.EDITOR | ViewMode.PREVIEW
+): ViewMode {
+  // Cycle: EDITOR -> SPLIT -> PREVIEW -> SPLIT -> EDITOR
+  // From SPLIT, go to the opposite of lastNonSplitViewMode
+  // From EDITOR or PREVIEW, always go to SPLIT
+  if (viewMode === ViewMode.SPLIT) {
+    return lastNonSplitViewMode === ViewMode.EDITOR ? ViewMode.PREVIEW : ViewMode.EDITOR;
+  }
+  return ViewMode.SPLIT;
 }
 
 function normalizeKeyName(key: string): string {
@@ -111,12 +118,12 @@ function createShortcutMap(shortcuts: ShortcutConfig, handlers: Record<keyof Sho
 }
 
 function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?: (() => void) | null) {
-  const { settings, viewMode, setViewMode } = useAppStore();
+  const { settings, viewMode, lastNonSplitViewMode, setViewMode } = useAppStore();
 
   return useCallback((event: KeyboardEvent) => {
     const shortcutEntries = createShortcutMap(settings.shortcuts, {
       save: saveHandler ?? options.onSave,
-      toggleView: options.onToggleView ?? (() => setViewMode(getNextViewMode(viewMode))),
+      toggleView: options.onToggleView ?? (() => setViewMode(getNextViewMode(viewMode, lastNonSplitViewMode), 'toggle')),
       aiAnalyze: options.onAIAnalyze,
       search: options.onSearch,
       sidebarSearch: options.onSidebarSearch,
@@ -163,6 +170,7 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
     options.onToggleTheme,
     options.onToggleView,
     settings.shortcuts,
+    lastNonSplitViewMode,
     setViewMode,
     viewMode,
     saveHandler,

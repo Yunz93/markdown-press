@@ -26,3 +26,5 @@ src-tauri/target
 *.sw?
 .claude
 .omx/
+secure-settings.json
+secure-settings.key

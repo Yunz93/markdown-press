@@ -9,6 +9,7 @@ import type { HeadingNode } from '../utils/outline';
 import {
   DEFAULT_CHINESE_FONT_FAMILY,
   DEFAULT_ENGLISH_FONT_FAMILY,
+  DEFAULT_UI_FONT_FAMILY,
   isLegacyDefaultChineseFontFamily,
 } from '../utils/fontSettings';
 import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
@@ -181,6 +182,12 @@ export const useAppStore = create<AppState>()(
           ...persistedSettings,
           blogRepoUrl: resolvePersistedBlogRepoUrl(persistedSettings),
           blogSiteUrl: resolvePersistedBlogSiteUrl(persistedSettings),
+          uiFontFamily: typeof persistedSettings.uiFontFamily === 'string' && persistedSettings.uiFontFamily.trim()
+            ? persistedSettings.uiFontFamily
+            : DEFAULT_UI_FONT_FAMILY,
+          uiFontSize: typeof persistedSettings.uiFontSize === 'number' && Number.isFinite(persistedSettings.uiFontSize)
+            ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
+            : defaultSettings.uiFontSize,
           englishFontFamily: typeof persistedSettings.englishFontFamily === 'string' && persistedSettings.englishFontFamily.trim()
             ? persistedSettings.englishFontFamily
             : (typeof persistedSettings.fontFamily === 'string' && persistedSettings.fontFamily.trim()

@@ -185,7 +185,7 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
 
   return (
     <div
-      className="absolute top-0 right-0 w-96 max-w-full bg-white dark:bg-gray-900 border-b border-l border-gray-200 dark:border-gray-700 shadow-lg rounded-bl-xl z-40"
+      className="ui-scaled absolute top-0 right-0 w-96 max-w-full bg-white dark:bg-gray-900 border-b border-l border-gray-200 dark:border-gray-700 shadow-lg rounded-bl-xl z-40"
       onKeyDown={handleKeyDown}
     >
       <div className="p-3">
