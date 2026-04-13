@@ -5,70 +5,16 @@ import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import {
   buildDynamicFontFaceCss,
   type FontSettings,
-  getBundledPresetAssetUrl,
+  getBundledPresetDataUrlOverrides,
 } from '../fontSettings';
-
-const inlinedAssetDataUrlCache = new Map<string, Promise<string>>();
-
-function resolveAssetUrl(assetUrl: string): string {
-  if (typeof window === 'undefined') {
-    return assetUrl;
-  }
-
-  return new URL(assetUrl, window.location.href).href;
-}
-
-async function inlineAssetAsDataUrl(assetUrl: string): Promise<string> {
-  const resolvedUrl = resolveAssetUrl(assetUrl);
-  const cached = inlinedAssetDataUrlCache.get(resolvedUrl);
-  if (cached) {
-    return cached;
-  }
-
-  const promise = fetch(resolvedUrl)
-    .then(async (response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to fetch asset: ${response.status} ${response.statusText}`);
-      }
-
-      return blobToDataUrl(await response.blob());
-    });
-
-  inlinedAssetDataUrlCache.set(resolvedUrl, promise);
-  return promise;
-}
-
-async function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob'));
-    reader.readAsDataURL(blob);
-  });
-}
 
 export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promise<string> {
   if (!fontSettings) {
     return '';
   }
 
-  const presetOverrides = Object.fromEntries(
-    Object.values(fontSettings)
-      .filter((value): value is string => typeof value === 'string' && value.startsWith('preset:'))
-      .map((presetId) => {
-        const assetUrl = getBundledPresetAssetUrl(presetId);
-        return [presetId, assetUrl];
-      })
-      .filter((entry): entry is [string, string] => Boolean(entry[1]))
-  );
-
-  const dataUrlEntries = await Promise.all(
-    Object.entries(presetOverrides).map(async ([presetId, assetUrl]) => (
-      [presetId, await inlineAssetAsDataUrl(assetUrl)] as const
-    ))
-  );
-
-  return buildDynamicFontFaceCss(fontSettings, Object.fromEntries(dataUrlEntries));
+  const overrides = await getBundledPresetDataUrlOverrides(fontSettings);
+  return buildDynamicFontFaceCss(fontSettings, overrides);
 }
 
 export function renderProperties(frontmatter: Record<string, unknown> | null): string {

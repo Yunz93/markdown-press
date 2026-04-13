@@ -1,5 +1,0 @@
-{
-  "name": "M記",
-  "description": "A minimalist static blog editor tailored for Markdown users. Features AI-powered frontmatter generation for SEO and direct publishing to a GitHub-backed simple-blog.",
-  "requestFramePermissions": []
-}

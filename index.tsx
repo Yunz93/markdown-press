@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './src/App';
+import { ensureDynamicFontFaces, getInitialFontSettingsFromLocalStorage } from './src/utils/fontSettings';
 import 'github-markdown-css/github-markdown.css';
 import 'katex/dist/katex.min.css';
 import './index.css';
@@ -20,9 +21,19 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+async function bootstrap() {
+  try {
+    await ensureDynamicFontFaces(getInitialFontSettingsFromLocalStorage());
+  } catch {
+    // Fallback silently - App mount will retry font registration.
+  }
+
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
+
+void bootstrap();

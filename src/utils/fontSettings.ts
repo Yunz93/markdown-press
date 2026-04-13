@@ -44,6 +44,7 @@ export const BUNDLED_FONT_PRESETS: BundledFontPreset[] = [
 ];
 
 const presetById = new Map(BUNDLED_FONT_PRESETS.map((preset) => [preset.id, preset]));
+const presetDataUrlCache = new Map<string, Promise<string>>();
 
 const UI_FONT_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 const CONTENT_FONT_FALLBACK = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
@@ -53,6 +54,7 @@ export const DEFAULT_UI_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
 export const DEFAULT_EDITOR_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
 export const DEFAULT_PREVIEW_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
 export const DEFAULT_CODE_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
+export const FONT_SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 
 function getZoneFallback(zone: FontZone): string {
   if (zone === 'ui') return UI_FONT_FALLBACK;
@@ -89,6 +91,35 @@ function resolveAssetUrl(assetUrl: string): string {
   return assetUrl.startsWith('http') || assetUrl.startsWith('/')
     ? assetUrl
     : new URL(assetUrl, window.location.href).href;
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob as data URL'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function inlineAssetAsDataUrl(assetUrl: string): Promise<string> {
+  const resolvedUrl = resolveAssetUrl(assetUrl);
+  const cached = presetDataUrlCache.get(resolvedUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = fetch(resolvedUrl)
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch preset font asset: ${response.status} ${response.statusText}`);
+      }
+
+      return blobToDataUrl(await response.blob());
+    });
+
+  presetDataUrlCache.set(resolvedUrl, promise);
+  return promise;
 }
 
 function normalizeSingleFontSetting(value: string | undefined, fallback: string): string {
@@ -188,6 +219,59 @@ export function normalizeStoredCodeFontFamily(value: string | undefined): string
   return normalizeSingleFontSetting(value, DEFAULT_CODE_FONT_FAMILY);
 }
 
+export function getDefaultFontSettings(): FontSettings {
+  return {
+    uiFontFamily: DEFAULT_UI_FONT_FAMILY,
+    editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
+    previewFontFamily: DEFAULT_PREVIEW_FONT_FAMILY,
+    codeFontFamily: DEFAULT_CODE_FONT_FAMILY,
+  };
+}
+
+export function getInitialFontSettingsFromLocalStorage(): FontSettings {
+  const defaults = getDefaultFontSettings();
+  if (typeof window === 'undefined') {
+    return defaults;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(FONT_SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return defaults;
+    }
+
+    type LegacyFontSettingsPayload = Partial<AppSettings> & {
+      englishFontFamily?: string;
+      chineseFontFamily?: string;
+      fontFamily?: string;
+    };
+    const parsed = JSON.parse(raw) as {
+      state?: { settings?: LegacyFontSettingsPayload };
+      settings?: LegacyFontSettingsPayload;
+    };
+    const persistedSettings: LegacyFontSettingsPayload = parsed?.state?.settings ?? parsed?.settings ?? {};
+
+    return {
+      uiFontFamily: normalizeStoredUiFontFamily(persistedSettings.uiFontFamily),
+      editorFontFamily: normalizeStoredEditorFontFamily(
+        persistedSettings.editorFontFamily
+          ?? persistedSettings.chineseFontFamily
+          ?? persistedSettings.englishFontFamily
+          ?? persistedSettings.fontFamily
+      ),
+      previewFontFamily: normalizeStoredPreviewFontFamily(
+        persistedSettings.previewFontFamily
+          ?? persistedSettings.chineseFontFamily
+          ?? persistedSettings.englishFontFamily
+          ?? persistedSettings.fontFamily
+      ),
+      codeFontFamily: normalizeStoredCodeFontFamily(persistedSettings.codeFontFamily),
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 export function buildSystemFontFamily(fontName: string): string {
   return `${SYSTEM_PREFIX}${fontName.trim()}`;
 }
@@ -212,6 +296,28 @@ export function getBundledPresetAssetUrl(presetId: string): string | null {
   return presetById.get(presetId)?.assetUrl ?? null;
 }
 
+export async function getBundledPresetDataUrl(presetId: string): Promise<string | null> {
+  const assetUrl = getBundledPresetAssetUrl(presetId);
+  if (!assetUrl) {
+    return null;
+  }
+
+  return inlineAssetAsDataUrl(assetUrl);
+}
+
+export async function getBundledPresetDataUrlOverrides(settings: FontSettings): Promise<Record<string, string>> {
+  const overrides = await Promise.all(
+    collectUsedPresetIds(settings).map(async (presetId) => {
+      const dataUrl = await getBundledPresetDataUrl(presetId);
+      return dataUrl ? [presetId, dataUrl] as const : null;
+    })
+  );
+
+  return Object.fromEntries(
+    overrides.filter((entry): entry is readonly [string, string] => Boolean(entry))
+  );
+}
+
 export function buildDynamicFontFaceCss(
   settings: FontSettings,
   overrides: Partial<Record<string, string>> = {},
@@ -229,7 +335,8 @@ export function buildDynamicFontFaceCss(
 export async function ensureDynamicFontFaces(settings: FontSettings): Promise<void> {
   if (typeof document === 'undefined') return;
 
-  const css = buildDynamicFontFaceCss(settings);
+  const overrides = await getBundledPresetDataUrlOverrides(settings);
+  const css = buildDynamicFontFaceCss(settings, overrides);
   let styleElement = document.getElementById(DYNAMIC_FONT_STYLE_ID) as HTMLStyleElement | null;
 
   if (!styleElement) {
