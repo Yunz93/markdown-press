@@ -12,7 +12,7 @@ import { useAppStore, selectContent } from '../../store/appStore';
 import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { useFileOperations } from '../../hooks/useFileOperations';
 import { useFileSystem } from '../../hooks/useFileSystem';
-import { getCompositeFontFamily } from '../../utils/fontSettings';
+import { getResolvedCodeFontFamily, getResolvedPreviewFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
 import { throttle } from '../../utils/throttle';
 import { useThrottledResize } from '../../utils/performance';
@@ -118,7 +118,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
   const content = useAppStore(selectContent);
   const previewContent = useDeferredValue(content);
-  const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
+  const previewFontFamily = useMemo(() => getResolvedPreviewFontFamily(settings), [settings.previewFontFamily]);
+  const codeFontFamily = useMemo(() => getResolvedCodeFontFamily(settings), [settings.codeFontFamily]);
   const previewRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   
@@ -157,9 +158,11 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
     '--preview-content-bottom': `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
-    '--editor-font-family': fontFamily,
-    '--editor-font-size': `${settings.fontSize}px`,
-  }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
+    '--preview-font-family': previewFontFamily,
+    '--preview-font-size': `${settings.previewFontSize}px`,
+    '--preview-code-font-family': codeFontFamily,
+    '--preview-code-font-size': `${settings.codeFontSize}px`,
+  }) as React.CSSProperties, [layoutMetrics, previewFontFamily, settings.previewFontSize, codeFontFamily, settings.codeFontSize]);
 
   // Optimized pane resize tracking
   useLayoutEffect(() => {

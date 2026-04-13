@@ -25,20 +25,24 @@ export function useSettings() {
     });
   }, [updateSettings]);
 
-  const updateFontSize = useCallback((fontSize: number) => {
-    updateSettings({ fontSize });
+  const updateEditorFontSize = useCallback((editorFontSize: number) => {
+    updateSettings({ editorFontSize });
   }, [updateSettings]);
 
   const toggleWordWrap = useCallback(() => {
     updateSettings((state) => ({ wordWrap: !state.settings.wordWrap }));
   }, [updateSettings]);
 
-  const updateEnglishFontFamily = useCallback((englishFontFamily: string) => {
-    updateSettings({ englishFontFamily });
+  const updateEditorFontFamily = useCallback((editorFontFamily: string) => {
+    updateSettings({ editorFontFamily });
   }, [updateSettings]);
 
-  const updateChineseFontFamily = useCallback((chineseFontFamily: string) => {
-    updateSettings({ chineseFontFamily });
+  const updatePreviewFontFamily = useCallback((previewFontFamily: string) => {
+    updateSettings({ previewFontFamily });
+  }, [updateSettings]);
+
+  const updateCodeFontFamily = useCallback((codeFontFamily: string) => {
+    updateSettings({ codeFontFamily });
   }, [updateSettings]);
 
   const updateBlogRepoUrl = useCallback((blogRepoUrl: string) => {
@@ -89,10 +93,11 @@ export function useSettings() {
     openSettings,
     closeSettings,
     toggleTheme,
-    updateFontSize,
+    updateEditorFontSize,
     toggleWordWrap,
-    updateEnglishFontFamily,
-    updateChineseFontFamily,
+    updateEditorFontFamily,
+    updatePreviewFontFamily,
+    updateCodeFontFamily,
     updateBlogRepoUrl,
     updateBlogSiteUrl,
     updateShortcuts,

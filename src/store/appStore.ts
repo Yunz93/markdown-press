@@ -7,10 +7,14 @@ import { createUISlice, type UIState, type UIActions, initialUIState, defaultSet
 import { ViewMode, type FileNode, type AppSettings, type Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import {
-  DEFAULT_CHINESE_FONT_FAMILY,
-  DEFAULT_ENGLISH_FONT_FAMILY,
+  DEFAULT_CODE_FONT_FAMILY,
+  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
-  isLegacyDefaultChineseFontFamily,
+  normalizeStoredCodeFontFamily,
+  normalizeStoredEditorFontFamily,
+  normalizeStoredPreviewFontFamily,
+  normalizeStoredUiFontFamily,
 } from '../utils/fontSettings';
 import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
 import { normalizeMetadataFields } from '../utils/metadataFields';
@@ -173,29 +177,50 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({ settings: sanitizeSettingsForPersistence((state as any).settings) }),
       merge: (persistedState, currentState) => {
         const persistedSettings = stripSensitiveSettings((persistedState as any)?.settings ?? {});
-        const persistedChineseFontFamily = typeof persistedSettings.chineseFontFamily === 'string'
-          ? persistedSettings.chineseFontFamily.trim()
-          : '';
         const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
+        const legacyContentFontFamily = typeof persistedSettings.chineseFontFamily === 'string' && persistedSettings.chineseFontFamily.trim()
+          ? persistedSettings.chineseFontFamily
+          : (typeof persistedSettings.englishFontFamily === 'string' && persistedSettings.englishFontFamily.trim()
+            ? persistedSettings.englishFontFamily
+            : (typeof persistedSettings.fontFamily === 'string' && persistedSettings.fontFamily.trim()
+              ? persistedSettings.fontFamily
+              : DEFAULT_EDITOR_FONT_FAMILY));
+        const legacyContentFontSize = typeof persistedSettings.fontSize === 'number' && Number.isFinite(persistedSettings.fontSize)
+          ? Math.min(32, Math.max(12, persistedSettings.fontSize))
+          : 16;
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
           blogRepoUrl: resolvePersistedBlogRepoUrl(persistedSettings),
           blogSiteUrl: resolvePersistedBlogSiteUrl(persistedSettings),
           uiFontFamily: typeof persistedSettings.uiFontFamily === 'string' && persistedSettings.uiFontFamily.trim()
-            ? persistedSettings.uiFontFamily
+            ? normalizeStoredUiFontFamily(persistedSettings.uiFontFamily)
             : DEFAULT_UI_FONT_FAMILY,
           uiFontSize: typeof persistedSettings.uiFontSize === 'number' && Number.isFinite(persistedSettings.uiFontSize)
             ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
             : defaultSettings.uiFontSize,
-          englishFontFamily: typeof persistedSettings.englishFontFamily === 'string' && persistedSettings.englishFontFamily.trim()
-            ? persistedSettings.englishFontFamily
-            : (typeof persistedSettings.fontFamily === 'string' && persistedSettings.fontFamily.trim()
-              ? persistedSettings.fontFamily
-              : DEFAULT_ENGLISH_FONT_FAMILY),
-          chineseFontFamily: persistedChineseFontFamily && !isLegacyDefaultChineseFontFamily(persistedChineseFontFamily)
-            ? persistedChineseFontFamily
-            : DEFAULT_CHINESE_FONT_FAMILY,
+          editorFontFamily: typeof persistedSettings.editorFontFamily === 'string' && persistedSettings.editorFontFamily.trim()
+            ? normalizeStoredEditorFontFamily(persistedSettings.editorFontFamily)
+            : normalizeStoredEditorFontFamily(legacyContentFontFamily),
+          editorFontSize: typeof persistedSettings.editorFontSize === 'number' && Number.isFinite(persistedSettings.editorFontSize)
+            ? Math.min(32, Math.max(12, persistedSettings.editorFontSize))
+            : legacyContentFontSize,
+          previewFontFamily: typeof persistedSettings.previewFontFamily === 'string' && persistedSettings.previewFontFamily.trim()
+            ? normalizeStoredPreviewFontFamily(persistedSettings.previewFontFamily)
+            : normalizeStoredPreviewFontFamily(legacyContentFontFamily || DEFAULT_PREVIEW_FONT_FAMILY),
+          previewFontSize: typeof persistedSettings.previewFontSize === 'number' && Number.isFinite(persistedSettings.previewFontSize)
+            ? Math.min(32, Math.max(12, persistedSettings.previewFontSize))
+            : legacyContentFontSize,
+          codeFontFamily: typeof persistedSettings.codeFontFamily === 'string' && persistedSettings.codeFontFamily.trim()
+            ? normalizeStoredCodeFontFamily(persistedSettings.codeFontFamily)
+            : DEFAULT_CODE_FONT_FAMILY,
+          codeFontSize: typeof persistedSettings.codeFontSize === 'number' && Number.isFinite(persistedSettings.codeFontSize)
+            ? Math.min(28, Math.max(11, persistedSettings.codeFontSize))
+            : (typeof persistedSettings.editorCodeFontSize === 'number' && Number.isFinite(persistedSettings.editorCodeFontSize)
+              ? Math.min(28, Math.max(11, persistedSettings.editorCodeFontSize))
+              : (typeof persistedSettings.previewCodeFontSize === 'number' && Number.isFinite(persistedSettings.previewCodeFontSize)
+                ? Math.min(28, Math.max(11, persistedSettings.previewCodeFontSize))
+                : Math.max(11, legacyContentFontSize - 1))),
           ...resolvedAISettings,
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),

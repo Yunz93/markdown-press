@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useAppStore, selectContent } from '../../store/appStore';
 import { exportToHtml, downloadHtml, exportToPlainText, downloadPlainText } from '../../utils/export';
 import type { FileNode } from '../../types';
-import { getCompositeFontFamily } from '../../utils/fontSettings';
+import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../../utils/fontSettings';
 import { useI18n } from '../../hooks/useI18n';
 
 interface ExportMenuProps {
@@ -27,7 +27,8 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
   const content = useAppStore(selectContent);
   const { activeTabId, files, settings, showNotification } = useAppStore();
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
-  const fontFamily = getCompositeFontFamily(settings);
+  const previewFontFamily = buildPreviewExportFontFamily(settings);
+  const codeFontFamily = buildCodeExportFontFamily(settings);
   const [isExporting, setIsExporting] = useState(false);
   const [format, setFormat] = useState<ExportFormat | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -46,9 +47,11 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
         const html = await exportToHtml(content, {
           theme,
           includeTOC,
-          fontFamily,
+          fontFamily: previewFontFamily,
+          codeFontFamily,
           fontSettings: settings,
-          fontSize: settings.fontSize,
+          fontSize: settings.previewFontSize,
+          codeFontSize: settings.codeFontSize,
         });
         const saved = await downloadHtml(html, filename, activeFile?.path);
         if (saved) {
@@ -69,7 +72,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
       setFormat(null);
       onClose?.();
     }
-  }, [content, activeFile, theme, includeTOC, onClose, fontFamily, settings.fontSize, showNotification]);
+  }, [content, activeFile, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.previewFontSize, settings.codeFontSize, showNotification]);
 
   const fileName = activeFile?.name?.replace('.md', '') || 'document';
 

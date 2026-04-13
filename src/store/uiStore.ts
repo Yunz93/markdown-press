@@ -1,7 +1,12 @@
 import type { AppSettings, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../services/aiPrompts';
-import { DEFAULT_CHINESE_FONT_FAMILY, DEFAULT_ENGLISH_FONT_FAMILY, DEFAULT_UI_FONT_FAMILY } from '../utils/fontSettings';
+import {
+  DEFAULT_CODE_FONT_FAMILY,
+  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_PREVIEW_FONT_FAMILY,
+  DEFAULT_UI_FONT_FAMILY,
+} from '../utils/fontSettings';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
 import { normalizeTrashFolder } from '../utils/trashFolder';
 import { getPreferredShortcutModifierToken } from '../utils/shortcuts';
@@ -60,11 +65,14 @@ export const defaultSettings: AppSettings = {
   aiProvider: 'gemini',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
   uiFontSize: 18,
-  fontSize: 16,
+  editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
+  editorFontSize: 16,
+  previewFontFamily: DEFAULT_PREVIEW_FONT_FAMILY,
+  previewFontSize: 16,
+  codeFontFamily: DEFAULT_CODE_FONT_FAMILY,
+  codeFontSize: 15,
   wordWrap: true,
   formatMarkdownOnManualSave: false,
-  englishFontFamily: DEFAULT_ENGLISH_FONT_FAMILY,
-  chineseFontFamily: DEFAULT_CHINESE_FONT_FAMILY,
   resourceFolder: 'resources',
   trashFolder: '.trash',
   attachmentPasteFormat: 'obsidian',

@@ -28,7 +28,10 @@
       "Bash(sed 's/import { useI18n } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useI18n'\"'\"';/import { useI18n } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useI18n'\"'\"';\\\\nimport type { ShikiHighlighter } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useShikiHighlighter'\"'\"';/')",
       "Bash(mv /tmp/EditorPane.tsx /Users/yunz/Code/VibeCoding/markdown-press/src/components/editor/EditorPane.tsx)",
       "Bash(sed 's/import { localizeKnownError, t } from '\\\\''\\\\.\\\\.\\\\/utils\\\\/i18n'\\\\'';/import { localizeKnownError, t } from '\\\\''\\\\.\\\\.\\\\/utils\\\\/i18n'\\\\'';\\\\nimport type { ShikiHighlighter } from '\\\\''\\\\.\\\\.\\\\/hooks\\\\/useShikiHighlighter'\\\\'';/')",
-      "Bash(mv /tmp/useExportActions.ts /Users/yunz/Code/VibeCoding/markdown-press/src/hooks/useExportActions.ts)"
+      "Bash(mv /tmp/useExportActions.ts /Users/yunz/Code/VibeCoding/markdown-press/src/hooks/useExportActions.ts)",
+      "Bash(hdiutil attach:*)",
+      "Bash(xargs -I{} find {} -name \"TsangerJinKai02-W04.ttf\" -o -type d -name \"resources\")",
+      "Bash(cat /Users/yunz/Code/VibeCoding/markdown-press/src-tauri/capabilities/*.json)"
     ]
   }
 }

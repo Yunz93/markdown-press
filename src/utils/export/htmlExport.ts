@@ -1,6 +1,6 @@
 import { renderMarkdown } from '../markdown';
 import { parseFrontmatter } from '../frontmatter';
-import { getCompositeFontFamily } from '../fontSettings';
+import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../fontSettings';
 import type { ExportOptions } from './types';
 import {
   buildExportStyles,
@@ -21,8 +21,10 @@ export async function exportToHtml(
     theme = 'light',
     includeTOC = false,
     fontFamily,
+    codeFontFamily,
     fontSettings,
     fontSize,
+    codeFontSize,
     includeProperties = true,
     highlighter,
   } = options;
@@ -32,9 +34,10 @@ export async function exportToHtml(
 
   // Generate table of contents if requested
   const toc = includeTOC ? generateTOC(body) : '';
-  const resolvedFontFamily = fontFamily || (fontSettings ? getCompositeFontFamily(fontSettings) : undefined);
+  const resolvedFontFamily = fontFamily || (fontSettings ? buildPreviewExportFontFamily(fontSettings) : undefined);
+  const resolvedCodeFontFamily = codeFontFamily || (fontSettings ? buildCodeExportFontFamily(fontSettings) : undefined);
   const fontFaceCss = await buildExportFontFaceCss(fontSettings);
-  const styles = buildExportStyles(theme, resolvedFontFamily, fontSize, fontFaceCss);
+  const styles = buildExportStyles(theme, resolvedFontFamily, fontSize, fontFaceCss, resolvedCodeFontFamily, codeFontSize);
   const propertiesHtml = includeProperties ? renderProperties(frontmatter) : '';
   const documentMarkup = buildExportDocument(`${propertiesHtml}<article class="markdown-body">${htmlContent}</article>`, toc);
 

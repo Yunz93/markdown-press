@@ -16,12 +16,15 @@ import {
   normalizeBlogSiteUrl,
 } from '../../utils/blogRepo';
 import {
-  DEFAULT_CHINESE_FONT_FAMILY,
-  DEFAULT_ENGLISH_FONT_FAMILY,
+  BUNDLED_FONT_PRESETS,
+  DEFAULT_CODE_FONT_FAMILY,
+  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
-  getResolvedChineseFontFamily,
-  getResolvedEnglishFontFamily,
-  buildUiFontFamily,
+  buildSystemFontFamily,
+  getResolvedCodeFontFamily,
+  getResolvedEditorFontFamily,
+  getResolvedPreviewFontFamily,
   getResolvedUiFontFamily,
 } from '../../utils/fontSettings';
 import { useI18n } from '../../hooks/useI18n';
@@ -635,62 +638,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const currentUiFontValue = settings.uiFontFamily?.trim() || DEFAULT_UI_FONT_FAMILY;
-  const currentEnglishFontValue = settings.englishFontFamily?.trim() || DEFAULT_ENGLISH_FONT_FAMILY;
-  const currentChineseFontValue = settings.chineseFontFamily?.trim() || DEFAULT_CHINESE_FONT_FAMILY;
+  const currentEditorFontValue = settings.editorFontFamily?.trim() || DEFAULT_EDITOR_FONT_FAMILY;
+  const currentPreviewFontValue = settings.previewFontFamily?.trim() || DEFAULT_PREVIEW_FONT_FAMILY;
+  const currentCodeFontValue = settings.codeFontFamily?.trim() || DEFAULT_CODE_FONT_FAMILY;
 
-  const uiFontOptions = [
-    {
-      label: t('settings_uiFontBundledOption'),
-      value: DEFAULT_UI_FONT_FAMILY,
-    },
-    ...availableSystemFonts.map((fontFamily) => ({
-      label: fontFamily,
-      value: buildUiFontFamily(fontFamily),
-    })),
-  ].filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
+  const bundledFontOptions = BUNDLED_FONT_PRESETS.map((preset) => ({
+    label: preset.label,
+    value: preset.id,
+  }));
 
-  if (!uiFontOptions.some((option) => option.value === currentUiFontValue)) {
-    uiFontOptions.unshift({
-      label: t('settings_uiFontCurrentOption'),
-      value: currentUiFontValue,
-    });
-  }
+  const systemFontOptions = availableSystemFonts.map((fontFamily) => ({
+    label: fontFamily,
+    value: buildSystemFontFamily(fontFamily),
+  }));
 
-  const englishFontOptions = [
-    {
-      label: t('settings_englishFontDefaultOption'),
-      value: DEFAULT_ENGLISH_FONT_FAMILY,
-    },
-    ...availableSystemFonts.map((fontFamily) => ({
-      label: fontFamily,
-      value: fontFamily,
-    })),
-  ].filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
+  const buildFontOptions = (currentValue: string) => {
+    const options = [...bundledFontOptions, ...systemFontOptions]
+      .filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
 
-  if (!englishFontOptions.some((option) => option.value === currentEnglishFontValue)) {
-    englishFontOptions.unshift({
-      label: t('settings_uiFontCurrentOption'),
-      value: currentEnglishFontValue,
-    });
-  }
+    if (!options.some((option) => option.value === currentValue)) {
+      options.unshift({
+        label: t('settings_uiFontCurrentOption'),
+        value: currentValue,
+      });
+    }
 
-  const chineseFontOptions = [
-    {
-      label: t('settings_chineseFontBundledOption'),
-      value: DEFAULT_CHINESE_FONT_FAMILY,
-    },
-    ...availableSystemFonts.map((fontFamily) => ({
-      label: fontFamily,
-      value: fontFamily,
-    })),
-  ].filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
+    return options;
+  };
 
-  if (!chineseFontOptions.some((option) => option.value === currentChineseFontValue)) {
-    chineseFontOptions.unshift({
-      label: t('settings_uiFontCurrentOption'),
-      value: currentChineseFontValue,
-    });
-  }
+  const uiFontOptions = buildFontOptions(currentUiFontValue);
+  const editorFontOptions = buildFontOptions(currentEditorFontValue);
+  const previewFontOptions = buildFontOptions(currentPreviewFontValue);
+  const codeFontOptions = buildFontOptions(currentCodeFontValue);
 
   return (
     <div className="ui-scaled fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-fade-in-02s">
@@ -924,16 +903,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="space-y-5">
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_fontSize')}</label>
-                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.fontSize}px</span>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_editorFontSize')}</label>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.editorFontSize}px</span>
                       </div>
                       <input
                         type="range"
                         min="12"
                         max="32"
                         step="1"
-                        value={settings.fontSize}
-                        onChange={(e) => onUpdateSettings({ ...settings, fontSize: parseInt(e.target.value) })}
+                        value={settings.editorFontSize}
+                        onChange={(e) => onUpdateSettings({ editorFontSize: parseInt(e.target.value, 10) })}
                         className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
                       />
                     </div>
@@ -959,46 +938,92 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_englishFont')}</label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_editorFont')}</label>
                         <select
-                          value={currentEnglishFontValue}
-                          onChange={(e) => onUpdateSettings({ ...settings, englishFontFamily: e.target.value })}
+                          value={currentEditorFontValue}
+                          onChange={(e) => onUpdateSettings({ editorFontFamily: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
                         >
-                          {englishFontOptions.map((option) => (
+                          {editorFontOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
                           ))}
                         </select>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_englishFontDesc')}</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_editorFontDesc')}</p>
                         <div
                           className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
-                          style={{ fontFamily: getResolvedEnglishFontFamily(settings) }}
+                          style={{ fontFamily: getResolvedEditorFontFamily(settings), fontSize: `${settings.editorFontSize}px` }}
                         >
-                          {t('settings_englishFontPreview')}
+                          {t('settings_editorFontPreview')}
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_chineseFont')}</label>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_previewFont')}</label>
+                          <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.previewFontSize}px</span>
+                        </div>
                         <select
-                          value={currentChineseFontValue}
-                          onChange={(e) => onUpdateSettings({ ...settings, chineseFontFamily: e.target.value })}
+                          value={currentPreviewFontValue}
+                          onChange={(e) => onUpdateSettings({ previewFontFamily: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
                         >
-                          {chineseFontOptions.map((option) => (
+                          {previewFontOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
                           ))}
                         </select>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_chineseFontDesc')}</p>
+                        <input
+                          type="range"
+                          min="12"
+                          max="32"
+                          step="1"
+                          value={settings.previewFontSize}
+                          onChange={(e) => onUpdateSettings({ previewFontSize: parseInt(e.target.value, 10) })}
+                          className="mt-3 w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_previewFontDesc')}</p>
                         <div
                           className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
-                          style={{ fontFamily: getResolvedChineseFontFamily(settings) }}
+                          style={{ fontFamily: getResolvedPreviewFontFamily(settings), fontSize: `${settings.previewFontSize}px` }}
                         >
-                          {t('settings_chineseFontPreview')}
+                          {t('settings_previewFontPreview')}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_codeFont')}</label>
+                          <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.codeFontSize}px</span>
+                        </div>
+                        <select
+                          value={currentCodeFontValue}
+                          onChange={(e) => onUpdateSettings({ codeFontFamily: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                        >
+                          {codeFontOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="range"
+                          min="11"
+                          max="28"
+                          step="1"
+                          value={settings.codeFontSize}
+                          onChange={(e) => onUpdateSettings({ codeFontSize: parseInt(e.target.value, 10) })}
+                          className="mt-3 w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_codeFontDesc')}</p>
+                        <div
+                          className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                          style={{ fontFamily: getResolvedCodeFontFamily(settings), fontSize: `${settings.codeFontSize}px` }}
+                        >
+                          {t('settings_codeFontPreview')}
                         </div>
                       </div>
                     </div>

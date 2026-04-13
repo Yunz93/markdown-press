@@ -15,7 +15,7 @@ import { getPaneLayoutMetrics, type PaneDensity } from './paneLayout';
 import { clearActiveEditorView, registerActiveEditorView } from '../../utils/editorSelectionBridge';
 import { startCompletion } from '@codemirror/autocomplete';
 import { EditorView } from '@codemirror/view';
-import { getCompositeFontFamily } from '../../utils/fontSettings';
+import { getResolvedCodeFontFamily, getResolvedEditorFontFamily } from '../../utils/fontSettings';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { useCodeMirror, useWikiLinks, useImagePaste, useScrollSync } from './hooks';
 import type { WikiLinkPreviewData } from './hooks';
@@ -123,7 +123,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   } = useAppStore();
   const resolvedPlaceholder = placeholder ?? t('editor_emptyState');
 
-  const fontFamily = useMemo(() => getCompositeFontFamily(settings), [settings.englishFontFamily, settings.chineseFontFamily]);
+  const editorFontFamily = useMemo(() => getResolvedEditorFontFamily(settings), [settings.editorFontFamily]);
+  const codeFontFamily = useMemo(() => getResolvedCodeFontFamily(settings), [settings.codeFontFamily]);
   const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
 
   const editorRootRef = useRef<HTMLDivElement>(null);
@@ -350,10 +351,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     '--pane-content-top': `${layoutMetrics.contentPaddingTop}px`,
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
     '--editor-content-bottom': `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
-    '--editor-font-family': fontFamily,
-    '--editor-font-size': `${settings.fontSize}px`,
+    '--editor-font-family': editorFontFamily,
+    '--editor-font-size': `${settings.editorFontSize}px`,
+    '--editor-code-font-family': codeFontFamily,
+    '--editor-code-font-size': `${settings.codeFontSize}px`,
     '--editor-line-height': String(EDITOR_LINE_HEIGHT),
-  }) as React.CSSProperties, [layoutMetrics, fontFamily, settings.fontSize]);
+  }) as React.CSSProperties, [layoutMetrics, editorFontFamily, settings.editorFontSize, codeFontFamily, settings.codeFontSize]);
 
   // Hover preview state
   const [hoverPreview, setHoverPreview] = useState<HoverPreviewState | null>(null);

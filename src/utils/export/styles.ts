@@ -4,10 +4,8 @@ import { escapeHtml } from './core';
 import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import {
   buildDynamicFontFaceCss,
-  getCompositeFontFamily,
   type FontSettings,
-  usesBundledChineseFont,
-  getBundledChineseFontAssetUrl,
+  getBundledPresetAssetUrl,
 } from '../fontSettings';
 
 const inlinedAssetDataUrlCache = new Map<string, Promise<string>>();
@@ -54,15 +52,23 @@ export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promi
     return '';
   }
 
-  const fontUrl = await getBundledChineseFontAssetUrl();
-  const bundledChineseFontSrc = usesBundledChineseFont(fontSettings) && fontUrl
-    ? await inlineAssetAsDataUrl(fontUrl)
-    : undefined;
-
-  return buildDynamicFontFaceCss(
-    fontSettings,
-    bundledChineseFontSrc ? { bundledChineseFontSrc } : undefined
+  const presetOverrides = Object.fromEntries(
+    Object.values(fontSettings)
+      .filter((value): value is string => typeof value === 'string' && value.startsWith('preset:'))
+      .map((presetId) => {
+        const assetUrl = getBundledPresetAssetUrl(presetId);
+        return [presetId, assetUrl];
+      })
+      .filter((entry): entry is [string, string] => Boolean(entry[1]))
   );
+
+  const dataUrlEntries = await Promise.all(
+    Object.entries(presetOverrides).map(async ([presetId, assetUrl]) => (
+      [presetId, await inlineAssetAsDataUrl(assetUrl)] as const
+    ))
+  );
+
+  return buildDynamicFontFaceCss(fontSettings, Object.fromEntries(dataUrlEntries));
 }
 
 export function renderProperties(frontmatter: Record<string, unknown> | null): string {
@@ -92,10 +98,14 @@ export function buildExportStyles(
   theme: 'light' | 'dark',
   fontFamily?: string,
   fontSize?: number,
-  fontFaceCss = ''
+  fontFaceCss = '',
+  codeFontFamily?: string,
+  codeFontSize?: number,
 ): string {
   const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
   const resolvedFontSize = fontSize ?? 16;
+  const resolvedCodeFontFamily = codeFontFamily || '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace';
+  const resolvedCodeFontSize = codeFontSize ?? Math.max(12, resolvedFontSize - 1);
 
   return `
     ${fontFaceCss}
@@ -210,8 +220,8 @@ export function buildExportStyles(
       background: ${theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)'};
       border-radius: 0.45rem;
       padding: 0.15rem 0.35rem;
-      font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-      font-size: 0.92em;
+      font-family: ${resolvedCodeFontFamily};
+      font-size: ${resolvedCodeFontSize}px;
     }
 
     .export-document .markdown-body pre {

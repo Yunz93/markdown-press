@@ -4,7 +4,7 @@ import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsSer
 import { generateFrontmatter, parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
 import { downloadHtml, exportToHtml } from '../utils/export';
 import { type Frontmatter } from '../types';
-import { getCompositeFontFamily } from '../utils/fontSettings';
+import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../utils/fontSettings';
 import { buildSimpleBlogPostUrl, prepareSimpleBlogPublish } from '../utils/simpleBlogPublish';
 import { getFileSystem, isTauriEnvironment } from '../types/filesystem';
 import {
@@ -51,7 +51,8 @@ export function useExportActions(
     showNotification,
   } = useAppStore();
   const content = useAppStore(selectContent);
-  const fontFamily = getCompositeFontFamily(settings);
+  const previewFontFamily = buildPreviewExportFontFamily(settings);
+  const codeFontFamily = buildCodeExportFontFamily(settings);
 
   const invokePublishWithTimeout = useCallback(async (payload: Record<string, unknown>) => {
     const { invoke } = await import('@tauri-apps/api/core');
@@ -126,9 +127,11 @@ export function useExportActions(
         title: activeFile.name.replace('.md', ''),
         theme: settings.themeMode,
         includeTOC: false,
-        fontFamily,
+        fontFamily: previewFontFamily,
+        codeFontFamily,
         fontSettings: settings,
-        fontSize: settings.fontSize,
+        fontSize: settings.previewFontSize,
+        codeFontSize: settings.codeFontSize,
         includeProperties: false,
         highlighter,
       });
@@ -140,7 +143,7 @@ export function useExportActions(
       console.error('Failed to export HTML:', error);
       showNotification(t(settings.language, 'notifications_exportHtmlFailed'), 'error');
     }
-  }, [activeTabId, content, files, fontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.previewFontSize, settings.codeFontSize, settings.themeMode, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();

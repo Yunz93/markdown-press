@@ -6,8 +6,10 @@ export interface ExportOptions {
   theme?: 'light' | 'dark';
   includeTOC?: boolean;
   fontFamily?: string;
+  codeFontFamily?: string;
   fontSettings?: FontSettings;
   fontSize?: number;
+  codeFontSize?: number;
   includeProperties?: boolean;
   highlighter?: ShikiHighlighter | null;
 }

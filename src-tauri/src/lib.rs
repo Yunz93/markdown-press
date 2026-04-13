@@ -65,13 +65,6 @@ fn startup_log(message: impl AsRef<str>) {
     );
     println!("{}", line);
     log::info!("{}", line);
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/markdown-press-startup.log")
-    {
-        let _ = writeln!(file, "{}", line);
-    }
 }
 
 #[derive(Debug, Serialize)]

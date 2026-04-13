@@ -24,7 +24,7 @@ import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
-import { ensureDynamicFontFaces, getResolvedUiFontFamily, traceFontDiagnostics } from './utils/fontSettings';
+import { ensureDynamicFontFaces, getResolvedUiFontFamily } from './utils/fontSettings';
 import { hydrateSensitiveSettingsIntoStore } from './services/secureSettingsService';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
@@ -132,25 +132,15 @@ const App: React.FC = () => {
   }, [settingsHydrated]);
 
   useEffect(() => {
-    traceStartup('Dynamic font load started', {
-      englishFontFamily: settings.englishFontFamily,
-      chineseFontFamily: settings.chineseFontFamily,
-    });
-
     ensureDynamicFontFaces(settings)
       .then(() => {
-        traceStartup('Dynamic font load completed');
-        traceFontDiagnostics(settings);
         // After fonts are loaded, notify editor to refresh
         if (typeof document !== 'undefined') {
           document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
         }
       })
-      .catch((error) => {
-        traceStartup('Dynamic font load failed', error instanceof Error ? error.message : String(error));
-        traceFontDiagnostics(settings);
-      });
-  }, [settings.englishFontFamily, settings.chineseFontFamily]);
+      .catch(() => undefined);
+  }, [settings.uiFontFamily, settings.editorFontFamily, settings.previewFontFamily, settings.codeFontFamily]);
 
   useEffect(() => {
     traceStartup('App mounted');

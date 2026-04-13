@@ -92,11 +92,14 @@ export interface AppSettings {
   aiProvider: AIProvider;
   uiFontFamily: string;
   uiFontSize: number;
-  fontSize: number;
+  editorFontFamily: string;
+  editorFontSize: number;
+  previewFontFamily: string;
+  previewFontSize: number;
+  codeFontFamily: string;
+  codeFontSize: number;
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;
-  englishFontFamily: string;
-  chineseFontFamily: string;
   resourceFolder: string;
   trashFolder: string;
   attachmentPasteFormat: AttachmentPasteFormat;

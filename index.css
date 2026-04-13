@@ -244,8 +244,8 @@ html[data-app-booting="true"] *::after {
   box-shadow:
     inset 1px 0 0 var(--editor-code-block-border),
     inset -1px 0 0 var(--editor-code-block-border);
-  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 0.92em;
+  font-family: var(--editor-code-font-family);
+  font-size: var(--editor-code-font-size);
   line-height: 1.75;
   padding: 0 1.1rem !important;
 }
@@ -476,7 +476,7 @@ html[data-app-booting="true"] *::after {
   max-height: min(20rem, calc(100vh - 10rem));
   overflow: auto;
   padding: 0.85rem 0.95rem 0.95rem;
-  font-family: var(--editor-font-family);
+  font-family: var(--preview-font-family, var(--editor-font-family));
 }
 
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body {
@@ -1209,8 +1209,8 @@ html[data-app-booting="true"] *::after {
   line-height: 1.95;
   overflow-wrap: anywhere;
   word-break: break-word;
-  font-family: var(--editor-font-family) !important;
-  font-size: var(--editor-font-size);
+  font-family: var(--preview-font-family) !important;
+  font-size: var(--preview-font-size);
 }
 
 .preview-pane-document-compact.markdown-body {
@@ -1229,8 +1229,8 @@ html[data-app-booting="true"] *::after {
   margin: 0;
   padding: var(--pane-content-top) var(--pane-content-px) var(--preview-content-bottom, var(--pane-content-bottom));
   color: #0f172a;
-  font-family: var(--editor-font-family);
-  font-size: var(--editor-font-size);
+  font-family: var(--preview-font-family);
+  font-size: var(--preview-font-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -1405,8 +1405,8 @@ html[data-app-booting="true"] *::after {
   background: rgba(15, 23, 42, 0.06);
   border-radius: 0.45rem;
   padding: 0.15rem 0.35rem;
-  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 0.92em;
+  font-family: var(--preview-code-font-family);
+  font-size: var(--preview-code-font-size);
 }
 
 .preview-pane-document.markdown-body pre {
