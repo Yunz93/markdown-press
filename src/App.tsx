@@ -30,7 +30,6 @@ import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimu
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
 import { findUnusedAttachments } from './utils/attachmentCleanup';
-import { traceStartup } from './utils/startupTrace';
 import type { PaneDensity } from './components/editor/paneLayout';
 import { useI18n } from './hooks/useI18n';
 
@@ -142,24 +141,6 @@ const App: React.FC = () => {
       .catch(() => undefined);
   }, [settings.uiFontFamily, settings.editorFontFamily, settings.previewFontFamily, settings.codeFontFamily]);
 
-  useEffect(() => {
-    traceStartup('App mounted');
-  }, []);
-
-  useEffect(() => {
-    traceStartup('Store hydration state changed', { hydrated: settingsHydrated });
-  }, [settingsHydrated]);
-
-  useEffect(() => {
-    traceStartup('Workspace state changed', {
-      hydrated: settingsHydrated,
-      rootFolderPath,
-      fileCount: files.length,
-      activeTabId,
-      currentFilePath,
-    });
-  }, [activeTabId, currentFilePath, files.length, rootFolderPath, settingsHydrated]);
-
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
@@ -194,8 +175,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!settingsHydrated || typeof document === 'undefined') return;
-
-    traceStartup('Boot flag cleared');
     const frame = window.requestAnimationFrame(() => {
       document.documentElement.removeAttribute('data-app-booting');
     });

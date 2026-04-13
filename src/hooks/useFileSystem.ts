@@ -7,7 +7,6 @@ import type { FileNode } from '../types';
 import { localizeKnownError, t } from '../utils/i18n';
 import { DEFAULT_TRASH_FOLDER, sanitizeTrashFolder } from '../utils/trashFolder';
 import { isTauriEnvironment } from '../types/filesystem';
-import { traceStartup } from '../utils/startupTrace';
 
 const TRASH_ROOT_MARKER = '__root__';
 function getPathSeparator(path: string): '/' | '\\' {
@@ -307,11 +306,9 @@ export function useFileSystem() {
    */
   const initializeSampleNotes = useCallback(async (targetDir: string): Promise<boolean> => {
     try {
-      traceStartup('Sample notes init started', { targetDir });
       const fs = await getFileSystem();
       if (!fs.copySampleNotes) {
         console.log('Sample notes not supported in this environment');
-        traceStartup('Sample notes init skipped', 'copySampleNotes unsupported');
         return false;
       }
 
@@ -328,14 +325,9 @@ export function useFileSystem() {
       if (updated) {
         showNotification(t(settings.language, 'notifications_sampleNotesSynced'), 'success');
       }
-      traceStartup('Sample notes init completed', { targetDir, updated });
       return updated;
     } catch (error) {
       console.error('Failed to initialize sample notes:', error);
-      traceStartup(
-        'Sample notes init failed',
-        error instanceof Error ? error.message : String(error)
-      );
       // Don't show error notification - this is not critical
       return false;
     }
@@ -353,11 +345,6 @@ export function useFileSystem() {
       const fs = await getFileSystem();
       const dirPath = path || await fs.openDirectory();
       if (!dirPath) return null;
-      traceStartup('openKnowledgeBase started', {
-        dirPath,
-        silentSuccess: options?.silentSuccess ?? false,
-        skipSampleNotes: options?.skipSampleNotes ?? false,
-      });
 
       // Helper to wrap operations with timeout
       const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, context: string): Promise<T> => {
@@ -368,36 +355,24 @@ export function useFileSystem() {
       };
 
       try {
-        traceStartup('Register allowed path started', { dirPath });
         await withTimeout(
           registerTauriAllowedPath(dirPath, true),
           5000,
           'Register allowed path'
         );
-        traceStartup('Register allowed path completed', { dirPath });
       } catch (error) {
         console.warn('Failed to register allowed path (continuing):', error);
-        traceStartup(
-          'Register allowed path failed',
-          error instanceof Error ? error.message : String(error)
-        );
       }
 
       const trashRootPath = joinPath(dirPath, sanitizeTrashFolder(settings.trashFolder));
       try {
-        traceStartup('Register trash path started', { trashRootPath });
         await withTimeout(
           registerTauriAllowedPathIfExists(trashRootPath, true),
           3000,
           'Register trash path'
         );
-        traceStartup('Register trash path completed', { trashRootPath });
       } catch (error) {
         console.warn('Failed to register trash path (continuing):', error);
-        traceStartup(
-          'Register trash path failed',
-          error instanceof Error ? error.message : String(error)
-        );
       }
 
       const shouldInitializeSampleNotes =
@@ -408,22 +383,12 @@ export function useFileSystem() {
       // Only sync sample notes the first time a workspace is opened.
       if (shouldInitializeSampleNotes) {
         await initializeSampleNotes(dirPath);
-      } else {
-        traceStartup('Sample notes init skipped', {
-          dirPath,
-          reason: 'already-opened-or-disabled',
-        });
       }
 
-      traceStartup('Knowledge base directory read started', { dirPath });
       let fileNodes = await withErrorHandling(
         () => fs.readDirectory(dirPath),
         'Failed to read knowledge base'
       );
-      traceStartup('Knowledge base directory read completed', {
-        dirPath,
-        topLevelCount: fileNodes.length,
-      });
 
       const lastOpenedFilePath = useAppStore.getState().settings.lastOpenedFilePath;
       const preferredInitialFile = lastOpenedFilePath ? findFileInTree(fileNodes, lastOpenedFilePath) : undefined;
@@ -431,15 +396,10 @@ export function useFileSystem() {
       setCurrentFilePath(null);
       setFiles(fileNodes);
       setRootFolderPath(dirPath);
-      traceStartup('Knowledge base state committed', {
-        dirPath,
-        preferredInitialFilePath: preferredInitialFile?.path ?? null,
-      });
 
       const initialFile = preferredInitialFile ?? findFirstOpenableFile(fileNodes);
       if (initialFile) {
         try {
-          traceStartup('Initial file read started', { path: initialFile.path });
           const initialContent = await withErrorHandling(
             () => fs.readFile(initialFile.path),
             `Failed to read file: ${initialFile.name}`
@@ -447,39 +407,22 @@ export function useFileSystem() {
 
           addTab(initialFile.id, initialContent);
           setCurrentFilePath(initialFile.path);
-          traceStartup('Initial file read completed', {
-            path: initialFile.path,
-            bytes: initialContent.length,
-          });
 
           if (isPreviewOnlyFile(initialFile.name) && !isMarkdownFile(initialFile.name)) {
             setViewMode(ViewMode.PREVIEW);
-            traceStartup('Initial file opened in preview mode', { path: initialFile.path });
           }
         } catch (error) {
           handleFileSystemError(error, 'Failed to open initial file');
-          traceStartup(
-            'Initial file read failed',
-            error instanceof Error ? error.message : String(error)
-          );
         }
-      } else {
-        traceStartup('No initial file found', { dirPath });
       }
 
       updateKnowledgeBaseMetadata(dirPath);
-      traceStartup('Knowledge base metadata updated', { dirPath });
       if (!options?.silentSuccess) {
         showNotification(t(settings.language, 'notifications_knowledgeBaseOpenedSuccessfully'), 'success');
       }
-      traceStartup('openKnowledgeBase completed', { dirPath });
       return dirPath;
     } catch (error) {
       handleFileSystemError(error, 'Failed to open knowledge base');
-      traceStartup(
-        'openKnowledgeBase failed',
-        error instanceof Error ? error.message : String(error)
-      );
       return null;
     }
   }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata, initializeSampleNotes, settings.trashFolder]);
