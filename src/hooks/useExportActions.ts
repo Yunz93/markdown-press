@@ -15,6 +15,7 @@ import {
 } from '../utils/blogRepo';
 import { refreshDocumentUpdateTime } from '../utils/metadataFields';
 import { localizeKnownError, t } from '../utils/i18n';
+import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
 
 const PUBLISH_TIMEOUT_MS = 45000;
 
@@ -38,7 +39,7 @@ export function useExportActions(
     contentOverride?: string,
     options?: { formatBeforeSave?: boolean; trigger?: 'auto' | 'manual' | 'system' }
   ) => Promise<boolean>,
-  highlighter?: any | null
+  highlighter?: ShikiHighlighter | null
 ) {
   const {
     files,

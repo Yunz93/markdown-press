@@ -7,7 +7,7 @@ export interface ResolvedAttachmentTarget {
   name: string;
 }
 
-interface AttachmentResolverContext {
+export interface AttachmentResolverContext {
   cacheNamespace: string;
   currentFilePath?: string | null;
   rootFolderPath?: string | null;

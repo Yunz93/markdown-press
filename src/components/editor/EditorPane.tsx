@@ -22,13 +22,14 @@ import type { WikiLinkPreviewData } from './hooks';
 import { throttle } from '../../utils/throttle';
 import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
 import { useI18n } from '../../hooks/useI18n';
+import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 
 interface EditorPaneProps {
   placeholder?: string;
   onContentChange?: (content: string) => void;
   onScroll?: (percentage: number) => void;
   onGenerateWikiFromSelection?: (selection: { text: string; from: number; to: number }) => Promise<string | null>;
-  highlighter?: any;
+  highlighter?: ShikiHighlighter | null;
   density?: PaneDensity;
 }
 

@@ -1,4 +1,5 @@
 import type { FontSettings } from '../fontSettings';
+import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 
 export interface ExportOptions {
   title?: string;
@@ -8,7 +9,7 @@ export interface ExportOptions {
   fontSettings?: FontSettings;
   fontSize?: number;
   includeProperties?: boolean;
-  highlighter?: any | null;
+  highlighter?: ShikiHighlighter | null;
 }
 
 export interface SaveExportOptions {

@@ -3,7 +3,11 @@ import type { AppSettings, MetadataField } from '../../types';
 import { isTauriEnvironment } from '../../types/filesystem';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../../services/aiPrompts';
 import { fetchAvailableModels, type ModelOption } from '../../services/modelCatalogService';
-import { listAvailableSystemFontFamilies } from '../../services/systemFontService';
+import {
+  getCachedSystemFontFamilies,
+  hasCachedSystemFontFamilies,
+  listAvailableSystemFontFamilies,
+} from '../../services/systemFontService';
 import { hydrateSensitiveSettingsIntoStore, persistSecureSetting, type SensitiveSettingKey } from '../../services/secureSettingsService';
 import {
   isValidOrEmptyBlogRepoUrl,
@@ -359,7 +363,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     codex: false,
   });
   const [modelLoadMessage, setModelLoadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [availableSystemFonts, setAvailableSystemFonts] = useState<string[]>([]);
+  const [availableSystemFonts, setAvailableSystemFonts] = useState<string[]>(() => getCachedSystemFontFamilies() ?? []);
   const [isLoadingSystemFonts, setIsLoadingSystemFonts] = useState(false);
   const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<Record<ShortcutGroupId, boolean>>({
     workspace: true,
@@ -408,6 +412,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+
+    const cachedFonts = getCachedSystemFontFamilies();
+    if (cachedFonts) {
+      setAvailableSystemFonts(cachedFonts);
+    }
+
+    if (hasCachedSystemFontFamilies()) {
+      setIsLoadingSystemFonts(false);
+      return;
+    }
 
     let cancelled = false;
     setIsLoadingSystemFonts(true);

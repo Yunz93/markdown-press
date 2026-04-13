@@ -24,9 +24,10 @@ import { parseFrontmatter } from '../../utils/frontmatter';
 import { isWindowsPlatform } from '../../utils/platform';
 import type { FileNode, Frontmatter } from '../../types';
 import { useI18n } from '../../hooks/useI18n';
+import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 
 interface PreviewPaneProps {
-  highlighter?: any;
+  highlighter?: ShikiHighlighter | null;
   onScroll?: (percentage: number) => void;
   density?: PaneDensity;
   syncedPercentage?: number | null;

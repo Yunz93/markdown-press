@@ -12,7 +12,23 @@
       "Bash(npx tsc:*)",
       "Bash(wc -l /Users/yunz/Code/VibeCoding/markdown-press/src/**/*.ts /Users/yunz/Code/VibeCoding/markdown-press/src/**/*.tsx)",
       "Bash(git checkout:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(cargo check:*)",
+      "Bash(cloc /Users/yunz/Code/VibeCoding/markdown-press/src --quiet)",
+      "Bash(wc:*)",
+      "Bash(ls -la /Users/yunz/Code/VibeCoding/markdown-press/*.config.*)",
+      "Bash(sed -n '1,35p' /Users/yunz/Code/VibeCoding/markdown-press/src/components/editor/PreviewPane.tsx)",
+      "Read(//tmp/**)",
+      "Bash(sed 's/import { useI18n } from \"\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useI18n\";/import { useI18n } from \"\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useI18n\";\\\\nimport type { ShikiHighlighter } from \"\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useShikiHighlighter\";/')",
+      "Bash(mv /tmp/PreviewPane.tsx /Users/yunz/Code/VibeCoding/markdown-press/src/components/editor/PreviewPane.tsx)",
+      "Bash(sed 's/import { useCallback, useMemo, useRef } from '\"'\"'react'\"'\"';/import { useCallback, useMemo, useRef } from '\"'\"'react'\"'\"';\\\\nimport type { ShikiHighlighter } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/..\\\\/hooks\\\\/useShikiHighlighter'\"'\"';/')",
+      "Bash(mv /tmp/useWikiLinks.ts /Users/yunz/Code/VibeCoding/markdown-press/src/components/editor/hooks/useWikiLinks.ts)",
+      "Bash(sed 's/import type { FileNode } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/..\\\\/types'\"'\"';/import type { FileNode } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/..\\\\/types'\"'\"';\\\\nimport type { ShikiHighlighter } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/..\\\\/hooks\\\\/useShikiHighlighter'\"'\"';/')",
+      "Bash(mv /tmp/usePreviewRenderer.ts /Users/yunz/Code/VibeCoding/markdown-press/src/components/editor/hooks/usePreviewRenderer.ts)",
+      "Bash(sed 's/import { useI18n } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useI18n'\"'\"';/import { useI18n } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useI18n'\"'\"';\\\\nimport type { ShikiHighlighter } from '\"'\"'\\\\.\\\\.\\\\/..\\\\/hooks\\\\/useShikiHighlighter'\"'\"';/')",
+      "Bash(mv /tmp/EditorPane.tsx /Users/yunz/Code/VibeCoding/markdown-press/src/components/editor/EditorPane.tsx)",
+      "Bash(sed 's/import { localizeKnownError, t } from '\\\\''\\\\.\\\\.\\\\/utils\\\\/i18n'\\\\'';/import { localizeKnownError, t } from '\\\\''\\\\.\\\\.\\\\/utils\\\\/i18n'\\\\'';\\\\nimport type { ShikiHighlighter } from '\\\\''\\\\.\\\\.\\\\/hooks\\\\/useShikiHighlighter'\\\\'';/')",
+      "Bash(mv /tmp/useExportActions.ts /Users/yunz/Code/VibeCoding/markdown-press/src/hooks/useExportActions.ts)"
     ]
   }
 }

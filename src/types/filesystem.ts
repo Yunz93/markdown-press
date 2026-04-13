@@ -49,30 +49,59 @@ export function isTauriEnvironment(): boolean {
 }
 
 /**
+ * Check if Tauri core APIs are fully initialized and ready to use
+ * This goes beyond isTauriEnvironment() by actually trying to use the API
+ */
+async function isTauriCoreReady(): Promise<boolean> {
+  if (!isTauriEnvironment()) return false;
+
+  try {
+    // Try to import and invoke a simple Tauri command to verify core is ready
+    const { invoke } = await import('@tauri-apps/api/core');
+    // Ping the backend to verify connection is established
+    await invoke('ping');
+    return true;
+  } catch {
+    // If ping doesn't exist or fails, check if we can at least import core
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      return typeof invoke === 'function';
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
  * Wait for Tauri environment to be ready
  * Use this when you need to ensure Tauri APIs are available
  * This is useful in build mode where Tauri injection might be delayed
  */
-export function waitForTauri(maxWaitMs: number = 5000): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (isTauriEnvironment()) {
-      resolve(true);
-      return;
-    }
+export async function waitForTauri(maxWaitMs: number = 5000): Promise<boolean> {
+  if (await isTauriCoreReady()) {
+    return true;
+  }
 
-    const startTime = Date.now();
-    const checkInterval = setInterval(() => {
-      if (isTauriEnvironment()) {
-        clearInterval(checkInterval);
+  const startTime = Date.now();
+  return new Promise((resolve) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const check = async (): Promise<void> => {
+      if (await isTauriCoreReady()) {
+        if (timeoutId) clearTimeout(timeoutId);
         resolve(true);
         return;
       }
 
       if (Date.now() - startTime > maxWaitMs) {
-        clearInterval(checkInterval);
         resolve(false);
+        return;
       }
-    }, 100);
+
+      timeoutId = setTimeout(check, 100);
+    };
+
+    check();
   });
 }
 

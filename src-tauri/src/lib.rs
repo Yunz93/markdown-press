@@ -65,6 +65,13 @@ fn startup_log(message: impl AsRef<str>) {
     );
     println!("{}", line);
     log::info!("{}", line);
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/markdown-press-startup.log")
+    {
+        let _ = writeln!(file, "{}", line);
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -564,6 +571,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            ping,
             trace_startup,
             get_secure_settings,
             set_secure_secret,
@@ -586,6 +594,11 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn ping() -> Result<String, String> {
+    Ok("pong".to_string())
 }
 
 #[tauri::command]
@@ -622,7 +635,13 @@ fn set_secure_secret(app: tauri::AppHandle, key: String, value: Option<String>) 
 }
 
 #[tauri::command]
-fn list_system_fonts() -> Result<Vec<String>, String> {
+async fn list_system_fonts() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| collect_system_fonts())
+        .await
+        .map_err(|e| format!("Failed to join system font query task: {}", e))?
+}
+
+fn collect_system_fonts() -> Result<Vec<String>, String> {
     #[cfg(target_os = "macos")]
     {
         let output = Command::new("system_profiler")
@@ -729,6 +748,9 @@ fn list_system_fonts() -> Result<Vec<String>, String> {
 
         return Ok(families.into_iter().collect());
     }
+
+    #[allow(unreachable_code)]
+    Ok(Vec::new())
 }
 
 #[tauri::command]

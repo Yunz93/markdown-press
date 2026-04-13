@@ -7,9 +7,10 @@ import { WritingStatsDisplay } from '../stats/WritingStatsDisplay';
 import { throttle } from '../../utils/throttle';
 import type { PaneDensity } from './paneLayout';
 import { useI18n } from '../../hooks/useI18n';
+import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 
 interface SplitViewProps {
-  highlighter?: any;
+  highlighter?: ShikiHighlighter | null;
   onContentChange?: (content: string) => void;
   onGenerateWikiFromSelection?: (selection: { text: string; from: number; to: number }) => Promise<string | null>;
   isOutlineOpen: boolean;

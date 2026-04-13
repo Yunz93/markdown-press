@@ -9,9 +9,10 @@ import { getMarkdownPressShikiTheme } from './shikiTheme';
 import { parseWikiLinkReference } from './wikiLinks';
 import type { ThemeMode } from '../types';
 import { LRUCache, hashContent } from './performance';
+import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
 
 interface MarkdownRenderOptions {
-  highlighter?: any | null;
+  highlighter?: ShikiHighlighter | null;
   themeMode?: ThemeMode;
 }
 
@@ -146,14 +147,14 @@ export function getMarkdownIt(): MarkdownIt {
 }
 
 // Store highlighter reference for the current render
-let currentHighlighter: any | null = null;
+let currentHighlighter: ShikiHighlighter | null = null;
 let currentTheme: ThemeMode = 'light';
 
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
 
-function canUseShikiLanguage(highlighter: any | null, lang: string): boolean {
+function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string): boolean {
   if (!highlighter || !lang) return false;
 
   const loadedLanguages = new Set<string>(highlighter.getLoadedLanguages?.() ?? []);
@@ -166,11 +167,11 @@ function canUseShikiLanguage(highlighter: any | null, lang: string): boolean {
   return false;
 }
 
-function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMode: ThemeMode = 'light') {
+function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | null, themeMode: ThemeMode = 'light') {
   // Always update current highlighter reference for the latest instance
   currentHighlighter = highlighter;
   currentTheme = themeMode;
-  
+
   // Get the base fence renderer - this should be the original markdown-it fence renderer
   // We avoid using the current md.renderer.rules.fence to prevent wrapping ourselves
   const baseFence = baseFenceRenderer;
@@ -196,7 +197,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
     // This is more reliable than the module-level variable in build mode
     const activeHighlighter = localHighlighter ?? currentHighlighter;
     const activeThemeMode = localThemeMode ?? currentTheme;
-    
+
     if (activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
       try {
         const activeTheme = getMarkdownPressShikiTheme(activeThemeMode);
@@ -229,7 +230,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: any | null, themeMo
 /**
  * React hook for markdown renderer with Shiki syntax highlighting
  */
-export function useMarkdownRenderer(highlighter: any | null, themeMode: ThemeMode) {
+export function useMarkdownRenderer(highlighter: ShikiHighlighter | null, themeMode: ThemeMode) {
   // Apply KaTeX theme
   useEffect(() => {
     applyKatexDarkTheme();

@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useMemo, useRef } from 'react';
+import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 import type { Completion, CompletionContext, CompletionSource } from '@codemirror/autocomplete';
 import type { FileNode } from '../../../types';
 import { renderMarkdown } from '../../../utils/markdown';
@@ -46,7 +47,7 @@ export interface UseWikiLinksOptions {
   rootFolderPath?: string | null;
   files: FileNode[];
   fileContents: Record<string, string>;
-  highlighter?: any;
+  highlighter?: ShikiHighlighter | null;
   themeMode?: 'light' | 'dark';
   readFile: (file: FileNode) => Promise<string>;
 }

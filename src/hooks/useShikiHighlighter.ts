@@ -2,10 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { extractMarkdownFenceLanguages, SHIKI_CORE_LANGS } from '../utils/shikiLanguages';
 import { MARKDOWN_PRESS_SHIKI_THEMES } from '../utils/shikiTheme';
 
-interface ShikiHighlighter {
+/** Language input type for Shiki loadLanguage */
+type LanguageInput = {
+  name: string;
+  displayName?: string;
+  [key: string]: unknown;
+};
+
+/** Shiki highlighter interface for syntax highlighting */
+export interface ShikiHighlighter {
   codeToHtml: (code: string, options: { lang: string; theme: string }) => string;
   getLoadedLanguages?: () => string[];
-  loadLanguage?: (...langs: any[]) => Promise<void>;
+  loadLanguage?: (...langs: LanguageInput[]) => Promise<void>;
   supportsLanguage?: (lang: string) => boolean;
 }
 

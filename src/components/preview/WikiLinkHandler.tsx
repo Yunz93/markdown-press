@@ -1,9 +1,11 @@
 import React from 'react';
 import { parseWikiLinkReference } from '../../utils/wikiLinks';
-import { resolveAttachmentTarget } from '../../utils/attachmentResolver';
+import { resolveAttachmentTarget, type AttachmentResolverContext } from '../../utils/attachmentResolver';
 import { isImageAttachment, isMarkdownNote, isPdfAttachment } from './previewUtils';
 import { warmPreviewImage, resolvePreviewSource } from '../../utils/previewImageCache';
 import { useI18n } from '../../hooks/useI18n';
+import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
+import type { FileNode } from '../../types';
 
 interface WikiLinkHandlerProps {
   target: string;
@@ -11,7 +13,7 @@ interface WikiLinkHandlerProps {
   embedWidth?: number;
   embedHeight?: number;
   currentFilePath: string | null;
-  attachmentResolverContext: any;
+  attachmentResolverContext: AttachmentResolverContext;
   onNavigate?: (target: string) => Promise<void>;
   children?: React.ReactNode;
 }
@@ -50,19 +52,24 @@ export const WikiLinkHandler: React.FC<WikiLinkHandlerProps> = ({
   );
 };
 
+interface RenderMarkdownOptions {
+  highlighter?: ShikiHighlighter | null;
+  themeMode?: string;
+}
+
 interface AttachmentEmbedProps {
   target: string;
   label?: string;
   embedWidth?: number;
   embedHeight?: number;
   currentFilePath: string | null;
-  attachmentResolverContext: any;
+  attachmentResolverContext: AttachmentResolverContext;
   fileContents?: Record<string, string>;
   content?: string;
-  readFile?: (node: any) => Promise<string>;
-  renderMarkdown?: (markdown: string, options: any) => string;
+  readFile?: (node: Pick<FileNode, 'id' | 'name' | 'type' | 'path'>) => Promise<string>;
+  renderMarkdown?: (markdown: string, options: RenderMarkdownOptions) => string;
   themeMode?: string;
-  highlighter?: any;
+  highlighter?: ShikiHighlighter | null;
 }
 
 export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
@@ -129,7 +136,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
 
           // Simple fragment extraction - in real implementation would use extractWikiNoteFragment
           const title = label || resolvedTarget.name.replace(/\.(md|markdown)$/i, '');
-          
+
           if (!cancelled) {
             setResolved({
               type: 'note',
@@ -145,8 +152,8 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
 
         if (!cancelled) {
           setResolved({
-            type: isImageAttachment(resolvedTarget.name) ? 'image' 
-                 : isPdfAttachment(resolvedTarget.name) ? 'pdf' 
+            type: isImageAttachment(resolvedTarget.name) ? 'image'
+                 : isPdfAttachment(resolvedTarget.name) ? 'pdf'
                  : 'file',
             path: resolvedTarget.path,
             name: resolvedTarget.name,

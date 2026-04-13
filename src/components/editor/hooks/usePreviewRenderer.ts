@@ -16,13 +16,14 @@ import { hydrateCachedPreviewImageSources, resolvePreviewSource, warmPreviewImag
 import { parseWikiLinkReference, extractWikiNoteFragment } from '../../../utils/wikiLinks';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../../utils/attachmentResolver';
 import type { FileNode } from '../../../types';
+import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 
 export interface UsePreviewRendererOptions {
   content: string;
   currentFilePath?: string | null;
   isMarkdownPreview: boolean;
   isHtmlPreview: boolean;
-  highlighter?: any;
+  highlighter?: ShikiHighlighter | null;
   themeMode?: 'light' | 'dark';
   files: FileNode[];
   rootFolderPath?: string | null;

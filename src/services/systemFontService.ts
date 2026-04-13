@@ -29,6 +29,7 @@ const LINUX_FALLBACK_FONTS = [
 ];
 
 let cachedSystemFontFamiliesPromise: Promise<string[]> | null = null;
+let cachedSystemFontFamilies: string[] | null = null;
 
 function normalizeFontFamilies(fontFamilies: string[]): string[] {
   return Array.from(
@@ -98,12 +99,27 @@ export async function listAvailableSystemFontFamilies(): Promise<string[]> {
         ? await listTauriSystemFonts()
         : await listBrowserSystemFonts();
 
-      return normalizeFontFamilies([
+      cachedSystemFontFamilies = normalizeFontFamilies([
         ...discoveredFonts,
         ...getFallbackFontFamilies(),
       ]);
+      return cachedSystemFontFamilies;
     })();
   }
 
   return cachedSystemFontFamiliesPromise;
+}
+
+export function getCachedSystemFontFamilies(): string[] | null {
+  return cachedSystemFontFamilies ? [...cachedSystemFontFamilies] : null;
+}
+
+export function hasCachedSystemFontFamilies(): boolean {
+  return Array.isArray(cachedSystemFontFamilies);
+}
+
+export function warmAvailableSystemFontFamilies(): void {
+  void listAvailableSystemFontFamilies().catch((error) => {
+    console.warn('[systemFontService] Failed to warm system fonts cache:', error);
+  });
 }

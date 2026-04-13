@@ -24,7 +24,7 @@ import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
-import { ensureDynamicFontFaces, getResolvedUiFontFamily } from './utils/fontSettings';
+import { ensureDynamicFontFaces, getResolvedUiFontFamily, traceFontDiagnostics } from './utils/fontSettings';
 import { hydrateSensitiveSettingsIntoStore } from './services/secureSettingsService';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
@@ -140,6 +140,7 @@ const App: React.FC = () => {
     ensureDynamicFontFaces(settings)
       .then(() => {
         traceStartup('Dynamic font load completed');
+        traceFontDiagnostics(settings);
         // After fonts are loaded, notify editor to refresh
         if (typeof document !== 'undefined') {
           document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
@@ -147,6 +148,7 @@ const App: React.FC = () => {
       })
       .catch((error) => {
         traceStartup('Dynamic font load failed', error instanceof Error ? error.message : String(error));
+        traceFontDiagnostics(settings);
       });
   }, [settings.englishFontFamily, settings.chineseFontFamily]);
 
@@ -550,6 +552,7 @@ const App: React.FC = () => {
     return (
       <div
         className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
+        data-font-probe="onboarding-shell"
         style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
       >
         <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
@@ -558,13 +561,14 @@ const App: React.FC = () => {
               M
             </div>
             <div>
-              <h1 className="text-xl font-semibold">{t('app_chooseKnowledgeBase')}</h1>
+              <h1 className="text-xl font-semibold" data-font-probe="onboarding-title">{t('app_chooseKnowledgeBase')}</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">{t('app_chooseKnowledgeBaseDesc')}</p>
             </div>
           </div>
           <button
             onClick={handleSwitchKnowledgeBase}
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium hover:opacity-90 transition-opacity"
+            data-font-probe="onboarding-button"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
@@ -581,6 +585,7 @@ const App: React.FC = () => {
   return (
     <div
       className="flex h-screen overflow-hidden text-sm"
+      data-font-probe="app-shell"
       style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
     >
       <Sidebar
