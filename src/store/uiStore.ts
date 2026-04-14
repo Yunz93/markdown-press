@@ -49,7 +49,7 @@ export interface UIActions {
   setPublishing: (publishing: boolean) => void;
   setSettings: (settings: AppSettings) => void;
   updateSettings: (updates: Partial<AppSettings> | ((state: UIState) => Partial<AppSettings>)) => void;
-  showNotification: (msg: string, type: 'success' | 'error') => void;
+  showNotification: (msg: string, type?: 'success' | 'error' | 'info') => void;
   clearNotification: () => void;
   setOutlineHeadings: (headings: HeadingNode[]) => void;
   setActiveHeadingId: (id: string | null) => void;
@@ -174,7 +174,7 @@ export function createUISlice(
         clearTimeout(notificationTimer);
       }
 
-      set(() => ({ notification: { msg, type } }));
+      set(() => ({ notification: { msg, type: type ?? 'success' } }));
       notificationTimer = setTimeout(() => {
         notificationTimer = null;
         set(() => ({ notification: null }));

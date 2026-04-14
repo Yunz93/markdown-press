@@ -1,22 +1,18 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    // Detect Tauri build environment
     const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
     
     return {
       server: {
         port: 3000,
-        host: '0.0.0.0',
+        host: 'localhost',
       },
       publicDir: 'public',
       plugins: [react()],
       define: {
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        // Expose build mode to application
         __DEV__: mode === 'development',
         __PROD__: mode === 'production',
       },
@@ -56,6 +52,14 @@ export default defineConfig(({ mode }) => {
                 || id.includes('/github-markdown-css/')
               ) {
                 return 'markdown-vendor';
+              }
+
+              if (id.includes('/mermaid/') || id.includes('/mermaid-')) {
+                return 'mermaid-vendor';
+              }
+
+              if (id.includes('/@google/genai/')) {
+                return 'ai-vendor';
               }
 
               if (id.includes('/@tauri-apps/')) {

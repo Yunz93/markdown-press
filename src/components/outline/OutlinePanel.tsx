@@ -81,7 +81,7 @@ const HeadingItem: React.FC<HeadingItemProps> = ({
   );
 };
 
-export const OutlinePanel: React.FC<OutlinePanelProps> = ({
+export const OutlinePanel: React.FC<OutlinePanelProps> = React.memo(({
   headings,
   activeHeadingId,
   onHeadingClick,
@@ -187,4 +187,4 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
       </div>
     </div>
   );
-};
+});

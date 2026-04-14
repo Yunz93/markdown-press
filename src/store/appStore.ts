@@ -39,6 +39,30 @@ export interface AppState extends
 
 const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'geminiApiKey', 'codexApiKey'] as const;
 
+function clampPersistedNumber(value: unknown, min: number, max: number, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+}
+
+function resolveFirstValidNumber(
+  settings: Record<string, unknown>, keys: string[], min: number, max: number, fallback: number,
+): number {
+  for (const key of keys) {
+    const v = settings[key];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return Math.min(max, Math.max(min, v));
+    }
+  }
+  return fallback;
+}
+
+function resolveFirstValidString(settings: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const v = settings[key];
+    if (typeof v === 'string' && v.trim()) return v;
+  }
+  return '';
+}
+
 function stripSensitiveSettings(settings: Record<string, unknown>): Record<string, unknown> {
   const sanitized = { ...settings };
   SENSITIVE_SETTING_KEYS.forEach((key) => {
@@ -178,29 +202,15 @@ export const useAppStore = create<AppState>()(
       merge: (persistedState, currentState) => {
         const persistedSettings = stripSensitiveSettings((persistedState as any)?.settings ?? {});
         const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
-        const legacyContentFontFamily = typeof persistedSettings.chineseFontFamily === 'string' && persistedSettings.chineseFontFamily.trim()
-          ? persistedSettings.chineseFontFamily
-          : (typeof persistedSettings.englishFontFamily === 'string' && persistedSettings.englishFontFamily.trim()
-            ? persistedSettings.englishFontFamily
-            : (typeof persistedSettings.fontFamily === 'string' && persistedSettings.fontFamily.trim()
-              ? persistedSettings.fontFamily
-              : DEFAULT_EDITOR_FONT_FAMILY));
-        const legacyContentFontSize = typeof persistedSettings.fontSize === 'number' && Number.isFinite(persistedSettings.fontSize)
-          ? Math.min(32, Math.max(12, persistedSettings.fontSize))
-          : 16;
-        const resolvedSharedFontSize = typeof persistedSettings.fontSize === 'number' && Number.isFinite(persistedSettings.fontSize)
-          ? Math.min(32, Math.max(11, persistedSettings.fontSize))
-          : (typeof persistedSettings.editorFontSize === 'number' && Number.isFinite(persistedSettings.editorFontSize)
-            ? Math.min(32, Math.max(11, persistedSettings.editorFontSize))
-            : (typeof persistedSettings.previewFontSize === 'number' && Number.isFinite(persistedSettings.previewFontSize)
-              ? Math.min(32, Math.max(11, persistedSettings.previewFontSize))
-              : (typeof persistedSettings.codeFontSize === 'number' && Number.isFinite(persistedSettings.codeFontSize)
-                ? Math.min(32, Math.max(11, persistedSettings.codeFontSize))
-                : (typeof persistedSettings.editorCodeFontSize === 'number' && Number.isFinite(persistedSettings.editorCodeFontSize)
-                  ? Math.min(32, Math.max(11, persistedSettings.editorCodeFontSize))
-                  : (typeof persistedSettings.previewCodeFontSize === 'number' && Number.isFinite(persistedSettings.previewCodeFontSize)
-                    ? Math.min(32, Math.max(11, persistedSettings.previewCodeFontSize))
-                    : legacyContentFontSize)))));
+        const legacyContentFontFamily = resolveFirstValidString(
+          persistedSettings, ['chineseFontFamily', 'englishFontFamily', 'fontFamily'],
+        ) || DEFAULT_EDITOR_FONT_FAMILY;
+        const legacyContentFontSize = clampPersistedNumber(persistedSettings.fontSize, 12, 32, 16);
+        const resolvedSharedFontSize = resolveFirstValidNumber(
+          persistedSettings,
+          ['fontSize', 'editorFontSize', 'previewFontSize', 'codeFontSize', 'editorCodeFontSize', 'previewCodeFontSize'],
+          11, 32, legacyContentFontSize,
+        );
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,

@@ -110,7 +110,7 @@ const TabContextMenu: React.FC<{
   );
 };
 
-export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
+export const TabBar: React.FC<TabBarProps> = React.memo(({ onToggleSidebar }) => {
   const { t } = useI18n();
   void onToggleSidebar;
   const {
@@ -211,4 +211,4 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
       )}
     </div>
   );
-};
+});

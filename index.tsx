@@ -28,7 +28,7 @@ async function bootstrap() {
     // Fallback silently - App mount will retry font registration.
   }
 
-  const root = ReactDOM.createRoot(rootElement);
+  const root = ReactDOM.createRoot(rootElement!);
   root.render(
     <React.StrictMode>
       <App />

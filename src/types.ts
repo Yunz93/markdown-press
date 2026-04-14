@@ -122,7 +122,7 @@ export interface AppSettings {
 
 export interface Notification {
   msg: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
 }
 
 export interface DragDropEvent {

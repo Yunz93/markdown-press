@@ -226,7 +226,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   } = options;
 
   // Initialize markdown renderer
-  useMarkdownRenderer(highlighter, themeMode);
+  useMarkdownRenderer(highlighter ?? null, themeMode);
 
   // Parse markdown content
   const parsedContent = useMemo(() => {

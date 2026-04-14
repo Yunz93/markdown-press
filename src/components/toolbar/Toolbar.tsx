@@ -20,7 +20,7 @@ interface ToolbarProps {
   onExportHtml?: () => void;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({
+export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   fileName,
   viewMode,
   onViewModeChange,
@@ -147,4 +147,4 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
     </div>
   );
-};
+});

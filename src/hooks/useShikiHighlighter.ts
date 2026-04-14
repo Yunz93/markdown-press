@@ -3,7 +3,7 @@ import { extractMarkdownFenceLanguages, SHIKI_CORE_LANGS } from '../utils/shikiL
 import { MARKDOWN_PRESS_SHIKI_THEMES } from '../utils/shikiTheme';
 
 /** Language input type for Shiki loadLanguage */
-type LanguageInput = {
+type LanguageInput = string | {
   name: string;
   displayName?: string;
   [key: string]: unknown;
@@ -42,7 +42,7 @@ async function createShikiHighlighter(): Promise<ShikiHighlighter | null> {
     return {
       codeToHtml: highlighter.codeToHtml.bind(highlighter),
       getLoadedLanguages: highlighter.getLoadedLanguages?.bind(highlighter),
-      loadLanguage: highlighter.loadLanguage?.bind(highlighter),
+      loadLanguage: highlighter.loadLanguage?.bind(highlighter) as ShikiHighlighter['loadLanguage'],
       supportsLanguage: (lang: string) => bundledLanguageIds.has(lang),
     };
   } catch (error) {

@@ -7,28 +7,9 @@ import type { FileNode } from '../types';
 import { localizeKnownError, t } from '../utils/i18n';
 import { DEFAULT_TRASH_FOLDER, sanitizeTrashFolder } from '../utils/trashFolder';
 import { isTauriEnvironment } from '../types/filesystem';
+import { getPathSeparator, joinFsPath, normalizeSlashes, getPathBasename } from '../utils/pathHelpers';
 
 const TRASH_ROOT_MARKER = '__root__';
-function getPathSeparator(path: string): '/' | '\\' {
-  return path.includes('\\') ? '\\' : '/';
-}
-
-function getPathBasename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] || path;
-}
-
-function joinPath(basePath: string, segment: string): string {
-  const sep = getPathSeparator(basePath);
-  if (basePath.endsWith('/') || basePath.endsWith('\\')) {
-    return `${basePath}${segment}`;
-  }
-  return `${basePath}${sep}${segment}`;
-}
-
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '');
-}
 
 function isMarkdownFile(name: string): boolean {
   return /\.(md|markdown)$/i.test(name);
@@ -81,13 +62,13 @@ function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
 }
 
 function hasOpenedKnowledgeBaseBefore(path: string): boolean {
-  const normalizedPath = normalizePath(path);
+  const normalizedPath = normalizeSlashes(path);
   const history = useAppStore.getState().settings.knowledgeBases || [];
-  return history.some((knowledgeBase) => normalizePath(knowledgeBase.path) === normalizedPath);
+  return history.some((knowledgeBase) => normalizeSlashes(knowledgeBase.path) === normalizedPath);
 }
 
 function joinPathSegments(basePath: string, ...segments: string[]): string {
-  return segments.filter(Boolean).reduce((acc, segment) => joinPath(acc, segment), basePath);
+  return segments.filter(Boolean).reduce((acc, segment) => joinFsPath(acc, segment), basePath);
 }
 
 async function registerTauriAllowedPath(path: string, recursive: boolean): Promise<void> {
@@ -122,8 +103,8 @@ async function registerTauriAllowedPathIfExists(path: string, recursive: boolean
 }
 
 function getRelativePathFromRoot(path: string, rootPath: string): string {
-  const normalizedPath = normalizePath(path);
-  const normalizedRoot = normalizePath(rootPath);
+  const normalizedPath = normalizeSlashes(path);
+  const normalizedRoot = normalizeSlashes(rootPath);
   if (normalizedPath === normalizedRoot) return '';
   const withSlash = `${normalizedRoot}/`;
   if (normalizedPath.startsWith(withSlash)) {
@@ -139,8 +120,8 @@ function getParentRelativePath(relativePath: string): string {
 }
 
 function isPathInTrash(path: string, rootPath: string, trashFolder: string): boolean {
-  const normalizedPath = normalizePath(path);
-  const normalizedRoot = normalizePath(rootPath);
+  const normalizedPath = normalizeSlashes(path);
+  const normalizedRoot = normalizeSlashes(rootPath);
   const trashDirName = sanitizeTrashFolder(trashFolder);
   return (
     normalizedPath === `${normalizedRoot}/${trashDirName}` ||
@@ -158,8 +139,8 @@ function parseTrashPathInfo(
   rootPath: string,
   trashFolder: string
 ): { trashDirName: string; containerName: string; originalRelativePath: string } | null {
-  const normalizedPath = normalizePath(path);
-  const normalizedRoot = normalizePath(rootPath);
+  const normalizedPath = normalizeSlashes(path);
+  const normalizedRoot = normalizeSlashes(rootPath);
   const trashDirName = sanitizeTrashFolder(trashFolder);
   const trashPrefix = `${normalizedRoot}/${trashDirName}/`;
   if (!normalizedPath.startsWith(trashPrefix)) return null;
@@ -202,7 +183,7 @@ async function ensureTrashRootDirectory(
   trashRootPath: string;
 }> {
   const trashDirName = sanitizeTrashFolder(trashFolder || DEFAULT_TRASH_FOLDER);
-  const trashRootPath = joinPath(rootPath, trashDirName);
+  const trashRootPath = joinFsPath(rootPath, trashDirName);
   await registerTauriAllowedPath(trashRootPath, true);
   await fs.createDirectory(trashRootPath);
   return {
@@ -364,7 +345,7 @@ export function useFileSystem() {
         console.warn('Failed to register allowed path (continuing):', error);
       }
 
-      const trashRootPath = joinPath(dirPath, sanitizeTrashFolder(settings.trashFolder));
+      const trashRootPath = joinFsPath(dirPath, sanitizeTrashFolder(settings.trashFolder));
       try {
         await withTimeout(
           registerTauriAllowedPathIfExists(trashRootPath, true),
@@ -508,7 +489,7 @@ export function useFileSystem() {
         return null;
       }
 
-      const fullPath = joinPath(basePath, fileName);
+      const fullPath = joinFsPath(basePath, fileName);
       await withErrorHandling(
         () => fs.createFile(fullPath, content),
         'Failed to create file'
@@ -544,7 +525,7 @@ export function useFileSystem() {
         return null;
       }
 
-      const fullPath = joinPath(basePath, folderName);
+      const fullPath = joinFsPath(basePath, folderName);
       await withErrorHandling(
         () => fs.createDirectory(fullPath),
         'Failed to create folder'
@@ -626,7 +607,7 @@ export function useFileSystem() {
       );
 
       if (rootPath && parsedTrashInfo) {
-        const trashContainerPath = joinPath(joinPath(rootPath, parsedTrashInfo.trashDirName), parsedTrashInfo.containerName);
+        const trashContainerPath = joinFsPath(joinFsPath(rootPath, parsedTrashInfo.trashDirName), parsedTrashInfo.containerName);
         const containerChildren = await withErrorHandling(
           () => fs.readDirectory(trashContainerPath),
           'Failed to inspect trash container'
@@ -692,7 +673,7 @@ export function useFileSystem() {
       const relativePath = getRelativePathFromRoot(file.path, rootPath);
       const parentRelativePath = getParentRelativePath(relativePath);
       const containerName = createTrashContainerName(parentRelativePath);
-      const containerPath = joinPath(trashRootPath, containerName);
+      const containerPath = joinFsPath(trashRootPath, containerName);
 
       await withErrorHandling(
         () => fs.createDirectory(containerPath),
@@ -753,7 +734,7 @@ export function useFileSystem() {
         'Failed to prepare restore target'
       );
 
-      const targetPath = joinPath(targetParentPath, getPathBasename(file.path));
+      const targetPath = joinFsPath(targetParentPath, getPathBasename(file.path));
       const targetExists = await withErrorHandling(
         () => fs.fileExists(targetPath),
         'Failed to check restore target'
@@ -768,7 +749,7 @@ export function useFileSystem() {
         'Failed to restore item from trash'
       );
 
-      const trashContainerPath = joinPath(joinPath(rootPath, parsed.trashDirName), parsed.containerName);
+      const trashContainerPath = joinFsPath(joinFsPath(rootPath, parsed.trashDirName), parsed.containerName);
       const containerChildren = await withErrorHandling(
         () => fs.readDirectory(trashContainerPath),
         'Failed to inspect trash container'
@@ -795,8 +776,11 @@ export function useFileSystem() {
   const moveFile = useCallback(async (sourceFile: FileNode, targetFolderPath: string): Promise<string | null> => {
     try {
       const fs = await getFileSystem();
+      if (!fs.moveFile) {
+        throw new Error('File move is not supported in this environment');
+      }
       const newPath = await withErrorHandling(
-        () => fs.moveFile(sourceFile.path, targetFolderPath),
+        () => fs.moveFile!(sourceFile.path, targetFolderPath),
         'Failed to move file'
       );
       return newPath;

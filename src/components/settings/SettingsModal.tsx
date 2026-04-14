@@ -1518,7 +1518,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <input
                                           type="text"
                                           value={formatShortcutForDisplay(editableValue)}
-                                          onChange={(e) => handleShortcutChange(item.settingKey, e.target.value)}
+                                          onChange={(e) => handleShortcutChange(item.settingKey!, e.target.value)}
                                           aria-label={shortcutLabels[item.settingKey] || item.label}
                                           className="w-28 shrink-0 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-2.5 py-1.5 text-center font-mono text-xs uppercase tracking-wide text-gray-700 dark:text-gray-200 outline-none focus:border-accent-DEFAULT"
                                         />

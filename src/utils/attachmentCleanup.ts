@@ -1,6 +1,7 @@
 import type { FileNode } from '../types';
 import { getFileSystem } from '../types/filesystem';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from './attachmentResolver';
+import { joinFsPath, normalizeSlashes, sanitizeResourceFolder } from './pathHelpers';
 import { parseWikiLinkReference } from './wikiLinks';
 
 interface FindUnusedAttachmentsOptions {
@@ -21,30 +22,6 @@ const WIKI_LINK_REGEX = /!?\[\[([^[\]]+)\]\]/g;
 const MARKDOWN_LINK_REGEX = /!?\[[^\]]*]\((<[^>\n]+>|[^)\n]+)\)/g;
 const HTML_ATTACHMENT_REGEX = /<(?:img|audio|video|source|a)\b[^>]+(?:src|href)=["']([^"']+)["']/gi;
 
-function getPathSeparator(path: string): '/' | '\\' {
-  return path.includes('\\') ? '\\' : '/';
-}
-
-function joinFsPath(basePath: string, ...segments: string[]): string {
-  return segments.filter(Boolean).reduce((currentPath, segment) => {
-    const separator = getPathSeparator(currentPath);
-    return currentPath.endsWith(separator)
-      ? `${currentPath}${segment}`
-      : `${currentPath}${separator}${segment}`;
-  }, basePath);
-}
-
-function normalizeSlashes(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '');
-}
-
-function sanitizeResourceFolder(folder: string): string {
-  return folder
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/^\.\//, '');
-}
 
 function flattenFiles(nodes: FileNode[]): FileNode[] {
   return nodes.flatMap((node) => (

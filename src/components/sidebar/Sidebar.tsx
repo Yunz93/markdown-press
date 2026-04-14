@@ -116,7 +116,7 @@ async function writeToClipboard(text: string): Promise<void> {
   }
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar: React.FC<SidebarProps> = React.memo(({
   files,
   activeFileId,
   onFileSelect,
@@ -668,4 +668,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
     </>
   );
-};
+});

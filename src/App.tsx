@@ -572,7 +572,7 @@ const App: React.FC = () => {
         onMoveNode={fileOps.handleMoveNode}
         onMoveToRoot={fileOps.handleMoveToRoot}
         currentKnowledgeBaseName={currentKnowledgeBaseName}
-        currentKnowledgeBasePath={rootFolderPath}
+        currentKnowledgeBasePath={rootFolderPath ?? undefined}
         onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
         isOpen={isSidebarOpen}
         searchFocusRequestKey={sidebarSearchRequestKey}

@@ -126,7 +126,7 @@ export async function persistSecureSetting(key: SensitiveSettingKey, value: stri
 
   const previousWrite = secureWriteQueue.get(key) ?? Promise.resolve();
   const nextWrite = previousWrite
-    .catch(() => {})
+    .catch((e) => console.warn('Previous secure write failed:', e))
     .then(async () => {
       const trimmed = value.trim();
       await invokeSecureSettingsCommand('set_secure_secret', {

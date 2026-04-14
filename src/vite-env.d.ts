@@ -7,11 +7,16 @@ interface ImportMetaEnv {
   readonly DEV: boolean
   readonly PROD: boolean
   readonly MODE: string
-  readonly VITE_GEMINI_API_KEY?: string
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
+}
+
+declare module 'markdown-it-task-lists' {
+  import type MarkdownIt from 'markdown-it';
+  const taskLists: MarkdownIt.PluginSimple;
+  export default taskLists;
 }
 
 declare module '*.css?inline' {
