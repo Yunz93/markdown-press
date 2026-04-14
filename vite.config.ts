@@ -75,7 +75,7 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      // Base path: absolute for production/Tauri (asset:// protocol), relative for web dev
-      base: mode === 'production' ? '/' : './',
+      // Base path: absolute for Tauri builds (custom protocol), relative for web builds
+      base: isTauri ? '/' : './',
     };
 });

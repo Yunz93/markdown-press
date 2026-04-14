@@ -352,11 +352,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
     '--editor-content-bottom': `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
     '--editor-font-family': editorFontFamily,
-    '--editor-font-size': `${settings.editorFontSize}px`,
+    '--editor-font-size': `${settings.fontSize}px`,
     '--editor-code-font-family': codeFontFamily,
-    '--editor-code-font-size': `${settings.codeFontSize}px`,
+    '--editor-code-font-size': `${settings.fontSize}px`,
     '--editor-line-height': String(EDITOR_LINE_HEIGHT),
-  }) as React.CSSProperties, [layoutMetrics, editorFontFamily, settings.editorFontSize, codeFontFamily, settings.codeFontSize]);
+  }) as React.CSSProperties, [layoutMetrics, editorFontFamily, settings.fontSize, codeFontFamily]);
 
   // Hover preview state
   const [hoverPreview, setHoverPreview] = useState<HoverPreviewState | null>(null);

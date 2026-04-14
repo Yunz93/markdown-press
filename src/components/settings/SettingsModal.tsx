@@ -903,16 +903,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="space-y-5">
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_editorFontSize')}</label>
-                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.editorFontSize}px</span>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_fontSize')}</label>
+                        <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.fontSize}px</span>
                       </div>
                       <input
                         type="range"
-                        min="12"
+                        min="11"
                         max="32"
                         step="1"
-                        value={settings.editorFontSize}
-                        onChange={(e) => onUpdateSettings({ editorFontSize: parseInt(e.target.value, 10) })}
+                        value={settings.fontSize}
+                        onChange={(e) => onUpdateSettings({ fontSize: parseInt(e.target.value, 10) })}
                         className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
                       />
                     </div>
@@ -953,17 +953,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_editorFontDesc')}</p>
                         <div
                           className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
-                          style={{ fontFamily: getResolvedEditorFontFamily(settings), fontSize: `${settings.editorFontSize}px` }}
+                          style={{ fontFamily: getResolvedEditorFontFamily(settings), fontSize: `${settings.fontSize}px` }}
                         >
                           {t('settings_editorFontPreview')}
                         </div>
                       </div>
 
                       <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_previewFont')}</label>
-                          <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.previewFontSize}px</span>
-                        </div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_previewFont')}</label>
                         <select
                           value={currentPreviewFontValue}
                           onChange={(e) => onUpdateSettings({ previewFontFamily: e.target.value })}
@@ -975,29 +972,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </option>
                           ))}
                         </select>
-                        <input
-                          type="range"
-                          min="12"
-                          max="32"
-                          step="1"
-                          value={settings.previewFontSize}
-                          onChange={(e) => onUpdateSettings({ previewFontSize: parseInt(e.target.value, 10) })}
-                          className="mt-3 w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
-                        />
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_previewFontDesc')}</p>
                         <div
                           className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
-                          style={{ fontFamily: getResolvedPreviewFontFamily(settings), fontSize: `${settings.previewFontSize}px` }}
+                          style={{ fontFamily: getResolvedPreviewFontFamily(settings), fontSize: `${settings.fontSize}px` }}
                         >
                           {t('settings_previewFontPreview')}
                         </div>
                       </div>
 
                       <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_codeFont')}</label>
-                          <span className="text-xs font-mono bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md">{settings.codeFontSize}px</span>
-                        </div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_codeFont')}</label>
                         <select
                           value={currentCodeFontValue}
                           onChange={(e) => onUpdateSettings({ codeFontFamily: e.target.value })}
@@ -1009,19 +994,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </option>
                           ))}
                         </select>
-                        <input
-                          type="range"
-                          min="11"
-                          max="28"
-                          step="1"
-                          value={settings.codeFontSize}
-                          onChange={(e) => onUpdateSettings({ codeFontSize: parseInt(e.target.value, 10) })}
-                          className="mt-3 w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white"
-                        />
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_codeFontDesc')}</p>
                         <div
                           className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
-                          style={{ fontFamily: getResolvedCodeFontFamily(settings), fontSize: `${settings.codeFontSize}px` }}
+                          style={{ fontFamily: getResolvedCodeFontFamily(settings), fontSize: `${settings.fontSize}px` }}
                         >
                           {t('settings_codeFontPreview')}
                         </div>

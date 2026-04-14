@@ -50,8 +50,8 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
           fontFamily: previewFontFamily,
           codeFontFamily,
           fontSettings: settings,
-          fontSize: settings.previewFontSize,
-          codeFontSize: settings.codeFontSize,
+          fontSize: settings.fontSize,
+          codeFontSize: settings.fontSize,
         });
         const saved = await downloadHtml(html, filename, activeFile?.path);
         if (saved) {
@@ -72,7 +72,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
       setFormat(null);
       onClose?.();
     }
-  }, [content, activeFile, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.previewFontSize, settings.codeFontSize, showNotification]);
+  }, [content, activeFile, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.fontSize, showNotification]);
 
   const fileName = activeFile?.name?.replace('.md', '') || 'document';
 

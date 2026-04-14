@@ -130,8 +130,8 @@ export function useExportActions(
         fontFamily: previewFontFamily,
         codeFontFamily,
         fontSettings: settings,
-        fontSize: settings.previewFontSize,
-        codeFontSize: settings.codeFontSize,
+        fontSize: settings.fontSize,
+        codeFontSize: settings.fontSize,
         includeProperties: false,
         highlighter,
       });
@@ -143,7 +143,7 @@ export function useExportActions(
       console.error('Failed to export HTML:', error);
       showNotification(t(settings.language, 'notifications_exportHtmlFailed'), 'error');
     }
-  }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.previewFontSize, settings.codeFontSize, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
 
   const handlePublishBlog = useCallback(async () => {
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();

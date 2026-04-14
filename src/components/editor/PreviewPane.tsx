@@ -159,10 +159,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     '--pane-content-bottom': `${layoutMetrics.contentPaddingBottom}px`,
     '--preview-content-bottom': `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
     '--preview-font-family': previewFontFamily,
-    '--preview-font-size': `${settings.previewFontSize}px`,
+    '--preview-font-size': `${settings.fontSize}px`,
     '--preview-code-font-family': codeFontFamily,
-    '--preview-code-font-size': `${settings.codeFontSize}px`,
-  }) as React.CSSProperties, [layoutMetrics, previewFontFamily, settings.previewFontSize, codeFontFamily, settings.codeFontSize]);
+    '--preview-code-font-size': `${settings.fontSize}px`,
+  }) as React.CSSProperties, [layoutMetrics, previewFontFamily, settings.fontSize, codeFontFamily]);
 
   // Optimized pane resize tracking
   useLayoutEffect(() => {

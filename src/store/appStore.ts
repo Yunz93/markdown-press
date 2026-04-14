@@ -188,6 +188,19 @@ export const useAppStore = create<AppState>()(
         const legacyContentFontSize = typeof persistedSettings.fontSize === 'number' && Number.isFinite(persistedSettings.fontSize)
           ? Math.min(32, Math.max(12, persistedSettings.fontSize))
           : 16;
+        const resolvedSharedFontSize = typeof persistedSettings.fontSize === 'number' && Number.isFinite(persistedSettings.fontSize)
+          ? Math.min(32, Math.max(11, persistedSettings.fontSize))
+          : (typeof persistedSettings.editorFontSize === 'number' && Number.isFinite(persistedSettings.editorFontSize)
+            ? Math.min(32, Math.max(11, persistedSettings.editorFontSize))
+            : (typeof persistedSettings.previewFontSize === 'number' && Number.isFinite(persistedSettings.previewFontSize)
+              ? Math.min(32, Math.max(11, persistedSettings.previewFontSize))
+              : (typeof persistedSettings.codeFontSize === 'number' && Number.isFinite(persistedSettings.codeFontSize)
+                ? Math.min(32, Math.max(11, persistedSettings.codeFontSize))
+                : (typeof persistedSettings.editorCodeFontSize === 'number' && Number.isFinite(persistedSettings.editorCodeFontSize)
+                  ? Math.min(32, Math.max(11, persistedSettings.editorCodeFontSize))
+                  : (typeof persistedSettings.previewCodeFontSize === 'number' && Number.isFinite(persistedSettings.previewCodeFontSize)
+                    ? Math.min(32, Math.max(11, persistedSettings.previewCodeFontSize))
+                    : legacyContentFontSize)))));
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
@@ -202,25 +215,13 @@ export const useAppStore = create<AppState>()(
           editorFontFamily: typeof persistedSettings.editorFontFamily === 'string' && persistedSettings.editorFontFamily.trim()
             ? normalizeStoredEditorFontFamily(persistedSettings.editorFontFamily)
             : normalizeStoredEditorFontFamily(legacyContentFontFamily),
-          editorFontSize: typeof persistedSettings.editorFontSize === 'number' && Number.isFinite(persistedSettings.editorFontSize)
-            ? Math.min(32, Math.max(12, persistedSettings.editorFontSize))
-            : legacyContentFontSize,
           previewFontFamily: typeof persistedSettings.previewFontFamily === 'string' && persistedSettings.previewFontFamily.trim()
             ? normalizeStoredPreviewFontFamily(persistedSettings.previewFontFamily)
             : normalizeStoredPreviewFontFamily(legacyContentFontFamily || DEFAULT_PREVIEW_FONT_FAMILY),
-          previewFontSize: typeof persistedSettings.previewFontSize === 'number' && Number.isFinite(persistedSettings.previewFontSize)
-            ? Math.min(32, Math.max(12, persistedSettings.previewFontSize))
-            : legacyContentFontSize,
           codeFontFamily: typeof persistedSettings.codeFontFamily === 'string' && persistedSettings.codeFontFamily.trim()
             ? normalizeStoredCodeFontFamily(persistedSettings.codeFontFamily)
             : DEFAULT_CODE_FONT_FAMILY,
-          codeFontSize: typeof persistedSettings.codeFontSize === 'number' && Number.isFinite(persistedSettings.codeFontSize)
-            ? Math.min(28, Math.max(11, persistedSettings.codeFontSize))
-            : (typeof persistedSettings.editorCodeFontSize === 'number' && Number.isFinite(persistedSettings.editorCodeFontSize)
-              ? Math.min(28, Math.max(11, persistedSettings.editorCodeFontSize))
-              : (typeof persistedSettings.previewCodeFontSize === 'number' && Number.isFinite(persistedSettings.previewCodeFontSize)
-                ? Math.min(28, Math.max(11, persistedSettings.previewCodeFontSize))
-                : Math.max(11, legacyContentFontSize - 1))),
+          fontSize: resolvedSharedFontSize,
           ...resolvedAISettings,
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),

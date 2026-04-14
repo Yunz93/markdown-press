@@ -93,11 +93,9 @@ export interface AppSettings {
   uiFontFamily: string;
   uiFontSize: number;
   editorFontFamily: string;
-  editorFontSize: number;
   previewFontFamily: string;
-  previewFontSize: number;
   codeFontFamily: string;
-  codeFontSize: number;
+  fontSize: number;
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;
   resourceFolder: string;

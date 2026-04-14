@@ -25,8 +25,8 @@ export function useSettings() {
     });
   }, [updateSettings]);
 
-  const updateEditorFontSize = useCallback((editorFontSize: number) => {
-    updateSettings({ editorFontSize });
+  const updateFontSize = useCallback((fontSize: number) => {
+    updateSettings({ fontSize });
   }, [updateSettings]);
 
   const toggleWordWrap = useCallback(() => {
@@ -93,7 +93,7 @@ export function useSettings() {
     openSettings,
     closeSettings,
     toggleTheme,
-    updateEditorFontSize,
+    updateFontSize,
     toggleWordWrap,
     updateEditorFontFamily,
     updatePreviewFontFamily,

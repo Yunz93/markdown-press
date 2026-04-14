@@ -1,6 +1,8 @@
 import type { AppSettings } from '../types';
-import lxgwWenKaiAssetUrl from '../assets/fonts/LXGWWenKai-Regular.ttf?url';
-import tsangerJinKaiAssetUrl from '../assets/fonts/TsangerJinKai02-W04.ttf?url';
+import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
+
+const lxgwWenKaiAssetUrl = new URL('../assets/fonts/LXGWWenKai-Regular.ttf', import.meta.url).href;
+const tsangerJinKaiAssetUrl = new URL('../assets/fonts/TsangerJinKai02-W04.ttf', import.meta.url).href;
 
 const DYNAMIC_FONT_STYLE_ID = 'markdown-press-dynamic-font-faces';
 const PRESET_PREFIX = 'preset:';
@@ -88,9 +90,11 @@ function resolveAssetUrl(assetUrl: string): string {
     return assetUrl;
   }
 
-  return assetUrl.startsWith('http') || assetUrl.startsWith('/')
-    ? assetUrl
-    : new URL(assetUrl, window.location.href).href;
+  if (assetUrl.startsWith('http')) {
+    return assetUrl;
+  }
+
+  return new URL(assetUrl, window.location.href).href;
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -192,15 +196,15 @@ function buildPresetFontFaceCss(
   assetUrl: string,
 ): string {
   const resolvedUrl = resolveAssetUrl(assetUrl);
-  return [preset.fontFaceFamily, ...preset.familyNames].map((familyName) => `
+  return `
 @font-face {
-  font-family: "${escapeFontName(familyName)}";
+  font-family: "${escapeFontName(preset.fontFaceFamily)}";
   src: url("${resolvedUrl}") format("truetype");
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
   font-display: swap;
 }
-`.trim()).join('\n\n');
+`.trim();
 }
 
 export function normalizeStoredUiFontFamily(value: string | undefined): string {
@@ -308,8 +312,13 @@ export async function getBundledPresetDataUrl(presetId: string): Promise<string 
 export async function getBundledPresetDataUrlOverrides(settings: FontSettings): Promise<Record<string, string>> {
   const overrides = await Promise.all(
     collectUsedPresetIds(settings).map(async (presetId) => {
-      const dataUrl = await getBundledPresetDataUrl(presetId);
-      return dataUrl ? [presetId, dataUrl] as const : null;
+      try {
+        const dataUrl = await getBundledPresetDataUrl(presetId);
+        return dataUrl ? [presetId, dataUrl] as const : null;
+      } catch (error) {
+        console.warn(`Failed to inline preset font ${presetId}:`, error);
+        return null;
+      }
     })
   );
 
@@ -332,13 +341,72 @@ export function buildDynamicFontFaceCss(
     .join('\n\n');
 }
 
+async function loadFontViaFontFaceApi(preset: BundledFontPreset): Promise<void> {
+  if (!document.fonts) return;
+
+  const resolvedUrl = resolveAssetUrl(preset.assetUrl);
+  const existing = Array.from(document.fonts).find(
+    (f) => f.family === preset.fontFaceFamily
+  );
+  if (existing?.status === 'loaded') return;
+
+  const response = await fetch(resolvedUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch font ${preset.fontFaceFamily}: ${response.status}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  const face = new FontFace(preset.fontFaceFamily, buffer, {
+    style: 'normal',
+    weight: '400',
+    display: 'swap',
+  });
+  await face.load();
+  document.fonts.add(face);
+}
+
 export async function ensureDynamicFontFaces(settings: FontSettings): Promise<void> {
   if (typeof document === 'undefined') return;
 
-  const overrides = await getBundledPresetDataUrlOverrides(settings);
-  const css = buildDynamicFontFaceCss(settings, overrides);
-  let styleElement = document.getElementById(DYNAMIC_FONT_STYLE_ID) as HTMLStyleElement | null;
+  if (__PROD__) {
+    try {
+      await waitForTauri(800);
+    } catch {
+      // ignore - continue with best-effort environment detection
+    }
+  }
 
+  const useTauriFontFaceApi = isTauriEnvironment();
+  const usedPresetIds = collectUsedPresetIds(settings);
+
+  if (useTauriFontFaceApi) {
+    // WKWebView cannot load fonts from tauri:// in CSS @font-face src: url().
+    // Bypass the CSS resource loader by fetching the font binary via JS and
+    // registering it directly through the FontFace API.
+    const results = await Promise.allSettled(
+      usedPresetIds.map((presetId) => {
+        const preset = presetById.get(presetId);
+        if (!preset) return Promise.resolve();
+        return loadFontViaFontFaceApi(preset);
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.warn('[fontSettings] FontFace API load failed:', result.reason);
+      }
+    }
+  }
+
+  // Inject @font-face CSS. In Tauri the font data is already loaded via
+  // FontFace API above, so the CSS declaration just makes the family name
+  // available in the cascade (the src: url() won't actually be needed).
+  // In web builds, the CSS src: url() (with data: overrides) is the primary
+  // loading mechanism.
+  const overrides = useTauriFontFaceApi ? {} : await getBundledPresetDataUrlOverrides(settings);
+  const css = buildDynamicFontFaceCss(settings, overrides);
+
+  let styleElement = document.getElementById(DYNAMIC_FONT_STYLE_ID) as HTMLStyleElement | null;
   if (!styleElement) {
     styleElement = document.createElement('style');
     styleElement.id = DYNAMIC_FONT_STYLE_ID;
@@ -349,16 +417,13 @@ export async function ensureDynamicFontFaces(settings: FontSettings): Promise<vo
     styleElement.textContent = css;
   }
 
-  if (!css || !document.fonts) {
-    return;
+  if (!useTauriFontFaceApi && css && document.fonts) {
+    const loadTargets = usedPresetIds
+      .map((presetId) => presetById.get(presetId)?.fontFaceFamily)
+      .filter((name): name is string => Boolean(name))
+      .map((name) => document.fonts.load(`1em "${name}"`, 'Aa测'));
+    await Promise.all(loadTargets);
   }
-
-  const loadTargets = collectUsedPresetIds(settings)
-    .map((presetId) => presetById.get(presetId)?.fontFaceFamily)
-    .filter((familyName): familyName is string => Boolean(familyName))
-    .map((familyName) => document.fonts.load(`1em "${familyName}"`, 'Aa测'));
-
-  await Promise.all(loadTargets);
 }
 
 export function buildPreviewExportFontFamily(settings: Pick<AppSettings, 'previewFontFamily'>): string {
