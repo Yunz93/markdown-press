@@ -69,7 +69,7 @@ export interface ShortcutConfig {
   newFolder: string;
   closeTab: string;
   openKnowledgeBase: string;
-  exportHtml: string;
+  exportPdf: string;
 }
 
 export interface MetadataField {

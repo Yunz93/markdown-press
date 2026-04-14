@@ -161,7 +161,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     '--preview-font-family': previewFontFamily,
     '--preview-font-size': `${settings.fontSize}px`,
     '--preview-code-font-family': codeFontFamily,
-    '--preview-code-font-size': `${settings.fontSize}px`,
+    '--preview-code-font-size': `${Math.max(12, settings.fontSize - 2)}px`,
   }) as React.CSSProperties, [layoutMetrics, previewFontFamily, settings.fontSize, codeFontFamily]);
 
   // Optimized pane resize tracking

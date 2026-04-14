@@ -133,6 +133,7 @@ export function useShikiHighlighter(markdownContent = '') {
       codeToHtml: highlighterInstance.codeToHtml.bind(highlighterInstance),
       getLoadedLanguages: highlighterInstance.getLoadedLanguages?.bind(highlighterInstance),
       loadLanguage: highlighterInstance.loadLanguage?.bind(highlighterInstance),
+      supportsLanguage: highlighterInstance.supportsLanguage?.bind(highlighterInstance),
       __revision: highlighterRevision,
     };
   }, [highlighterInstance, highlighterRevision]);

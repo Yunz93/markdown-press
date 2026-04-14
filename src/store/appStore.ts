@@ -169,7 +169,7 @@ function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
     toggleSidebar: ['Ctrl+B'],
     toggleTheme: ['Ctrl+T'],
     openKnowledgeBase: ['Ctrl+Shift+O'],
-    exportHtml: ['Ctrl+Shift+E'],
+    exportPdf: ['Ctrl+Shift+E'],
   };
 
   (Object.keys(defaultShortcutMigrations) as Array<keyof typeof mergedShortcuts>).forEach((key) => {

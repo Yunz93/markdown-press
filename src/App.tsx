@@ -144,7 +144,7 @@ const App: React.FC = () => {
   }, [settings.uiFontFamily, settings.editorFontFamily, settings.previewFontFamily, settings.codeFontFamily]);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
-  const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
+  const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave, highlighter);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
@@ -333,7 +333,7 @@ const App: React.FC = () => {
         }
       },
       onOpenKnowledgeBase: () => { void handleSwitchKnowledgeBase(); },
-      onExportHtml: () => { void handleExportToHtml(); },
+      onExportPdf: () => { void handleExportToPdf(); },
     }
   );
 
@@ -485,6 +485,7 @@ const App: React.FC = () => {
   const currentKnowledgeBaseName = useMemo(() => getPathBasename(rootFolderPath), [rootFolderPath]);
   const uiFontFamily = useMemo(() => getResolvedUiFontFamily(settings), [settings.uiFontFamily]);
   const uiScaleStyle = useMemo(() => ({
+    '--ui-font-size': `${settings.uiFontSize}px`,
     '--ui-font-scale': `${settings.uiFontSize / defaultSettings.uiFontSize}`,
   }) as React.CSSProperties, [settings.uiFontSize]);
   // Show onboarding when no knowledge base is open
@@ -599,7 +600,7 @@ const App: React.FC = () => {
           onToggleTheme={toggleTheme}
           themeMode={settings.themeMode}
           onPublishBlog={handlePublishBlog}
-          onExportHtml={handleExportToHtml}
+          onExportPdf={handleExportToPdf}
         />
 
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />

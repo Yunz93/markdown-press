@@ -23,13 +23,16 @@ export function isAbortLikeError(error: unknown): boolean {
   return error.name === 'AbortError' || error.message.toLowerCase().includes('aborted');
 }
 
+/**
+ * Returns the saved file path on success (Tauri), empty string for browser saves, or null if cancelled.
+ */
 export async function saveExportFile({
   content,
   filename,
   defaultExtension,
   mimeType,
   description,
-}: SaveExportOptions): Promise<boolean> {
+}: SaveExportOptions): Promise<string | null> {
   const suggestedName = ensureFileExtension(filename, defaultExtension);
 
   if (isTauriEnvironment()) {
@@ -44,16 +47,16 @@ export async function saveExportFile({
     });
 
     if (!targetPath) {
-      return false;
+      return null;
     }
 
     if (typeof content === 'string') {
       await writeTextFile(targetPath, content);
-      return true;
+      return targetPath;
     }
 
     await writeFile(targetPath, content);
-    return true;
+    return targetPath;
   }
 
   if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
@@ -77,10 +80,10 @@ export async function saveExportFile({
       const writable = await handle.createWritable();
       await writable.write(content);
       await writable.close();
-      return true;
+      return '';
     } catch (error) {
       if (isAbortLikeError(error)) {
-        return false;
+        return null;
       }
 
       throw error;
@@ -96,5 +99,5 @@ export async function saveExportFile({
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  return true;
+  return '';
 }

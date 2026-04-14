@@ -49,36 +49,37 @@ body {
 }
 
 :root {
+  --ui-font-size: 18px;
   --ui-font-scale: 1;
 }
 
 .ui-scaled {
-  font-size: calc(1rem * var(--ui-font-scale));
+  font-size: var(--ui-font-size);
 }
 
 .ui-scaled.text-xs,
 .ui-scaled .text-xs {
-  font-size: calc(0.75rem * var(--ui-font-scale));
+  font-size: calc(var(--ui-font-size) * 0.75);
 }
 
 .ui-scaled.text-sm,
 .ui-scaled .text-sm {
-  font-size: calc(0.875rem * var(--ui-font-scale));
+  font-size: calc(var(--ui-font-size) * 0.875);
 }
 
 .ui-scaled.text-base,
 .ui-scaled .text-base {
-  font-size: calc(1rem * var(--ui-font-scale));
+  font-size: var(--ui-font-size);
 }
 
 .ui-scaled.text-lg,
 .ui-scaled .text-lg {
-  font-size: calc(1.125rem * var(--ui-font-scale));
+  font-size: calc(var(--ui-font-size) * 1.125);
 }
 
 .ui-scaled.text-xl,
 .ui-scaled .text-xl {
-  font-size: calc(1.25rem * var(--ui-font-scale));
+  font-size: calc(var(--ui-font-size) * 1.25);
 }
 
 .ui-scaled .text-\[10px\] {
@@ -1428,6 +1429,8 @@ html[data-app-booting="true"] *::after {
   border-radius: 0;
   white-space: pre;
   overflow-x: auto;
+  font-family: var(--preview-code-font-family);
+  font-size: var(--preview-code-font-size);
 }
 
 .preview-pane-document.markdown-body pre.shiki {
@@ -1443,6 +1446,8 @@ html[data-app-booting="true"] *::after {
   padding: 0;
   color: inherit;
   background: transparent !important;
+  font-family: var(--preview-code-font-family);
+  font-size: var(--preview-code-font-size);
 }
 
 .preview-pane-document.markdown-body pre.shiki .line {

@@ -59,7 +59,7 @@ export async function exportToHtml(
   return html;
 }
 
-export async function downloadHtml(htmlContent: string, filename: string, sourceFilePath?: string): Promise<boolean> {
+export async function downloadHtml(htmlContent: string, filename: string, sourceFilePath?: string): Promise<string | null> {
   return saveExportFile({
     content: await prepareHtmlForDownload(htmlContent, sourceFilePath),
     filename,

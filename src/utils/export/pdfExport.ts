@@ -3,7 +3,7 @@ import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import { saveExportFile } from './core';
 import { prepareExportImages, waitForImages, waitForNextPaint } from './images';
 
-export async function exportToPdf(htmlContent: string, filename: string, sourceFilePath?: string): Promise<boolean> {
+export async function exportToPdf(htmlContent: string, filename: string, sourceFilePath?: string): Promise<string | null> {
   const { default: html2pdf } = await import('html2pdf.js');
   type Html2PdfWorker = InstanceType<typeof html2pdf.Worker>;
   type Html2PdfSetOptions = Parameters<Html2PdfWorker['set']>[0];

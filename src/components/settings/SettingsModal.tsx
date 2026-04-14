@@ -154,7 +154,7 @@ function getShortcutLabels(t: (key: TranslationKey, params?: Record<string, stri
     newFolder: t('settings_newFolder'),
     closeTab: t('settings_closeTab'),
     openKnowledgeBase: t('settings_openKnowledgeBase'),
-    exportHtml: t('settings_exportHtml'),
+    exportPdf: t('settings_exportPdf'),
   };
 }
 
@@ -326,11 +326,11 @@ function getShortcutGroups(t: (key: TranslationKey, params?: Record<string, stri
         shortcuts: ['Escape'],
       },
       {
-        id: 'exportHtml',
-        label: t('settings_exportHtml'),
-        description: t('settings_exportHtmlDesc'),
+        id: 'exportPdf',
+        label: t('settings_exportPdf'),
+        description: t('settings_exportPdfDesc'),
         editable: true,
-        settingKey: 'exportHtml',
+        settingKey: 'exportPdf',
       },
       {
         id: 'cleanupUnusedAttachments',

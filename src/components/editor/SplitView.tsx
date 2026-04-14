@@ -9,6 +9,10 @@ import type { PaneDensity } from './paneLayout';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 
+const PANE_TRANSITION_MS = 200;
+const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+const DIVIDER_TRANSITION = `left ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), opacity 120ms ease, transform ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+
 interface SplitViewProps {
   highlighter?: ShikiHighlighter | null;
   onContentChange?: (content: string) => void;
@@ -32,8 +36,6 @@ export const SplitView: React.FC<SplitViewProps> = ({
 }) => {
   const { t } = useI18n();
   const MIN_SPLIT_PANE_WIDTH = 360;
-  const PANE_TRANSITION = 'width 280ms cubic-bezier(0.22, 1, 0.36, 1)';
-  const DIVIDER_TRANSITION = 'left 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)';
   const { viewMode } = useAppStore();
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
@@ -41,11 +43,13 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorPaneRef = useRef<EditorPaneHandle | null>(null);
   const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
+  const editorWrapperRef = useRef<HTMLDivElement | null>(null);
   const previousViewModeRef = useRef(viewMode);
   const [visualMode, setVisualMode] = useState<ViewMode>(viewMode);
   const editorScrollPercentageRef = useRef(0);
   const previewScrollPercentageRef = useRef(0);
   const transitionResyncTimerRef = useRef<number | null>(null);
+  const transitionCleanupRef = useRef<(() => void) | null>(null);
   const scrollPositionsRef = useRef<Record<string, {
     editor: number;
     preview: number;
@@ -131,11 +135,19 @@ export const SplitView: React.FC<SplitViewProps> = ({
     previewScrollPercentageRef.current = percentage;
   }, []);
 
-  const syncVisiblePanesToAnchor = useCallback((anchorPercentage: number) => {
+  const cleanupTransition = useCallback(() => {
+    if (transitionCleanupRef.current) {
+      transitionCleanupRef.current();
+      transitionCleanupRef.current = null;
+    }
     if (transitionResyncTimerRef.current !== null) {
       window.clearTimeout(transitionResyncTimerRef.current);
       transitionResyncTimerRef.current = null;
     }
+  }, []);
+
+  const syncVisiblePanesToAnchor = useCallback((anchorPercentage: number) => {
+    cleanupTransition();
 
     if (viewMode !== ViewMode.PREVIEW) {
       editorPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
@@ -145,18 +157,37 @@ export const SplitView: React.FC<SplitViewProps> = ({
       previewPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
     }
 
-    transitionResyncTimerRef.current = window.setTimeout(() => {
-      transitionResyncTimerRef.current = null;
-
+    const resyncAfterTransition = () => {
+      transitionCleanupRef.current = null;
       if (viewMode !== ViewMode.PREVIEW) {
         editorPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
       }
-
       if (viewMode !== ViewMode.EDITOR) {
         previewPaneRef.current?.syncScrollTo(anchorPercentage, { immediate: true });
       }
-    }, 320);
-  }, [viewMode]);
+    };
+
+    const wrapper = editorWrapperRef.current;
+    if (wrapper) {
+      const onTransitionEnd = (e: TransitionEvent) => {
+        if (e.propertyName !== 'width') return;
+        wrapper.removeEventListener('transitionend', onTransitionEnd);
+        if (transitionResyncTimerRef.current !== null) {
+          window.clearTimeout(transitionResyncTimerRef.current);
+          transitionResyncTimerRef.current = null;
+        }
+        resyncAfterTransition();
+      };
+      wrapper.addEventListener('transitionend', onTransitionEnd);
+      transitionCleanupRef.current = () => wrapper.removeEventListener('transitionend', onTransitionEnd);
+    }
+
+    transitionResyncTimerRef.current = window.setTimeout(() => {
+      transitionResyncTimerRef.current = null;
+      cleanupTransition();
+      resyncAfterTransition();
+    }, PANE_TRANSITION_MS + 50);
+  }, [viewMode, cleanupTransition]);
 
   const saveActiveTabScrollState = useCallback((tabId: string | null) => {
     if (!tabId) return;
@@ -169,12 +200,13 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
   useEffect(() => {
     return () => {
+      cleanupTransition();
       if (transitionResyncTimerRef.current !== null) {
         window.clearTimeout(transitionResyncTimerRef.current);
       }
       saveActiveTabScrollState(activeTabId);
     };
-  }, [activeTabId, saveActiveTabScrollState]);
+  }, [activeTabId, saveActiveTabScrollState, cleanupTransition]);
 
   useEffect(() => {
     if (!activeTabId) return;
@@ -200,7 +232,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
     };
   }, [activeTabId, syncVisiblePanesToAnchor]);
 
-  // Handle view mode changes
+  // Handle view mode changes — always anchor on the editor position
   useEffect(() => {
     const previousViewMode = previousViewModeRef.current;
     previousViewModeRef.current = viewMode;
@@ -208,11 +240,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
     setVisualMode(viewMode);
     if (previousViewMode === viewMode) return;
 
-    const anchorPercentage = previousViewMode === ViewMode.PREVIEW
-      ? previewScrollPercentageRef.current
-      : editorScrollPercentageRef.current;
+    const anchorPercentage = editorScrollPercentageRef.current;
 
-    editorScrollPercentageRef.current = anchorPercentage;
     previewScrollPercentageRef.current = anchorPercentage;
     syncVisiblePanesToAnchor(anchorPercentage);
   }, [syncVisiblePanesToAnchor, viewMode]);
@@ -228,7 +257,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
     width: `${editorWidth}%`,
     opacity: editorActive ? 1 : 0,
     pointerEvents: editorActive ? 'auto' : 'none',
-    transition: isResizing ? 'none' : `${PANE_TRANSITION}, opacity 180ms ease`,
+    transition: isResizing ? 'none' : `${PANE_TRANSITION}, opacity 120ms ease`,
     willChange: isResizing ? 'auto' : 'width, opacity',
   };
 
@@ -236,7 +265,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
     width: `${previewWidth}%`,
     opacity: previewActive ? 1 : 0,
     pointerEvents: previewActive ? 'auto' : 'none',
-    transition: isResizing ? 'none' : `${PANE_TRANSITION}, opacity 180ms ease`,
+    transition: isResizing ? 'none' : `${PANE_TRANSITION}, opacity 120ms ease`,
     willChange: isResizing ? 'auto' : 'width, opacity',
   };
 
@@ -248,6 +277,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
         style={{ pointerEvents: isResizing ? 'none' : 'auto' }}
       >
         <div
+          ref={editorWrapperRef}
           aria-hidden={!editorActive}
           className="h-full min-w-0 overflow-hidden flex flex-col relative"
           style={editorPaneStyle}

@@ -99,7 +99,7 @@ export const defaultSettings: AppSettings = {
     newFolder: `${primaryShortcutModifier}+Shift+N`,
     closeTab: `${primaryShortcutModifier}+W`,
     openKnowledgeBase: 'Cmd+Shift+K',
-    exportHtml: 'Cmd+Shift+H',
+    exportPdf: 'Cmd+Shift+H',
   },
   knowledgeBases: [],
   lastKnowledgeBasePath: '',
