@@ -5,6 +5,9 @@ import { ensureDynamicFontFaces, getInitialFontSettingsFromLocalStorage } from '
 import 'github-markdown-css/github-markdown.css';
 import 'katex/dist/katex.min.css';
 import './index.css';
+import './src/styles/editor.css';
+import './src/styles/preview.css';
+import './src/styles/components.css';
 
 // Ensure process.env exists for some libraries
 if (typeof window !== 'undefined' && !window.process) {

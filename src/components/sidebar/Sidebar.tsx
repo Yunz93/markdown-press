@@ -18,11 +18,8 @@ import {
   MAX_SIDEBAR_WIDTH,
 } from './hooks';
 
-import {
-  PromptDialog,
-  ConfirmDialog,
-  ContextMenu,
-} from './components';
+import { ContextMenu } from './components';
+import { ConfirmDialog, PromptDialog } from '../ui/Dialog';
 
 import {
   getTrashItems,
@@ -606,47 +603,43 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         />
       )}
 
-      {/* New File Dialog */}
       <PromptDialog
         isOpen={dialogState.type === 'newFile'}
         title={t('sidebar_newFileTitle')}
         label={t('app_fileName')}
         defaultValue={dialogState.defaultValue || t('app_untitled')}
-        onConfirm={(value) =>
+        onSubmit={(value) =>
           handleNewFileConfirm(
             dialogState.file?.type === 'folder' ? dialogState.file : undefined,
             value
           )
         }
-        onCancel={closeDialog}
+        onClose={closeDialog}
       />
 
-      {/* Rename Dialog */}
       <PromptDialog
         isOpen={dialogState.type === 'rename'}
         title={t('sidebar_renameTitle')}
         label={t('sidebar_newName')}
         defaultValue={dialogState.defaultValue || ''}
-        onConfirm={(value) => handleRenameConfirm(dialogState.file, value)}
-        onCancel={closeDialog}
+        onSubmit={(value) => handleRenameConfirm(dialogState.file, value)}
+        onClose={closeDialog}
       />
 
-      {/* New Folder Dialog */}
       <PromptDialog
         isOpen={dialogState.type === 'newFolder'}
         title={t('sidebar_newFolderTitle')}
         label={t('sidebar_folderName')}
         defaultValue=""
-        onConfirm={(value) =>
+        onSubmit={(value) =>
           handleNewFolderConfirm(
             dialogState.file?.type === 'folder' ? dialogState.file : undefined,
             value
           )
         }
-        onCancel={closeDialog}
+        onClose={closeDialog}
       />
 
-      {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={dialogState.type === 'delete'}
         title={t('sidebar_deleteItemTitle')}
@@ -654,7 +647,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         confirmText={t('common_delete')}
         variant="danger"
         onConfirm={() => handleDeleteConfirm(dialogState.file)}
-        onCancel={closeDialog}
+        onClose={closeDialog}
       />
 
       <ConfirmDialog
@@ -664,7 +657,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         confirmText={t('context_emptyTrash')}
         variant="danger"
         onConfirm={() => handleEmptyTrashConfirm(trashItems)}
-        onCancel={closeDialog}
+        onClose={closeDialog}
       />
     </>
   );

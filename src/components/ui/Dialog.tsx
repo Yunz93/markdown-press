@@ -65,7 +65,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
   const content = (
     <div
-      className="ui-scaled fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="ui-scaled fixed inset-0 z-[200] flex items-center justify-center p-4"
       style={{ '--ui-font-scale': `${uiFontScale}` } as React.CSSProperties}
       onClick={handleBackdropClick}
     >
@@ -97,7 +97,7 @@ export const Dialog: React.FC<DialogProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label="关闭对话框"
+              aria-label="Close dialog"
             >
               <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />

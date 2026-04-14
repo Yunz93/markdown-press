@@ -2,7 +2,7 @@
  * Performance utilities for optimizing UI rendering and large file handling
  */
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 // Constants for large file handling
 export const LARGE_FILE_THRESHOLDS = {
@@ -275,60 +275,6 @@ export async function processInBatches<T, R>(
   }
 
   return results;
-}
-
-/**
- * Incremental content loader for large files
- */
-export function useIncrementalContent(
-  content: string,
-  chunkSize: number = LARGE_FILE_THRESHOLDS.RENDER_CHUNK_SIZE
-) {
-  const [visibleContent, setVisibleContent] = useState(content);
-  const [isLoading, setIsLoading] = useState(false);
-  const metricsRef = useRef(getFileMetrics(content));
-
-  useEffect(() => {
-    const metrics = getFileMetrics(content);
-    metricsRef.current = metrics;
-
-    if (!metrics.isLarge) {
-      setVisibleContent(content);
-      return;
-    }
-
-    // For large files, load incrementally
-    setIsLoading(true);
-    const lines = content.split('\n');
-    let currentChunk = 0;
-
-    const loadNextChunk = () => {
-      const start = currentChunk * chunkSize;
-      const end = Math.min(start + chunkSize, lines.length);
-      const chunk = lines.slice(0, end).join('\n');
-
-      setVisibleContent(chunk);
-      currentChunk++;
-
-      if (end < lines.length) {
-        // Schedule next chunk
-        requestIdleCallback(() => {
-          loadNextChunk();
-        }, { timeout: 100 });
-      } else {
-        setIsLoading(false);
-      }
-    };
-
-    // Start with first chunk
-    loadNextChunk();
-
-    return () => {
-      setIsLoading(false);
-    };
-  }, [content, chunkSize]);
-
-  return { visibleContent, isLoading, metrics: metricsRef.current };
 }
 
 /**
