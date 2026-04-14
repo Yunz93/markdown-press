@@ -50,7 +50,28 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}
-          releaseBody: See the assets to download this version and install.
+          releaseBody: |
+            See the assets to download this version and install.
+
+            ### macOS 安装说明
+
+            由于本应用未经 Apple 签名公证，macOS 可能会提示"已损坏"或"无法验证开发者"。请按以下步骤操作：
+
+            1. 下载 `.dmg` 文件并将应用拖入 Applications 文件夹
+            2. 打开终端（Terminal），执行以下命令：
+               ```
+               xattr -cr /Applications/M記.app
+               ```
+            3. 再次双击打开应用即可
+
+            > 如果你通过浏览器下载到 Downloads 文件夹但还未移动，请先运行：
+            > ```
+            > xattr -cr ~/Downloads/M記.app
+            > ```
+
+            ### Windows 安装说明
+
+            下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
           releaseDraft: false
           prerelease: false
           releaseAssetNamePattern: MarkdownPress_[version]_[arch][ext]
@@ -96,7 +117,28 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}
-          releaseBody: See the assets to download this version and install.
+          releaseBody: |
+            See the assets to download this version and install.
+
+            ### macOS 安装说明
+
+            由于本应用未经 Apple 签名公证，macOS 可能会提示"已损坏"或"无法验证开发者"。请按以下步骤操作：
+
+            1. 下载 `.dmg` 文件并将应用拖入 Applications 文件夹
+            2. 打开终端（Terminal），执行以下命令：
+               ```
+               xattr -cr /Applications/M記.app
+               ```
+            3. 再次双击打开应用即可
+
+            > 如果你通过浏览器下载到 Downloads 文件夹但还未移动，请先运行：
+            > ```
+            > xattr -cr ~/Downloads/M記.app
+            > ```
+
+            ### Windows 安装说明
+
+            下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
           releaseDraft: false
           prerelease: false
           releaseAssetNamePattern: MarkdownPress_[version]_[arch][ext]

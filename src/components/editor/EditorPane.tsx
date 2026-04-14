@@ -23,6 +23,9 @@ import { throttle } from '../../utils/throttle';
 import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
+import { uploadImageToHosting, isImageHostingEnabled } from '../../services/imageHostingService';
+import { readFile as tauriReadFile, exists as tauriExists } from '@tauri-apps/plugin-fs';
+import { join, dirname } from '@tauri-apps/api/path';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -91,6 +94,51 @@ function findWikiLinkNearPosition(text: string, pos: number) {
   return null;
 }
 
+interface LocalImageMatch {
+  src: string;
+  alt: string;
+  from: number;
+  to: number;
+}
+
+const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\(<?([^)\s>]+)>?\)/g;
+const OBSIDIAN_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]*?))?\]\]/g;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+
+function isRemoteUrl(src: string): boolean {
+  return /^(https?:|data:|blob:)/i.test(src) || src.startsWith('//');
+}
+
+function findLocalImageAtPos(docText: string, lineFrom: number, lineText: string, pos: number): LocalImageMatch | null {
+  let match: RegExpExecArray | null;
+
+  STANDARD_IMAGE_RE.lastIndex = 0;
+  while ((match = STANDARD_IMAGE_RE.exec(lineText)) !== null) {
+    const mFrom = lineFrom + match.index;
+    const mTo = mFrom + match[0].length;
+    if (pos >= mFrom && pos <= mTo) {
+      const src = match[2].trim();
+      if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
+        return { src, alt: match[1] || src.split('/').pop()?.replace(/\.[^.]+$/, '') || 'image', from: mFrom, to: mTo };
+      }
+    }
+  }
+
+  OBSIDIAN_IMAGE_RE.lastIndex = 0;
+  while ((match = OBSIDIAN_IMAGE_RE.exec(lineText)) !== null) {
+    const mFrom = lineFrom + match.index;
+    const mTo = mFrom + match[0].length;
+    if (pos >= mFrom && pos <= mTo) {
+      const src = match[1].trim();
+      if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
+        return { src, alt: match[2] || src.split('/').pop()?.replace(/\.[^.]+$/, '') || 'image', from: mFrom, to: mTo };
+      }
+    }
+  }
+
+  return null;
+}
+
 interface HoverPreviewState {
   preview: WikiLinkPreviewData;
   x: number;
@@ -143,7 +191,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     text: string;
   } | null>(null);
   const [isGeneratingWiki, setIsGeneratingWiki] = useState(false);
-  
+  const [imageMenu, setImageMenu] = useState<{
+    x: number;
+    y: number;
+    match: LocalImageMatch;
+  } | null>(null);
+  const [isUploadingSingle, setIsUploadingSingle] = useState(false);
+
   // Completion trigger ref
   const completionStartFrameRef = useRef<number | null>(null);
   const closeSelectionMenu = useCallback(() => {
@@ -191,38 +245,44 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   // Scroll sync hook
   const scrollSync = useScrollSync({ onScroll });
 
+  const closeImageMenu = useCallback(() => setImageMenu(null), []);
+
   const handleSelectionContextMenu = useCallback((event: MouseEvent, view: EditorView) => {
-    if (!onGenerateWikiFromSelection) {
-      return false;
-    }
-
-    const selection = view.state.selection.main;
-    if (selection.empty) {
-      closeSelectionMenu();
-      return false;
-    }
-
     const clickPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-    if (clickPos == null || clickPos < selection.from || clickPos > selection.to) {
-      closeSelectionMenu();
-      return false;
+    const selection = view.state.selection.main;
+
+    if (clickPos != null) {
+      const line = view.state.doc.lineAt(clickPos);
+      const imgMatch = findLocalImageAtPos(view.state.doc.toString(), line.from, line.text, clickPos);
+      if (imgMatch) {
+        event.preventDefault();
+        closeSelectionMenu();
+        setImageMenu({ x: event.clientX, y: event.clientY, match: imgMatch });
+        return true;
+      }
     }
 
-    const selectedText = view.state.sliceDoc(selection.from, selection.to).trim();
-    if (!selectedText) {
-      closeSelectionMenu();
-      return false;
+    setImageMenu(null);
+
+    if (!selection.empty && onGenerateWikiFromSelection) {
+      if (clickPos != null && clickPos >= selection.from && clickPos <= selection.to) {
+        const selectedText = view.state.sliceDoc(selection.from, selection.to).trim();
+        if (selectedText) {
+          event.preventDefault();
+          setSelectionMenu({
+            x: event.clientX,
+            y: event.clientY,
+            from: selection.from,
+            to: selection.to,
+            text: selectedText,
+          });
+          return true;
+        }
+      }
     }
 
-    event.preventDefault();
-    setSelectionMenu({
-      x: event.clientX,
-      y: event.clientY,
-      from: selection.from,
-      to: selection.to,
-      text: selectedText,
-    });
-    return true;
+    closeSelectionMenu();
+    return false;
   }, [closeSelectionMenu, onGenerateWikiFromSelection]);
 
   // CodeMirror hook
@@ -287,6 +347,62 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
       setIsGeneratingWiki(false);
     }
   }, [closeSelectionMenu, codeMirror.view, onGenerateWikiFromSelection, selectionMenu]);
+
+  const handleUploadLocalImage = useCallback(async () => {
+    const menu = imageMenu;
+    const view = codeMirror.view;
+    if (!menu || !view) return;
+
+    const { match } = menu;
+    closeImageMenu();
+
+    const currentSettings = useAppStore.getState().settings;
+    if (!currentSettings.imageHosting?.provider || currentSettings.imageHosting.provider === 'none') {
+      showNotification(t('notifications_imageHostingNotConfigured'), 'error');
+      return;
+    }
+
+    setIsUploadingSingle(true);
+
+    try {
+      let resolvedPath: string;
+      const src = decodeURIComponent(match.src);
+
+      if (src.startsWith('/') || /^[A-Z]:\\/i.test(src)) {
+        resolvedPath = src;
+      } else if (currentFilePath) {
+        const dir = await dirname(currentFilePath);
+        resolvedPath = await join(dir, src);
+      } else if (rootFolderPath) {
+        resolvedPath = await join(rootFolderPath, src);
+      } else {
+        throw new Error('Cannot resolve image path');
+      }
+
+      const fileExists = await tauriExists(resolvedPath);
+      if (!fileExists) {
+        showNotification(t('notifications_imageFileNotFound', { path: src }), 'error');
+        return;
+      }
+
+      const data = await tauriReadFile(resolvedPath);
+      const filename = src.split('/').pop() || 'image.png';
+      const result = await uploadImageToHosting(data.buffer as ArrayBuffer, filename, currentSettings);
+
+      const replacement = `![${match.alt}](${result.url})`;
+      view.dispatch({
+        changes: { from: match.from, to: match.to, insert: replacement },
+        selection: { anchor: match.from + replacement.length },
+      });
+      showNotification(t('notifications_imageUploaded'), 'success');
+    } catch (err) {
+      console.error('Single image upload failed:', err);
+      const detail = err instanceof Error ? err.message : String(err);
+      showNotification(t('notifications_imageUploadFailed', { error: detail }), 'error');
+    } finally {
+      setIsUploadingSingle(false);
+    }
+  }, [imageMenu, codeMirror.view, closeImageMenu, currentFilePath, rootFolderPath, showNotification, t]);
 
   // Register/clear editor view for selection bridge
   useEffect(() => {
@@ -499,6 +615,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     };
   }, [closeSelectionMenu, selectionMenu]);
 
+  useEffect(() => {
+    if (!imageMenu) return;
+    const dismiss = () => closeImageMenu();
+    const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(); };
+    document.addEventListener('click', dismiss);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', dismiss, true);
+    return () => {
+      document.removeEventListener('click', dismiss);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', dismiss, true);
+    };
+  }, [closeImageMenu, imageMenu]);
+
   // Cancel scroll sync on view mode change
   useEffect(() => {
     scrollSync.cancelScrollSync();
@@ -619,6 +749,39 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
               <path d="M12 2l2.8 6.2L21 9l-4.5 4 1.2 6.1L12 16l-5.7 3.1L7.5 13 3 9l6.2-.8L12 2z" />
             </svg>
             {isGeneratingWiki ? t('ai_generatingWiki') : t('ai_generateWiki')}
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {imageMenu && createPortal(
+        <div
+          className="fixed z-[160] min-w-[220px] rounded-xl border border-gray-200/70 bg-white/95 py-1.5 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95"
+          style={{ left: imageMenu.x, top: imageMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="mx-3 mb-1 mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
+            {imageMenu.match.src}
+          </div>
+          <button
+            type="button"
+            onClick={() => { void handleUploadLocalImage(); }}
+            disabled={isUploadingSingle}
+            className="mx-1.5 flex w-[calc(100%-12px)] items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            {isUploadingSingle ? (
+              <svg className="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            )}
+            {isUploadingSingle ? t('toolbar_uploadingImage') : t('editor_uploadToHosting')}
           </button>
         </div>,
         document.body

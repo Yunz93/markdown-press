@@ -8,6 +8,7 @@ import { AITab } from './tabs/AITab';
 import { MetadataTab } from './tabs/MetadataTab';
 import { ShortcutsTab } from './tabs/ShortcutsTab';
 import { PublishingTab } from './tabs/PublishingTab';
+import { ImageHostingTab } from './tabs/ImageHostingTab';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface SettingsModalProps {
   onUpdateSettings: (updates: Partial<AppSettings>) => void;
 }
 
-type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai' | 'interface';
+type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai' | 'interface' | 'imageHosting';
 
 interface TabConfig {
   id: SettingsTab;
@@ -82,6 +83,17 @@ function getTabs(t: (key: TranslationKey, params?: Record<string, string | numbe
       ),
     },
     {
+      id: 'imageHosting',
+      label: t('settings_tab_imageHosting'),
+      icon: (props) => (
+        <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      ),
+    },
+    {
       id: 'general',
       label: t('settings_tab_publishing'),
       icon: (props) => (
@@ -133,6 +145,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         return <MetadataTab settings={settings} onUpdateSettings={onUpdateSettings} />;
       case 'shortcuts':
         return <ShortcutsTab settings={settings} onUpdateSettings={onUpdateSettings} />;
+      case 'imageHosting':
+        return <ImageHostingTab settings={settings} onUpdateSettings={onUpdateSettings} />;
       case 'general':
         return <PublishingTab settings={settings} onUpdateSettings={onUpdateSettings} />;
     }

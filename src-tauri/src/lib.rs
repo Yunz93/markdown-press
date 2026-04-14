@@ -1,3 +1,5 @@
+mod image_hosting;
+
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
@@ -31,6 +33,10 @@ const SECURE_SETTINGS_VERSION: u8 = 1;
 const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
 const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
+const SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN: &str = "imageHostingGithubToken";
+const SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY: &str = "imageHostingS3SecretAccessKey";
+const SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET: &str = "imageHostingOssAccessKeySecret";
+const SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY: &str = "imageHostingQiniuSecretKey";
 
 fn publish_log(message: impl AsRef<str>) {
     let now = SystemTime::now()
@@ -210,6 +216,10 @@ struct SecureSettingsResult {
     blog_github_token: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
+    image_hosting_github_token: Option<String>,
+    image_hosting_s3_secret_access_key: Option<String>,
+    image_hosting_oss_access_key_secret: Option<String>,
+    image_hosting_qiniu_secret_key: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -218,6 +228,10 @@ struct SecureSettingsFile {
     blog_github_token: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
+    image_hosting_github_token: Option<String>,
+    image_hosting_s3_secret_access_key: Option<String>,
+    image_hosting_oss_access_key_secret: Option<String>,
+    image_hosting_qiniu_secret_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -465,7 +479,11 @@ fn write_secure_settings_file(
     let path = secure_settings_file_path(app)?;
     let has_secrets = settings.blog_github_token.is_some()
         || settings.gemini_api_key.is_some()
-        || settings.codex_api_key.is_some();
+        || settings.codex_api_key.is_some()
+        || settings.image_hosting_github_token.is_some()
+        || settings.image_hosting_s3_secret_access_key.is_some()
+        || settings.image_hosting_oss_access_key_secret.is_some()
+        || settings.image_hosting_qiniu_secret_key.is_some();
 
     if !has_secrets {
         match fs::remove_file(&path) {
@@ -511,6 +529,10 @@ fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String
         SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
+        SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token,
+        SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => settings.image_hosting_s3_secret_access_key,
+        SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => settings.image_hosting_oss_access_key_secret,
+        SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => settings.image_hosting_qiniu_secret_key,
         _ => None,
     })
 }
@@ -527,6 +549,10 @@ fn write_secure_secret(
         SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token = normalized,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
+        SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token = normalized,
+        SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => settings.image_hosting_s3_secret_access_key = normalized,
+        SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => settings.image_hosting_oss_access_key_secret = normalized,
+        SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => settings.image_hosting_qiniu_secret_key = normalized,
         _ => return Err(format!("Unsupported secure setting key: {}", key)),
     }
 
@@ -538,8 +564,25 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
         SECRET_KEY_BLOG_GITHUB_TOKEN => Some(SECRET_KEY_BLOG_GITHUB_TOKEN),
         SECRET_KEY_GEMINI_API_KEY => Some(SECRET_KEY_GEMINI_API_KEY),
         SECRET_KEY_CODEX_API_KEY => Some(SECRET_KEY_CODEX_API_KEY),
+        SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => Some(SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN),
+        SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => Some(SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY),
+        SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => Some(SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET),
+        SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => Some(SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY),
         _ => None,
     }
+}
+
+#[tauri::command]
+async fn upload_image_to_hosting(
+    provider: String,
+    config_json: String,
+    image_base64: String,
+    filename: String,
+) -> Result<image_hosting::ImageUploadResponse, String> {
+    let image_bytes = BASE64_STANDARD
+        .decode(image_base64.trim())
+        .map_err(|e| format!("Failed to decode image data: {}", e))?;
+    image_hosting::upload_image(&provider, &config_json, &image_bytes, &filename).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -558,7 +601,8 @@ pub fn run() {
             delete_path_recursively,
             reveal_in_explorer,
             copy_sample_notes,
-            publish_simple_blog
+            publish_simple_blog,
+            upload_image_to_hosting
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -594,6 +638,10 @@ fn get_secure_settings(app: tauri::AppHandle) -> Result<SecureSettingsResult, St
         blog_github_token: read_secure_secret(&app, SECRET_KEY_BLOG_GITHUB_TOKEN)?,
         gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
         codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
+        image_hosting_github_token: read_secure_secret(&app, SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN)?,
+        image_hosting_s3_secret_access_key: read_secure_secret(&app, SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY)?,
+        image_hosting_oss_access_key_secret: read_secure_secret(&app, SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET)?,
+        image_hosting_qiniu_secret_key: read_secure_secret(&app, SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY)?,
     })
 }
 

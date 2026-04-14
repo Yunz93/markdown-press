@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
 import { useFileSystem } from '../../hooks/useFileSystem';
@@ -113,6 +114,61 @@ async function writeToClipboard(text: string): Promise<void> {
   }
 }
 
+const RootContextMenu: React.FC<{
+  x: number;
+  y: number;
+  onClose: () => void;
+  onCreateFile: () => void;
+  onCreateFolder: () => void;
+}> = ({ x, y, onClose, onCreateFile, onCreateFolder }) => {
+  const { t } = useI18n();
+
+  React.useEffect(() => {
+    const handleClick = () => onClose();
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed z-[150] min-w-[180px] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/70 dark:border-white/10 py-1.5 animate-scale-in"
+      style={{ left: x, top: y }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={onCreateFile}
+        className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group mx-1.5 w-[calc(100%-12px)]"
+      >
+        <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="12" y1="18" x2="12" y2="12" />
+          <line x1="9" y1="15" x2="15" y2="15" />
+        </svg>
+        {t('context_newFile')}
+      </button>
+      <button
+        onClick={onCreateFolder}
+        className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group mx-1.5 w-[calc(100%-12px)]"
+      >
+        <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          <line x1="12" y1="11" x2="12" y2="17" />
+          <line x1="9" y1="14" x2="15" y2="14" />
+        </svg>
+        {t('context_newFolder')}
+      </button>
+    </div>
+  );
+};
+
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
   files,
   activeFileId,
@@ -149,6 +205,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [locatedFileId, setLocatedFileId] = useState<string | null>(null);
+  const [rootContextMenu, setRootContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const trashItems = useMemo(() => getTrashItems(files, trashFolder), [files, trashFolder]);
 
@@ -269,6 +326,18 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     }
   }, [currentKnowledgeBasePath, showNotification, t]);
 
+  const handleRootContextMenu = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-file-tree-item]')) return;
+    e.preventDefault();
+    const x = Math.min(e.clientX, window.innerWidth - 220);
+    const y = Math.min(e.clientY, window.innerHeight - 200);
+    setRootContextMenu({ x, y });
+  }, []);
+
+  const closeRootContextMenu = useCallback(() => {
+    setRootContextMenu(null);
+  }, []);
+
   return (
     <>
       {isOpen && (
@@ -349,6 +418,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           onDragLeave={handleRootDragLeave}
           onDrop={(e) => handleRootDrop(e, onMoveToRoot)}
           onDragEnd={() => setIsRootDragOver(false)}
+          onContextMenu={handleRootContextMenu}
         >
           {files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600 px-6 text-center">
@@ -601,6 +671,23 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           onRestoreFromTrash={() => onRestoreFromTrash(contextMenu.node)}
           onDeleteForever={() => openDeleteDialog(contextMenu.node)}
         />
+      )}
+
+      {rootContextMenu && createPortal(
+        <RootContextMenu
+          x={rootContextMenu.x}
+          y={rootContextMenu.y}
+          onClose={closeRootContextMenu}
+          onCreateFile={() => {
+            openNewFileDialog(undefined, t('app_untitled'));
+            closeRootContextMenu();
+          }}
+          onCreateFolder={() => {
+            openNewFolderDialog(undefined);
+            closeRootContextMenu();
+          }}
+        />,
+        document.body
       )}
 
       <PromptDialog

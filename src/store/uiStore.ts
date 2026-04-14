@@ -1,4 +1,4 @@
-import type { AppSettings, Notification } from '../types';
+import type { AppSettings, ImageHostingConfig, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../services/aiPrompts';
 import {
@@ -60,6 +60,17 @@ export interface UIActions {
  */
 const primaryShortcutModifier = getPreferredShortcutModifierToken();
 
+export const defaultImageHostingConfig: ImageHostingConfig = {
+  provider: 'none',
+  pasteAction: 'local',
+  keepLocalCopy: true,
+  github: { repo: '', branch: 'main', path: 'images/', customDomain: '' },
+  s3: { endpoint: '', region: '', bucket: '', pathPrefix: 'images/', accessKeyId: '', customDomain: '' },
+  aliyunOss: { endpoint: '', bucket: '', pathPrefix: 'images/', accessKeyId: '', customDomain: '' },
+  qiniu: { bucket: '', zone: 'z0', accessKey: '', pathPrefix: 'images/', domain: '' },
+  custom: { uploadUrl: '', method: 'POST', headers: '{}', fileFieldName: 'file', responseUrlJsonPath: 'data.url' },
+};
+
 export const defaultSettings: AppSettings = {
   language: 'zh-CN',
   aiProvider: 'gemini',
@@ -84,6 +95,7 @@ export const defaultSettings: AppSettings = {
   codexApiKey: '',
   codexModel: 'gpt-5.2-codex',
   aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
+  imageHosting: defaultImageHostingConfig,
   shortcuts: {
     save: `${primaryShortcutModifier}+S`,
     toggleView: 'Cmd+Shift+V',

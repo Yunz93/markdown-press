@@ -17,6 +17,11 @@ export interface AttachmentResolverContext {
 const resolvedAttachmentCache = new Map<string, Promise<ResolvedAttachmentTarget | null>>();
 const fileExistenceCache = new Map<string, Promise<boolean>>();
 
+export function clearAttachmentResolverCache(): void {
+  resolvedAttachmentCache.clear();
+  fileExistenceCache.clear();
+}
+
 function hasUriScheme(value: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(value) || value.startsWith('//');
 }

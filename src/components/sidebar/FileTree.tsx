@@ -142,7 +142,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   const showChildren = isFolder && (expanded || forceExpanded) && node.children;
 
   return (
-    <div className="select-none">
+    <div className="select-none" data-file-tree-item>
       <div
         ref={itemRef}
         className={`

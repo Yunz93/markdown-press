@@ -6,7 +6,11 @@ import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
 const SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 const SECURE_SETTINGS_WAIT_MS = 5000;
 
-export const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'geminiApiKey', 'codexApiKey'] as const;
+export const SENSITIVE_SETTING_KEYS = [
+  'blogGithubToken', 'geminiApiKey', 'codexApiKey',
+  'imageHostingGithubToken', 'imageHostingS3SecretAccessKey',
+  'imageHostingOssAccessKeySecret', 'imageHostingQiniuSecretKey',
+] as const;
 
 export type SensitiveSettingKey = typeof SENSITIVE_SETTING_KEYS[number];
 export type SensitiveSettings = Pick<AppSettings, SensitiveSettingKey>;
@@ -15,6 +19,10 @@ interface SecureSettingsPayload {
   blogGithubToken?: string | null;
   geminiApiKey?: string | null;
   codexApiKey?: string | null;
+  imageHostingGithubToken?: string | null;
+  imageHostingS3SecretAccessKey?: string | null;
+  imageHostingOssAccessKeySecret?: string | null;
+  imageHostingQiniuSecretKey?: string | null;
 }
 
 const secureWriteQueue = new Map<SensitiveSettingKey, Promise<void>>();
@@ -112,6 +120,10 @@ export async function loadSecureSettings(): Promise<Partial<SensitiveSettings>> 
       blogGithubToken: normalizeSecretValue(payload.blogGithubToken),
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
+      imageHostingGithubToken: normalizeSecretValue(payload.imageHostingGithubToken),
+      imageHostingS3SecretAccessKey: normalizeSecretValue(payload.imageHostingS3SecretAccessKey),
+      imageHostingOssAccessKeySecret: normalizeSecretValue(payload.imageHostingOssAccessKeySecret),
+      imageHostingQiniuSecretKey: normalizeSecretValue(payload.imageHostingQiniuSecretKey),
     };
     hasLoadedSecureSettingsFromBackend = true;
     return { ...secureSettingsCache };

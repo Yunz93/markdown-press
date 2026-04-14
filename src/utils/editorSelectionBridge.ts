@@ -21,6 +21,23 @@ export function clearActiveEditorView(view: EditorView): void {
   }
 }
 
+export function getActiveEditorView(): EditorView | null {
+  return activeEditorView;
+}
+
+export function insertTextAtCursor(text: string): boolean {
+  if (!activeEditorView) return false;
+  const view = activeEditorView;
+  const selection = view.state.selection.main;
+  view.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: text },
+    selection: { anchor: selection.from + text.length },
+    scrollIntoView: true,
+  });
+  view.focus();
+  return true;
+}
+
 export function focusEditorRangeByOffset(
   start: number,
   end: number = start,
