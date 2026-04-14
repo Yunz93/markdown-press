@@ -18,6 +18,8 @@ interface ToolbarProps {
   themeMode: ThemeMode;
   onPublishBlog?: () => void;
   onExportPdf?: () => void;
+  onUploadImage?: () => void;
+  isUploadingImage?: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = React.memo(({
@@ -33,7 +35,9 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onToggleTheme,
   themeMode,
   onPublishBlog,
-  onExportPdf
+  onExportPdf,
+  onUploadImage,
+  isUploadingImage = false,
 }) => {
   const { t } = useI18n();
   const isDark = themeMode === 'dark';
@@ -104,6 +108,28 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
 
           <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
         </div>
+
+        {onUploadImage && (
+          <button
+            onClick={onUploadImage}
+            disabled={!fileName || isUploadingImage}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+            title={isUploadingImage ? (t('toolbar_uploadingImage')) : (t('toolbar_uploadImage'))}
+          >
+            {isUploadingImage ? (
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v3a5 5 0 0 0-5 5H4z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            )}
+          </button>
+        )}
 
         {(onPublishBlog || onExportPdf) && (
           <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">

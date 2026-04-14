@@ -19,6 +19,10 @@ export function useSecureSettings(
     blogGithubToken: 0,
     geminiApiKey: 0,
     codexApiKey: 0,
+    imageHostingGithubToken: 0,
+    imageHostingS3SecretAccessKey: 0,
+    imageHostingOssAccessKeySecret: 0,
+    imageHostingQiniuSecretKey: 0,
   });
   const secureSaveResetTimerRef = useRef<Partial<Record<SensitiveSettingKey, number>>>({});
 

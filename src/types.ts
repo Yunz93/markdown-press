@@ -87,6 +87,61 @@ export type ThemeMode = 'light' | 'dark';
 export type AppLanguage = 'zh-CN' | 'en';
 export type AttachmentPasteFormat = 'markdown' | 'obsidian';
 export type OrderedListMode = 'strict' | 'loose';
+
+export type ImageHostingProvider = 'none' | 'github' | 's3' | 'aliyun_oss' | 'qiniu' | 'custom';
+export type ImagePasteAction = 'local' | 'upload';
+
+export interface ImageHostingGitHubConfig {
+  repo: string;
+  branch: string;
+  path: string;
+  customDomain: string;
+}
+
+export interface ImageHostingS3Config {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  pathPrefix: string;
+  accessKeyId: string;
+  customDomain: string;
+}
+
+export interface ImageHostingAliyunOssConfig {
+  endpoint: string;
+  bucket: string;
+  pathPrefix: string;
+  accessKeyId: string;
+  customDomain: string;
+}
+
+export interface ImageHostingQiniuConfig {
+  bucket: string;
+  zone: string;
+  accessKey: string;
+  pathPrefix: string;
+  domain: string;
+}
+
+export interface ImageHostingCustomConfig {
+  uploadUrl: string;
+  method: 'POST' | 'PUT';
+  headers: string;
+  fileFieldName: string;
+  responseUrlJsonPath: string;
+}
+
+export interface ImageHostingConfig {
+  provider: ImageHostingProvider;
+  pasteAction: ImagePasteAction;
+  keepLocalCopy: boolean;
+  github: ImageHostingGitHubConfig;
+  s3: ImageHostingS3Config;
+  aliyunOss: ImageHostingAliyunOssConfig;
+  qiniu: ImageHostingQiniuConfig;
+  custom: ImageHostingCustomConfig;
+}
+
 export interface AppSettings {
   language: AppLanguage;
   aiProvider: AIProvider;
@@ -111,6 +166,11 @@ export interface AppSettings {
   codexApiKey?: string;
   codexModel?: string;
   aiSystemPrompt?: string;
+  imageHosting: ImageHostingConfig;
+  imageHostingGithubToken?: string;
+  imageHostingS3SecretAccessKey?: string;
+  imageHostingOssAccessKeySecret?: string;
+  imageHostingQiniuSecretKey?: string;
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;

@@ -5,6 +5,8 @@ import {
   normalizeSlashes,
   sanitizeResourceFolder,
   getPathBasename,
+  getRelativePath,
+  getPathDirname,
 } from './pathHelpers';
 
 describe('getPathSeparator', () => {
@@ -96,5 +98,55 @@ describe('getPathBasename', () => {
 
   it('returns path itself for empty result', () => {
     expect(getPathBasename('')).toBe('');
+  });
+});
+
+describe('getRelativePath', () => {
+  it('computes relative path between sibling directories', () => {
+    expect(getRelativePath('/vault/notes/a.md', '/vault/resources/img.png'))
+      .toBe('../resources/img.png');
+  });
+
+  it('computes relative path to a deeper directory', () => {
+    expect(getRelativePath('/vault/notes/a.md', '/vault/notes/sub/b.md'))
+      .toBe('sub/b.md');
+  });
+
+  it('computes relative path from deeper directory', () => {
+    expect(getRelativePath('/vault/notes/sub/a.md', '/vault/resources/img.png'))
+      .toBe('../../resources/img.png');
+  });
+
+  it('computes relative path for same directory', () => {
+    expect(getRelativePath('/vault/notes/a.md', '/vault/notes/b.md'))
+      .toBe('b.md');
+  });
+
+  it('handles Windows-style backslashes', () => {
+    expect(getRelativePath('C:\\vault\\notes\\a.md', 'C:\\vault\\resources\\img.png'))
+      .toBe('../resources/img.png');
+  });
+
+  it('returns . when from and to are in the same directory', () => {
+    expect(getRelativePath('/vault/a.md', '/vault/'))
+      .toBe('.');
+  });
+});
+
+describe('getPathDirname', () => {
+  it('returns parent directory of a file', () => {
+    expect(getPathDirname('/vault/notes/a.md')).toBe('/vault/notes');
+  });
+
+  it('returns parent of a directory path', () => {
+    expect(getPathDirname('/vault/notes')).toBe('/vault');
+  });
+
+  it('returns / for root-level files', () => {
+    expect(getPathDirname('/file.md')).toBe('/');
+  });
+
+  it('normalizes backslashes', () => {
+    expect(getPathDirname('C:\\Users\\vault\\file.md')).toBe('C:/Users/vault');
   });
 });

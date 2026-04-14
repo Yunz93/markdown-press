@@ -22,10 +22,11 @@ import { TabBar } from './components/tabs/TabBar';
 import { PromptDialog } from './components/ui/Dialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
-import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
+import { focusEditorRangeByOffset, getActiveEditorView, insertTextAtCursor } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
 import { ensureDynamicFontFaces, getResolvedUiFontFamily } from './utils/fontSettings';
 import { hydrateSensitiveSettingsIntoStore } from './services/secureSettingsService';
+import { uploadImageToHosting } from './services/imageHostingService';
 import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
 import { throttle } from './utils/throttle';
 import { logEnvironment } from './utils/environment';
@@ -182,6 +183,7 @@ const App: React.FC = () => {
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave, highlighter);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
@@ -404,6 +406,55 @@ const App: React.FC = () => {
     setViewMode(mode, 'direct');
   }, [setViewMode]);
 
+  const handleUploadImage = useCallback(async () => {
+    const currentSettings = useAppStore.getState().settings;
+    if (currentSettings.imageHosting.provider === 'none') return;
+
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'] }],
+      });
+      if (!selected) return;
+
+      const filePath = typeof selected === 'string' ? selected : (selected as { path?: string }).path;
+      if (!filePath) return;
+
+      setIsUploadingImage(true);
+
+      const { readFile } = await import('@tauri-apps/plugin-fs');
+      const fileData = await readFile(filePath);
+      const fileName = filePath.split(/[\\/]/).pop() || `image-${Date.now()}.png`;
+
+      const placeholder = `![Uploading ${fileName}...]()`;
+      insertTextAtCursor(placeholder);
+
+      const result = await uploadImageToHosting(fileData.buffer as ArrayBuffer, fileName, currentSettings);
+      const altText = fileName.replace(/\.[^.]+$/, '');
+      const finalText = `![${altText}](${result.url})`;
+
+      const view = getActiveEditorView();
+      if (view) {
+        const doc = view.state.doc.toString();
+        const idx = doc.indexOf(placeholder);
+        if (idx >= 0) {
+          view.dispatch({
+            changes: { from: idx, to: idx + placeholder.length, insert: finalText },
+          });
+        }
+      }
+
+      showNotification(t('notifications_imageUploaded'), 'success');
+    } catch (err) {
+      console.error('Toolbar image upload failed:', err);
+      const detail = err instanceof Error ? err.message : String(err);
+      showNotification(t('notifications_imageUploadFailed', { error: detail }), 'error');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }, [showNotification, t]);
+
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
     setSidebarWidth(clamp(nextWidth, LAYOUT.SIDEBAR.MIN_WIDTH, LAYOUT.SIDEBAR.MAX_WIDTH));
   }, []);
@@ -616,6 +667,8 @@ const App: React.FC = () => {
           themeMode={settings.themeMode}
           onPublishBlog={handlePublishBlog}
           onExportPdf={handleExportToPdf}
+          onUploadImage={settings.imageHosting.provider !== 'none' ? handleUploadImage : undefined}
+          isUploadingImage={isUploadingImage}
         />
 
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />

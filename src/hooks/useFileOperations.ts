@@ -2,9 +2,12 @@ import { useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useFileSystem } from './useFileSystem';
 import { ViewMode, type FileNode } from '../types';
+import { getFileSystem } from '../types/filesystem';
+import { clearAttachmentResolverCache } from '../utils/attachmentResolver';
 import { generateFrontmatter } from '../utils/frontmatter';
-import { parseMetadataTemplateValue } from '../utils/metadataFields';
 import { t } from '../utils/i18n';
+import { findAndRewriteAffectedFiles } from '../utils/linkRewriter';
+import { parseMetadataTemplateValue } from '../utils/metadataFields';
 
 function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   for (const node of nodes) {
@@ -240,16 +243,67 @@ export function useFileOperations() {
     });
   }, []);
 
+  const updateLinksAfterMove = useCallback(async (pathMap: Record<string, string>) => {
+    const state = useAppStore.getState();
+    if (!state.rootFolderPath) return;
+
+    try {
+      const fs = await getFileSystem();
+      const result = await findAndRewriteAffectedFiles({
+        movedPathMap: pathMap,
+        files: state.files,
+        rootFolderPath: state.rootFolderPath,
+        fileContentOverrides: state.fileContents,
+        readFile: (path) => fs.readFile(path),
+      });
+
+      if (result.modifiedFiles.length === 0) return;
+
+      for (const mod of result.modifiedFiles) {
+        await fs.writeFile(mod.path, mod.newContent);
+      }
+
+      useAppStore.setState((s) => {
+        const nextContents = { ...s.fileContents };
+        const nextSaved = { ...s.lastSavedContent };
+        for (const mod of result.modifiedFiles) {
+          if (mod.path in nextContents) {
+            nextContents[mod.path] = mod.newContent;
+          }
+          if (mod.path in nextSaved) {
+            nextSaved[mod.path] = mod.newContent;
+          }
+        }
+        return { fileContents: nextContents, lastSavedContent: nextSaved };
+      });
+
+      clearAttachmentResolverCache();
+
+      showNotification(
+        t(settings.language, 'notifications_linksUpdated', {
+          count: String(result.modifiedFiles.length),
+        }),
+        'success',
+      );
+    } catch (e) {
+      console.error('Failed to update links after move:', e);
+      showNotification(t(settings.language, 'notifications_linkUpdateFailed'), 'error');
+    }
+  }, [showNotification]);
+
   const handleRename = useCallback(async (file: FileNode, newName: string) => {
     try {
       const newPath = await renameFile(file, newName);
       if (!newPath || newPath === file.path) return;
 
-      remapPathReferencesAfterMove(buildMovedPathMap(file, newPath));
+      const pathMap = buildMovedPathMap(file, newPath);
+      remapPathReferencesAfterMove(pathMap);
+      await refreshFileTree();
+      await updateLinksAfterMove(pathMap);
     } catch {
       showNotification(t(settings.language, 'notifications_renameFailed'), 'error');
     }
-  }, [renameFile, remapPathReferencesAfterMove, showNotification]);
+  }, [renameFile, remapPathReferencesAfterMove, refreshFileTree, updateLinksAfterMove, showNotification]);
 
   const moveNodeToTargetPath = useCallback(async (sourceNode: FileNode, targetPath: string) => {
     const normalizedTargetPath = normalizePath(targetPath);
@@ -278,14 +332,16 @@ export function useFileOperations() {
       const newPath = await moveFile(sourceNode, targetPath);
       if (!newPath) return;
 
-      remapPathReferencesAfterMove(buildMovedPathMap(sourceNode, newPath));
+      const pathMap = buildMovedPathMap(sourceNode, newPath);
+      remapPathReferencesAfterMove(pathMap);
       await refreshFileTree();
+      await updateLinksAfterMove(pathMap);
       showNotification(t(settings.language, sourceNode.type === 'folder' ? 'notifications_folderMoved' : 'notifications_fileMoved'), 'success');
     } catch (e) {
       console.error('Failed to move item:', e);
       showNotification(t(settings.language, sourceNode.type === 'folder' ? 'notifications_failedMoveFolder' : 'notifications_failedMoveFile'), 'error');
     }
-  }, [moveFile, refreshFileTree, remapPathReferencesAfterMove, showNotification]);
+  }, [moveFile, refreshFileTree, remapPathReferencesAfterMove, updateLinksAfterMove, showNotification]);
 
   const handleMoveNode = useCallback(async (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
