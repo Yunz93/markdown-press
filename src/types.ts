@@ -69,7 +69,7 @@ export interface ShortcutConfig {
   newFolder: string;
   closeTab: string;
   openKnowledgeBase: string;
-  exportHtml: string;
+  exportPdf: string;
 }
 
 export interface MetadataField {
@@ -122,7 +122,7 @@ export interface AppSettings {
 
 export interface Notification {
   msg: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
 }
 
 export interface DragDropEvent {

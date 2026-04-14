@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
 import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
 import { generateFrontmatter, parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
-import { downloadHtml, exportToHtml } from '../utils/export';
+import { exportToHtml, exportToPdf } from '../utils/export';
 import { type Frontmatter } from '../types';
 import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../utils/fontSettings';
 import { buildSimpleBlogPostUrl, prepareSimpleBlogPublish } from '../utils/simpleBlogPublish';
@@ -31,7 +31,7 @@ function findFileInTree(nodes: import('../types').FileNode[], id: string): impor
 }
 
 /**
- * Encapsulates PDF export and blog publish actions.
+ * Encapsulates export and blog publish actions.
  * Extracted from App.tsx.
  */
 export function useExportActions(
@@ -110,7 +110,7 @@ export function useExportActions(
     }
   }, []);
 
-  const handleExportToHtml = useCallback(async () => {
+  const handleExportToPdf = useCallback(async () => {
     if (!activeTabId || !content) {
       showNotification(t(settings.language, 'notifications_noFileToExport'), 'error');
       return;
@@ -131,17 +131,23 @@ export function useExportActions(
         codeFontFamily,
         fontSettings: settings,
         fontSize: settings.fontSize,
-        codeFontSize: settings.fontSize,
+        codeFontSize: Math.max(12, settings.fontSize - 2),
         includeProperties: false,
         highlighter,
       });
-      const saved = await downloadHtml(htmlContent, activeFile.name, activeFile.path);
-      if (saved) {
-        showNotification(t(settings.language, 'notifications_htmlExported'), 'success');
+      const savedPath = await exportToPdf(htmlContent, activeFile.name, activeFile.path);
+      if (savedPath !== null) {
+        showNotification(t(settings.language, 'notifications_pdfExported'), 'success');
+        if (savedPath) {
+          try {
+            const fs = await getFileSystem();
+            await fs.revealInExplorer?.(savedPath);
+          } catch { /* best-effort */ }
+        }
       }
     } catch (error) {
-      console.error('Failed to export HTML:', error);
-      showNotification(t(settings.language, 'notifications_exportHtmlFailed'), 'error');
+      console.error('Failed to export PDF:', error);
+      showNotification(t(settings.language, 'notifications_exportPdfFailed'), 'error');
     }
   }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
 
@@ -260,5 +266,5 @@ export function useExportActions(
     }
   }, [activeTabId, backfillPublishedLink, files, forceSave, invokePublishWithTimeout, rootFolderPath, setContentForFile, setPublishing, showNotification]);
 
-  return { handleExportToHtml, handlePublishBlog };
+  return { handleExportToPdf, handlePublishBlog };
 }

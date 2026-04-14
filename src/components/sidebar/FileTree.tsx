@@ -201,7 +201,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
 
       {showChildren && (
         <div className="ml-0 mt-0.5 space-y-0.5">
-          {node.children
+          {(node.children ?? [])
             .filter(child => !child.isTrash)
             .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
             .map(child => (

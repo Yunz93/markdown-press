@@ -233,16 +233,6 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
         userEvent: 'input',
       }));
 
-      // 严格模式下重新编号
-      if (options?.strictMode) {
-        setTimeout(() => {
-          const renumberChanges = getStrictOrderedListNormalizationChanges(state);
-          if (renumberChanges && dispatch) {
-            // 需要在新的 dispatch 中处理
-          }
-        }, 0);
-      }
-
       return true;
     }
 

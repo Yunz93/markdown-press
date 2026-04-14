@@ -39,7 +39,7 @@ export function exportToPlainText(content: string): string {
   return text;
 }
 
-export async function downloadPlainText(text: string, filename: string): Promise<boolean> {
+export async function downloadPlainText(text: string, filename: string): Promise<string | null> {
   return saveExportFile({
     content: text,
     filename,

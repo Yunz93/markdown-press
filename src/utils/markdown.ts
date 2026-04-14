@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify';
 import { useEffect } from 'react';
 import MarkdownIt from 'markdown-it';
 import type Token from 'markdown-it/lib/token.mjs';
+import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import taskLists from 'markdown-it-task-lists';
 import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensions';
 import { normalizeShikiLanguage } from './shikiLanguages';
@@ -61,7 +62,7 @@ const createMarkdownIt = () => {
     state.tokens = nextTokens;
   });
 
-  const parseWikiSyntax = (state: MarkdownIt.StateInline, silent: boolean, embed: boolean) => {
+  const parseWikiSyntax = (state: StateInline, silent: boolean, embed: boolean) => {
     const start = state.pos;
     const source = state.src;
     const linkStart = embed ? start + 1 : start;

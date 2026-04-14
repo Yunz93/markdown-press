@@ -354,7 +354,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     '--editor-font-family': editorFontFamily,
     '--editor-font-size': `${settings.fontSize}px`,
     '--editor-code-font-family': codeFontFamily,
-    '--editor-code-font-size': `${settings.fontSize}px`,
+    '--editor-code-font-size': `${Math.max(12, settings.fontSize - 2)}px`,
     '--editor-line-height': String(EDITOR_LINE_HEIGHT),
   }) as React.CSSProperties, [layoutMetrics, editorFontFamily, settings.fontSize, codeFontFamily]);
 

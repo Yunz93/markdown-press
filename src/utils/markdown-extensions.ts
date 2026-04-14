@@ -34,9 +34,17 @@ async function getMermaid() {
 /**
  * Initialize KaTeX for inline and display math
  */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export function initKaTeX(md: any) {
   // Inline math: $...$
-  md.inline.ruler.after('text', 'katex_inline_math', (state, silent) => {
+  md.inline.ruler.after('text', 'katex_inline_math', (state: any, silent: boolean) => {
     const start = state.pos;
     if (state.src[start] !== '$') return false;
 
@@ -64,7 +72,7 @@ export function initKaTeX(md: any) {
   });
 
   // Display math: $$...$$
-  md.block.ruler.after('blockquote', 'katex_display_math', (state, start, end) => {
+  md.block.ruler.after('blockquote', 'katex_display_math', (state: any, start: number, end: number) => {
     const pos = state.bMarks[start] + state.tShift[start];
     const max = state.eMarks[start];
 
@@ -115,7 +123,7 @@ export function initKaTeX(md: any) {
     try {
       return `<div class="katex-display">${katex.renderToString(content, { ...katexOptions, displayMode: true })}</div>`;
     } catch (e) {
-      return `<div class="katex-error">Failed to render: ${content}</div>`;
+      return `<div class="katex-error">Failed to render: ${escapeHtml(content)}</div>`;
     }
   };
 }
@@ -175,7 +183,10 @@ export async function renderMermaidDiagrams(container?: HTMLElement | null) {
         el.dataset.mermaidSource = code;
         el.dataset.mermaidRendered = 'true';
       } catch (e) {
-        el.innerHTML = `<div class="mermaid-error">Failed to render diagram: ${e}</div>`;
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'mermaid-error';
+        errorDiv.textContent = `Failed to render diagram: ${e}`;
+        el.replaceChildren(errorDiv);
         el.dataset.mermaidSource = code;
         el.dataset.mermaidRendered = 'error';
       }

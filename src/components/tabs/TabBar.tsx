@@ -110,7 +110,7 @@ const TabContextMenu: React.FC<{
   );
 };
 
-export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
+export const TabBar: React.FC<TabBarProps> = React.memo(({ onToggleSidebar }) => {
   const { t } = useI18n();
   void onToggleSidebar;
   const {
@@ -154,13 +154,35 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
     }
   }, [closeOtherTabs, fileMap, setCurrentFilePath]);
 
+  const handleTabStripKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const strip = e.currentTarget;
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (!activeEl || !strip.contains(activeEl)) return;
+
+      const idx = openTabs.findIndex((id) => id === activeTabId);
+      if (idx === -1 || openTabs.length === 0) return;
+
+      e.preventDefault();
+      const delta = e.key === 'ArrowRight' ? 1 : -1;
+      const nextIdx = (idx + delta + openTabs.length) % openTabs.length;
+      const nextId = openTabs[nextIdx];
+      handleTabClick(nextId);
+      requestAnimationFrame(() => {
+        strip.querySelector<HTMLElement>(`[data-tab-file-id="${CSS.escape(nextId)}"]`)?.focus();
+      });
+    },
+    [openTabs, activeTabId, handleTabClick],
+  );
+
   if (openTabs.length === 0) {
     return null;
   }
 
   return (
     <div className="tab-bar ui-scaled min-w-0">
-      <div className="tab-strip">
+      <div className="tab-strip" role="tablist" onKeyDown={handleTabStripKeyDown}>
         {openTabs.map((fileId) => {
           const file = fileMap.get(fileId);
           if (!file) return null;
@@ -172,7 +194,17 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
             <div
               key={fileId}
               className={`tab browser-tab ${isActive ? 'is-active' : 'is-inactive'}`}
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              data-tab-file-id={fileId}
               onClick={() => handleTabClick(fileId)}
+              onKeyDown={(ev) => {
+                if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                if ((ev.target as HTMLElement).closest('button')) return;
+                ev.preventDefault();
+                handleTabClick(fileId);
+              }}
               onContextMenu={(event) => handleTabContextMenu(event, fileId)}
               title={file.path}
             >
@@ -189,6 +221,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                     className="close-tab p-0.5 rounded-md hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-colors flex-shrink-0"
                     onClick={(e) => handleCloseTab(e, fileId)}
                     title={t('tab_closeTab')}
+                    aria-label={`${t('tab_closeTab')} ${getDisplayFileName(file.name)}`}
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18" />
@@ -211,4 +244,4 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
       )}
     </div>
   );
-};
+});

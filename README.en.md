@@ -16,36 +16,49 @@ M記 is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. 
 - Three view modes: Editor, Preview, and Split
 - Linked scrolling between editor and preview in split mode
 - Preview support for KaTeX, Mermaid, task lists, tables, and syntax-highlighted code blocks
-- Outline panel with heading navigation
+- Outline panel with heading navigation, auto-highlights the current section
+- Status bar showing live writing stats: characters, words, paragraphs, headings, and estimated reading time
+- Wiki link hover preview with Cmd/Ctrl
+- Direct preview of images, PDF, and HTML files
 - External links can open in the system browser
 
 ### Markdown and Knowledge Base Features
 - YAML frontmatter support with configurable metadata templates
 - New files generate an H1 title that matches the file name
-- Cross-file wiki links with `[[file]]`
+- Cross-file wiki links with `[[file]]` and `[[file|alias]]`
 - In-document heading jumps with `[[#heading]]` and `[[heading]]`
-- Local attachment embeds with `![[path/to/file]]`
-- Image attachments render inline in preview; non-image attachments can be revealed in the system file explorer
+- Block references with `[[note#^block]]`
+- Local attachment embeds with `![[path/to/file]]`, optional sizing via `![[img|600]]` or `![[img|600x400]]`
+- Image paste auto-saves to the resource folder, with Markdown or Obsidian link format
+- `update_time` in frontmatter is automatically refreshed on save
 
 ### Files and Sidebar
 - Folder-based local knowledge base workflow
-- Multi-tab editing
+- Multi-tab editing with right-click tab actions (close other tabs)
 - Sidebar file tree with create, rename, and drag-and-drop move
+- Vault-wide full-text search in sidebar
+- Locate current file in sidebar
 - Built-in Trash with restore and bulk permanent delete
 - Trash directory is standardized to `.trash` and hidden from the main file tree
-- Right-click tab actions, including close other tabs
+- Unused attachment cleanup (`Cmd+Shift+-`)
 
 ### Writing Experience
 - Improved frontmatter highlighting with colored keys and neutral values
 - Consistent layout rhythm between editor and preview panes
-- Independent English and Chinese font configuration, with bundled LXGW WenKai as the default Chinese font
+- Independent UI, editor, preview, and code font configuration, with bundled LXGW WenKai as the default Chinese font
+- Configurable UI font size
 - Dark mode as the default theme
 - Configurable core keyboard shortcuts in settings
+- Format Markdown on manual save (ordered list strict/loose mode)
+- Configurable auto-save interval (5 seconds to 30 minutes)
+- In-file search and replace (regex, case-sensitive)
 
 ### AI and Export
-- Google Gemini integration for writing enhancement and metadata generation
+- Dual AI provider: Google Gemini and OpenAI-compatible API, with custom system prompt and model selection
+- AI document enhancement: grammar polish, SEO summary, tag generation
+- Generate wiki article from selected text with automatic back-linking
 - PDF export
-- Publish flag workflow by marking notes as `is_publish: true`
+- Publish to a `simple-blog` GitHub repository with automatic Vercel deployment
 
 ## Screenshot
 
@@ -63,11 +76,11 @@ M記 is a desktop Markdown editor built with Tauri 2, React 19, and TypeScript. 
 - Syntax highlighting: [Shiki](https://shiki.style/)
 - Math rendering: [KaTeX](https://katex.org/)
 - Diagrams: [Mermaid](https://mermaid.js.org/)
-- AI: [Google Gemini API](https://ai.google.dev/)
+- AI: [Google Gemini API](https://ai.google.dev/) / [OpenAI API](https://platform.openai.com/)
 
 ## Requirements
 
-This project currently supports macOS only. Windows and Linux build/file-operation support has been removed for now.
+This project currently supports macOS and Windows. Linux build/file-operation support has been removed for now.
 
 ### Common
 
@@ -100,11 +113,13 @@ npm install
 
 ### 3. Configure AI (optional)
 
-You can enter the Gemini API key in the app settings, or provide it locally:
+You can enter the Gemini or OpenAI API key in the app settings, or provide it locally:
 
 ```env
 GEMINI_API_KEY=your_api_key_here
 ```
+
+OpenAI-compatible APIs are also supported; configure the base URL and key in settings.
 
 ### 4. Run in development mode
 
@@ -184,21 +199,32 @@ Recommended parity checks between development and release builds:
 - First-file open layout after cold start
 - Outline panel visibility and heading jump in preview mode
 - Linked scrolling in split mode
-- `[[file]]`, `[[#heading]]`, and `![[attachment]]` resolution
+- `[[file]]`, `[[#heading]]`, `[[note#^block]]`, and `![[attachment]]` resolution
 - External links, image attachments, and PDF export
+- Sidebar full-text search and locate current file
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl/Cmd + S` | Save current file |
-| `Ctrl/Cmd + E` | Toggle view mode |
-| `Ctrl/Cmd + J` | AI enhance |
-| `Ctrl/Cmd + F` | Open search |
-| `Ctrl/Cmd + 0` | Open settings |
-| `Ctrl/Cmd + O` | Toggle outline |
-| `Ctrl/Cmd + Z` | Undo |
-| `Ctrl/Cmd + Shift + Z` / `Ctrl/Cmd + Y` | Redo |
+| `Cmd/Ctrl + S` | Save current file |
+| `Cmd + Shift + V` | Toggle view mode |
+| `Cmd/Ctrl + J` | AI enhance |
+| `Cmd + Shift + F` | In-file search |
+| `Cmd + Shift + S` | Sidebar search |
+| `Cmd + Shift + 0` | Open settings |
+| `Cmd + Shift + O` | Toggle outline |
+| `Cmd + Shift + B` | Toggle sidebar |
+| `Cmd + Shift + T` | Toggle light/dark theme |
+| `Cmd + Shift + K` | Open knowledge base |
+| `Cmd + Shift + L` | Locate current file in sidebar |
+| `Cmd + Shift + H` | Export PDF |
+| `Cmd/Ctrl + N` | New note |
+| `Cmd/Ctrl + Shift + N` | New folder |
+| `Cmd/Ctrl + W` | Close tab |
+| `Cmd + Shift + -` | Cleanup unused attachments |
+| `Cmd/Ctrl + Z` | Undo |
+| `Cmd/Ctrl + Shift + Z` / `Cmd/Ctrl + Y` | Redo |
 
 ## Project Structure
 
@@ -221,9 +247,10 @@ markdown-press/
 
 - Dark mode is the default theme
 - `.trash` is an internal application directory and should not be edited manually
-- The preview pipeline supports wiki links, heading jumps, and attachment resolution
-- Settings allow separate English and Chinese font configuration
+- The preview pipeline supports wiki links, heading jumps, block references, and attachment resolution
+- Settings allow separate UI, editor, preview, and code font configuration
 - The bundled default Chinese font is LXGW WenKai; see `src/assets/fonts/LXGWWenKai-OFL.txt` for its license
+- External file change watch: if a file is modified outside the app with no unsaved edits, it reloads automatically
 
 ## Contributing
 
@@ -247,3 +274,4 @@ The application code is licensed under the [MIT License](./LICENSE). The bundled
 - [KaTeX](https://katex.org/)
 - [Mermaid](https://mermaid.js.org/)
 - [Google Gemini](https://ai.google.dev/)
+- [OpenAI](https://openai.com/)

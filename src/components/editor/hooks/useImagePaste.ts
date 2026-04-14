@@ -10,6 +10,7 @@ import type { AttachmentPasteFormat } from '../../../types';
 import { getFileSystem } from '../../../types/filesystem';
 import { useAppStore } from '../../../store/appStore';
 import { t } from '../../../utils/i18n';
+import { joinFsPath, normalizeSlashes, sanitizeResourceFolder } from '../../../utils/pathHelpers';
 
 export interface UseImagePasteOptions {
   rootFolderPath?: string | null;
@@ -25,30 +26,6 @@ export interface UseImagePasteReturn {
   handlePastedImage: (file: File, view: EditorView) => Promise<boolean>;
 }
 
-function getPathSeparator(path: string): '/' | '\\' {
-  return path.includes('\\') ? '\\' : '/';
-}
-
-function joinFsPath(basePath: string, ...segments: string[]): string {
-  return segments.filter(Boolean).reduce((currentPath, segment) => {
-    const separator = getPathSeparator(currentPath);
-    return currentPath.endsWith(separator)
-      ? `${currentPath}${segment}`
-      : `${currentPath}${separator}${segment}`;
-  }, basePath);
-}
-
-function normalizeSlashes(path: string): string {
-  return path.replace(/\\/g, '/');
-}
-
-function sanitizeResourceFolder(folder: string): string {
-  return folder
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/^\.\//, '');
-}
 
 function getImageExtension(mimeType: string): string {
   switch (mimeType.toLowerCase()) {

@@ -58,6 +58,43 @@ if (typeof window !== 'undefined') {
   logEnvironment();
 }
 
+const KnowledgeBaseOnboarding: React.FC<{
+  uiScaleStyle: React.CSSProperties;
+  uiFontFamily: string;
+  onOpen: () => void;
+}> = ({ uiScaleStyle, uiFontFamily, onOpen }) => {
+  const { t } = useI18n();
+  return (
+    <div
+      className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
+      style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
+    >
+      <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
+            M
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold">{t('app_chooseKnowledgeBase')}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('app_chooseKnowledgeBaseDesc')}</p>
+          </div>
+        </div>
+        <button
+          onClick={onOpen}
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium hover:opacity-90 transition-opacity"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+            <line x1="12" y1="15" x2="12" y2="10" />
+            <polyline points="9 13 12 10 15 13" />
+          </svg>
+          {t('app_openKnowledgeBase')}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const { t } = useI18n();
   const {
@@ -144,7 +181,7 @@ const App: React.FC = () => {
   }, [settings.uiFontFamily, settings.editorFontFamily, settings.previewFontFamily, settings.codeFontFamily]);
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
-  const { handleExportToHtml, handlePublishBlog } = useExportActions(forceSave, highlighter);
+  const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave, highlighter);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
@@ -333,7 +370,7 @@ const App: React.FC = () => {
         }
       },
       onOpenKnowledgeBase: () => { void handleSwitchKnowledgeBase(); },
-      onExportHtml: () => { void handleExportToHtml(); },
+      onExportPdf: () => { void handleExportToPdf(); },
     }
   );
 
@@ -485,6 +522,7 @@ const App: React.FC = () => {
   const currentKnowledgeBaseName = useMemo(() => getPathBasename(rootFolderPath), [rootFolderPath]);
   const uiFontFamily = useMemo(() => getResolvedUiFontFamily(settings), [settings.uiFontFamily]);
   const uiScaleStyle = useMemo(() => ({
+    '--ui-font-size': `${settings.uiFontSize}px`,
     '--ui-font-scale': `${settings.uiFontSize / defaultSettings.uiFontSize}`,
   }) as React.CSSProperties, [settings.uiFontSize]);
   // Show onboarding when no knowledge base is open
@@ -521,33 +559,11 @@ const App: React.FC = () => {
 
   if (shouldShowKnowledgeBaseOnboarding) {
     return (
-      <div
-        className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
-        style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
-      >
-        <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
-              M
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold">{t('app_chooseKnowledgeBase')}</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('app_chooseKnowledgeBaseDesc')}</p>
-            </div>
-          </div>
-          <button
-            onClick={handleSwitchKnowledgeBase}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium hover:opacity-90 transition-opacity"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-              <line x1="12" y1="15" x2="12" y2="10" />
-              <polyline points="9 13 12 10 15 13" />
-            </svg>
-            {t('app_openKnowledgeBase')}
-          </button>
-        </div>
-      </div>
+      <KnowledgeBaseOnboarding
+        uiScaleStyle={uiScaleStyle}
+        uiFontFamily={uiFontFamily}
+        onOpen={handleSwitchKnowledgeBase}
+      />
     );
   }
 
@@ -572,7 +588,7 @@ const App: React.FC = () => {
         onMoveNode={fileOps.handleMoveNode}
         onMoveToRoot={fileOps.handleMoveToRoot}
         currentKnowledgeBaseName={currentKnowledgeBaseName}
-        currentKnowledgeBasePath={rootFolderPath}
+        currentKnowledgeBasePath={rootFolderPath ?? undefined}
         onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
         isOpen={isSidebarOpen}
         searchFocusRequestKey={sidebarSearchRequestKey}
@@ -599,7 +615,7 @@ const App: React.FC = () => {
           onToggleTheme={toggleTheme}
           themeMode={settings.themeMode}
           onPublishBlog={handlePublishBlog}
-          onExportHtml={handleExportToHtml}
+          onExportPdf={handleExportToPdf}
         />
 
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
@@ -648,11 +664,15 @@ const App: React.FC = () => {
       />
 
       {notification && (
-        <div className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-50 animate-fade-in border glass ${
-          notification.type === 'success'
-            ? 'text-green-600 border-green-100 dark:border-green-900'
-            : 'text-red-500 border-red-100 dark:border-red-900'
-        }`}>
+        <div
+          className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-50 animate-fade-in border glass ${
+            notification.type === 'success'
+              ? 'text-green-600 border-green-100 dark:border-green-900'
+              : 'text-red-500 border-red-100 dark:border-red-900'
+          }`}
+          role="status"
+          aria-live="polite"
+        >
           {notification.msg}
         </div>
       )}

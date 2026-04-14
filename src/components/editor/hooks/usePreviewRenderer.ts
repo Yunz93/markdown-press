@@ -10,7 +10,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { parseFrontmatter } from '../../../utils/frontmatter';
-import { renderMarkdown, useMarkdownRenderer } from '../../../utils/markdown';
+import { renderMarkdown, useMarkdownRenderer, clearMarkdownCache } from '../../../utils/markdown';
 import { renderMermaidDiagrams } from '../../../utils/markdown-extensions';
 import { hydrateCachedPreviewImageSources, resolvePreviewSource, warmPreviewImage } from '../../../utils/previewImageCache';
 import { parseWikiLinkReference, extractWikiNoteFragment } from '../../../utils/wikiLinks';
@@ -226,7 +226,18 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   } = options;
 
   // Initialize markdown renderer
-  useMarkdownRenderer(highlighter, themeMode);
+  useMarkdownRenderer(highlighter ?? null, themeMode);
+
+  // Clear stale cache entries when the highlighter becomes available,
+  // ensuring previously-cached unhighlighted renders don't persist.
+  const hadHighlighterRef = useRef(Boolean(highlighter));
+  useEffect(() => {
+    const hasHighlighter = Boolean(highlighter);
+    if (hasHighlighter && !hadHighlighterRef.current) {
+      clearMarkdownCache();
+    }
+    hadHighlighterRef.current = hasHighlighter;
+  }, [highlighter]);
 
   // Parse markdown content
   const parsedContent = useMemo(() => {

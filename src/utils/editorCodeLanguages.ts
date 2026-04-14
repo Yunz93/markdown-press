@@ -13,7 +13,7 @@ function loadLegacyLanguage<TModule extends Record<string, unknown>>(
       throw new Error(`Legacy CodeMirror mode "${String(exportName)}" is not available.`);
     }
 
-    return new LanguageSupport(StreamLanguage.define(legacyMode as Parameters<typeof StreamLanguage.define>[0]));
+    return new LanguageSupport(StreamLanguage.define(legacyMode as unknown as Parameters<typeof StreamLanguage.define>[0]));
   };
 }
 
