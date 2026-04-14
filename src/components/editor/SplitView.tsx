@@ -294,7 +294,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
         </div>
 
         <div
-          className="w-1 hover:bg-accent-DEFAULT/50 z-10 absolute h-full flex items-center justify-center"
+          className="w-3 hover:bg-accent-DEFAULT/50 z-10 absolute h-full flex items-center justify-center"
           style={{
             left: `${editorWidth}%`,
             opacity: isSplitView ? 1 : 0,
@@ -306,7 +306,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
           }}
           onMouseDown={isSplitView ? handleMouseDown : undefined}
         >
-          <div className="h-8 w-1 rounded-full bg-gray-300 dark:bg-gray-600 opacity-0 hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-200/70 dark:bg-white/[0.06]" />
+          <div className="relative h-8 w-1 rounded-full bg-gray-300 dark:bg-gray-600 opacity-0 hover:opacity-100 transition-opacity" />
         </div>
 
         <div
