@@ -6,6 +6,7 @@ import { exportToHtml, exportToPdf } from '../utils/export';
 import { type Frontmatter } from '../types';
 import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../utils/fontSettings';
 import { buildSimpleBlogPostUrl, prepareSimpleBlogPublish } from '../utils/simpleBlogPublish';
+import { replaceLocalImagesWithHostingForPublish } from '../utils/publishLocalImagesToHosting';
 import { getFileSystem, isTauriEnvironment } from '../types/filesystem';
 import {
   isValidBlogRepoUrl,
@@ -226,12 +227,42 @@ export function useExportActions(
       console.log('[publish] currentFilePath:', activeFile.path);
       console.log('[publish] file tree entries:', latestFiles.length);
 
+      const hostingResult = await replaceLocalImagesWithHostingForPublish(contentToPublish, {
+        files: latestFiles,
+        rootFolderPath: latestRootFolderPath,
+        currentFilePath: activeFile.path,
+        settings: hydratedSettings,
+      });
+
+      if (!hostingResult.ok) {
+        if (hostingResult.reason === 'hosting_not_configured') {
+          showNotification(t(hydratedSettings.language, 'notifications_imageHostingNotConfigured'), 'error');
+        } else {
+          showNotification(
+            t(hydratedSettings.language, 'notifications_imageUploadFailed', { error: hostingResult.message }),
+            'error',
+          );
+        }
+        return;
+      }
+
+      let markdownForPublish = hostingResult.markdown;
+      if (hostingResult.uploadedCount > 0) {
+        setContentForFile(activeTabId, markdownForPublish);
+        const savedHosting = await forceSave(markdownForPublish);
+        if (!savedHosting) {
+          showNotification(t(hydratedSettings.language, 'notifications_saveBeforePublishFailed'), 'error');
+          return;
+        }
+        markdownForPublish = useAppStore.getState().fileContents[activeTabId] ?? markdownForPublish;
+      }
+
       const prepared = await prepareSimpleBlogPublish({
         files: latestFiles,
         blogSiteUrl: normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
         rootFolderPath: latestRootFolderPath,
         currentFilePath: activeFile.path,
-        markdownContent: contentToPublish,
+        markdownContent: markdownForPublish,
       });
 
       if (prepared.unresolvedImages.length > 0) {

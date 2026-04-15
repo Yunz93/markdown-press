@@ -117,9 +117,30 @@ const createMarkdownIt = () => {
   initKaTeX(md);
   initMermaid(md);
 
+  /** Percent-encode spaces and non-ASCII in http(s) URLs for valid HTML attributes. */
+  const normalizeHttpUrlForHtmlAttribute = (url: string): string => {
+    if (!/^https?:\/\//i.test(url)) return url;
+    try {
+      return encodeURI(decodeURI(url));
+    } catch {
+      try {
+        return encodeURI(url);
+      } catch {
+        return url;
+      }
+    }
+  };
+
   const defaultImageRenderer = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
+    const srcIdx = token.attrIndex('src');
+    if (srcIdx >= 0 && token.attrs) {
+      const raw = token.attrs[srcIdx][1];
+      if (typeof raw === 'string') {
+        token.attrs[srcIdx][1] = normalizeHttpUrlForHtmlAttribute(raw);
+      }
+    }
     token.attrSet('decoding', 'sync');
     token.attrSet('loading', 'eager');
     token.attrSet('fetchpriority', 'high');
@@ -129,6 +150,19 @@ const createMarkdownIt = () => {
     }
 
     return self.renderToken(tokens, idx, options);
+  };
+
+  const defaultLinkOpen = md.renderer.rules.link_open;
+  md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    const token = tokens[idx];
+    const hrefIdx = token.attrIndex('href');
+    if (hrefIdx >= 0 && token.attrs) {
+      const raw = token.attrs[hrefIdx][1];
+      if (typeof raw === 'string') {
+        token.attrs[hrefIdx][1] = normalizeHttpUrlForHtmlAttribute(raw);
+      }
+    }
+    return defaultLinkOpen?.(tokens, idx, options, env, self) || self.renderToken(tokens, idx, options);
   };
 
   return md;
@@ -249,6 +283,32 @@ function createCacheKey(markdown: string, options: MarkdownRenderOptions): strin
 }
 
 /**
+ * CommonMark ends a bare link destination at the first space. Wrap http(s) URLs that contain
+ * spaces in angle brackets so markdown-it parses the full destination (fixes broken <img src>).
+ */
+function angleBracketBareMarkdownHttpUrls(markdown: string): string {
+  const wrap = (prefix: string, url: string, suffix: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed || !/\s/.test(trimmed) || trimmed.startsWith('<')) {
+      return `${prefix}${url}${suffix}`;
+    }
+    return `${prefix}<${trimmed}>${suffix}`;
+  };
+
+  let out = markdown.replace(
+    /(!\[[^\]]*\]\()\s*(https?:\/\/[^)\n]+)\s*(\))/gi,
+    (full, open: string, url: string, close: string) => wrap(open, url, close),
+  );
+
+  out = out.replace(
+    /(\[[^\]]+\]\()\s*(https?:\/\/[^)\n]+)\s*(\))/gi,
+    (full, open: string, url: string, close: string) => wrap(open, url, close),
+  );
+
+  return out;
+}
+
+/**
  * Render markdown to HTML with sanitization and caching
  */
 export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
@@ -271,7 +331,8 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   configureFenceRenderer(md, highlighter, themeMode);
 
   const env: MarkdownRenderEnv = {};
-  const renderedHtml = md.render(markdown, env);
+  const normalizedMarkdown = angleBracketBareMarkdownHttpUrls(markdown);
+  const renderedHtml = md.render(normalizedMarkdown, env);
 
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {

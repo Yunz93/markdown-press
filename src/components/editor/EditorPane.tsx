@@ -24,8 +24,8 @@ import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 import { uploadImageToHosting, isImageHostingEnabled } from '../../services/imageHostingService';
-import { readFile as tauriReadFile, exists as tauriExists } from '@tauri-apps/plugin-fs';
-import { join, dirname } from '@tauri-apps/api/path';
+import { readFile as tauriReadFile } from '@tauri-apps/plugin-fs';
+import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -365,28 +365,23 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     setIsUploadingSingle(true);
 
     try {
-      let resolvedPath: string;
-      const src = decodeURIComponent(match.src);
+      const attachmentContext = createAttachmentResolverContext(files, rootFolderPath, currentFilePath);
+      const resolved = await resolveAttachmentTarget(attachmentContext, match.src.trim());
 
-      if (src.startsWith('/') || /^[A-Z]:\\/i.test(src)) {
-        resolvedPath = src;
-      } else if (currentFilePath) {
-        const dir = await dirname(currentFilePath);
-        resolvedPath = await join(dir, src);
-      } else if (rootFolderPath) {
-        resolvedPath = await join(rootFolderPath, src);
-      } else {
-        throw new Error('Cannot resolve image path');
-      }
-
-      const fileExists = await tauriExists(resolvedPath);
-      if (!fileExists) {
-        showNotification(t('notifications_imageFileNotFound', { path: src }), 'error');
+      if (!resolved) {
+        let displayPath = match.src.trim();
+        try {
+          displayPath = decodeURIComponent(displayPath);
+        } catch {
+          /* keep raw */
+        }
+        showNotification(t('notifications_imageFileNotFound', { path: displayPath }), 'error');
         return;
       }
 
+      const { path: resolvedPath, name: resolvedName } = resolved;
       const data = await tauriReadFile(resolvedPath);
-      const filename = src.split('/').pop() || 'image.png';
+      const filename = resolvedName || match.src.split(/[/\\]/).pop() || 'image.png';
       const result = await uploadImageToHosting(data.buffer as ArrayBuffer, filename, currentSettings);
 
       const replacement = `![${match.alt}](${result.url})`;
@@ -402,7 +397,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     } finally {
       setIsUploadingSingle(false);
     }
-  }, [imageMenu, codeMirror.view, closeImageMenu, currentFilePath, rootFolderPath, showNotification, t]);
+  }, [imageMenu, codeMirror.view, closeImageMenu, currentFilePath, rootFolderPath, files, showNotification, t]);
 
   // Register/clear editor view for selection bridge
   useEffect(() => {

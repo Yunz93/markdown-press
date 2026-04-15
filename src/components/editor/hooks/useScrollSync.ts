@@ -64,15 +64,20 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
 
   // 发射滚动百分比
   const emitScrollPercentage = useCallback((scrollContainer: HTMLElement) => {
-    if (isSyncingScroll.current) return;
+    const denom = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    if (denom <= 0) return;
+
+    const percentage = getNormalizedScrollPercentage(scrollContainer.scrollTop, denom);
+
+    // 程序化滚动期间仍更新 ref，避免与真实 scrollTop 脱节导致分屏联动偶发失效
+    if (isSyncingScroll.current) {
+      lastScrollPercentage.current = percentage;
+      return;
+    }
 
     const onScrollCallback = onScrollRef.current;
     if (!onScrollCallback) return;
 
-    const percentage = getNormalizedScrollPercentage(
-      scrollContainer.scrollTop,
-      scrollContainer.scrollHeight - scrollContainer.clientHeight
-    );
     if (Math.abs(percentage - lastScrollPercentage.current) <= emitThresholdRef.current) return;
 
     lastScrollPercentage.current = percentage;
@@ -102,6 +107,14 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
 
     unlockAnimationFrameRef.current = requestAnimationFrame(() => {
       unlockAnimationFrameRef.current = null;
+      const view = viewRef.current;
+      if (view) {
+        const dom = view.scrollDOM;
+        const d = dom.scrollHeight - dom.clientHeight;
+        if (d > 0) {
+          lastScrollPercentage.current = getNormalizedScrollPercentage(dom.scrollTop, d);
+        }
+      }
       isSyncingScroll.current = false;
     });
   }, []);
@@ -174,6 +187,10 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
       cancelScrollSync();
       isSyncingScroll.current = true;
       scrollDom.scrollTop = targetScrollTop;
+      const d = scrollDom.scrollHeight - scrollDom.clientHeight;
+      if (d > 0) {
+        lastScrollPercentage.current = getNormalizedScrollPercentage(scrollDom.scrollTop, d);
+      }
       scheduleSyncUnlock();
       return;
     }

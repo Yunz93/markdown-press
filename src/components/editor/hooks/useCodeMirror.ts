@@ -223,18 +223,18 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
             compartments.placeholder.of(cmPlaceholder(placeholder)),
             EditorView.domEventHandlers({
               scroll: (() => {
-                // Throttle scroll events for better performance
-                let lastScrollTime = 0;
-                const SCROLL_THROTTLE = 16; // ~60fps
+                // 每帧合并多次 scroll，避免时间节流丢掉末次位置导致分屏联动偶发不同步
+                let rafScheduled = false;
                 return () => {
-                  const now = performance.now();
-                  if (now - lastScrollTime < SCROLL_THROTTLE) return false;
-                  lastScrollTime = now;
-                  
-                  const scrollHandler = onScrollRef.current;
-                  if (scrollHandler) {
-                    scrollHandler();
-                  }
+                  if (rafScheduled) return false;
+                  rafScheduled = true;
+                  requestAnimationFrame(() => {
+                    rafScheduled = false;
+                    const scrollHandler = onScrollRef.current;
+                    if (scrollHandler) {
+                      scrollHandler();
+                    }
+                  });
                   return false;
                 };
               })(),

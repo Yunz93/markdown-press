@@ -125,6 +125,56 @@ fn normalize_path_prefix(prefix: &str) -> String {
 
 // ─── GitHub Provider ─────────────────────────────────────────────────────────
 
+/// Accepts `owner/repo`, `https://github.com/owner/repo`, `git@github.com:owner/repo.git`, etc.
+fn parse_github_repo_slug(raw: &str) -> Result<String, String> {
+    fn is_valid_segment(segment: &str) -> bool {
+        !segment.is_empty()
+            && segment
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
+    }
+
+    fn two_segment_from_tail(tail: &str) -> Result<String, String> {
+        let trimmed = tail.trim().trim_matches('/').trim_end_matches(".git");
+        let mut parts = trimmed.split('/').filter(|p| !p.is_empty());
+        let owner = parts
+            .next()
+            .ok_or_else(|| "GitHub repo: missing owner.".to_string())?;
+        let name = parts
+            .next()
+            .ok_or_else(|| "GitHub repo: missing repository name (use owner/repo or a github.com URL).".to_string())?;
+        if parts.next().is_some() {
+            return Err(
+                "GitHub repo must be only owner/repo, not a path inside the repository.".to_string(),
+            );
+        }
+        if !is_valid_segment(owner) || !is_valid_segment(name) {
+            return Err("Invalid owner or repository name.".to_string());
+        }
+        Ok(format!("{}/{}", owner, name))
+    }
+
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("GitHub repo is empty.".to_string());
+    }
+
+    if let Some(tail) = trimmed.strip_prefix("https://github.com/") {
+        return two_segment_from_tail(tail);
+    }
+    if let Some(tail) = trimmed.strip_prefix("http://github.com/") {
+        return two_segment_from_tail(tail);
+    }
+    if let Some(tail) = trimmed.strip_prefix("github.com/") {
+        return two_segment_from_tail(tail);
+    }
+    if let Some(tail) = trimmed.strip_prefix("git@github.com:") {
+        return two_segment_from_tail(tail);
+    }
+
+    two_segment_from_tail(trimmed)
+}
+
 #[derive(Debug, Deserialize)]
 struct GitHubCreateContentResponse {
     content: GitHubContentInfo,
@@ -134,6 +184,55 @@ struct GitHubCreateContentResponse {
 struct GitHubContentInfo {
     download_url: Option<String>,
     path: String,
+}
+
+/// GET /repos/{owner}/{repo}/contents/{path} — returns `sha` when the file already exists.
+#[derive(Debug, Deserialize)]
+struct GitHubGetContentsResponse {
+    sha: String,
+}
+
+async fn github_get_existing_file_sha(
+    client: &Client,
+    owner: &str,
+    repo: &str,
+    encoded_path: &str,
+    branch: &str,
+    token: &str,
+) -> Result<Option<String>, String> {
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/contents/{}?ref={}",
+        owner,
+        repo,
+        encoded_path,
+        percent_encode_query_component(branch)
+    );
+
+    let response = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await
+        .map_err(|e| format!("GitHub GET contents failed: {}", e))?;
+
+    if response.status() == 404 {
+        return Ok(None);
+    }
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("GitHub GET contents returned {}: {}", status, text));
+    }
+
+    let meta: GitHubGetContentsResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse GitHub GET contents: {}", e))?;
+
+    Ok(Some(meta.sha))
 }
 
 async fn upload_to_github(
@@ -148,24 +247,40 @@ async fn upload_to_github(
         return Err("GitHub repo and token are required.".to_string());
     }
 
-    let (owner, repo) = config.repo.split_once('/')
-        .ok_or("GitHub repo must be in 'owner/repo' format.")?;
+    let repo_slug = parse_github_repo_slug(&config.repo)?;
+    let (owner, repo) = repo_slug
+        .split_once('/')
+        .ok_or_else(|| "GitHub repo must be in 'owner/repo' format.".to_string())?;
 
     let prefix = normalize_path_prefix(&config.path);
     let file_path = format!("{}{}", prefix, filename);
     let branch = if config.branch.is_empty() { "main" } else { &config.branch };
 
     let client = create_upload_client()?;
+    let encoded_path = percent_encode_path(&file_path);
+    let existing_sha = github_get_existing_file_sha(
+        &client,
+        owner,
+        repo,
+        &encoded_path,
+        branch,
+        &config.token,
+    )
+    .await?;
+
     let url = format!(
         "https://api.github.com/repos/{}/{}/contents/{}",
-        owner, repo, percent_encode_path(&file_path)
+        owner, repo, encoded_path
     );
 
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "message": format!("upload: {}", filename),
         "content": BASE64_STANDARD.encode(image_bytes),
         "branch": branch,
     });
+    if let Some(ref sha) = existing_sha {
+        body["sha"] = serde_json::Value::String(sha.clone());
+    }
 
     let response = client
         .put(&url)
@@ -199,12 +314,15 @@ async fn upload_to_github(
 
     let url = if !config.custom_domain.is_empty() {
         let domain = config.custom_domain.trim_end_matches('/');
-        format!("{}/{}", domain, result.content.path)
+        format!("{}/{}", domain, percent_encode_path(&result.content.path))
     } else {
         result.content.download_url.unwrap_or_else(|| {
             format!(
                 "https://raw.githubusercontent.com/{}/{}/{}/{}",
-                owner, repo, branch, file_path
+                owner,
+                repo,
+                branch,
+                percent_encode_path(&file_path)
             )
         })
     };
@@ -546,6 +664,22 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+/// Encode a string for use in a query value (e.g. `?ref=` branch names with `/`).
+fn percent_encode_query_component(value: &str) -> String {
+    value
+        .as_bytes()
+        .iter()
+        .map(|&b| {
+            let c = b as char;
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
+                c.to_string()
+            } else {
+                format!("%{:02X}", b)
+            }
+        })
+        .collect()
+}
+
 fn percent_encode_path(path: &str) -> String {
     path.split('/')
         .map(|segment| {
@@ -616,4 +750,38 @@ fn day_of_week(y: i32, m: u32, d: u32) -> u32 {
     let t = [0i32, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
     let y = if m < 3 { y - 1 } else { y };
     ((y + y / 4 - y / 100 + y / 400 + t[(m - 1) as usize] + d as i32).rem_euclid(7)) as u32
+}
+
+#[cfg(test)]
+mod github_slug_tests {
+    use super::parse_github_repo_slug;
+
+    #[test]
+    fn accepts_owner_repo() {
+        assert_eq!(
+            parse_github_repo_slug("Yunz93/PicRepo").unwrap(),
+            "Yunz93/PicRepo"
+        );
+    }
+
+    #[test]
+    fn accepts_https_github_url() {
+        assert_eq!(
+            parse_github_repo_slug("https://github.com/Yunz93/PicRepo").unwrap(),
+            "Yunz93/PicRepo"
+        );
+    }
+
+    #[test]
+    fn accepts_git_ssh() {
+        assert_eq!(
+            parse_github_repo_slug("git@github.com:Yunz93/PicRepo.git").unwrap(),
+            "Yunz93/PicRepo"
+        );
+    }
+
+    #[test]
+    fn rejects_plain_https_without_github_host() {
+        assert!(parse_github_repo_slug("https://example.com/a/b").is_err());
+    }
 }

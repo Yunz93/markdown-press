@@ -242,6 +242,22 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     scroll.syncScrollTo(element, syncedPercentage);
   }, [scroll, syncedPercentage]);
 
+  useLayoutEffect(() => {
+    const element = previewRef.current;
+    if (!element) return;
+    scroll.flushPendingScrollSync(element);
+  }, [scroll, renderer.enhancedBodyHtml, renderer.parsedContent.bodyHTML, activeTabId]);
+
+  useEffect(() => {
+    const element = previewRef.current;
+    if (!element) return;
+    const ro = new ResizeObserver(() => {
+      scroll.flushPendingScrollSync(element);
+    });
+    ro.observe(element);
+    return () => ro.disconnect();
+  }, [scroll]);
+
   useEffect(() => {
     const element = previewRef.current;
     if (!element) return;

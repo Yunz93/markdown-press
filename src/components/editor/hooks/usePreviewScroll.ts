@@ -29,6 +29,8 @@ export interface UsePreviewScrollReturn {
   cancelScrollSync: () => void;
   // 同步到百分比
   syncScrollTo: (element: HTMLElement, percentage: number, options?: { immediate?: boolean }) => void;
+  // 布局就绪后补应用（例如预览高度曾为零）
+  flushPendingScrollSync: (element: HTMLElement) => void;
   // 检查是否正在同步
   isSyncing: () => boolean;
 }
@@ -46,6 +48,7 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   const syncDurationRef = useRef(SYNC_MIN_DURATION_MS);
   const syncedElementRef = useRef<HTMLElement | null>(null);
   const unlockAnimationFrameRef = useRef<number | null>(null);
+  const pendingScrollPercentageRef = useRef<number | null>(null);
   const scrollThresholdRef = useRef(DEFAULT_SCROLL_THRESHOLD);
   const emitThresholdRef = useRef(DEFAULT_SCROLL_EMIT_THRESHOLD);
 
@@ -74,6 +77,7 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
     syncStartTimeRef.current = 0;
     syncedElementRef.current = null;
     isSyncingScroll.current = false;
+    pendingScrollPercentageRef.current = null;
   }, []);
 
   const scheduleSyncUnlock = useCallback(() => {
@@ -147,28 +151,54 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
   // Sync scroll to percentage
   const syncScrollTo = useCallback((element: HTMLElement, percentage: number, options?: { immediate?: boolean }) => {
     const scrollHeight = element.scrollHeight - element.clientHeight;
-    if (scrollHeight <= 0) return;
+    if (scrollHeight <= 0) {
+      pendingScrollPercentageRef.current = percentage;
+      return;
+    }
 
     const targetScroll = scrollHeight * percentage;
 
-    if (Math.abs(element.scrollTop - targetScroll) <= scrollThresholdRef.current) return;
+    if (Math.abs(element.scrollTop - targetScroll) <= scrollThresholdRef.current) {
+      pendingScrollPercentageRef.current = null;
+      return;
+    }
+    pendingScrollPercentageRef.current = null;
     if (options?.immediate) {
       cancelScrollSync();
+      isSyncingScroll.current = true;
       element.scrollTop = targetScroll;
+      const d = element.scrollHeight - element.clientHeight;
+      if (d > 0) {
+        lastScrollPercentage.current = getNormalizedScrollPercentage(element.scrollTop, d);
+      }
+      scheduleSyncUnlock();
       return;
     }
     animateSyncedScroll(element, targetScroll);
-  }, [animateSyncedScroll, cancelScrollSync]);
+  }, [animateSyncedScroll, cancelScrollSync, scheduleSyncUnlock]);
+
+  const flushPendingScrollSync = useCallback((element: HTMLElement) => {
+    const pending = pendingScrollPercentageRef.current;
+    if (pending === null) return;
+    const scrollHeight = element.scrollHeight - element.clientHeight;
+    if (scrollHeight <= 0) return;
+    syncScrollTo(element, pending, { immediate: true });
+  }, [syncScrollTo]);
 
   // Handle scroll event
   const handleScroll = useCallback((element: HTMLElement) => {
-    const onScrollCallback = onScrollRef.current;
-    if (!onScrollCallback || isSyncingScroll.current) return;
+    const denom = element.scrollHeight - element.clientHeight;
+    if (denom <= 0) return;
 
-    const percentage = getNormalizedScrollPercentage(
-      element.scrollTop,
-      element.scrollHeight - element.clientHeight
-    );
+    const percentage = getNormalizedScrollPercentage(element.scrollTop, denom);
+
+    if (isSyncingScroll.current) {
+      lastScrollPercentage.current = percentage;
+      return;
+    }
+
+    const onScrollCallback = onScrollRef.current;
+    if (!onScrollCallback) return;
 
     if (Math.abs(percentage - lastScrollPercentage.current) <= emitThresholdRef.current) return;
 
@@ -184,6 +214,7 @@ export function usePreviewScroll(options: UsePreviewScrollOptions): UsePreviewSc
     handleScroll,
     cancelScrollSync,
     syncScrollTo,
+    flushPendingScrollSync,
     isSyncing,
-  }), [cancelScrollSync, handleScroll, isSyncing, syncScrollTo]);
+  }), [cancelScrollSync, flushPendingScrollSync, handleScroll, isSyncing, syncScrollTo]);
 }

@@ -197,13 +197,13 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
                   role="switch"
                   aria-checked={ih.keepLocalCopy}
                   onClick={() => updateIH({ keepLocalCopy: !ih.keepLocalCopy })}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                    ih.keepLocalCopy ? 'bg-accent-DEFAULT' : 'bg-gray-200 dark:bg-white/10'
+                  className={`w-10 h-6 rounded-full transition-colors duration-200 relative shrink-0 cursor-pointer ${
+                    ih.keepLocalCopy ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
                   }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      ih.keepLocalCopy ? 'translate-x-5' : 'translate-x-0'
+                    className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 shadow-sm pointer-events-none ${
+                      ih.keepLocalCopy ? 'translate-x-4' : 'translate-x-0'
                     }`}
                   />
                 </button>
@@ -226,7 +226,11 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
               placeholder="owner/repo"
               className={inputClass}
             />
-            <p className={descClass}>{isZh ? '格式：owner/repo' : 'Format: owner/repo'}</p>
+            <p className={descClass}>
+              {isZh
+                ? '格式：owner/repo，或粘贴 https://github.com/owner/repo'
+                : 'Use owner/repo or paste https://github.com/owner/repo'}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
