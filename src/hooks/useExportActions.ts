@@ -217,15 +217,26 @@ export function useExportActions(
         return;
       }
 
-      const contentToPublish = useAppStore.getState().fileContents[activeTabId] ?? nextContent;
+      const storeState = useAppStore.getState();
+      const contentToPublish = storeState.fileContents[activeTabId] ?? nextContent;
+      const latestFiles = storeState.files;
+      const latestRootFolderPath = storeState.rootFolderPath;
+
+      console.log('[publish] rootFolderPath:', latestRootFolderPath);
+      console.log('[publish] currentFilePath:', activeFile.path);
+      console.log('[publish] file tree entries:', latestFiles.length);
 
       const prepared = await prepareSimpleBlogPublish({
-        files,
+        files: latestFiles,
         blogSiteUrl: normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
-        rootFolderPath,
+        rootFolderPath: latestRootFolderPath,
         currentFilePath: activeFile.path,
         markdownContent: contentToPublish,
       });
+
+      if (prepared.unresolvedImages.length > 0) {
+        console.warn('[publish] unresolved local images:', prepared.unresolvedImages);
+      }
 
       await invokePublishWithTimeout({
         request: {
@@ -254,7 +265,16 @@ export function useExportActions(
         return;
       }
 
-      showNotification(t(hydratedSettings.language, 'notifications_publishSuccess'), 'success');
+      if (prepared.unresolvedImages.length > 0) {
+        showNotification(
+          t(hydratedSettings.language, 'notifications_unresolvedImages', {
+            count: String(prepared.unresolvedImages.length),
+          }),
+          'error',
+        );
+      } else {
+        showNotification(t(hydratedSettings.language, 'notifications_publishSuccess'), 'success');
+      }
     } catch (error) {
       console.error('Failed to publish blog:', error);
       const message = error instanceof Error

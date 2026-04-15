@@ -6,8 +6,8 @@ status: draft
 slug: ''
 aliases: ''
 is_publish: false
-create_time: 2026-03-21
-update_time: "2026-03-21 00:00:00"
+"date created": 2026-03-21
+"date modified": "2026-03-21 00:00:00"
 ---
 
 ## 主要内容

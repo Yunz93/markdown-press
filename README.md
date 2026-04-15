@@ -52,7 +52,7 @@ xattr -cr /Applications/M記.app
 - 支持 Obsidian 知识库内联语法：`[[note]]`、`[[note|alias]]`、`[[#heading]]`、`[[note#^block]]` 块引用
 - 支持附件嵌入 `![[path]]`，可选指定尺寸（如 `![[img|600]]`、`![[img|600x400]]`）
 - 图片粘贴自动保存至资源文件夹，支持 Markdown / Obsidian 两种链接格式
-- 编辑并保存时，如果 frontmatter 中存在 `update_time`，应用会自动刷新它的值
+- 编辑并保存时，如果 frontmatter 中存在 `date modified`（或 `update_time` 等兼容键名），应用会自动刷新它的值
 
 ### 文件与侧边栏
 
@@ -141,8 +141,8 @@ xattr -cr /Applications/M記.app
 - 博客仓库中的 Markdown 文件名保持当前文件名，不会因为 `slug` 或 `aliases` 改名
 - simple-blog 的真实访问地址由 `slug` 决定；如果需要英文 URL，应手动填写 `slug`
 - `aliases` 不参与发布 URL 计算，只作为文章别名字段保留
-- 新建笔记默认 metadata 模板已内置 `slug`、`aliases`、`create_time`、`update_time`
-- 编辑并保存时，如果 frontmatter 中存在 `update_time`，应用会自动刷新它的值
+- 新建笔记默认 metadata 模板已内置 `slug`、`aliases`、`date created`、`date modified`
+- 编辑并保存时，如果 frontmatter 中存在 `date modified`（或 `update_time` 等兼容键名），应用会自动刷新它的值
 
 支持的仓库格式：
 

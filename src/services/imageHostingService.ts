@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { AppSettings, ImageHostingProvider } from '../types';
 import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
+import { hydrateSensitiveSettingsIntoStore } from './secureSettingsService';
 
 export interface ImageUploadResult {
   url: string;
@@ -92,7 +93,8 @@ export async function uploadImageToHosting(
     await waitForTauri(5000);
   }
 
-  const configJson = buildProviderConfigJson(settings);
+  const freshSettings = await hydrateSensitiveSettingsIntoStore(settings);
+  const configJson = buildProviderConfigJson(freshSettings);
   const imageBase64 = arrayBufferToBase64(imageData);
 
   const result = await invoke<{ url: string }>('upload_image_to_hosting', {

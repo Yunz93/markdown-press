@@ -180,7 +180,18 @@ async fn upload_to_github(
     if !response.status().is_success() {
         let status = response.status();
         let text = response.text().await.unwrap_or_default();
-        return Err(format!("GitHub API returned {}: {}", status, text));
+        let hint = if status.as_u16() == 404 {
+            let token_len = config.token.len();
+            format!(
+                " [repo={}/{}, branch={}, token={}...({} chars)]",
+                owner, repo, branch,
+                if token_len > 4 { &config.token[..4] } else { "?" },
+                token_len
+            )
+        } else {
+            String::new()
+        };
+        return Err(format!("GitHub API returned {}: {}{}", status, text, hint));
     }
 
     let result: GitHubCreateContentResponse = response.json().await

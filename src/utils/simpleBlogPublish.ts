@@ -16,6 +16,7 @@ export interface PreparedSimpleBlogPublish {
   postRelativePath: string;
   assetDirectoryRelativePath: string;
   assets: SimpleBlogPublishAsset[];
+  unresolvedImages: string[];
 }
 
 interface PrepareSimpleBlogPublishOptions {
@@ -336,6 +337,7 @@ export async function prepareSimpleBlogPublish(
   const resolverContext = createAttachmentResolverContext(files, rootFolderPath, currentFilePath);
   const assetMap = new Map<string, SimpleBlogPublishAsset>();
   const markdownFileContentCache = new Map<string, Promise<string | null>>();
+  const unresolvedImages: string[] = [];
   let assetCounter = 0;
 
   const readMarkdownFileContent = async (file: FileNode): Promise<string | null> => {
@@ -391,6 +393,7 @@ export async function prepareSimpleBlogPublish(
 
     const resolved = await resolveAttachmentTarget(resolverContext, reference.target);
     if (!resolved) {
+      unresolvedImages.push(reference.target);
       return match[0];
     }
 
@@ -399,6 +402,8 @@ export async function prepareSimpleBlogPublish(
     return `![${altText}](/${asset.targetRelativePath})`;
   });
 
+  const alreadyRewrittenPrefix = `/${assetDirectoryRelativePath}/`;
+
   transformedBody = await replaceAsync(transformedBody, MARKDOWN_IMAGE_REGEX, async (match) => {
     const altText = match[1] || '';
     const target = decodeMarkdownDestination(match[2]);
@@ -406,8 +411,13 @@ export async function prepareSimpleBlogPublish(
       return match[0];
     }
 
+    if (target.startsWith(alreadyRewrittenPrefix)) {
+      return match[0];
+    }
+
     const resolved = await resolveAttachmentTarget(resolverContext, target);
     if (!resolved) {
+      unresolvedImages.push(target);
       return match[0];
     }
 
@@ -456,10 +466,24 @@ export async function prepareSimpleBlogPublish(
     return `${prefix}[${label}](${appendWikiLinkFragment(targetUrl, reference)})`;
   });
 
+  if (unresolvedImages.length > 0) {
+    console.warn(
+      `[publish] ${unresolvedImages.length} local image(s) could not be resolved and will be skipped:`,
+      unresolvedImages,
+    );
+  }
+
+  const assets = Array.from(assetMap.values());
+  console.log(
+    `[publish] prepared ${assets.length} asset(s) for publish`,
+    assets.length > 0 ? assets.map((a) => a.targetRelativePath) : '(none)',
+  );
+
   return {
     markdownContent: `${generateFrontmatter(published.frontmatter)}${transformedBody}`,
     postRelativePath,
     assetDirectoryRelativePath,
-    assets: Array.from(assetMap.values()),
+    assets,
+    unresolvedImages,
   };
 }

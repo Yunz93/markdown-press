@@ -44,8 +44,8 @@ export const DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'slug', defaultValue: '' },
   { key: 'aliases', defaultValue: '' },
   { key: 'is_publish', defaultValue: 'false' },
-  { key: 'create_time', defaultValue: '{now:datetime}' },
-  { key: 'update_time', defaultValue: '{now:datetime}' },
+  { key: 'date created', defaultValue: '{now:datetime}' },
+  { key: 'date modified', defaultValue: '{now:datetime}' },
 ];
 
 const AUTO_REFRESH_UPDATE_TIME_KEYS = new Set([
@@ -84,8 +84,8 @@ function fieldsMatch(fields: MetadataField[], expectedFields: readonly MetadataF
 }
 
 function renameLegacyMetadataKey(key: string): string {
-  if (key === 'date created') return 'create_time';
-  if (key === 'date modified') return 'update_time';
+  if (key === 'create_time') return 'date created';
+  if (key === 'update_time') return 'date modified';
   return key;
 }
 
@@ -184,6 +184,13 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
     return cloneMetadataFields(DEFAULT_METADATA_FIELDS);
   }
 
+  if (
+    fieldsMatch(rawFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS)
+    || fieldsMatch(rawFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS_WITH_SECONDS)
+  ) {
+    return cloneMetadataFields(DEFAULT_METADATA_FIELDS);
+  }
+
   const fields = rawFields
     .map((field): MetadataField | null => {
       const key = renameLegacyMetadataKey(field.key);
@@ -207,13 +214,6 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
     if (seenKeys.has(field.key)) continue;
     seenKeys.add(field.key);
     dedupedFields.push(field);
-  }
-
-  if (
-    fieldsMatch(dedupedFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS)
-    || fieldsMatch(dedupedFields, RENAMED_LEGACY_DEFAULT_METADATA_FIELDS_WITH_SECONDS)
-  ) {
-    return cloneMetadataFields(DEFAULT_METADATA_FIELDS);
   }
 
   return dedupedFields;

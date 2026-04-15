@@ -49,7 +49,7 @@ Download the `.exe` installer and run it. If Windows SmartScreen blocks the laun
 - Block references with `[[note#^block]]`
 - Local attachment embeds with `![[path/to/file]]`, optional sizing via `![[img|600]]` or `![[img|600x400]]`
 - Image paste auto-saves to the resource folder, with Markdown or Obsidian link format
-- `update_time` in frontmatter is automatically refreshed on save
+- `date modified` (or compatible keys such as `update_time`) in frontmatter is automatically refreshed on save
 
 ### Files and Sidebar
 - Folder-based local knowledge base workflow
@@ -124,8 +124,8 @@ Notes:
 - The actual public URL in `simple-blog` is determined by `slug`
 - If you want an English URL, fill in `slug` explicitly
 - `aliases` is kept as metadata only and is not used to build the publish URL
-- New-note metadata templates include `slug`, `aliases`, `create_time`, and `update_time`
-- When a note is edited and saved, `update_time` is refreshed automatically if it exists in frontmatter
+- New-note metadata templates include `slug`, `aliases`, `date created`, and `date modified`
+- When a note is edited and saved, `date modified` (or compatible keys such as `update_time`) is refreshed automatically if it exists in frontmatter
 - During publishing, Obsidian-style wiki links are converted into clickable Markdown links when the target note is already published
 
 ## License
