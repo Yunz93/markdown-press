@@ -333,24 +333,21 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     }
   }, [activeTabId, flattenedHeadings, renderer.enhancedBodyHtml, isMarkdownPreview]);
 
-  // Render Mermaid diagrams - debounced and limited for performance
-  useEffect(() => {
+  // Run Mermaid after the preview DOM is committed (layout phase avoids races with deferred
+  // markdown HTML and removes the visible "raw text in gray box" flash from setTimeout).
+  useLayoutEffect(() => {
     if (!isMarkdownPreview) return;
     const container = previewRef.current;
     if (!container) return;
 
-    // Count mermaid diagrams to avoid performance issues
     const mermaidCount = container.querySelectorAll('.mermaid').length;
     if (mermaidCount > 20) {
       console.warn(`[PreviewPane] Too many Mermaid diagrams (${mermaidCount}), skipping render`);
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      renderMermaidDiagrams(container);
-    }, 100); // Increased delay for better batching
-    return () => window.clearTimeout(timer);
-  }, [renderer.enhancedBodyHtml, isMarkdownPreview, settings.themeMode]);
+    void renderMermaidDiagrams(container, { themeMode: settings.themeMode as 'light' | 'dark' });
+  }, [renderer.enhancedBodyHtml, renderer.parsedContent.bodyHTML, isMarkdownPreview, settings.themeMode]);
 
   // Asset preview (image/video/PDF)
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');

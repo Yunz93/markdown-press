@@ -9,27 +9,35 @@ const katexOptions: katex.KatexOptions = {
 };
 
 let mermaidModulePromise: Promise<typeof import('mermaid')> | null = null;
-let mermaidInitialized = false;
 
-async function getMermaid() {
+async function loadMermaidModule() {
   if (!mermaidModulePromise) {
     mermaidModulePromise = import('mermaid');
   }
   const module = await mermaidModulePromise;
-  const mermaid = module.default;
+  return module.default;
+}
 
-  if (!mermaidInitialized) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'strict',
-      fontFamily: 'inherit',
-    });
-    mermaidInitialized = true;
+/** Last `themeMode` passed to `mermaid.initialize` (re-run when it changes). */
+let lastMermaidThemeMode: 'light' | 'dark' | null = null;
+
+async function ensureMermaidConfigured(themeMode: 'light' | 'dark' = 'light') {
+  const mermaid = await loadMermaidModule();
+  if (lastMermaidThemeMode === themeMode) {
+    return mermaid;
   }
-
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: themeMode === 'dark' ? 'dark' : 'default',
+    fontFamily: 'inherit',
+  });
+  lastMermaidThemeMode = themeMode;
   return mermaid;
 }
+
+export type RenderMermaidDiagramsOptions = {
+  themeMode?: 'light' | 'dark';
+};
 
 /**
  * Initialize KaTeX for inline and display math
@@ -86,7 +94,6 @@ export function initKaTeX(md: any) {
     if (contentEnd === -1) {
       // Search across multiple lines
       let currentLine = start;
-      let currentPos = contentStart;
 
       while (currentLine < state.lineMax) {
         const lineStart = state.bMarks[currentLine];
@@ -100,7 +107,6 @@ export function initKaTeX(md: any) {
         }
 
         currentLine++;
-        currentPos = lineEnd;
       }
 
       if (contentEnd === -1) return false;
@@ -108,12 +114,22 @@ export function initKaTeX(md: any) {
 
     const content = state.src.slice(contentStart, contentEnd).trim();
 
-    // Create token
+    // Line index of the closing `$$` (must advance state.line past entire block;
+    // otherwise following lines are re-parsed as paragraphs / broken escapes, and
+    // later fenced blocks e.g. ```mermaid fail to tokenize).
+    let endLine = start;
+    for (let i = start; i < state.lineMax; i++) {
+      if (contentEnd >= state.bMarks[i] && contentEnd < state.eMarks[i]) {
+        endLine = i;
+        break;
+      }
+    }
+
     const token = state.push('katex_display', '', 0);
     token.content = content;
-    token.map = [start, state.line];
+    token.map = [start, endLine + 1];
 
-    state.line = start + 1;
+    state.line = endLine + 1;
     return true;
   });
 
@@ -137,10 +153,10 @@ export function initMermaid(md: any) {
 
   md.renderer.rules.fence = (tokens: any[], idx: number, options: any, env: any, self: any) => {
     const token = tokens[idx];
-    const lang = token.info.trim();
+    const fenceLang = (token.info.trim().split(/\s+/)[0] || '').toLowerCase();
 
     // Check if it's a mermaid diagram
-    if (lang === 'mermaid' || lang === 'mmd') {
+    if (fenceLang === 'mermaid' || fenceLang === 'mmd') {
       const code = token.content.trim();
       const id = `mermaid-${Math.random().toString(36).substring(2, 11)}`;
 
@@ -152,47 +168,88 @@ export function initMermaid(md: any) {
   };
 }
 
+function getMermaidDefinition(el: HTMLElement): string {
+  if (el.dataset.mermaidSource) {
+    return el.dataset.mermaidSource;
+  }
+  return (el.textContent || '').trim();
+}
+
 /**
- * Render all Mermaid diagrams in the container
+ * Render all Mermaid diagrams in the container.
+ * Uses Mermaid's official `run()` API so diagram text is read from
+ * `innerHTML` (with entity decode / dedent) and `render` receives the host element — required
+ * for reliable rendering in Mermaid 11 (pie, stateDiagram, classDiagram, etc.).
  */
-export async function renderMermaidDiagrams(container?: HTMLElement | null) {
+export async function renderMermaidDiagrams(
+  container?: HTMLElement | null,
+  options?: RenderMermaidDiagramsOptions,
+) {
   if (typeof window === 'undefined') return;
 
-  const elements = container
+  const themeMode = options?.themeMode ?? 'light';
+
+  const nodeList = container
     ? container.querySelectorAll('.mermaid')
     : document.querySelectorAll('.mermaid');
 
-  if (elements.length === 0) return;
+  if (nodeList.length === 0) return;
+
+  if (nodeList.length > 20) {
+    console.warn(`[Mermaid] Too many diagrams (${nodeList.length}), skipping render`);
+    return;
+  }
+
+  const mermaid = await ensureMermaidConfigured(themeMode);
+  const all = Array.from(nodeList) as HTMLElement[];
+  const sourceByEl = new Map<HTMLElement, string>();
+  const pending: HTMLElement[] = [];
+
+  for (const el of all) {
+    const def = getMermaidDefinition(el);
+    if (!def && !el.querySelector('svg')) {
+      continue;
+    }
+
+    const stable = el.querySelector('svg')
+      && el.dataset.mermaidRendered === 'true'
+      && el.dataset.mermaidSource === def
+      && (el.dataset.mermaidTheme ?? '') === themeMode;
+    if (stable) {
+      continue;
+    }
+
+    sourceByEl.set(el, def);
+    el.removeAttribute('data-processed');
+    pending.push(el);
+  }
+
+  if (pending.length === 0) {
+    return;
+  }
 
   try {
-    const mermaid = await getMermaid();
-    const renderBatchId = Date.now();
-
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i] as HTMLElement;
-      const code = el.dataset.mermaidSource || el.textContent || '';
-      const id = el.id || `mermaid-${renderBatchId}-${i}`;
-      if (!code) continue;
-      if (el.dataset.mermaidRendered === 'true' && el.dataset.mermaidSource === code) {
-        continue;
-      }
-
-      try {
-        const { svg } = await mermaid.render(id, code);
-        el.innerHTML = svg;
-        el.dataset.mermaidSource = code;
-        el.dataset.mermaidRendered = 'true';
-      } catch (e) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'mermaid-error';
-        errorDiv.textContent = `Failed to render diagram: ${e}`;
-        el.replaceChildren(errorDiv);
-        el.dataset.mermaidSource = code;
-        el.dataset.mermaidRendered = 'error';
-      }
-    }
+    await mermaid.run({
+      nodes: pending,
+      suppressErrors: true,
+    });
   } catch (e) {
-    console.error('Mermaid render failed:', e);
+    console.error('Mermaid run failed:', e);
+  }
+
+  for (const el of pending) {
+    const src = sourceByEl.get(el) ?? '';
+    el.dataset.mermaidSource = src;
+    el.dataset.mermaidTheme = themeMode;
+    if (el.querySelector('svg')) {
+      el.dataset.mermaidRendered = 'true';
+    } else {
+      el.dataset.mermaidRendered = 'error';
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'mermaid-error';
+      errorDiv.textContent = 'Failed to render diagram';
+      el.replaceChildren(errorDiv);
+    }
   }
 }
 

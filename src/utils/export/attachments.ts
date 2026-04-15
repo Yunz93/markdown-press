@@ -69,7 +69,7 @@ export async function prepareHtmlForDownload(htmlContent: string, sourceFilePath
     renderTarget.setAttribute('data-theme', theme);
     await enhanceExportAttachmentEmbeds(renderTarget, sourceFilePath);
     await prepareExportImages(renderTarget, sourceFilePath);
-    await renderMermaidDiagrams(renderTarget);
+    await renderMermaidDiagrams(renderTarget, { themeMode: theme === 'dark' ? 'dark' : 'light' });
     await waitForImages(renderTarget);
     if ('fonts' in document) {
       await document.fonts.ready;

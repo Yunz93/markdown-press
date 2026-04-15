@@ -301,6 +301,23 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
+/* Prose line-height (1.95) must not apply inside fences — Shiki uses .line { display:block }. */
+.preview-pane-document.markdown-body pre,
+.preview-pane-document.markdown-body pre:not(.shiki) code,
+.preview-pane-document.markdown-body pre.shiki,
+.preview-pane-document.markdown-body pre.shiki code,
+.preview-pane-document.markdown-body pre.shiki .line {
+  line-height: 1.45;
+}
+
+.preview-pane-document-compact.markdown-body pre,
+.preview-pane-document-compact.markdown-body pre:not(.shiki) code,
+.preview-pane-document-compact.markdown-body pre.shiki,
+.preview-pane-document-compact.markdown-body pre.shiki code,
+.preview-pane-document-compact.markdown-body pre.shiki .line {
+  line-height: 1.42;
+}
+
 .preview-pane-document.markdown-body pre:not(.shiki) code {
   display: block;
   padding: 1rem 1.1rem;
@@ -360,6 +377,14 @@
   padding: 1rem 1.05rem;
   background: transparent !important;
   line-height: 1.8;
+}
+
+.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre,
+.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre:not(.shiki) code,
+.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki,
+.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki code,
+.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki .line {
+  line-height: 1.45;
 }
 
 .preview-pane-document.markdown-body table {

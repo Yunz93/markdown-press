@@ -7,7 +7,7 @@ slug: ''
 aliases: ''
 is_publish: false
 "date created": 2026-03-21
-"date modified": "2026-03-21 00:00:00"
+"date modified": "2026-04-15 00:00:00"
 ---
 
 ## 主要内容
@@ -151,23 +151,23 @@ void main()
 #### 4.8 链接
 链接可以由两种形式生成：**行内式**和**参考式**。    
 **行内式**：
-> \[younghz的Markdown库\]\(https:://github.com/younghz/Markdown "Markdown"\)。
+> \[younghz的Markdown库\]\(https://github.com/younghz/Markdown "Markdown"\)。
 
 效果：
-> [younghz的Markdown库](https:://github.com/younghz/Markdown "Markdown")。
+> [younghz的Markdown库](https://github.com/younghz/Markdown "Markdown")。
 
 **参考式**：
 > \[younghz的Markdown库1\]\[1\]    
 > \[younghz的Markdown库2\]\[2\]    
-> \[1\]:https:://github.com/younghz/Markdown "Markdown"    
-> \[2\]:https:://github.com/younghz/Markdown "Markdown"    
+> \[1\]:https://github.com/younghz/Markdown "Markdown"    
+> \[2\]:https://github.com/younghz/Markdown "Markdown"    
 
 效果：
 > [younghz的Markdown库1][1]    
 > [younghz的Markdown库2][2]
 
-[1]: https:://github.com/younghz/Markdown "Markdown"
-[2]: https:://github.com/younghz/Markdown "Markdown"
+[1]: https://github.com/younghz/Markdown "Markdown"
+[2]: https://github.com/younghz/Markdown "Markdown"
 
 **注意**：上述的`[1]:https:://github.com/younghz/Markdown "Markdown"`不出现在区块中。
 
@@ -220,3 +220,255 @@ Markdown的使用者：
 
 
 关于其它扩展语法可参见具体工具的使用说明。
+
+---
+
+## 附录 A：GFM 与常用扩展（本应用预览）
+
+### A.1 删除线（GFM）
+
+~~这是一段被删除线标记的文字~~
+
+### A.2 任务列表（GFM）
+
+- [ ] 待办项（未完成）
+- [x] 已完成项
+  - [ ] 嵌套待办
+
+### A.3 自动链接与裸 URL
+
+显式尖括号链接：<https://spec.commonmark.org/>
+
+同一行内裸 URL（开启 linkify 时识别）：https://example.com/doc
+
+### A.4 行内数学（KaTeX）
+
+欧拉公式：$e^{i\pi} + 1 = 0$
+
+行内分数与求和：$\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$
+
+集合与量词：$\forall x \in \mathbb{R},\; x^2 \geq 0$；存在：$\exists n \in \mathbb{N}$
+
+微分与向量：$\frac{\partial f}{\partial x}$，单位向量 $\hat{\mathbf{i}}$，范数 $\lVert x \rVert_2$
+
+三角与根式：$\sin^2\theta + \cos^2\theta = 1$，$\sqrt{x^2 + y^2}$
+
+上下标与二项式：$x^{10}$，$x_{i,j}$，$\binom{n}{k}$
+
+### A.5 块级数学（KaTeX）
+
+$$
+\int_0^1 x^2\,dx = \frac{1}{3}
+$$
+
+多行对齐（aligned）：
+
+$$
+\begin{aligned}
+f(x) &= x^2 \\
+f'(x) &= 2x
+\end{aligned}
+$$
+
+矩阵（bmatrix）：
+
+$$
+\mathbf{A} = \begin{bmatrix}
+1 & 2 \\
+3 & 4
+\end{bmatrix}
+$$
+
+分段函数（cases）：
+
+$$
+|x| = \begin{cases}
+x, & x \geq 0 \\
+-x, & x < 0
+\end{cases}
+$$
+
+极限与级数：
+
+$$
+\lim_{n \to \infty} \frac{1}{n} = 0,
+\qquad
+\sum_{k=1}^{\infty} \frac{1}{2^k} = 1
+$$
+
+### A.6 Mermaid 流程图
+
+```mermaid
+flowchart LR
+  A([开始]) --> B{判断}
+  B -->|是| C[结束]
+  B -->|否| D[返回]
+  D --> A
+```
+
+### A.7 Mermaid 时序图
+
+```mermaid
+sequenceDiagram
+  participant A as 客户端
+  participant B as 服务
+  A->>B: 请求
+  B-->>A: 响应
+```
+
+子图与纵向流程（`flowchart TB`）：
+
+```mermaid
+flowchart TB
+  subgraph 输入
+    U[用户输入]
+  end
+  subgraph 处理
+    V[校验]
+    W[保存]
+  end
+  U --> V --> W
+```
+
+### A.8 围栏代码（多语言标签）
+
+```ts
+export type Theme = 'light' | 'dark';
+```
+
+```json
+{ "ok": true, "count": 3 }
+```
+
+### A.9 复杂表格（对齐）
+
+| 左对齐 | 居中 | 右对齐 |
+| :----- | :---: | ----: |
+| L      |  C   |   1.0 |
+| `code` | **粗** | 200 |
+
+### A.10 嵌套列表与引用
+
+1. 有序一级
+   - 无序子项
+   - 另一子项
+2. 有序二级
+
+> 外层引用
+> > 内层引用
+> >
+> > - 引用内的列表
+
+### A.11 分隔线（多种形式）
+
+---
+
+***
+
+___
+
+### A.12 行内换行（软换行）
+
+第一行末尾两个空格后回车，仍属同一段落。  
+这是同一段的第二行（GFM 中常见；本应用 `breaks: true` 时单换行也可分段，以预览为准）。
+
+### A.13 与 Obsidian 的差异说明（阅读时请对照）
+
+以下在 **Obsidian** 中有特殊语义；在本应用中可能按**普通 Markdown**显示，用于检查「是否静默损坏」：
+
+- **Callout**：`> [!note] 标题` 与正文
+- **脚注**：示例引用[^fn-demo] 与文末定义
+- **高亮**：`==高亮文本==`
+- **注释**：`%% 不显示的正文 %%`
+- **块 ID**：单独一行 `^demo-block-id`（会尝试挂到上一块，与 Obsidian 块语法可能略有差异）
+
+[^fn-demo]: 这是脚注定义；若未渲染为脚注，将整段当作普通文本排查。
+
+> [!warning] Callout 示例（可能显示为普通引用）
+>
+> 若预览与 Obsidian 不一致，属预期差距。
+
+==若未被高亮渲染，则仍为字面等号==
+
+%% 若整段仍可见，说明未按 Obsidian 注释处理 %%
+
+本段为块 ID锚点前的段落。
+
+^demo-block-id
+
+### A.14 安全 HTML（视净化策略可能折叠）
+
+<details>
+<summary>点击展开（若被允许）</summary>
+
+<p>这里是 <code>details</code> 折叠区域内的说明正文（勿在正文里再写裸的 <code>&lt;details&gt;</code> 标签，否则会被当成嵌套折叠而搞乱章节边界）。</p>
+
+</details>
+
+### A.15 数学公式补充（块级 / 边界）
+
+根号与分式组合：
+
+$$
+\sqrt{\frac{a}{b}} = \frac{\sqrt{a}}{\sqrt{b}}
+\quad (a,b > 0)
+$$
+
+高斯积分（常见排版压力测试）：
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
+$$
+
+多行公式（无 `aligned`，纯换行）：
+
+$$
+f(0) = 1
+$$
+$$
+f(1) = e
+$$
+
+行内故意错误式（应降级为原文或错误提示，不应整页崩）：$ \left( \broken $
+
+### A.16 Mermaid 补充（多图类型与 `mmd` 别名）
+
+饼图：
+
+```mermaid
+pie title 示例占比
+  "A" : 40
+  "B" : 35
+  "C" : 25
+```
+
+状态图（`stateDiagram-v2`）：
+
+```mermaid
+stateDiagram-v2
+  [*] --> 草稿
+  草稿 --> 已发布: 发布
+  已发布 --> 草稿: 撤回
+  已发布 --> [*]
+```
+
+简单类图：
+
+```mermaid
+classDiagram
+  class Animal {
+    +String name
+    +int age
+    +makeSound()
+  }
+  class Dog
+  Animal <|-- Dog
+```
+
+与 ```mermaid``` 等价的信息密度图（语言标签写 `mmd`）：
+
+```mmd
+flowchart LR
+  p1([入口]) --> p2[处理]
+  p2 --> p3([出口])
+```

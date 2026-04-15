@@ -210,6 +210,14 @@ export function buildExportStyles(
       display: block;
     }
 
+    .export-document .markdown-body pre,
+    .export-document .markdown-body pre:not(.shiki) code,
+    .export-document .markdown-body pre.shiki,
+    .export-document .markdown-body pre.shiki code,
+    .export-document .markdown-body pre.shiki .line {
+      line-height: 1.45;
+    }
+
     .export-document .markdown-body table th,
     .export-document .markdown-body table td {
       border-color: var(--border-color);

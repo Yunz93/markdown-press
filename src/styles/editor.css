@@ -392,6 +392,14 @@
   margin-bottom: 0;
 }
 
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre,
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre:not(.shiki) code,
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki,
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki code,
+.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki .line {
+  line-height: 1.45;
+}
+
 .editor-pane-layout .cm-frontmatter-line {
   padding-top: 0.16rem !important;
   padding-bottom: 0.16rem !important;

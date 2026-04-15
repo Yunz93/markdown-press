@@ -261,6 +261,11 @@ export function normalizeShikiLanguage(rawLang: string): string {
   const normalized = rawLang.trim().toLowerCase();
   if (!normalized) return '';
 
+  // Diagram fences are handled by Mermaid, not Shiki — must not fall through to ''.
+  if (normalized === 'mermaid' || normalized === 'mmd') {
+    return normalized;
+  }
+
   // Avoid passing arbitrary fence-info text into Shiki.
   // Accept only plausible language identifiers and known aliases/core names.
   if (!/^[a-z][a-z0-9_+#.-]*$/i.test(normalized)) {

@@ -7,11 +7,10 @@
  * - 资源解析
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { parseFrontmatter } from '../../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer, clearMarkdownCache } from '../../../utils/markdown';
-import { renderMermaidDiagrams } from '../../../utils/markdown-extensions';
 import { hydrateCachedPreviewImageSources, resolvePreviewSource, warmPreviewImage } from '../../../utils/previewImageCache';
 import { parseWikiLinkReference, extractWikiNoteFragment } from '../../../utils/wikiLinks';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../../utils/attachmentResolver';
@@ -39,9 +38,6 @@ export interface UsePreviewRendererReturn {
   sanitizedHtmlPreview: string;
   assetPreviewSrc: string;
   requiresAsyncEnhancement: boolean;
-  
-  // 刷新 Mermaid
-  refreshMermaid: () => void;
 }
 
 // Helper functions
@@ -296,7 +292,6 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
   const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => basePreviewHtml);
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
-  const mermaidTimerRef = useRef<number | null>(null);
   const basePreviewHtmlRef = useRef(basePreviewHtml);
   const enhancedBodyHtmlRef = useRef(enhancedBodyHtml);
   useEffect(() => {
@@ -660,31 +655,11 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     };
   }, []);
 
-  // Refresh Mermaid
-  const refreshMermaid = useCallback(() => {
-    if (mermaidTimerRef.current) {
-      clearTimeout(mermaidTimerRef.current);
-    }
-    mermaidTimerRef.current = window.setTimeout(() => {
-      renderMermaidDiagrams(document.body);
-    }, 50);
-  }, []);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (mermaidTimerRef.current) {
-        clearTimeout(mermaidTimerRef.current);
-      }
-    };
-  }, []);
-
   return {
     parsedContent,
     enhancedBodyHtml,
     sanitizedHtmlPreview,
     assetPreviewSrc,
     requiresAsyncEnhancement,
-    refreshMermaid,
   };
 }

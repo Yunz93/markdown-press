@@ -41,7 +41,7 @@ export async function exportToPdf(htmlContent: string, filename: string, sourceF
     renderTarget.setAttribute('data-theme', theme);
 
     await prepareExportImages(renderTarget, sourceFilePath);
-    await renderMermaidDiagrams(renderTarget);
+    await renderMermaidDiagrams(renderTarget, { themeMode: theme === 'dark' ? 'dark' : 'light' });
     await waitForImages(renderTarget);
     if ('fonts' in document) {
       await document.fonts.ready;
