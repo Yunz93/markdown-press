@@ -15,6 +15,8 @@ export interface ShikiHighlighter {
   getLoadedLanguages?: () => string[];
   loadLanguage?: (...langs: LanguageInput[]) => Promise<void>;
   supportsLanguage?: (lang: string) => boolean;
+  /** Bumps when lazy-loaded languages change; use in markdown render cache keys. */
+  __revision?: number;
 }
 
 let cachedHighlighter: ShikiHighlighter | null = null;

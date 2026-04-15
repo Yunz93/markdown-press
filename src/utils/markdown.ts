@@ -272,14 +272,12 @@ export function useMarkdownRenderer(highlighter: ShikiHighlighter | null, themeM
   }, [themeMode]);
 }
 
-interface RenderCacheKey {
-  content: string;
-  highlighter: boolean;
-  themeMode: ThemeMode;
-}
-
 function createCacheKey(markdown: string, options: MarkdownRenderOptions): string {
-  return `${hashContent(markdown)}_${options.highlighter ? '1' : '0'}_${options.themeMode ?? 'light'}`;
+  const hl = options.highlighter;
+  const hlToken = hl
+    ? `1_${typeof hl.__revision === 'number' ? hl.__revision : 0}`
+    : '0';
+  return `${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}`;
 }
 
 /**

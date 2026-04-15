@@ -5,9 +5,11 @@ import type { FileNode } from '../../types';
 import { getFileSystem } from '../../types/filesystem';
 import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../../utils/fontSettings';
 import { useI18n } from '../../hooks/useI18n';
+import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 
 interface ExportMenuProps {
   onClose?: () => void;
+  highlighter?: ShikiHighlighter | null;
 }
 
 export type ExportFormat = 'pdf' | 'plaintext';
@@ -23,7 +25,7 @@ function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
   return undefined;
 }
 
-export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
+export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose, highlighter = null }) => {
   const { t } = useI18n();
   const content = useAppStore(selectContent);
   const { activeTabId, files, settings, showNotification } = useAppStore();
@@ -53,6 +55,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
           fontSettings: settings,
           fontSize: settings.fontSize,
           codeFontSize: Math.max(12, settings.fontSize - 2),
+          highlighter,
         });
         const savedPath = await exportToPdf(html, filename, activeFile?.path);
         if (savedPath !== null) {
@@ -79,7 +82,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose }) => {
       setFormat(null);
       onClose?.();
     }
-  }, [content, activeFile, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.fontSize, showNotification]);
+  }, [content, activeFile, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.fontSize, showNotification, highlighter, t]);
 
   const fileName = activeFile?.name?.replace('.md', '') || 'document';
 
