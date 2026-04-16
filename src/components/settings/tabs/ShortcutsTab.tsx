@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import type { AppSettings } from '../../../types';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { AppSettings, ShortcutConfig } from '../../../types';
 import { useI18n } from '../../../hooks/useI18n';
 import type { TranslationKey } from '../../../utils/i18n';
 import {
   formatShortcutForDisplay,
-  getPreferredShortcutModifierToken,
-  normalizeShortcutForPlatform,
+  shortcutFromKeyboardEvent,
 } from '../../../utils/shortcuts';
+import { setShortcutCaptureActive } from '../../../utils/shortcutCaptureGate';
 import type { SettingsTabProps } from '../types';
 
 type ShortcutGroupId = 'workspace' | 'editing' | 'search' | 'panels';
@@ -112,32 +112,50 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
     search: true,
     panels: true,
   });
+  const [recordingKey, setRecordingKey] = useState<keyof ShortcutConfig | null>(null);
+  const shortcutsRef = useRef(settings.shortcuts);
+  shortcutsRef.current = settings.shortcuts;
 
-  const normalizeShortcut = (input: string): string => {
-    const parts = input.toLowerCase().split('+').map(p => p.trim());
-    const modifiers: string[] = [];
-    let key = '';
-    const preferredModifier = getPreferredShortcutModifierToken();
+  const toggleRecorder = useCallback((settingKey: keyof ShortcutConfig) => {
+    setRecordingKey((prev) => (prev === settingKey ? null : settingKey));
+  }, []);
 
-    for (const part of parts) {
-      if (part === 'ctrl' || part === 'control') modifiers.push(preferredModifier);
-      else if (part === 'meta' || part === 'cmd' || part === 'command') modifiers.push(preferredModifier);
-      else if (part === 'shift') modifiers.push('Shift');
-      else if (part === 'alt' || part === 'option') modifiers.push('Alt');
-      else if (part) key = part.length === 1 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  useEffect(() => {
+    if (!recordingKey) {
+      setShortcutCaptureActive(false);
+      return;
     }
 
-    if (!key) return '';
-    return normalizeShortcutForPlatform([...modifiers, key].join('+'));
-  };
+    setShortcutCaptureActive(true);
+    const capturedSettingKey = recordingKey;
 
-  const handleShortcutChange = (shortcutKey: string, value: string) => {
-    const normalized = normalizeShortcut(value);
-    if (!normalized) return;
-    onUpdateSettings({
-      shortcuts: { ...settings.shortcuts, [shortcutKey]: normalized }
-    });
-  };
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      if (event.key === 'Escape') {
+        setShortcutCaptureActive(false);
+        setRecordingKey(null);
+        return;
+      }
+
+      const serialized = shortcutFromKeyboardEvent(event);
+      if (!serialized) return;
+
+      setShortcutCaptureActive(false);
+      onUpdateSettings({
+        shortcuts: { ...shortcutsRef.current, [capturedSettingKey]: serialized },
+      });
+      setRecordingKey(null);
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      setShortcutCaptureActive(false);
+    };
+  }, [recordingKey, onUpdateSettings]);
 
   const toggleShortcutGroup = (groupId: ShortcutGroupId) => {
     setExpandedShortcutGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
@@ -186,6 +204,7 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                       {group.items.map((item) => {
                         const editableValue = item.settingKey ? settings.shortcuts[item.settingKey] : '';
                         const itemShortcuts = item.editable ? [editableValue] : (item.shortcuts ?? []);
+                        const isRecording = Boolean(item.settingKey && recordingKey === item.settingKey);
 
                         return (
                           <div
@@ -197,7 +216,7 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                                 <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{item.label}</span>
                                 {item.editable && (
                                   <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                    {t('settings_shortcutsEditable')}
+                                    {t('settings_shortcutRecordHint')}
                                   </span>
                                 )}
                               </div>
@@ -205,13 +224,24 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                             </div>
 
                             {item.editable && item.settingKey ? (
-                              <input
-                                type="text"
-                                value={formatShortcutForDisplay(editableValue)}
-                                onChange={(e) => handleShortcutChange(item.settingKey!, e.target.value)}
-                                aria-label={shortcutLabels[item.settingKey] || item.label}
-                                className="w-28 shrink-0 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-2.5 py-1.5 text-center font-mono text-xs uppercase tracking-wide text-gray-700 dark:text-gray-200 outline-none focus:border-accent-DEFAULT"
-                              />
+                              <div className="flex shrink-0 flex-col items-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRecorder(item.settingKey!)}
+                                  aria-pressed={isRecording}
+                                  aria-label={shortcutLabels[item.settingKey] || item.label}
+                                  className={`min-w-[7.5rem] rounded-lg border px-2.5 py-1.5 text-center font-mono text-xs outline-none transition-colors ${
+                                    isRecording
+                                      ? 'border-accent-DEFAULT bg-accent-DEFAULT/10 text-gray-900 dark:text-white ring-2 ring-accent-DEFAULT/30'
+                                      : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-200 hover:border-accent-DEFAULT/60 focus-visible:border-accent-DEFAULT'
+                                  }`}
+                                >
+                                  {isRecording ? t('settings_shortcutListening') : formatShortcutForDisplay(editableValue)}
+                                </button>
+                                {isRecording && (
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500">{t('settings_shortcutEscToCancel')}</span>
+                                )}
+                              </div>
                             ) : (
                               <div className="flex shrink-0 flex-wrap justify-end gap-1.5 max-w-[180px]">
                                 {itemShortcuts.map((shortcut) => (

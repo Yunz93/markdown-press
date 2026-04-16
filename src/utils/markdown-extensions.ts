@@ -29,7 +29,11 @@ async function ensureMermaidConfigured(themeMode: 'light' | 'dark' = 'light') {
   mermaid.initialize({
     startOnLoad: false,
     theme: themeMode === 'dark' ? 'dark' : 'default',
-    fontFamily: 'inherit',
+    fontFamily: '"Trebuchet MS", Verdana, Arial, sans-serif',
+    flowchart: {
+      htmlLabels: false,
+      useMaxWidth: true,
+    },
   });
   lastMermaidThemeMode = themeMode;
   return mermaid;
@@ -158,10 +162,10 @@ export function initMermaid(md: any) {
     // Check if it's a mermaid diagram
     if (fenceLang === 'mermaid' || fenceLang === 'mmd') {
       const code = token.content.trim();
-      const id = `mermaid-${Math.random().toString(36).substring(2, 11)}`;
-
-      // Return placeholder that will be replaced by actual SVG
-      return `<div class="mermaid" id="${id}">${code}</div>`;
+      // Omit a random id: it makes the HTML unstable and causes React to replace the DOM
+      // on every markdown render, destroying already-rendered Mermaid SVGs and forcing a
+      // re-render that can fail when the container is temporarily invisible.
+      return `<div class="mermaid">${code}</div>`;
     }
 
     return defaultFence(tokens, idx, options, env, self);
@@ -173,6 +177,23 @@ function getMermaidDefinition(el: HTMLElement): string {
     return el.dataset.mermaidSource;
   }
   return (el.textContent || '').trim();
+}
+
+/**
+ * Strip SVG / error UI from `.mermaid` nodes so the next `renderMermaidDiagrams` pass re-parses
+ * from source (used when the preview column was width‑0 and diagrams must not be treated as done).
+ */
+export function resetMermaidPlaceholders(container: HTMLElement): void {
+  for (const node of container.querySelectorAll('.mermaid')) {
+    const el = node as HTMLElement;
+    const src = (el.dataset.mermaidSource || el.textContent || '').trim();
+    if (!src) continue;
+    el.replaceChildren(document.createTextNode(src));
+    el.removeAttribute('data-processed');
+    delete el.dataset.mermaidRendered;
+    delete el.dataset.mermaidTheme;
+    delete el.dataset.mermaidSource;
+  }
 }
 
 /**
@@ -211,6 +232,16 @@ export async function renderMermaidDiagrams(
       continue;
     }
 
+    const rect = el.getBoundingClientRect();
+    const hasVisibleLayout = rect.width >= 4;
+
+    // Skip diagrams that aren't laid out yet (e.g. during a width transition from 0px).
+    // Width is the critical dimension for Mermaid layout; height can legitimately be 0 before
+    // the SVG is injected, so gating on height can starve initial renders.
+    if (!hasVisibleLayout) {
+      continue;
+    }
+
     const stable = el.querySelector('svg')
       && el.dataset.mermaidRendered === 'true'
       && el.dataset.mermaidSource === def
@@ -226,6 +257,14 @@ export async function renderMermaidDiagrams(
 
   if (pending.length === 0) {
     return;
+  }
+
+  // `mermaid.run` always reads the definition from `element.innerHTML`. After a prior pass the
+  // node may still hold an SVG (e.g. same React HTML while `themeMode` or deps re-fire). Reset to
+  // the stored source so Mermaid parses diagram text, not SVG markup.
+  for (const el of pending) {
+    const src = sourceByEl.get(el) ?? '';
+    el.textContent = src;
   }
 
   try {
@@ -254,32 +293,11 @@ export async function renderMermaidDiagrams(
 }
 
 /**
- * Apply dark theme to KaTeX
+ * Remove legacy global KaTeX overrides. Dark math colors come from `preview.css` (`.dark .katex`)
+ * so they track `html.dark` and never fight `settings.themeMode` (child effects can run before
+ * parent `useEffect` that used to toggle the class).
  */
-export function applyKatexDarkTheme() {
+export function applyKatexDarkTheme(): void {
   if (typeof document === 'undefined') return;
-
-  const styleId = 'katex-dark-theme';
-  let styleEl = document.getElementById(styleId) as HTMLStyleElement;
-
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = styleId;
-    document.head.appendChild(styleEl);
-  }
-
-  const isDark = document.documentElement.classList.contains('dark');
-
-  if (isDark) {
-    styleEl.textContent = `
-      .katex { color: #e5e7eb; }
-      .katex .mord { color: #e5e7eb; }
-      .katex .mtext { color: #9ca3af; }
-      .katex .msupsub { color: #e5e7eb; }
-      .katex-display { color: #e5e7eb; }
-      .katex-display .katex { color: #e5e7eb; }
-    `;
-  } else {
-    styleEl.textContent = '';
-  }
+  document.getElementById('katex-dark-theme')?.remove();
 }

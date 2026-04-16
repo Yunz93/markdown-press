@@ -19,93 +19,20 @@ interface SettingsModalProps {
 
 type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai' | 'interface' | 'imageHosting';
 
-type TabIconProps = { size: number; className?: string };
-
 interface TabConfig {
   id: SettingsTab;
   label: string;
-  icon: React.FC<TabIconProps>;
 }
 
 function getTabs(t: (key: TranslationKey, params?: Record<string, string | number>) => string): TabConfig[] {
   return [
-    {
-      id: 'interface',
-      label: t('settings_tab_interface'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'editor',
-      label: t('settings_tab_editor'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="4 7 4 4 20 4 20 7" />
-          <line x1="9" y1="20" x2="15" y2="20" />
-          <line x1="12" y1="4" x2="12" y2="20" />
-        </svg>
-      ),
-    },
-    {
-      id: 'ai',
-      label: t('settings_tab_ai'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'metadata',
-      label: t('settings_tab_metadata'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-          <line x1="7" y1="7" x2="7.01" y2="7" />
-        </svg>
-      ),
-    },
-    {
-      id: 'shortcuts',
-      label: t('settings_tab_shortcuts'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="2" y="4" width="20" height="16" rx="2" />
-          <line x1="6" y1="8" x2="6" y2="8" /><line x1="10" y1="8" x2="10" y2="8" />
-          <line x1="14" y1="8" x2="14" y2="8" /><line x1="18" y1="8" x2="18" y2="8" />
-          <line x1="6" y1="12" x2="6" y2="12" /><line x1="10" y1="12" x2="10" y2="12" />
-          <line x1="14" y1="12" x2="14" y2="12" /><line x1="18" y1="12" x2="18" y2="12" />
-          <line x1="6" y1="16" x2="10" y2="16" />
-        </svg>
-      ),
-    },
-    {
-      id: 'imageHosting',
-      label: t('settings_tab_imageHosting'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
-        </svg>
-      ),
-    },
-    {
-      id: 'general',
-      label: t('settings_tab_publishing'),
-      icon: ({ size, className }) => (
-        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v18" />
-          <path d="M5 8l7-5 7 5" />
-          <path d="M5 16l7 5 7-5" />
-        </svg>
-      ),
-    },
+    { id: 'interface', label: t('settings_tab_interface') },
+    { id: 'editor', label: t('settings_tab_editor') },
+    { id: 'ai', label: t('settings_tab_ai') },
+    { id: 'metadata', label: t('settings_tab_metadata') },
+    { id: 'shortcuts', label: t('settings_tab_shortcuts') },
+    { id: 'imageHosting', label: t('settings_tab_imageHosting') },
+    { id: 'general', label: t('settings_tab_publishing') },
   ];
 }
 
@@ -174,13 +101,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all ${
+                className={`rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all ${
                   activeTab === tab.id
                     ? 'bg-white text-gray-900 shadow-sm dark:bg-white/10 dark:text-white'
                     : 'text-gray-500 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5'
                 }`}
               >
-                <tab.icon className="shrink-0" size={18} />
                 {tab.label}
               </button>
             ))}

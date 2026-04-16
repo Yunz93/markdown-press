@@ -18,7 +18,7 @@ import { throttle } from '../../utils/throttle';
 import { useThrottledResize } from '../../utils/performance';
 import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
-import { renderMermaidDiagrams } from '../../utils/markdown-extensions';
+import { renderMermaidDiagrams, resetMermaidPlaceholders } from '../../utils/markdown-extensions';
 import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { isWindowsPlatform } from '../../utils/platform';
@@ -31,6 +31,8 @@ interface PreviewPaneProps {
   onScroll?: (percentage: number) => void;
   density?: PaneDensity;
   syncedPercentage?: number | null;
+  /** False when SplitView gives the preview column 0 width (e.g. editor-only). Synced to layout, not just store viewMode. */
+  previewLayoutActive?: boolean;
 }
 
 export interface PreviewPaneHandle {
@@ -113,6 +115,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   onScroll,
   density = 'comfortable' as PaneDensity,
   syncedPercentage = null,
+  previewLayoutActive = true,
 }, ref) => {
   const { t } = useI18n();
   const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
@@ -183,6 +186,19 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     activeTabId,
     readFile,
   });
+
+  /** Same string the markdown `<article>` uses via `dangerouslySetInnerHTML` (sync + async paths). */
+  const markdownPreviewMarkup = useMemo(() => {
+    if (!isMarkdownPreview) return '';
+    return renderer.requiresAsyncEnhancement
+      ? renderer.enhancedBodyHtml
+      : renderer.parsedContent.bodyHTML;
+  }, [
+    isMarkdownPreview,
+    renderer.enhancedBodyHtml,
+    renderer.parsedContent.bodyHTML,
+    renderer.requiresAsyncEnhancement,
+  ]);
 
   // Scroll sync hook
   const scroll = usePreviewScroll({ onScroll });
@@ -288,14 +304,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     };
   }, [scroll]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      scroll.cancelScrollSync();
-      navigation.clearScrollRetries();
-    };
-  }, [scroll, navigation]);
-
   // Apply heading attributes after render - use requestIdleCallback for better performance
   useEffect(() => {
     if (!isMarkdownPreview) return;
@@ -333,10 +341,12 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     }
   }, [activeTabId, flattenedHeadings, renderer.enhancedBodyHtml, isMarkdownPreview]);
 
-  // Run Mermaid after the preview DOM is committed (layout phase avoids races with deferred
-  // markdown HTML and removes the visible "raw text in gray box" flash from setTimeout).
-  useLayoutEffect(() => {
-    if (!isMarkdownPreview) return;
+  const prevPreviewLayoutActiveRef = useRef<boolean | null>(null);
+  const mermaidRenderRunningRef = useRef(false);
+  const mermaidRenderQueuedRef = useRef(false);
+
+  const runMermaidInPreview = useCallback(() => {
+    if (!isMarkdownPreview || previewLayoutActive === false) return;
     const container = previewRef.current;
     if (!container) return;
 
@@ -346,8 +356,131 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       return;
     }
 
-    void renderMermaidDiagrams(container, { themeMode: settings.themeMode as 'light' | 'dark' });
-  }, [renderer.enhancedBodyHtml, renderer.parsedContent.bodyHTML, isMarkdownPreview, settings.themeMode]);
+    if (mermaidRenderRunningRef.current) {
+      mermaidRenderQueuedRef.current = true;
+      return;
+    }
+
+    mermaidRenderRunningRef.current = true;
+
+    const flush = async () => {
+      try {
+        do {
+          mermaidRenderQueuedRef.current = false;
+          await renderMermaidDiagrams(container, { themeMode: settings.themeMode as 'light' | 'dark' });
+        } while (mermaidRenderQueuedRef.current);
+      } finally {
+        mermaidRenderRunningRef.current = false;
+      }
+    };
+
+    void flush();
+  }, [isMarkdownPreview, previewLayoutActive, settings.themeMode]);
+
+  // Run Mermaid after the preview DOM is committed (layout phase avoids races with deferred
+  // markdown HTML and removes the visible "raw text in gray box" flash from setTimeout).
+  useLayoutEffect(() => {
+    const container = previewRef.current;
+    if (!isMarkdownPreview || !container) {
+      prevPreviewLayoutActiveRef.current = previewLayoutActive;
+      return;
+    }
+
+    const prev = prevPreviewLayoutActiveRef.current;
+    prevPreviewLayoutActiveRef.current = previewLayoutActive;
+
+    if (previewLayoutActive && prev === false) {
+      resetMermaidPlaceholders(container);
+    }
+
+    runMermaidInPreview();
+  }, [isMarkdownPreview, markdownPreviewMarkup, previewLayoutActive, runMermaidInPreview]);
+
+  // Second pass after paint: Shiki/highlighter hydration and first-paint batching can leave the
+  // first layout effect without diagram nodes; rAF runs after the current frame settles.
+  useEffect(() => {
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      if (!cancelled) runMermaidInPreview();
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [markdownPreviewMarkup, previewLayoutActive, runMermaidInPreview]);
+
+  // Width animates after view mode changes; first flex pass can still be 0px — keep polling layout.
+  useEffect(() => {
+    const el = layoutRef.current;
+    if (!el || !isMarkdownPreview || previewLayoutActive === false) return;
+
+    const schedule = throttle(() => {
+      runMermaidInPreview();
+    }, 120);
+
+    const ro = new ResizeObserver(() => {
+      schedule();
+    });
+    ro.observe(el);
+    schedule();
+    return () => {
+      ro.disconnect();
+    };
+  }, [isMarkdownPreview, previewLayoutActive, runMermaidInPreview]);
+
+  // Some preview flows asynchronously rewrite the article subtree after Mermaid has rendered
+  // (e.g. attachment/media enhancement). Watch for Mermaid placeholders reappearing and heal them.
+  useEffect(() => {
+    const container = previewRef.current;
+    if (!container || !isMarkdownPreview || previewLayoutActive === false) return;
+
+    const schedule = throttle(() => {
+      const hasPendingMermaid = Array.from(container.querySelectorAll<HTMLElement>('.mermaid')).some((el) => (
+        !el.querySelector('svg')
+        || el.dataset.mermaidRendered !== 'true'
+      ));
+
+      if (hasPendingMermaid) {
+        runMermaidInPreview();
+      }
+    }, 120);
+
+    const observer = new MutationObserver((mutations) => {
+      const touchedMermaid = mutations.some((mutation) => {
+        if (mutation.target instanceof HTMLElement && mutation.target.closest('.mermaid')) {
+          return true;
+        }
+
+        return Array.from(mutation.addedNodes).some((node) => (
+          node instanceof HTMLElement
+          && (node.matches('.mermaid') || Boolean(node.querySelector('.mermaid')))
+        ));
+      });
+
+      if (touchedMermaid) {
+        schedule();
+      }
+    });
+
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isMarkdownPreview, previewLayoutActive, runMermaidInPreview]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mermaidRenderQueuedRef.current = false;
+      mermaidRenderRunningRef.current = false;
+      scroll.cancelScrollSync();
+      navigation.clearScrollRetries();
+    };
+  }, [scroll, navigation]);
 
   // Asset preview (image/video/PDF)
   const [assetPreviewSrc, setAssetPreviewSrc] = useState('');

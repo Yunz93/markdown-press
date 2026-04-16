@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { ViewMode, type ShortcutConfig } from '../types';
+import { isShortcutCaptureActive } from '../utils/shortcutCaptureGate';
 
 interface UseKeyboardShortcutsOptions {
   onSave?: () => void;
@@ -121,6 +122,8 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
   const { settings, viewMode, lastNonSplitViewMode, setViewMode } = useAppStore();
 
   return useCallback((event: KeyboardEvent) => {
+    if (isShortcutCaptureActive()) return;
+
     const shortcutEntries = createShortcutMap(settings.shortcuts, {
       save: saveHandler ?? options.onSave,
       toggleView: options.onToggleView ?? (() => setViewMode(getNextViewMode(viewMode, lastNonSplitViewMode), 'toggle')),

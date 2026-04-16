@@ -1,10 +1,18 @@
-import { describe, it, expect } from 'vitest';
+/** @vitest-environment happy-dom */
 
-/**
- * Tests for the escapeHtml function used to prevent XSS in KaTeX error output.
- * The function is module-private, so we test its behavior indirectly by
- * verifying the patterns it must handle.
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const initialize = vi.fn();
+const run = vi.fn();
+
+vi.mock('mermaid', () => ({
+  default: {
+    initialize,
+    run,
+  },
+}));
+
+import { renderMermaidDiagrams, resetMermaidPlaceholders } from './markdown-extensions';
 
 function escapeHtml(str: string): string {
   return str
@@ -12,6 +20,27 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function createVisibleMermaidHost(innerHTML = 'flowchart LR\nA-->B'): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'mermaid';
+  el.innerHTML = innerHTML;
+  Object.defineProperty(el, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      width: 480,
+      height: 240,
+      top: 0,
+      right: 480,
+      bottom: 240,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => null,
+    }),
+  });
+  return el;
 }
 
 describe('escapeHtml (KaTeX/Mermaid XSS prevention)', () => {
@@ -48,5 +77,44 @@ describe('escapeHtml (KaTeX/Mermaid XSS prevention)', () => {
     const output = escapeHtml(input);
     expect(output).not.toContain('<');
     expect(output).not.toContain('>');
+  });
+});
+
+describe('renderMermaidDiagrams', () => {
+  beforeEach(() => {
+    initialize.mockReset();
+    run.mockReset();
+    document.body.innerHTML = '';
+  });
+
+  it('does not rerun for an already rendered diagram when only legacy layout width metadata differs', async () => {
+    const container = document.createElement('div');
+    const el = createVisibleMermaidHost('<svg><g></g></svg>');
+    el.dataset.mermaidRendered = 'true';
+    el.dataset.mermaidSource = 'flowchart LR\nA-->B';
+    el.dataset.mermaidTheme = 'light';
+    el.dataset.mermaidLayoutWidth = '120';
+    container.appendChild(el);
+
+    await renderMermaidDiagrams(container, { themeMode: 'light' });
+
+    expect(initialize).toHaveBeenCalledTimes(1);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('resets rendered placeholders back to source text', () => {
+    const container = document.createElement('div');
+    const el = createVisibleMermaidHost('<svg><g></g></svg>');
+    el.dataset.mermaidRendered = 'true';
+    el.dataset.mermaidSource = 'flowchart LR\nA-->B';
+    el.dataset.mermaidTheme = 'dark';
+    container.appendChild(el);
+
+    resetMermaidPlaceholders(container);
+
+    expect(el.textContent).toBe('flowchart LR\nA-->B');
+    expect(el.dataset.mermaidRendered).toBeUndefined();
+    expect(el.dataset.mermaidTheme).toBeUndefined();
+    expect(el.dataset.mermaidSource).toBeUndefined();
   });
 });

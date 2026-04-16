@@ -265,11 +265,10 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
 /**
  * React hook for markdown renderer with Shiki syntax highlighting
  */
-export function useMarkdownRenderer(highlighter: ShikiHighlighter | null, themeMode: ThemeMode) {
-  // Apply KaTeX theme
+export function useMarkdownRenderer(highlighter: ShikiHighlighter | null, _themeMode: ThemeMode) {
   useEffect(() => {
     applyKatexDarkTheme();
-  }, [themeMode]);
+  }, []);
 }
 
 function createCacheKey(markdown: string, options: MarkdownRenderOptions): string {

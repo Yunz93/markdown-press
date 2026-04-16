@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { ViewMode } from '../../types';
 import { EditorPane, type EditorPaneHandle } from './EditorPane';
@@ -113,7 +113,13 @@ export const SplitView: React.FC<SplitViewProps> = ({
   }, [viewMode]);
 
   const isSplitModeRef = useRef(viewMode === ViewMode.SPLIT);
-  
+
+  // Keep `visualMode` in lockstep with `viewMode` before paint so pane widths (and
+  // `previewLayoutActive`) match the store on the same frame as preview layout effects.
+  useLayoutEffect(() => {
+    setVisualMode(viewMode);
+  }, [viewMode]);
+
   // Keep ref in sync with current view mode
   useEffect(() => {
     isSplitModeRef.current = viewMode === ViewMode.SPLIT;
@@ -237,7 +243,6 @@ export const SplitView: React.FC<SplitViewProps> = ({
     const previousViewMode = previousViewModeRef.current;
     previousViewModeRef.current = viewMode;
 
-    setVisualMode(viewMode);
     if (previousViewMode === viewMode) return;
 
     const anchorPercentage = editorScrollPercentageRef.current;
@@ -321,6 +326,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             highlighter={highlighter}
             density={contentDensity}
             onScroll={handlePreviewScroll}
+            previewLayoutActive={previewActive}
           />
         </div>
       </div>

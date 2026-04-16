@@ -7,7 +7,7 @@
  * - 资源解析
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { parseFrontmatter } from '../../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer, clearMarkdownCache } from '../../../utils/markdown';
@@ -298,6 +298,32 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     enhancedBodyHtmlRef.current = enhancedBodyHtml;
   }, [enhancedBodyHtml]);
 
+  // When the article uses async-enhanced HTML, sync `enhancedBodyHtml` → `basePreviewHtml` in a
+  // layout effect so the DOM matches before PreviewPane's Mermaid `useLayoutEffect`. When async
+  // enhancement is off, the article uses `parsedContent.bodyHTML` only — do not push `basePreviewHtml`
+  // into `enhancedBodyHtml` every keystroke (that caused regressions / extra churn).
+  useLayoutEffect(() => {
+    if (!isMarkdownPreview && !isHtmlPreview) {
+      basePreviewHtmlRef.current = '';
+      setEnhancedBodyHtml('');
+      enhancedBodyHtmlRef.current = '';
+      return;
+    }
+
+    if (!basePreviewHtml || typeof document === 'undefined') {
+      basePreviewHtmlRef.current = basePreviewHtml;
+      setEnhancedBodyHtml(basePreviewHtml);
+      return;
+    }
+
+    if (requiresAsyncEnhancement && basePreviewHtml !== basePreviewHtmlRef.current) {
+      basePreviewHtmlRef.current = basePreviewHtml;
+      setEnhancedBodyHtml(basePreviewHtml);
+    } else {
+      basePreviewHtmlRef.current = basePreviewHtml;
+    }
+  }, [basePreviewHtml, isHtmlPreview, isMarkdownPreview, requiresAsyncEnhancement]);
+
   // Attachment resolver context
   const attachmentResolverContext = useMemo(
     () => createAttachmentResolverContext(files, rootFolderPath, currentFilePath),
@@ -312,16 +338,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       return;
     }
 
-    if (!basePreviewHtml || typeof DOMParser === 'undefined') {
+    if (!basePreviewHtml || typeof document === 'undefined') {
       basePreviewHtmlRef.current = basePreviewHtml;
       setEnhancedBodyHtml(basePreviewHtml);
       return;
-    }
-
-    const basePreviewHtmlChanged = basePreviewHtml !== basePreviewHtmlRef.current;
-    if (basePreviewHtmlChanged) {
-      basePreviewHtmlRef.current = basePreviewHtml;
-      setEnhancedBodyHtml(basePreviewHtml);
     }
 
     if (!requiresAsyncEnhancement) {
@@ -332,15 +352,19 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
     void (async () => {
       try {
-        const parsed = new DOMParser().parseFromString(basePreviewHtml, 'text/html');
+        // Use an in-memory div instead of DOMParser: some release WebViews (e.g. WKWebView)
+        // normalize or drop inline token styles on Shiki output when round-tripping via
+        // parseFromString → innerHTML, which makes syntax highlighting appear broken.
+        const host = document.createElement('div');
+        host.innerHTML = basePreviewHtml;
         const embeds = isMarkdownPreview
-          ? Array.from(parsed.body.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
+          ? Array.from(host.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
           : [];
-        const markdownImages = Array.from(parsed.body.querySelectorAll<HTMLImageElement>('img'));
-        const markdownVideos = Array.from(parsed.body.querySelectorAll<HTMLVideoElement>('video'));
-        const markdownSources = Array.from(parsed.body.querySelectorAll<HTMLSourceElement>('source[src]'));
-        const iframes = Array.from(parsed.body.querySelectorAll<HTMLIFrameElement>('iframe'));
-        const anchorParagraphs = Array.from(parsed.body.querySelectorAll<HTMLParagraphElement>('p'));
+        const markdownImages = Array.from(host.querySelectorAll<HTMLImageElement>('img'));
+        const markdownVideos = Array.from(host.querySelectorAll<HTMLVideoElement>('video'));
+        const markdownSources = Array.from(host.querySelectorAll<HTMLSourceElement>('source[src]'));
+        const iframes = Array.from(host.querySelectorAll<HTMLIFrameElement>('iframe'));
+        const anchorParagraphs = Array.from(host.querySelectorAll<HTMLParagraphElement>('p'));
 
         // Process images
         await Promise.all(markdownImages.map(async (image) => {
@@ -355,7 +379,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             const resolvedName = resolvedAttachment?.name ?? previewTarget.split(/[\\/]/).pop() ?? previewTarget;
 
             if (isVideoAttachment(resolvedName)) {
-              const video = parsed.createElement('video');
+              const video = document.createElement('video');
               video.className = 'preview-attachment-video';
               video.controls = true;
               video.playsInline = true;
@@ -435,12 +459,12 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
           const externalVideo = resolveExternalVideoEmbed(href);
           if (!externalVideo) return;
 
-          paragraph.replaceWith(buildIframeEmbed(parsed, externalVideo));
+          paragraph.replaceWith(buildIframeEmbed(document, externalVideo));
         });
 
       if (embeds.length === 0) {
         if (!cancelled) {
-          const nextHtml = parsed.body.innerHTML;
+          const nextHtml = host.innerHTML;
           if (nextHtml !== enhancedBodyHtmlRef.current) {
             setEnhancedBodyHtml(nextHtml);
           }
@@ -508,7 +532,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
               return;
             }
 
-            const noteEmbed = parsed.createElement('section');
+            const noteEmbed = document.createElement('section');
             noteEmbed.className = 'preview-note-embed';
             if (embedWidth) noteEmbed.style.maxWidth = `${embedWidth}px`;
             if (embedHeight) {
@@ -516,11 +540,11 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
               noteEmbed.style.overflow = 'auto';
             }
 
-            const title = parsed.createElement('div');
+            const title = document.createElement('div');
             title.className = 'preview-note-embed-title';
             title.textContent = label || fragment.title;
 
-            const body = parsed.createElement('article');
+            const body = document.createElement('article');
             body.className = 'markdown-body preview-note-embed-body';
             try {
               body.innerHTML = renderMarkdown(fragment.markdown, { highlighter, themeMode });
@@ -535,7 +559,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
           // Image embed
           if (isImageAttachment(resolvedTarget.name)) {
-            const image = parsed.createElement('img');
+            const image = document.createElement('img');
             image.className = 'preview-attachment-image';
             image.alt = label || resolvedTarget.name;
             if (embedWidth) image.style.width = `${embedWidth}px`;
@@ -556,7 +580,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
           }
 
           if (isVideoAttachment(resolvedTarget.name)) {
-            const video = parsed.createElement('video');
+            const video = document.createElement('video');
             video.className = 'preview-attachment-video';
             video.controls = true;
             video.playsInline = true;
@@ -576,7 +600,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
           // PDF embed
           if (isPdfAttachment(resolvedTarget.name)) {
-            const pdfFrame = parsed.createElement('iframe');
+            const pdfFrame = document.createElement('iframe');
             pdfFrame.className = 'preview-attachment-pdf';
             pdfFrame.title = label || resolvedTarget.name;
             if (embedWidth) pdfFrame.style.width = `${embedWidth}px`;
@@ -593,18 +617,18 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
           }
 
           // Generic attachment
-          const attachment = parsed.createElement('a');
+          const attachment = document.createElement('a');
           attachment.className = 'preview-attachment-file';
           attachment.setAttribute('href', '#');
           attachment.dataset.attachmentPath = resolvedTarget.path;
           attachment.dataset.attachmentName = resolvedTarget.name;
           attachment.title = `Double-click to reveal ${resolvedTarget.name}`;
 
-          const fileName = parsed.createElement('span');
+          const fileName = document.createElement('span');
           fileName.className = 'preview-attachment-file-name';
           fileName.textContent = label || resolvedTarget.name;
 
-          const hint = parsed.createElement('span');
+          const hint = document.createElement('span');
           hint.className = 'preview-attachment-file-hint';
           hint.textContent = 'Double-click to reveal in Finder';
 
@@ -616,14 +640,14 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       }));
 
       if (!cancelled) {
-        const nextHtml = parsed.body.innerHTML;
+        const nextHtml = host.innerHTML;
         if (nextHtml !== enhancedBodyHtmlRef.current) {
           setEnhancedBodyHtml(nextHtml);
         }
       }
     } catch (error) {
       console.error('Preview renderer error:', error);
-      if (!cancelled && basePreviewHtmlChanged) {
+      if (!cancelled) {
         setEnhancedBodyHtml(basePreviewHtml);
       }
     }})();
