@@ -5,6 +5,7 @@
  */
 
 import { EditorSelection, EditorState, type StateCommand, type Transaction } from '@codemirror/state';
+import { updateSelectedLines as updateSelectedLinesWithSelectionMap } from './behavior/core';
 import {
   type ListItemInfo,
   type ListType,
@@ -47,50 +48,6 @@ function replaceCurrentLine(
     scrollIntoView: true,
     userEvent: 'input',
   }));
-  return true;
-}
-
-function updateSelectedLines(
-  state: EditorState,
-  dispatch: (tr: Transaction) => void,
-  transform: (lineText: string, lineNumber: number) => string,
-  options?: { renumberOrdered?: boolean }
-): boolean {
-  const changes: { from: number; to: number; insert: string }[] = [];
-  const affectedLines = new Set<number>();
-
-  for (const range of state.selection.ranges) {
-    const startLine = state.doc.lineAt(range.from).number;
-    const endLine = state.doc.lineAt(Math.max(range.from, range.to - 1)).number;
-
-    for (let i = startLine; i <= endLine; i++) {
-      if (affectedLines.has(i)) continue;
-      affectedLines.add(i);
-
-      const line = state.doc.line(i);
-      const newText = transform(line.text, i);
-      if (newText !== line.text) {
-        changes.push({ from: line.from, to: line.to, insert: newText });
-      }
-    }
-  }
-
-  if (changes.length === 0) return false;
-
-  dispatch(state.update({
-    changes,
-    scrollIntoView: true,
-    userEvent: 'input',
-  }));
-
-  // 如果需要重新编号，再次 dispatch
-  if (options?.renumberOrdered) {
-    const renumberChanges = getStrictOrderedListNormalizationChanges(state);
-    if (renumberChanges) {
-      // 注意：这里需要在新的 state 上操作
-    }
-  }
-
   return true;
 }
 
@@ -236,10 +193,14 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
       return true;
     }
 
-    // 普通文本：插入缩进
+    // 普通文本：有选区时按行首缩进，避免整段替换为一段空格
+    if (hasSelection) {
+      return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
+    }
+
     const changes = state.changeByRange(range => ({
-      changes: { from: range.from, to: range.to, insert: '    ' },
-      range: EditorSelection.cursor(range.from + 4),
+      changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
+      range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
     }));
 
     dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'input' }));
@@ -279,7 +240,7 @@ export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCom
     }
 
     // 普通文本：删除缩进
-    return updateSelectedLines(state, dispatch, (lineText) => {
+    return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText) => {
       const indent = getLeadingIndent(lineText);
       if (indent.length === 0) return lineText;
 
@@ -301,7 +262,7 @@ export const toggleUnorderedList: StateCommand = ({ state, dispatch }): boolean 
   // 如果选中的都是无序列表，则取消列表
   const allUnordered = items.length > 0 && items.every(i => i.type === 'unordered');
 
-  return updateSelectedLines(state, dispatch, (lineText, lineNumber) => {
+  return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText, { lineNumber }) => {
     const item = parseListItem(lineText, lineNumber, 0);
 
     if (allUnordered && item?.type === 'unordered') {
@@ -332,7 +293,7 @@ export const toggleOrderedList = (options?: { strictMode?: boolean }): StateComm
     // 如果选中的都是有序列表，则取消列表
     const allOrdered = items.length > 0 && items.every(i => i.type === 'ordered');
 
-    const handled = updateSelectedLines(state, dispatch, (lineText, lineNumber) => {
+    const handled = updateSelectedLinesWithSelectionMap(state, dispatch, (lineText, { lineNumber }) => {
       const item = parseListItem(lineText, lineNumber, 0);
 
       if (allOrdered && item?.type === 'ordered') {
@@ -378,7 +339,7 @@ export const toggleTaskList: StateCommand = ({ state, dispatch }): boolean => {
   // 如果选中的都是任务列表，则转为无序列表
   const allTask = items.length > 0 && items.every(i => i.type === 'task');
 
-  return updateSelectedLines(state, dispatch, (lineText, lineNumber) => {
+  return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText, { lineNumber }) => {
     const item = parseListItem(lineText, lineNumber, 0);
 
     if (allTask && item?.type === 'task') {

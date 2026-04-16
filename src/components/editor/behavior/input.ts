@@ -3,9 +3,9 @@
  * Enter, Backspace, Tab, Shift-Tab, Paste
  */
 
-import { insertNewlineAndIndent } from '@codemirror/commands';
+import { indentLess, insertNewlineAndIndent } from '@codemirror/commands';
 import { insertNewlineContinueMarkupCommand } from '@codemirror/lang-markdown';
-import type { StateCommand } from '@codemirror/state';
+import { EditorSelection, type StateCommand } from '@codemirror/state';
 import type { OrderedListMode } from '../../../types';
 import {
   isInsideFencedCode,
@@ -18,6 +18,9 @@ import {
   looksLikeUrl,
   LIST_INDENT_UNIT,
   getIndentUnit,
+  updateSelectedLines,
+  getLeadingIndent,
+  removeIndentUnit,
 } from './core';
 import { buildQuotePrefix, buildQuoteRaw } from './quotes';
 import { parseListItem } from '../nestedListBehavior';
@@ -27,8 +30,6 @@ import {
   handleListTab,
   handleListShiftTab,
 } from '../nestedListCommands';
-import { updateSelectedLines, getLeadingIndent, removeIndentUnit } from './core';
-import { indentLess } from '@codemirror/commands';
 import type { EditorView } from '@codemirror/view';
 
 function handleFrontmatterEnter({ state, dispatch }: Parameters<StateCommand>[0]): boolean {
@@ -227,7 +228,11 @@ export function createHandleSmartTab(orderedListMode: OrderedListMode): StateCom
       return cmd({ state, dispatch }) ?? false;
     }
 
-    // 普通文本
+    // 普通文本：有选区时按行首缩进，避免整段替换为一段空格
+    if (hasExpandedSelection) {
+      return updateSelectedLines(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
+    }
+
     const changes = state.changeByRange((range) => ({
       changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
       range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
@@ -237,8 +242,6 @@ export function createHandleSmartTab(orderedListMode: OrderedListMode): StateCom
     return true;
   };
 }
-
-import { EditorSelection } from '@codemirror/state';
 
 export const handleSmartShiftTab: StateCommand = ({ state, dispatch }): boolean => {
   return createHandleSmartShiftTab('strict')({ state, dispatch });

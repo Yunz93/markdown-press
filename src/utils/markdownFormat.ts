@@ -149,7 +149,9 @@ function isThematicBreak(line: string): boolean {
 }
 
 function isListItem(line: string): boolean {
-  return /^\s{0,3}(?:[-+*]|\d+[.)])\s+\S/.test(line);
+  // Any leading indent: nested list lines use 4+ spaces and must stay `list`, not `indentedCode`,
+  // or format-on-save inserts a blank line between parent and child (list vs indentedCode boundary).
+  return /^\s*(?:[-+*]|\d+[.)])\s+\S/.test(line);
 }
 
 function isBlockquote(line: string): boolean {

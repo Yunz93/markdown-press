@@ -200,15 +200,17 @@ function buildMarkdownListDecorations(view: EditorView): DecorationSet {
 
     const indentWidth = getIndentColumnWidth(match[1]);
     const depth = Math.floor(indentWidth / LIST_INDENT_UNIT.length);
+    // Guides only for *ancestor* indent columns; `depth` stripes put a line on the marker column.
+    const guideDepth = Math.max(0, depth - 1);
 
-    if (depth > 0) {
+    if (guideDepth > 0) {
       builder.add(
         line.from,
         line.from,
         Decoration.line({
           class: 'cm-markdown-list-line',
           attributes: {
-            style: `--cm-list-depth:${depth};`,
+            style: `--cm-list-depth:${guideDepth};`,
           },
         }),
       );

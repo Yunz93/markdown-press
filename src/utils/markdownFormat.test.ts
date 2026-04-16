@@ -31,6 +31,12 @@ describe('formatMarkdownForSave', () => {
     expect(out).not.toContain('\tcode line');
   });
 
+  it('does not insert a blank line between a parent list item and a nested list item', () => {
+    const input = ['- UI', '    - child one', '    - child two', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe('- UI\n    - child one\n    - child two');
+  });
+
   it('joins pipe table rows and normalizes Unicode dashes in separator rows', () => {
     const input = [
       '| 左对齐 | 居中 | 右对齐 |',

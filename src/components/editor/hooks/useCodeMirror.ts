@@ -33,6 +33,7 @@ import {
   getStrictOrderedListNormalizationChanges,
   LIST_INDENT_UNIT,
 } from '../behavior';
+import { markdownSelectionSurroundInputHandler } from '../behavior/surroundInput';
 import { markdownHighlightStyle } from '../decorations';
 import {
   frontmatterDecorations,
@@ -195,6 +196,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
           doc: initialContentRef.current,
           extensions: [
             history(),
+            EditorView.inputHandler.of(markdownSelectionSurroundInputHandler),
             keymap.of([
               ...completionKeymap,
               ...defaultKeymap,
