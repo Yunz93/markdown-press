@@ -129,8 +129,12 @@ html[data-app-booting="true"] *::after {
   font-family: inherit !important;
 }
 
-/* High Contrast Overrides for Light Mode */
-html:not(.dark) .markdown-body {
+/* High contrast for GitHub-style markdown outside the live preview pane.
+   The preview article uses `.preview-pane-document` + `preview.css`; forcing
+   `color: #000 !important` there overrides that cascade and breaks Mermaid:
+   many diagram paths use `currentColor`, which becomes solid black fills and
+   giant stroked wedges in WKWebView / release builds. */
+html:not(.dark) .markdown-body:not(.preview-pane-document) {
   color: #000000 !important;
   --color-fg-default: #000000 !important;
   --color-fg-muted: #444444 !important;

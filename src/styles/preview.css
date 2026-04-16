@@ -685,11 +685,21 @@
   overflow-y: hidden;
 }
 
-.preview-pane-document.markdown-body .mermaid svg {
+/* Only the root diagram <svg> should shrink with the preview column.
+   Mermaid nests <svg> for subgraphs/clusters; applying max-width / height:auto
+   to every descendant breaks its coordinate system (distorted scale, black
+   tiles) — WKWebView in Tauri release is stricter than Chrome in dev. */
+.preview-pane-document.markdown-body .mermaid > svg {
   display: block;
   max-width: 100%;
   height: auto;
   flex: none;
+}
+
+.preview-pane-document.markdown-body .mermaid svg svg {
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 .dark .preview-pane-document.markdown-body .mermaid {
