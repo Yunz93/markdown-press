@@ -154,6 +154,60 @@ function isIndentedCode(line: string): boolean {
   return /^(?: {4,}|\t)/.test(line);
 }
 
+/** One CommonMark indent unit for indented code blocks (4 spaces or one tab). */
+function stripOneLeadingIndent(line: string): string {
+  if (line.startsWith('\t')) return line.slice(1);
+  if (line.startsWith('    ')) return line.slice(4);
+  return line;
+}
+
+/**
+ * Lines with a 4-space/tab prefix are parsed as indented code blocks. Pasted snippets often
+ * only indent the inner lines; strip one indent level when such a line is "orphaned" between
+ * non-indented lines so it stays ordinary paragraph text after format-on-save.
+ */
+function unwrapOrphanIndentedCodeLines(lines: string[]): string[] {
+  if (lines.length === 0) return lines;
+
+  const prevNonBlankLine = (index: number): string | null => {
+    for (let j = index - 1; j >= 0; j -= 1) {
+      if (lines[j].trim() !== '') return lines[j];
+    }
+    return null;
+  };
+
+  const prevNonBlankIndex = (index: number): number | null => {
+    for (let j = index - 1; j >= 0; j -= 1) {
+      if (lines[j].trim() !== '') return j;
+    }
+    return null;
+  };
+
+  const nextNonBlankIndex = (index: number): number | null => {
+    for (let j = index + 1; j < lines.length; j += 1) {
+      if (lines[j].trim() !== '') return j;
+    }
+    return null;
+  };
+
+  return lines.map((line, i) => {
+    const kind = classifyMarkdownLine(line, prevNonBlankLine(i));
+    if (kind !== 'indentedCode') return line;
+
+    const pi = prevNonBlankIndex(i);
+    const ni = nextNonBlankIndex(i);
+    const prevKind =
+      pi === null ? null : classifyMarkdownLine(lines[pi], prevNonBlankLine(pi));
+    const nextKind =
+      ni === null ? null : classifyMarkdownLine(lines[ni], prevNonBlankLine(ni));
+
+    if (prevKind !== 'indentedCode' && nextKind !== 'indentedCode') {
+      return stripOneLeadingIndent(line);
+    }
+    return line;
+  });
+}
+
 function isHtmlCommentLine(line: string): boolean {
   return /^\s*<!--.*-->\s*$/.test(line);
 }
@@ -422,7 +476,7 @@ function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions):
 }
 
 function formatTextSegment(segment: string, options: MarkdownFormatOptions): string {
-  const normalizedLines = trimOuterBlankLines(segment.split('\n'));
+  const normalizedLines = unwrapOrphanIndentedCodeLines(trimOuterBlankLines(segment.split('\n')));
   const spacedLines: string[] = [];
   let previousBlank = false;
 

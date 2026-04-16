@@ -397,7 +397,7 @@
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki,
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki code,
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki .line {
-  line-height: 1.45;
+  line-height: 1.15;
 }
 
 .editor-pane-layout .cm-frontmatter-line {

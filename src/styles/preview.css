@@ -307,7 +307,7 @@
 .preview-pane-document.markdown-body pre.shiki,
 .preview-pane-document.markdown-body pre.shiki code,
 .preview-pane-document.markdown-body pre.shiki .line {
-  line-height: 1.32;
+  line-height: 1.15;
 }
 
 .preview-pane-document-compact.markdown-body pre,
@@ -315,7 +315,7 @@
 .preview-pane-document-compact.markdown-body pre.shiki,
 .preview-pane-document-compact.markdown-body pre.shiki code,
 .preview-pane-document-compact.markdown-body pre.shiki .line {
-  line-height: 1.28;
+  line-height: 1.1;
 }
 
 .preview-pane-document.markdown-body pre:not(.shiki) code {
@@ -391,7 +391,7 @@
 .preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki,
 .preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki code,
 .preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki .line {
-  line-height: 1.32;
+  line-height: 1.15;
 }
 
 .preview-pane-document.markdown-body table {

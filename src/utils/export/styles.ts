@@ -215,7 +215,7 @@ export function buildExportStyles(
     .export-document .markdown-body pre.shiki,
     .export-document .markdown-body pre.shiki code,
     .export-document .markdown-body pre.shiki .line {
-      line-height: 1.45;
+      line-height: 1.15;
     }
 
     .export-document .markdown-body table th,
