@@ -129,6 +129,18 @@ html[data-app-booting="true"] *::after {
   font-family: inherit !important;
 }
 
+/* GitHub's default h2 border-bottom reads as a horizontal rule between adjacent ## headings. */
+.markdown-body h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* markdown-it-footnote already emits <hr class="footnotes-sep">; GitHub CSS also sets
+   border-top on .footnotes — together that reads as two stacked dividers. */
+.markdown-body .footnotes {
+  border-top: none;
+}
+
 /* High contrast for GitHub-style markdown outside the live preview pane.
    The preview article uses `.preview-pane-document` + `preview.css`; forcing
    `color: #000 !important` there overrides that cascade and breaks Mermaid:

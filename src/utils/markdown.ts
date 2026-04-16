@@ -4,12 +4,14 @@ import MarkdownIt from 'markdown-it';
 import type Token from 'markdown-it/lib/token.mjs';
 import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import taskLists from 'markdown-it-task-lists';
+import footnote from 'markdown-it-footnote';
 import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensions';
 import { normalizeShikiLanguage } from './shikiLanguages';
 import { getMarkdownPressShikiTheme } from './shikiTheme';
 import { parseWikiLinkReference } from './wikiLinks';
 import type { ThemeMode } from '../types';
 import { LRUCache, hashContent } from './performance';
+import { normalizeMarkdownTablesForRender } from './markdownTableNormalize';
 import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
 
 interface MarkdownRenderOptions {
@@ -28,7 +30,10 @@ const createMarkdownIt = () => {
     linkify: true,
     typographer: true,
     breaks: true,
-  }).use(taskLists);
+  })
+    .use(taskLists)
+    // GFM/Obsidian-style [^id] refs and [^id]: definitions (otherwise parsed as reference links).
+    .use(footnote);
 
   md.core.ruler.after('inline', 'obsidian_block_references', (state) => {
     const nextTokens: Token[] = [];
@@ -328,12 +333,14 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   configureFenceRenderer(md, highlighter, themeMode);
 
   const env: MarkdownRenderEnv = {};
-  const normalizedMarkdown = angleBracketBareMarkdownHttpUrls(markdown);
+  const normalizedMarkdown = normalizeMarkdownTablesForRender(
+    angleBracketBareMarkdownHttpUrls(markdown),
+  );
   const renderedHtml = md.render(normalizedMarkdown, env);
 
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
-    ADD_TAGS: ['iframe'], // Allow iframe for embeds if needed
+    ADD_TAGS: ['iframe', 'section', 'sup'], // section/sup: markdown-it-footnote; iframe: embeds
     // Preserve Shiki token styling while still sanitizing the rest of the HTML.
     ADD_ATTR: [
       'align',

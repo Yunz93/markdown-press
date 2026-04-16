@@ -64,8 +64,33 @@ describe('renderMarkdown', () => {
     expect(html).toContain('task-list-item');
   });
 
+  it('renders GFM/Obsidian footnotes as superscript refs and a footnotes section', () => {
+    const md = 'Text[^a] end.\n\n[^a]: https://example.com/doc';
+    const html = renderMarkdown(md);
+    expect(html).toContain('class="footnote-ref"');
+    expect(html).toContain('<sup class="footnote-ref"');
+    expect(html).toContain('href="#fn');
+    expect(html).toContain('class="footnotes"');
+    expect(html).toContain('example.com/doc');
+  });
+
   it('maps standalone block id paragraph to data-block-id on previous block', () => {
     const html = renderMarkdown('Hello\n\n^my-id\n');
     expect(html).toContain('data-block-id="my-id"');
+  });
+
+  it('renders GFM tables with blank lines between rows and Unicode dash separator', () => {
+    const md = [
+      '| 左对齐 | 居中 | 右对齐 |',
+      '',
+      '| ------- | ----- | — |',
+      '',
+      '| L | C | 1.0 |',
+      '',
+    ].join('\n');
+    const html = renderMarkdown(md);
+    expect(html).toContain('<table>');
+    expect(html).toContain('<thead>');
+    expect(html).toContain('<tbody>');
   });
 });

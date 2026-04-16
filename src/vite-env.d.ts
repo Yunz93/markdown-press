@@ -19,6 +19,12 @@ declare module 'markdown-it-task-lists' {
   export default taskLists;
 }
 
+declare module 'markdown-it-footnote' {
+  import type MarkdownIt from 'markdown-it';
+  const footnote: MarkdownIt.PluginSimple;
+  export default footnote;
+}
+
 declare module '*.css?inline' {
   const css: string;
   export default css;

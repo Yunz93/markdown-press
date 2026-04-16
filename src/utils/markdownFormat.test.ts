@@ -30,4 +30,26 @@ describe('formatMarkdownForSave', () => {
     expect(out).toContain('code line');
     expect(out).not.toContain('\tcode line');
   });
+
+  it('joins pipe table rows and normalizes Unicode dashes in separator rows', () => {
+    const input = [
+      '| 左对齐 | 居中 | 右对齐 |',
+      '',
+      '| ------- | ----- | — |',
+      '',
+      '| L | C | 1.0 |',
+      '',
+    ].join('\n');
+
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out).toContain('| 左对齐 | 居中 | 右对齐 |');
+    expect(out).toContain('| ------- | ----- | - |');
+    expect(out).toContain('| L | C | 1.0 |');
+    const lines = out.trimEnd().split('\n');
+    const iHeader = lines.findIndex((l) => l.includes('左对齐'));
+    const iSep = lines.findIndex((l) => l.includes('| -------'));
+    const iData = lines.findIndex((l) => l.includes('| L |'));
+    expect(iSep).toBe(iHeader + 1);
+    expect(iData).toBe(iSep + 1);
+  });
 });

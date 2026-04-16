@@ -1,4 +1,10 @@
 import type { OrderedListMode } from '../types';
+import {
+  isMarkdownTableSeparatorLine,
+  isPotentialMarkdownTableRow,
+  normalizeMarkdownTableSeparatorLine,
+  preprocessMarkdownTableLines,
+} from './markdownTableNormalize';
 
 const MARKDOWN_FILE_REGEX = /\.(md|markdown)$/i;
 const FENCE_MARKER_REGEX = /^(\s*)(`{3,}|~{3,})/;
@@ -220,13 +226,6 @@ function isFootnoteDefinition(line: string): boolean {
   return /^\s{0,3}\[\^[^\]\n]+\]:\s*\S?/.test(line);
 }
 
-function isTableSeparator(line: string): boolean {
-  return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
-}
-
-function isPotentialTableRow(line: string): boolean {
-  return /^\s*\|?.+\|.+\|?\s*$/.test(line);
-}
 
 function normalizeAtxHeading(line: string): string {
   const match = line.match(/^(\s{0,3})(#{1,6})\s*(.*?)\s*(?:#+\s*)?$/);
@@ -284,15 +283,18 @@ function getOrderedListInfo(line: string): { indentLength: number; number: numbe
 }
 
 function isTableLine(line: string, previousNonBlankLine: string | null): boolean {
-  if (isTableSeparator(line)) {
-    return Boolean(previousNonBlankLine && isPotentialTableRow(previousNonBlankLine));
+  if (isMarkdownTableSeparatorLine(line)) {
+    return Boolean(previousNonBlankLine && isPotentialMarkdownTableRow(previousNonBlankLine));
   }
 
-  if (!isPotentialTableRow(line)) {
+  if (!isPotentialMarkdownTableRow(line)) {
     return false;
   }
 
-  return Boolean(previousNonBlankLine && (isTableSeparator(previousNonBlankLine) || isPotentialTableRow(previousNonBlankLine)));
+  return Boolean(
+    previousNonBlankLine &&
+      (isMarkdownTableSeparatorLine(previousNonBlankLine) || isPotentialMarkdownTableRow(previousNonBlankLine)),
+  );
 }
 
 function classifyMarkdownLine(line: string, previousNonBlankLine: string | null): MarkdownLineKind {
@@ -320,8 +322,23 @@ function classifyMarkdownLine(line: string, previousNonBlankLine: string | null)
   return 'paragraph';
 }
 
-function shouldInsertBlankLineBetween(previousKind: MarkdownLineKind, currentKind: MarkdownLineKind): boolean {
+function shouldInsertBlankLineBetween(
+  previousKind: MarkdownLineKind,
+  currentKind: MarkdownLineKind,
+  previousNonBlankLine: string | null,
+  currentLine: string,
+): boolean {
   if (previousKind === 'blank' || currentKind === 'blank') {
+    return false;
+  }
+
+  if (
+    currentKind === 'table' &&
+    previousKind === 'paragraph' &&
+    previousNonBlankLine &&
+    isPotentialMarkdownTableRow(previousNonBlankLine) &&
+    isMarkdownTableSeparatorLine(currentLine)
+  ) {
     return false;
   }
 
@@ -434,6 +451,9 @@ function normalizeMarkdownLine(
     case 'footnoteDefinition':
       orderedListCounters.clear();
       return normalizeFootnoteDefinition(line);
+    case 'table':
+      orderedListCounters.clear();
+      return normalizeMarkdownTableSeparatorLine(line);
     default:
       orderedListCounters.clear();
       return line;
@@ -445,11 +465,18 @@ function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions):
   let previousNonBlankLine: string | null = null;
   let previousKind: MarkdownLineKind = 'blank';
   const orderedListCounters = new Map<number, number>();
+  let deferredBlankAfterTable = false;
 
   for (const line of lines) {
     const currentKind = classifyMarkdownLine(line, previousNonBlankLine);
 
     if (currentKind === 'blank') {
+      if (previousKind === 'table') {
+        deferredBlankAfterTable = true;
+        orderedListCounters.clear();
+        continue;
+      }
+      deferredBlankAfterTable = false;
       if (output.length > 0 && output[output.length - 1] !== '') {
         output.push('');
       }
@@ -457,7 +484,15 @@ function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions):
       continue;
     }
 
-    if (shouldInsertBlankLineBetween(previousKind, currentKind) && output[output.length - 1] !== '') {
+    if (deferredBlankAfterTable) {
+      deferredBlankAfterTable = false;
+      // Table-to-table: blank dropped. Table-to-non-table: boundary blank from shouldInsert below.
+    }
+
+    if (
+      shouldInsertBlankLineBetween(previousKind, currentKind, previousNonBlankLine, line) &&
+      output[output.length - 1] !== ''
+    ) {
       output.push('');
     }
 
@@ -500,7 +535,7 @@ function formatTextSegment(segment: string, options: MarkdownFormatOptions): str
     spacedLines.push(applyChineseEnglishSpacing(trimmedRight));
   }
 
-  return normalizeBlockSpacing(spacedLines, options).join('\n');
+  return normalizeBlockSpacing(preprocessMarkdownTableLines(spacedLines), options).join('\n');
 }
 
 function isClosingFence(line: string, fenceMarker: string): boolean {

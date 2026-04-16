@@ -613,7 +613,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 stroke="currentColor"
                 strokeWidth="2"
               >
-                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               <p className="text-sm font-semibold truncate min-w-0">
                 {currentKnowledgeBaseName || t('app_openKnowledgeBase')}
@@ -626,9 +626,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               stroke="currentColor"
               strokeWidth="2"
             >
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-              <polyline points="9 13 12 10 15 13" />
-              <line x1="12" y1="10" x2="12" y2="16" />
+              <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
         </div>

@@ -148,6 +148,15 @@ export function buildExportStyles(
       color: ${theme === 'dark' ? '#c084fc' : '#7c3aed'};
     }
 
+    .export-document .markdown-body h2 {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .export-document .markdown-body .footnotes {
+      border-top: none;
+    }
+
     .export-document .markdown-body a {
       color: var(--accent-color);
       text-decoration-thickness: 1.5px;

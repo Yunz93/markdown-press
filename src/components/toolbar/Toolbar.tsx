@@ -43,14 +43,16 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
     <div className="ui-scaled sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-transparent bg-gray-50 dark:bg-black px-4 py-3 transition-colors md:px-6 md:py-2">
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden md:gap-4">
         <button
+          type="button"
           onClick={onMenuClick}
           className="inline-flex h-8 w-8 items-center justify-center -ml-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
           title={isSidebarOpen ? t('toolbar_hideSidebar') : t('toolbar_showSidebar')}
+          aria-label={isSidebarOpen ? t('toolbar_hideSidebar') : t('toolbar_showSidebar')}
+          aria-expanded={isSidebarOpen}
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="9" y1="4" x2="9" y2="20" />
-            {isSidebarOpen ? <line x1="6" y1="12" x2="7.5" y2="12" /> : <line x1="5.5" y1="12" x2="7.5" y2="12" />}
+            <line x1={isSidebarOpen ? 9 : 6} y1="4" x2={isSidebarOpen ? 9 : 6} y2="20" />
           </svg>
         </button>
 
