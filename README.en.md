@@ -87,14 +87,14 @@ Download the `.exe` installer and run it. If Windows SmartScreen blocks the laun
 | Shortcut | Action |
 | --- | --- |
 | `Cmd/Ctrl + S` | Save current file |
-| `Cmd + Shift + V` | Toggle view mode |
-| `Cmd/Ctrl + J` | AI enhance |
+| `Cmd/Ctrl + 0` | Open settings |
+| `Cmd/Ctrl + 1` | Toggle sidebar |
+| `Cmd/Ctrl + 2` | Toggle outline |
+| `Cmd/Ctrl + 3` | Toggle view mode |
+| `Cmd/Ctrl + 4` | Toggle light/dark theme |
+| `Cmd/Ctrl + 5` | AI enhance |
 | `Cmd + Shift + F` | In-file search |
 | `Cmd + Shift + S` | Sidebar search |
-| `Cmd + Shift + 0` | Open settings |
-| `Cmd + Shift + O` | Toggle outline |
-| `Cmd + Shift + B` | Toggle sidebar |
-| `Cmd + Shift + T` | Toggle light/dark theme |
 | `Cmd + Shift + K` | Open knowledge base |
 | `Cmd + Shift + L` | Locate current file in sidebar |
 | `Cmd + Shift + H` | Export PDF |

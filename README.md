@@ -91,14 +91,14 @@ M記 workspace
 | 快捷键                                     | 动作         |
 | --------------------------------------- | ---------- |
 | `Cmd/Ctrl + S`                          | 保存当前文件     |
-| `Cmd + Shift + V`                       | 切换视图模式     |
-| `Cmd/Ctrl + J`                          | AI 增强      |
+| `Cmd/Ctrl + 0`                          | 打开设置       |
+| `Cmd/Ctrl + 1`                          | 切换侧边栏      |
+| `Cmd/Ctrl + 2`                          | 切换 Outline |
+| `Cmd/Ctrl + 3`                          | 切换视图模式     |
+| `Cmd/Ctrl + 4`                          | 切换亮色/暗色主题  |
+| `Cmd/Ctrl + 5`                          | AI 增强      |
 | `Cmd + Shift + F`                       | 当前文件搜索     |
 | `Cmd + Shift + S`                       | 侧边栏搜索      |
-| `Cmd + Shift + 0`                       | 打开设置       |
-| `Cmd + Shift + O`                       | 切换 Outline |
-| `Cmd + Shift + B`                       | 切换侧边栏      |
-| `Cmd + Shift + T`                       | 切换亮色/暗色主题  |
 | `Cmd + Shift + K`                       | 打开知识库      |
 | `Cmd + Shift + L`                       | 在侧边栏定位当前文件 |
 | `Cmd + Shift + H`                       | 导出 PDF     |

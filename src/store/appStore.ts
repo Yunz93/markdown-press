@@ -161,13 +161,14 @@ function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
   };
 
   const defaultShortcutMigrations: Partial<Record<keyof typeof mergedShortcuts, string[]>> = {
-    toggleView: ['Ctrl+E'],
+    aiAnalyze: ['Cmd+J', 'Ctrl+J'],
+    toggleView: ['Ctrl+E', 'Cmd+Shift+V', 'Ctrl+Shift+V'],
     search: ['Ctrl+F'],
     sidebarSearch: ['Ctrl+Shift+F'],
-    settings: ['Ctrl+,', 'Cmd+,', 'Command+,', 'Meta+,'],
-    toggleOutline: ['Ctrl+O'],
-    toggleSidebar: ['Ctrl+B'],
-    toggleTheme: ['Ctrl+T'],
+    settings: ['Ctrl+,', 'Cmd+,', 'Command+,', 'Meta+,', 'Cmd+Shift+0', 'Ctrl+Shift+0'],
+    toggleOutline: ['Ctrl+O', 'Cmd+Shift+O', 'Ctrl+Shift+O'],
+    toggleSidebar: ['Ctrl+B', 'Cmd+Shift+B', 'Ctrl+Shift+B'],
+    toggleTheme: ['Ctrl+T', 'Cmd+Shift+T', 'Ctrl+Shift+T'],
     openKnowledgeBase: ['Ctrl+Shift+O'],
     exportPdf: ['Ctrl+Shift+E'],
   };
