@@ -116,6 +116,9 @@ npm run smoke:release
 欢迎提交 Issue 和 Pull Request。提交前建议至少执行：
 
 ```bash
+npm run lint
+npm run typecheck
+npm test
 npm run build
 npm run smoke:release
 ```

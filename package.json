@@ -9,6 +9,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "build": "npm run typecheck && vite build",
+    "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -61,6 +62,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@tauri-apps/cli": "^2.10.0",
     "@types/dompurify": "^3.0.5",
     "@types/js-yaml": "^4.0.9",
@@ -71,10 +73,14 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
     "happy-dom": "^15.11.7",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.2",
+    "typescript-eslint": "^8.58.2",
     "vite": "^6.2.0",
     "vitest": "^4.1.4"
   },

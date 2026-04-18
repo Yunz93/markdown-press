@@ -24,37 +24,20 @@ import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
 import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
-import { ensureDynamicFontFaces, getResolvedUiFontFamily } from './utils/fontSettings';
-import { hydrateSensitiveSettingsIntoStore } from './services/secureSettingsService';
-import { LAYOUT, clamp, getStoredPanelWidth, getMinimumWorkspaceWidth, getMinimumWorkspaceWidthWithOutline } from './config/layout';
-import { throttle } from './utils/throttle';
+import { getResolvedUiFontFamily } from './utils/fontSettings';
 import { logEnvironment } from './utils/environment';
-import { findUnusedAttachments } from './utils/attachmentCleanup';
-import type { PaneDensity } from './components/editor/paneLayout';
 import { useI18n } from './hooks/useI18n';
+import { getPathBasename, findFileInTree } from './app/appShellUtils';
+import { useAppBootstrap } from './app/useAppBootstrap';
+import { useActiveFileWatch } from './app/useActiveFileWatch';
+import { useWorkspaceLayout } from './app/useWorkspaceLayout';
+import { useAttachmentCleanup } from './app/useAttachmentCleanup';
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
 
-function getPathBasename(path: string | null | undefined): string {
-  if (!path) return '';
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] || path;
-}
-
-function findFileInTree(nodes: import('./types').FileNode[], id: string): import('./types').FileNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    if (node.children) {
-      const found = findFileInTree(node.children, id);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
 // Log environment info on app initialization for debugging
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   logEnvironment();
 }
 
@@ -136,202 +119,59 @@ const App: React.FC = () => {
   useUndoRedo();
 
   useThemeSync(settings.themeMode);
-
-  useEffect(() => {
-    if (!settingsHydrated || typeof window === 'undefined') return;
-
-    let cancelled = false;
-    const win = window;
-
-    const warmSecureSettings = () => {
-      if (cancelled) return;
-      void hydrateSensitiveSettingsIntoStore().catch((error) => {
-        console.warn('Failed to warm secure settings:', error);
-      });
-    };
-
-    if ('requestIdleCallback' in win) {
-      const idleId = win.requestIdleCallback(warmSecureSettings, { timeout: 1500 });
-      return () => {
-        cancelled = true;
-        win.cancelIdleCallback(idleId);
-      };
-    }
-
-    const timerId = setTimeout(warmSecureSettings, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(timerId);
-    };
-  }, [settingsHydrated]);
-
-  useEffect(() => {
-    ensureDynamicFontFaces(settings)
-      .then(() => {
-        // After fonts are loaded, notify editor to refresh
-        if (typeof document !== 'undefined') {
-          document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to ensure dynamic font faces:', error);
-      });
-  }, [settings.uiFontFamily, settings.editorFontFamily, settings.previewFontFamily, settings.codeFontFamily]);
+  useAppBootstrap({
+    settings,
+    settingsHydrated,
+    currentFilePath,
+    updateSettings,
+  });
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave, highlighter);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
-  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
-  const [mainContentWidth, setMainContentWidth] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth : 0
-  ));
-  const [viewportWidth, setViewportWidth] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth : 1440
-  ));
-  const [sidebarWidth, setSidebarWidth] = useState(() => (
-    getStoredPanelWidth(
-      LAYOUT.STORAGE_KEYS.SIDEBAR_WIDTH,
-      LAYOUT.SIDEBAR.DEFAULT_WIDTH,
-      LAYOUT.SIDEBAR.MIN_WIDTH,
-      LAYOUT.SIDEBAR.MAX_WIDTH
-    )
-  ));
-  const [outlineWidth, setOutlineWidth] = useState(() => (
-    getStoredPanelWidth(
-      LAYOUT.STORAGE_KEYS.OUTLINE_WIDTH,
-      LAYOUT.OUTLINE.DEFAULT_WIDTH,
-      LAYOUT.OUTLINE.MIN_WIDTH,
-      LAYOUT.OUTLINE.MAX_WIDTH
-    )
-  ));
-  const mainContentRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!settingsHydrated || typeof document === 'undefined') return;
-    const frame = window.requestAnimationFrame(() => {
-      document.documentElement.removeAttribute('data-app-booting');
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [settingsHydrated]);
-
-  // Remember the last opened file so startup can restore it after hydration.
-  useEffect(() => {
-    if (!settingsHydrated || !currentFilePath) return;
-    if (settings.lastOpenedFilePath === currentFilePath) return;
-
-    updateSettings({ lastOpenedFilePath: currentFilePath });
-  }, [settingsHydrated, currentFilePath, settings.lastOpenedFilePath, updateSettings]);
-
-  // Keep the watched/saved path derived from the active tab and current file tree.
-  useEffect(() => {
-    const nextPath = activeTabId ? findFileInTree(files, activeTabId)?.path ?? null : null;
-    if (currentFilePath !== nextPath) {
-      setCurrentFilePath(nextPath);
-    }
-  }, [activeTabId, files, currentFilePath, setCurrentFilePath]);
-
-  // Watch active file for external changes and auto-reload when safe
-  useEffect(() => {
-    if (!activeTabId || !currentFilePath) return;
-
-    let disposed = false;
-    let unwatch: (() => void) | null = null;
-
-    const setupWatcher = async () => {
-      // Cleanup previous watcher before setting up new one to prevent race conditions
-      if (unwatch) {
-        unwatch();
-        unwatch = null;
-      }
-      
-      unwatch = await watchFile(currentFilePath, async (event) => {
-        if (disposed) return;
-        if (event?.type === 'deleted') {
-          showNotification(t('notifications_fileDeletedOnDisk'), 'error');
-          return;
-        }
-        if (event?.type === 'error') {
-          showNotification(t('notifications_watchFileFailed'), 'error');
-          return;
-        }
-        if (event?.type !== 'modified') return;
-
-        const state = useAppStore.getState();
-        if (state.hasUnsavedChanges(activeTabId)) {
-          showNotification(t('notifications_fileChangedOnDisk'), 'error');
-          return;
-        }
-
-        const node = findFileInTree(state.files, activeTabId);
-        if (!node || node.type !== 'file') return;
-
-        try {
-          const latestContent = await readFile(node);
-          const currentCached = useAppStore.getState().fileContents[activeTabId];
-          if (currentCached === latestContent) return;
-
-          useAppStore.getState().updateTabContent(activeTabId, latestContent);
-          showNotification(t('notifications_fileReloaded'), 'success');
-        } catch (error) {
-          console.error('Failed to reload file from disk:', error);
-          showNotification(t('notifications_reloadFileFailed'), 'error');
-        }
-      });
-    };
-
-    setupWatcher();
-
-    return () => {
-      disposed = true;
-      if (unwatch) {
-        unwatch();
-        unwatch = null;
-      }
-    };
-  }, [activeTabId, currentFilePath, readFile, showNotification, watchFile]);
-
-  useEffect(() => {
-    const mainEl = mainContentRef.current;
-    if (!mainEl) return;
-
-    // Throttle resize updates to 16ms (60fps) for better performance
-    const throttledSetMainContentWidth = throttle(setMainContentWidth, 16);
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      throttledSetMainContentWidth(entry.contentRect.width);
-    });
-
-    resizeObserver.observe(mainEl);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handleResize = () => {
-      setViewportWidth(window.innerWidth);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(LAYOUT.STORAGE_KEYS.SIDEBAR_WIDTH, String(sidebarWidth));
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(LAYOUT.STORAGE_KEYS.OUTLINE_WIDTH, String(outlineWidth));
-  }, [outlineWidth]);
+  const {
+    contentDensity,
+    canShowOutlinePanel,
+    canShowOutlineToggle,
+    isOutlineOpen,
+    isOutlineVisible,
+    mainContentRef,
+    responsiveOutlineWidth,
+    responsiveSidebarWidth,
+    setIsOutlineOpen,
+    setOutlineWidth,
+    setSidebarWidth,
+  } = useWorkspaceLayout({
+    activeTabId,
+    isSidebarOpen,
+    viewMode,
+  });
+  useActiveFileWatch({
+    activeTabId,
+    currentFilePath,
+    files,
+    readFile,
+    setCurrentFilePath,
+    showNotification,
+    watchFile,
+    t,
+  });
+  const { handleCleanupUnusedAttachments } = useAttachmentCleanup({
+    closeTab,
+    fileContents,
+    files,
+    moveToTrash,
+    openTabs,
+    refreshFileTree,
+    rootFolderPath,
+    resourceFolder: settings.resourceFolder,
+    showNotification,
+    t,
+  });
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts(
@@ -403,7 +243,7 @@ const App: React.FC = () => {
   }, [setViewMode]);
 
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
-    setSidebarWidth(clamp(nextWidth, LAYOUT.SIDEBAR.MIN_WIDTH, LAYOUT.SIDEBAR.MAX_WIDTH));
+    setSidebarWidth(nextWidth);
   }, []);
 
   const handleSubmitNewNote = useCallback((value: string) => {
@@ -415,105 +255,12 @@ const App: React.FC = () => {
   }, [fileOps]);
 
   const handleOutlineWidthChange = useCallback((nextWidth: number) => {
-    setOutlineWidth(clamp(nextWidth, LAYOUT.OUTLINE.MIN_WIDTH, LAYOUT.OUTLINE.MAX_WIDTH));
+    setOutlineWidth(nextWidth);
   }, []);
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
     await openDirectory();
   }, [openDirectory]);
-
-  const handleCleanupUnusedAttachments = useCallback(async () => {
-    if (!rootFolderPath) {
-      showNotification(t('notifications_noKnowledgeBaseOpened'), 'error');
-      return;
-    }
-
-    try {
-      const scanResult = await findUnusedAttachments({
-        files,
-        rootFolderPath,
-        resourceFolder: settings.resourceFolder,
-        fileContentOverrides: fileContents,
-      });
-
-      if (scanResult.unusedAttachments.length === 0) {
-        showNotification(t('notifications_noUnusedAttachmentsFound'), 'success');
-        return;
-      }
-
-      const unusedPaths = new Set(scanResult.unusedAttachments.map((file) => file.path));
-      let movedCount = 0;
-
-      for (const attachment of scanResult.unusedAttachments) {
-        const movedPath = await moveToTrash(attachment, {
-          silent: true,
-          skipRefresh: true,
-        });
-
-        if (movedPath) {
-          movedCount += 1;
-        } else {
-          console.error('Failed to move unused attachment to trash:', attachment.path);
-        }
-      }
-
-      if (movedCount > 0) {
-        openTabs
-          .filter((tabId) => unusedPaths.has(tabId))
-          .forEach((tabId) => closeTab(tabId));
-        await refreshFileTree();
-      }
-
-      if (movedCount === scanResult.unusedAttachments.length) {
-        showNotification(
-          t('notifications_unusedAttachmentsRemoved', { count: movedCount }),
-          'success'
-        );
-        return;
-      }
-
-      if (movedCount > 0) {
-        showNotification(
-          t('notifications_unusedAttachmentsPartiallyRemoved', {
-            deleted: movedCount,
-            failed: scanResult.unusedAttachments.length - movedCount,
-          }),
-          'error'
-        );
-        return;
-      }
-
-      showNotification(t('notifications_removeUnusedAttachmentsFailed'), 'error');
-    } catch (error) {
-      console.error('Failed to cleanup unused attachments:', error);
-      showNotification(t('notifications_removeUnusedAttachmentsFailed'), 'error');
-    }
-  }, [
-    closeTab,
-    fileContents,
-    files,
-    moveToTrash,
-    openTabs,
-    refreshFileTree,
-    rootFolderPath,
-    settings.resourceFolder,
-    showNotification,
-    t,
-  ]);
-
-  useEffect(() => {
-    const handleCleanupShortcut = (event: KeyboardEvent) => {
-      if (event.repeat) return;
-      if (event.code !== 'Minus') return;
-      if (!event.metaKey || !event.shiftKey || event.ctrlKey || event.altKey) return;
-
-      event.preventDefault();
-      void handleCleanupUnusedAttachments();
-    };
-
-    window.addEventListener('keydown', handleCleanupShortcut, true);
-    return () => window.removeEventListener('keydown', handleCleanupShortcut, true);
-  }, [handleCleanupUnusedAttachments]);
 
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const notification = useAppStore(state => state.notification);
@@ -530,30 +277,6 @@ const App: React.FC = () => {
     settingsHydrated &&
     !rootFolderPath &&
     files.length === 0;
-  const minimumWorkspaceWidth = getMinimumWorkspaceWidth(viewMode);
-  const responsiveOutlineWidth = Math.min(
-    outlineWidth,
-    Math.max(LAYOUT.OUTLINE.MIN_WIDTH, Math.floor(mainContentWidth * 0.22))
-  );
-  const outlineReservationWidth = isOutlineOpen ? responsiveOutlineWidth + LAYOUT.GAP.OUTLINE_PANEL : 0;
-  const maxSidebarWidthForViewport = Math.max(
-    LAYOUT.SIDEBAR.RESPONSIVE_MIN_WIDTH,
-    viewportWidth - minimumWorkspaceWidth - outlineReservationWidth - LAYOUT.GAP.SHELL_EDGE
-  );
-  const responsiveSidebarWidth = isSidebarOpen
-    ? Math.min(sidebarWidth, maxSidebarWidthForViewport)
-    : sidebarWidth;
-  const workspaceWidthWithOutline = mainContentWidth - responsiveOutlineWidth - LAYOUT.GAP.OUTLINE_PANEL;
-  const minimumWorkspaceWidthWithOutline = getMinimumWorkspaceWidthWithOutline(viewMode);
-  const canShowOutlinePanel = Boolean(activeTabId) && workspaceWidthWithOutline >= minimumWorkspaceWidthWithOutline;
-  const isOutlineVisible = Boolean(activeTabId) && isOutlineOpen;
-  const canShowOutlineToggle = Boolean(activeTabId);
-  const contentDensity: PaneDensity = (
-    viewMode === ViewMode.SPLIT ||
-    mainContentWidth < 1360 ||
-    (isSidebarOpen && mainContentWidth < 1500) ||
-    isOutlineVisible
-  ) ? 'compact' : 'comfortable';
 
   if (shouldShowKnowledgeBaseOnboarding) {
     return (

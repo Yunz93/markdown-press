@@ -76,6 +76,17 @@ Download the `.exe` installer and run it. If Windows SmartScreen blocks the laun
 - PDF export
 - Publish to a `simple-blog` GitHub repository with automatic Vercel deployment
 
+## Local Validation
+
+Before opening a pull request, run:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
 ## Screenshot
 
 ### Main Workspace

@@ -1,0 +1,76 @@
+import { useEffect } from 'react';
+import type { AppSettings } from '../types';
+import { ensureDynamicFontFaces } from '../utils/fontSettings';
+import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
+
+interface UseAppBootstrapOptions {
+  settings: AppSettings;
+  settingsHydrated: boolean;
+  currentFilePath: string | null;
+  updateSettings: (patch: Partial<AppSettings>) => void;
+}
+
+export function useAppBootstrap(options: UseAppBootstrapOptions): void {
+  const {
+    settings,
+    settingsHydrated,
+    currentFilePath,
+    updateSettings,
+  } = options;
+
+  useEffect(() => {
+    if (!settingsHydrated || typeof window === 'undefined') return;
+
+    let cancelled = false;
+    const win = window;
+
+    const warmSecureSettings = () => {
+      if (cancelled) return;
+      void hydrateSensitiveSettingsIntoStore().catch((error) => {
+        console.warn('Failed to warm secure settings:', error);
+      });
+    };
+
+    if ('requestIdleCallback' in win) {
+      const idleId = win.requestIdleCallback(warmSecureSettings, { timeout: 1500 });
+      return () => {
+        cancelled = true;
+        win.cancelIdleCallback(idleId);
+      };
+    }
+
+    const timerId = setTimeout(warmSecureSettings, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timerId);
+    };
+  }, [settingsHydrated]);
+
+  useEffect(() => {
+    ensureDynamicFontFaces(settings)
+      .then(() => {
+        if (typeof document !== 'undefined') {
+          document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to ensure dynamic font faces:', error);
+      });
+  }, [settings]);
+
+  useEffect(() => {
+    if (!settingsHydrated || typeof document === 'undefined') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.documentElement.removeAttribute('data-app-booting');
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [settingsHydrated]);
+
+  useEffect(() => {
+    if (!settingsHydrated || !currentFilePath) return;
+    if (settings.lastOpenedFilePath === currentFilePath) return;
+
+    updateSettings({ lastOpenedFilePath: currentFilePath });
+  }, [settingsHydrated, currentFilePath, settings.lastOpenedFilePath, updateSettings]);
+}

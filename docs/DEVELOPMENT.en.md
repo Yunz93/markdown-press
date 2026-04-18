@@ -116,6 +116,9 @@ See [RELEASE_SMOKE_TEST.md](./RELEASE_SMOKE_TEST.md) for the manual checklist.
 Issues and pull requests are welcome. Before submitting changes, run:
 
 ```bash
+npm run lint
+npm run typecheck
+npm test
 npm run build
 npm run smoke:release
 ```

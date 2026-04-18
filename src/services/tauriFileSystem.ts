@@ -3,7 +3,7 @@ import { readTextFile, readFile as readBinaryFile, writeTextFile, writeFile, exi
 import { basename, dirname, join } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 import type { FileNode } from '../types';
-import type { IFileSystem } from '../types/filesystem';
+import type { FileWatchEvent, IFileSystem } from '../types/filesystem';
 import { useAppStore } from '../store/appStore';
 import { sanitizeTrashFolder } from '../utils/trashFolder';
 
@@ -461,7 +461,7 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Listen to file system events
    */
-  async watchFile(path: string, callback: (event: any) => void): Promise<() => void> {
+  async watchFile(path: string, callback: (event: FileWatchEvent | null) => void): Promise<() => void> {
     try {
       let previous = this.fileFormatStates.get(path)?.lastContent;
 

@@ -79,6 +79,17 @@ xattr -cr /Applications/M記.app
 - 支持 PDF 导出
 - 支持发布到 `simple-blog` 关联的 GitHub 仓库，并直接触发 Vercel 部署
 
+## 开发校验
+
+本地提交前建议至少执行：
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
 ## 截图
 
 ### 主工作区
@@ -168,4 +179,3 @@ M記 workspace
 - [Mermaid](https://mermaid.js.org/)
 - [Google Gemini](https://ai.google.dev/)
 - [OpenAI](https://openai.com/)
-

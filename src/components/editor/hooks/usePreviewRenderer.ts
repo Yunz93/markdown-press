@@ -8,14 +8,32 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import DOMPurify from 'dompurify';
-import { parseFrontmatter } from '../../../utils/frontmatter';
 import { renderMarkdown, useMarkdownRenderer, clearMarkdownCache } from '../../../utils/markdown';
-import { hydrateCachedPreviewImageSources, resolvePreviewSource, warmPreviewImage } from '../../../utils/previewImageCache';
+import { resolvePreviewSource, warmPreviewImage } from '../../../utils/previewImageCache';
 import { parseWikiLinkReference, extractWikiNoteFragment } from '../../../utils/wikiLinks';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../../utils/attachmentResolver';
 import type { FileNode } from '../../../types';
 import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
+import {
+  buildIframeEmbed,
+  configurePreviewImageElement,
+  hasEmbeddableMediaLinksInHtml,
+  hasUriScheme,
+  hasWikiEmbedsInHtml,
+  isHtmlDocument,
+  isImageAttachment,
+  isMarkdownNote,
+  isPdfAttachment,
+  isVideoAttachment,
+  normalizeExistingIframe,
+  resolveExternalVideoEmbed,
+} from '../preview/previewMedia';
+import {
+  getBasePreviewHtml,
+  renderMarkdownPreview,
+  sanitizeHtmlPreview,
+  shouldUseAsyncPreviewEnhancement,
+} from '../preview/previewRenderCore';
 
 export interface UsePreviewRendererOptions {
   content: string;
@@ -38,172 +56,6 @@ export interface UsePreviewRendererReturn {
   sanitizedHtmlPreview: string;
   assetPreviewSrc: string;
   requiresAsyncEnhancement: boolean;
-}
-
-// Helper functions
-function hasUriScheme(value: string): boolean {
-  return /^[a-z][a-z\d+\-.]*:/i.test(value.trim());
-}
-
-function isImageAttachment(fileName: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
-}
-
-function isMarkdownNote(fileName: string): boolean {
-  return /\.(md|markdown)$/i.test(fileName);
-}
-
-function isPdfAttachment(fileName: string): boolean {
-  return /\.pdf$/i.test(fileName);
-}
-
-function isVideoAttachment(fileName: string): boolean {
-  return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
-}
-
-function isHtmlDocument(fileName: string): boolean {
-  return /\.html?$/i.test(fileName);
-}
-
-function hasWikiEmbedsInHtml(html: string): boolean {
-  return html.includes('data-wiki-embed="true"') || html.includes('class="markdown-link markdown-embed"');
-}
-
-function hasEmbeddableMediaLinksInHtml(html: string): boolean {
-  return /href="https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|youtube-nocookie\.com|bilibili\.com|player\.bilibili\.com)\//i.test(html);
-}
-
-interface ExternalVideoEmbed {
-  provider: 'youtube' | 'bilibili';
-  src: string;
-  title: string;
-}
-
-function resolveYouTubeEmbed(url: URL): ExternalVideoEmbed | null {
-  const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
-  let videoId = '';
-
-  if (hostname === 'youtu.be') {
-    videoId = url.pathname.split('/').filter(Boolean)[0] ?? '';
-  } else if (hostname === 'youtube.com' || hostname === 'm.youtube.com') {
-    if (url.pathname === '/watch') {
-      videoId = url.searchParams.get('v') ?? '';
-    } else if (url.pathname.startsWith('/shorts/')) {
-      videoId = url.pathname.split('/')[2] ?? '';
-    } else if (url.pathname.startsWith('/embed/')) {
-      videoId = url.pathname.split('/')[2] ?? '';
-    }
-  } else if (hostname === 'youtube-nocookie.com' && url.pathname.startsWith('/embed/')) {
-    videoId = url.pathname.split('/')[2] ?? '';
-  }
-
-  if (!videoId) return null;
-
-  const embedUrl = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
-  const start = url.searchParams.get('t') ?? url.searchParams.get('start');
-  if (start) {
-    embedUrl.searchParams.set('start', start.replace(/s$/i, ''));
-  }
-
-  return {
-    provider: 'youtube',
-    src: embedUrl.toString(),
-    title: 'YouTube video',
-  };
-}
-
-function resolveBilibiliEmbed(url: URL): ExternalVideoEmbed | null {
-  const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
-
-  if (hostname === 'player.bilibili.com' && url.pathname === '/player.html') {
-    return {
-      provider: 'bilibili',
-      src: url.toString(),
-      title: 'Bilibili video',
-    };
-  }
-
-  if (!hostname.endsWith('bilibili.com')) {
-    return null;
-  }
-
-  const match = url.pathname.match(/\/video\/((?:BV[\w]+)|(?:av\d+))/i);
-  if (!match) return null;
-
-  const rawId = match[1];
-  const embedUrl = new URL('https://player.bilibili.com/player.html');
-
-  if (/^BV/i.test(rawId)) {
-    embedUrl.searchParams.set('bvid', rawId);
-  } else {
-    embedUrl.searchParams.set('aid', rawId.replace(/^av/i, ''));
-  }
-
-  const page = url.searchParams.get('p');
-  if (page) {
-    embedUrl.searchParams.set('page', page);
-  }
-
-  return {
-    provider: 'bilibili',
-    src: embedUrl.toString(),
-    title: 'Bilibili video',
-  };
-}
-
-function resolveExternalVideoEmbed(rawUrl: string): ExternalVideoEmbed | null {
-  try {
-    const url = new URL(rawUrl);
-    return resolveYouTubeEmbed(url) ?? resolveBilibiliEmbed(url);
-  } catch {
-    return null;
-  }
-}
-
-function buildIframeEmbed(document: Document, embed: ExternalVideoEmbed): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.className = `preview-external-video-embed is-${embed.provider}`;
-
-  const frame = document.createElement('iframe');
-  frame.className = 'preview-external-video-frame';
-  frame.src = embed.src;
-  frame.title = embed.title;
-  frame.loading = 'lazy';
-  frame.referrerPolicy = 'strict-origin-when-cross-origin';
-  frame.allowFullscreen = true;
-  frame.setAttribute(
-    'allow',
-    'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-  );
-
-  wrapper.appendChild(frame);
-  return wrapper;
-}
-
-function normalizeExistingIframe(frame: HTMLIFrameElement): void {
-  frame.classList.add('preview-external-video-frame');
-  if (!frame.getAttribute('loading')) {
-    frame.setAttribute('loading', 'lazy');
-  }
-  if (!frame.getAttribute('referrerpolicy')) {
-    frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-  }
-  if (!frame.getAttribute('allow')) {
-    frame.setAttribute(
-      'allow',
-      'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-    );
-  }
-  frame.setAttribute('allowfullscreen', 'true');
-}
-
-function configurePreviewImageElement(image: HTMLImageElement, src: string, originalSrc: string): void {
-  image.setAttribute('src', src);
-  image.setAttribute('data-original-src', originalSrc);
-  image.setAttribute('data-preview-warmed', 'true');
-  image.setAttribute('decoding', 'sync');
-  image.setAttribute('loading', 'eager');
-  image.setAttribute('fetchpriority', 'high');
 }
 
 export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePreviewRendererReturn {
@@ -237,57 +89,28 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
   // Parse markdown content
   const parsedContent = useMemo(() => {
-    if (!isMarkdownPreview) {
-      return { frontmatter: null, bodyHTML: '' };
-    }
-
-    if (!content) return { frontmatter: null, bodyHTML: '' };
-
-    const { frontmatter, body } = parseFrontmatter(content);
-    try {
-      const bodyHTML = hydrateCachedPreviewImageSources(
-        renderMarkdown(body, { highlighter, themeMode }),
-        currentFilePath || undefined
-      );
-      return { frontmatter, bodyHTML };
-    } catch (error) {
-      console.error('Markdown rendering error:', error);
-      return { frontmatter, bodyHTML: '<p>Error rendering markdown</p>' };
-    }
+    return renderMarkdownPreview({
+      content,
+      currentFilePath,
+      highlighter,
+      isMarkdownPreview,
+      themeMode,
+    });
   }, [content, currentFilePath, highlighter, isMarkdownPreview, themeMode]);
 
   // Sanitize HTML for HTML preview
   const sanitizedHtmlPreview = useMemo(() => {
-    if (!isHtmlPreview || !content) {
-      return '';
-    }
-
-    return DOMPurify.sanitize(content, {
-      ADD_TAGS: ['iframe', 'style'],
-      ADD_ATTR: ['allow', 'allowfullscreen', 'class', 'frameborder', 'href', 'id', 'rel', 'scrolling', 'src', 'style', 'target', 'title'],
-    });
+    return sanitizeHtmlPreview(content, isHtmlPreview);
   }, [content, isHtmlPreview]);
 
   const basePreviewHtml = useMemo(
-    () => (isMarkdownPreview ? parsedContent.bodyHTML : sanitizedHtmlPreview),
+    () => getBasePreviewHtml(isMarkdownPreview, parsedContent.bodyHTML, sanitizedHtmlPreview),
     [isMarkdownPreview, parsedContent.bodyHTML, sanitizedHtmlPreview]
   );
 
-  const hasWikiEmbeds = useMemo(
-    () => isMarkdownPreview && hasWikiEmbedsInHtml(basePreviewHtml),
-    [basePreviewHtml, isMarkdownPreview]
-  );
-
   const requiresAsyncEnhancement = useMemo(
-    () => Boolean(basePreviewHtml) && (
-      basePreviewHtml.includes('<img')
-      || basePreviewHtml.includes('<video')
-      || basePreviewHtml.includes('<source')
-      || basePreviewHtml.includes('<iframe')
-      || hasWikiEmbeds
-      || hasEmbeddableMediaLinksInHtml(basePreviewHtml)
-    ),
-    [basePreviewHtml, hasWikiEmbeds]
+    () => shouldUseAsyncPreviewEnhancement(basePreviewHtml, isMarkdownPreview),
+    [basePreviewHtml, isMarkdownPreview]
   );
 
   const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => basePreviewHtml);

@@ -1,5 +1,10 @@
 import type { FileNode } from '../types';
 
+export type FileWatchEvent =
+  | { path: string; type: 'modified' }
+  | { path: string; type: 'deleted' }
+  | { path: string; type: 'error'; error: unknown };
+
 /**
  * Unified file system interface
  * Implementations: TauriFileSystem (for Tauri app), BrowserFileSystem (for web)
@@ -21,7 +26,7 @@ export interface IFileSystem {
   createDirectory(path: string): Promise<void>;
   revealInExplorer?(path: string): Promise<void>;
   moveFile?(sourcePath: string, targetPath: string): Promise<string>;
-  watchFile?(path: string, callback: (event: any) => void): Promise<() => void>;
+  watchFile?(path: string, callback: (event: FileWatchEvent | null) => void): Promise<() => void>;
   /**
    * Copy sample notes from bundled resources to target directory
    * Only available in Tauri environment
