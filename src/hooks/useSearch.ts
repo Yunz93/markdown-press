@@ -1,6 +1,6 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
-import { useDebounce, isLargeFile } from '../utils/performance';
+import { isLargeFile } from '../utils/performance';
 
 export interface SearchOptions {
   caseSensitive?: boolean;

@@ -77,7 +77,7 @@ export function initKaTeX(md: any) {
         const rendered = katex.renderToString(content, katexOptions);
         const token = state.push('html_inline', '', 0);
         token.content = rendered;
-      } catch (e) {
+      } catch {
         const token = state.push('text', '', 0);
         token.content = `$${content}$`;
       }
@@ -88,7 +88,7 @@ export function initKaTeX(md: any) {
   });
 
   // Display math: $$...$$
-  md.block.ruler.after('blockquote', 'katex_display_math', (state: any, start: number, end: number) => {
+  md.block.ruler.after('blockquote', 'katex_display_math', (state: any, start: number, _end: number) => {
     const pos = state.bMarks[start] + state.tShift[start];
     const max = state.eMarks[start];
 
@@ -146,7 +146,7 @@ export function initKaTeX(md: any) {
     const content = tokens[idx].content;
     try {
       return `<div class="katex-display">${katex.renderToString(content, { ...katexOptions, displayMode: true })}</div>`;
-    } catch (e) {
+    } catch {
       return `<div class="katex-error">Failed to render: ${escapeHtml(content)}</div>`;
     }
   };

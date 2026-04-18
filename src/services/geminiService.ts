@@ -1,6 +1,15 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import type { GoogleGenAI } from "@google/genai";
 import type { AIAnalysisResult, AIWikiGenerationResult } from "../types";
 import { resolveAISystemPrompt } from './aiPrompts';
+
+let genaiModulePromise: Promise<typeof import("@google/genai")> | null = null;
+
+function loadGenAIModule(): Promise<typeof import("@google/genai")> {
+  if (!genaiModulePromise) {
+    genaiModulePromise = import("@google/genai");
+  }
+  return genaiModulePromise;
+}
 
 // Singleton instance - API key is not stored in a Map to avoid memory caching issues
 let aiInstance: GoogleGenAI | null = null;
@@ -15,7 +24,8 @@ export function clearAIInstance(): void {
   currentApiKey = null;
 }
 
-const getAIInstance = (apiKey: string): GoogleGenAI => {
+const getAIInstance = async (apiKey: string): Promise<GoogleGenAI> => {
+  const { GoogleGenAI } = await loadGenAIModule();
   // Clear old instance if API key changed
   if (currentApiKey !== apiKey) {
     aiInstance = null;
@@ -44,9 +54,11 @@ function sleep(ms: number): Promise<void> {
 /**
  * Check if the error is retryable (network errors, rate limits)
  */
-function isRetryableError(error: any): boolean {
-  if (!error) return false;
-  const message = error.message?.toLowerCase() || '';
+function isRetryableError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error && typeof (error as { message?: unknown }).message === 'string'
+    ? (error as { message: string }).message.toLowerCase()
+    : '';
   return (
     message.includes('network') ||
     message.includes('timeout') ||
@@ -66,6 +78,8 @@ export const analyzeContent = async (
   if (!apiKey) {
     throw new Error("Gemini API key is required");
   }
+
+  const { Type } = await loadGenAIModule();
 
   const prompt = `
     You are editing Markdown content for publication quality.
@@ -127,7 +141,7 @@ export async function generateGeminiJson<T>({
     throw new Error("Gemini API key is required");
   }
 
-  const ai = getAIInstance(apiKey);
+  const ai = await getAIInstance(apiKey);
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -154,8 +168,8 @@ export async function generateGeminiJson<T>({
 
       return JSON.parse(text) as T;
 
-    } catch (error: any) {
-      lastError = error;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       console.error(`Gemini analysis attempt ${attempt + 1} failed:`, error);
 
       // Check if we should retry
@@ -180,6 +194,7 @@ export async function generateGeminiWikiArticle(
   modelName: string = "gemini-2.0-flash-exp",
   systemPrompt?: string
 ): Promise<AIWikiGenerationResult> {
+  const { Type } = await loadGenAIModule();
   return generateGeminiJson<AIWikiGenerationResult>({
     apiKey,
     modelName,

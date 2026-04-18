@@ -1,9 +1,11 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(({ mode }) => {
     const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+    const analyzeBundle = process.env.ANALYZE === '1' || process.env.ANALYZE === 'true';
     
     return {
       server: {
@@ -11,7 +13,16 @@ export default defineConfig(({ mode }) => {
         host: 'localhost',
       },
       publicDir: 'public',
-      plugins: [react()],
+      plugins: [
+        react(),
+        analyzeBundle &&
+          visualizer({
+            filename: 'dist/stats.html',
+            gzipSize: true,
+            brotliSize: true,
+            open: false,
+          }),
+      ].filter(Boolean),
       define: {
         __DEV__: mode === 'development',
         __PROD__: mode === 'production',

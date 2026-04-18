@@ -11,12 +11,22 @@ export const LARGE_FILE_THRESHOLDS = {
   RENDER_CHUNK_SIZE: 1000, // Lines per chunk for incremental rendering
 } as const;
 
+/** Line count matching `String.prototype.split('\n').length` without allocating line strings. */
+export function countLines(content: string): number {
+  if (!content) return 0;
+  let n = 1;
+  for (let i = 0; i < content.length; i++) {
+    if (content.charCodeAt(i) === 10 /* \n */) n++;
+  }
+  return n;
+}
+
 /**
  * Check if content should be treated as a large file
  */
 export function isLargeFile(content: string): boolean {
   if (!content) return false;
-  const lineCount = content.split('\n').length;
+  const lineCount = countLines(content);
   return lineCount > LARGE_FILE_THRESHOLDS.LINE_COUNT ||
          content.length > LARGE_FILE_THRESHOLDS.CHAR_COUNT;
 }
@@ -26,7 +36,7 @@ export function isLargeFile(content: string): boolean {
  */
 export function getFileMetrics(content: string): { lines: number; chars: number; isLarge: boolean } {
   if (!content) return { lines: 0, chars: 0, isLarge: false };
-  const lines = content.split('\n').length;
+  const lines = countLines(content);
   const chars = content.length;
   return {
     lines,
@@ -38,7 +48,7 @@ export function getFileMetrics(content: string): { lines: number; chars: number;
 /**
  * Debounce hook with leading/trailing options
  */
-export function useDebounce<T extends (...args: any[]) => void>(
+export function useDebounce<T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number,
   options: { leading?: boolean; trailing?: boolean } = { leading: false, trailing: true }

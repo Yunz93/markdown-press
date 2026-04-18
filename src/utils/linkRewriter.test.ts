@@ -11,16 +11,6 @@ function file(path: string, name?: string): FileNode {
   };
 }
 
-function folder(path: string, children: FileNode[]): FileNode {
-  return {
-    id: path,
-    path,
-    name: path.split('/').pop()!,
-    type: 'folder',
-    children,
-  };
-}
-
 const ROOT = '/vault';
 
 async function runRewrite(opts: {

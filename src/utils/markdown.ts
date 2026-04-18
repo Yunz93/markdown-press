@@ -270,7 +270,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
 /**
  * React hook for markdown renderer with Shiki syntax highlighting
  */
-export function useMarkdownRenderer(highlighter: ShikiHighlighter | null, _themeMode: ThemeMode) {
+export function useMarkdownRenderer(_highlighter: ShikiHighlighter | null, _themeMode: ThemeMode) {
   useEffect(() => {
     applyKatexDarkTheme();
   }, []);
@@ -389,7 +389,7 @@ export function clearMarkdownCache(): void {
 /**
  * Configure custom CSS classes for markdown rendering
  */
-export function configureMarkdownClasses(md: MarkdownIt, classes: Record<string, string>) {
+export function configureMarkdownClasses(md: MarkdownIt, _classes: Record<string, string>) {
   // Configure heading classes
   md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
     const token = tokens[idx];

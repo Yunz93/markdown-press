@@ -65,5 +65,19 @@ export default tseslint.config(
       'no-console': 'off',
       'no-undef': 'off',
     },
+  },
+  {
+    files: ['src/services/filesystem/**/*.ts', 'src/utils/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
   }
 );
