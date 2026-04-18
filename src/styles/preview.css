@@ -664,6 +664,50 @@
   padding: 0.5em 0;
 }
 
+/* Preview prose rules like `word-break: break-word` and wide line-height must not
+   leak into KaTeX internals; WebKit release builds are much less forgiving here
+   and will split/offset symbols, matrices, and delimiters. */
+.preview-pane-document.markdown-body .katex,
+.preview-pane-document.markdown-body .katex * {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+.preview-pane-document.markdown-body .katex {
+  line-height: 1.2 !important;
+  text-indent: 0;
+}
+
+.preview-pane-document.markdown-body .katex-display > .katex {
+  white-space: nowrap;
+}
+
+html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex .katex-html {
+  display: none !important;
+}
+
+html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex .katex-mathml {
+  position: static !important;
+  clip: auto !important;
+  clip-path: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  white-space: normal !important;
+}
+
+html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex math {
+  color: inherit;
+}
+
+html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex-display > .katex .katex-mathml {
+  display: block;
+  text-align: center;
+}
+
 .katex-error {
   color: #ef4444;
   font-family: monospace;
@@ -674,32 +718,29 @@
 
 /* Mermaid Styles */
 .preview-pane-document.markdown-body .mermaid {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block;
   padding: 1.5em;
   background: rgba(128, 128, 128, 0.05);
   border-radius: 8px;
   margin: 1em 0;
   overflow-x: auto;
   overflow-y: hidden;
+  text-align: center;
 }
 
-/* Only the root diagram <svg> should shrink with the preview column.
-   Mermaid nests <svg> for subgraphs/clusters; applying max-width / height:auto
-   to every descendant breaks its coordinate system (distorted scale, black
-   tiles) — WKWebView in Tauri release is stricter than Chrome in dev. */
+/* Markdown preview has a generic `svg { max-width:100%; height:auto }` rule.
+   Mermaid emits nested SVG fragments; letting that rule touch every fragment
+   corrupts coordinates in WKWebView release builds. Reset Mermaid SVGs first,
+   then size only the root diagram. */
+.preview-pane-document.markdown-body .mermaid svg {
+  max-width: none !important;
+}
+
 .preview-pane-document.markdown-body .mermaid > svg {
   display: block;
-  max-width: 100%;
+  width: auto;
   height: auto;
-  flex: none;
-}
-
-.preview-pane-document.markdown-body .mermaid svg svg {
-  max-width: none !important;
-  width: auto !important;
-  height: auto !important;
+  margin: 0 auto;
 }
 
 .dark .preview-pane-document.markdown-body .mermaid {

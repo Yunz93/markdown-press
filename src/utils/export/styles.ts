@@ -139,6 +139,47 @@ export function buildExportStyles(
       color: var(--text-primary);
     }
 
+    .export-document .markdown-body .katex,
+    .export-document .markdown-body .katex * {
+      word-break: normal !important;
+      overflow-wrap: normal !important;
+    }
+
+    .export-document .markdown-body .katex {
+      line-height: 1.2 !important;
+      text-indent: 0;
+    }
+
+    .export-document .markdown-body .katex-display > .katex {
+      white-space: nowrap;
+    }
+
+    html[data-katex-render-mode="mathml"] .export-document .katex .katex-html {
+      display: none !important;
+    }
+
+    html[data-katex-render-mode="mathml"] .export-document .katex .katex-mathml {
+      position: static !important;
+      clip: auto !important;
+      clip-path: none !important;
+      width: auto !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important;
+      border: 0 !important;
+      white-space: normal !important;
+    }
+
+    html[data-katex-render-mode="mathml"] .export-document .katex math {
+      color: inherit;
+    }
+
+    html[data-katex-render-mode="mathml"] .export-document .katex-display > .katex .katex-mathml {
+      display: block;
+      text-align: center;
+    }
+
     .export-document .markdown-body h1,
     .export-document .markdown-body h2,
     .export-document .markdown-body h3,

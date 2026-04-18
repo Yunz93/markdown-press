@@ -12,7 +12,7 @@ vi.mock('mermaid', () => ({
   },
 }));
 
-import { renderMermaidDiagrams, resetMermaidPlaceholders } from './markdown-extensions';
+import { getKatexRenderMode, renderMermaidDiagrams, resetMermaidPlaceholders } from './markdown-extensions';
 
 function escapeHtml(str: string): string {
   return str
@@ -116,5 +116,24 @@ describe('renderMermaidDiagrams', () => {
     expect(el.dataset.mermaidRendered).toBeUndefined();
     expect(el.dataset.mermaidTheme).toBeUndefined();
     expect(el.dataset.mermaidSource).toBeUndefined();
+  });
+
+});
+
+describe('getKatexRenderMode', () => {
+  it('enables MathML fallback for production Tauri-like surfaces', () => {
+    expect(getKatexRenderMode({
+      isProd: true,
+      isTauri: true,
+      protocol: 'tauri:',
+    })).toBe('mathml');
+  });
+
+  it('does not enable MathML fallback for non-Tauri web builds', () => {
+    expect(getKatexRenderMode({
+      isProd: true,
+      isTauri: false,
+      protocol: 'https:',
+    })).toBeNull();
   });
 });

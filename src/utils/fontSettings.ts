@@ -1,5 +1,6 @@
 import type { AppSettings } from '../types';
 import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
+import { getKatexRenderMode } from './markdown-extensions';
 
 const lxgwWenKaiAssetUrl = new URL('../assets/fonts/LXGWWenKai-Regular.ttf', import.meta.url).href;
 const tsangerJinKaiAssetUrl = new URL('../assets/fonts/TsangerJinKai02-W04.ttf', import.meta.url).href;
@@ -22,6 +23,13 @@ export interface BundledFontPreset {
   familyNames: string[];
 }
 
+interface FontFaceApiSpec {
+  assetUrl: string;
+  fontFaceFamily: string;
+  fontStyle: 'normal' | 'italic';
+  fontWeight: string;
+}
+
 export const BUNDLED_FONT_PRESETS: BundledFontPreset[] = [
   {
     id: `${PRESET_PREFIX}lxgw-wenkai`,
@@ -42,6 +50,129 @@ export const BUNDLED_FONT_PRESETS: BundledFontPreset[] = [
       '仓耳今楷02 W04',
       '仓耳今楷02',
     ],
+  },
+];
+
+const KATEX_TAURI_FONT_SPECS: FontFaceApiSpec[] = [
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_AMS-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_AMS',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Caligraphic-Bold.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Caligraphic',
+    fontStyle: 'normal',
+    fontWeight: '700',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Caligraphic-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Caligraphic',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Fraktur-Bold.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Fraktur',
+    fontStyle: 'normal',
+    fontWeight: '700',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Fraktur-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Fraktur',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Main-Bold.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Main',
+    fontStyle: 'normal',
+    fontWeight: '700',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Main-BoldItalic.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Main',
+    fontStyle: 'italic',
+    fontWeight: '700',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Main-Italic.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Main',
+    fontStyle: 'italic',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Main',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Math-BoldItalic.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Math',
+    fontStyle: 'italic',
+    fontWeight: '700',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Math-Italic.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Math',
+    fontStyle: 'italic',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_SansSerif-Bold.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_SansSerif',
+    fontStyle: 'normal',
+    fontWeight: '700',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_SansSerif-Italic.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_SansSerif',
+    fontStyle: 'italic',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_SansSerif-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_SansSerif',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Script-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Script',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Size1-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Size1',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Size2-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Size2',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Size3-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Size3',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Size4-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Size4',
+    fontStyle: 'normal',
+    fontWeight: '400',
+  },
+  {
+    assetUrl: new URL('../../node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.woff2', import.meta.url).href,
+    fontFaceFamily: 'KaTeX_Typewriter',
+    fontStyle: 'normal',
+    fontWeight: '400',
   },
 ];
 
@@ -207,6 +338,15 @@ function buildPresetFontFaceCss(
 `.trim();
 }
 
+function buildPresetFontFaceApiSpec(preset: BundledFontPreset): FontFaceApiSpec {
+  return {
+    assetUrl: preset.assetUrl,
+    fontFaceFamily: preset.fontFaceFamily,
+    fontStyle: 'normal',
+    fontWeight: '400',
+  };
+}
+
 export function normalizeStoredUiFontFamily(value: string | undefined): string {
   return normalizeSingleFontSetting(value, DEFAULT_UI_FONT_FAMILY);
 }
@@ -341,24 +481,28 @@ export function buildDynamicFontFaceCss(
     .join('\n\n');
 }
 
-async function loadFontViaFontFaceApi(preset: BundledFontPreset): Promise<void> {
+async function loadFontViaFontFaceApi(spec: FontFaceApiSpec): Promise<void> {
   if (!document.fonts) return;
 
-  const resolvedUrl = resolveAssetUrl(preset.assetUrl);
+  const resolvedUrl = resolveAssetUrl(spec.assetUrl);
   const existing = Array.from(document.fonts).find(
-    (f) => f.family === preset.fontFaceFamily
+    (f) => (
+      f.family === spec.fontFaceFamily
+      && f.style === spec.fontStyle
+      && f.weight === spec.fontWeight
+    )
   );
   if (existing?.status === 'loaded') return;
 
   const response = await fetch(resolvedUrl);
   if (!response.ok) {
-    throw new Error(`Failed to fetch font ${preset.fontFaceFamily}: ${response.status}`);
+    throw new Error(`Failed to fetch font ${spec.fontFaceFamily}: ${response.status}`);
   }
 
   const buffer = await response.arrayBuffer();
-  const face = new FontFace(preset.fontFaceFamily, buffer, {
-    style: 'normal',
-    weight: '400',
+  const face = new FontFace(spec.fontFaceFamily, buffer, {
+    style: spec.fontStyle,
+    weight: spec.fontWeight,
     display: 'swap',
   });
   await face.load();
@@ -377,6 +521,7 @@ export async function ensureDynamicFontFaces(settings: FontSettings): Promise<vo
   }
 
   const useTauriFontFaceApi = isTauriEnvironment();
+  const shouldLoadKatexViaFontFaceApi = useTauriFontFaceApi && getKatexRenderMode() !== 'mathml';
   const usedPresetIds = collectUsedPresetIds(settings);
 
   if (useTauriFontFaceApi) {
@@ -384,16 +529,30 @@ export async function ensureDynamicFontFaces(settings: FontSettings): Promise<vo
     // Bypass the CSS resource loader by fetching the font binary via JS and
     // registering it directly through the FontFace API.
     const results = await Promise.allSettled(
-      usedPresetIds.map((presetId) => {
-        const preset = presetById.get(presetId);
-        if (!preset) return Promise.resolve();
-        return loadFontViaFontFaceApi(preset);
-      })
+      [
+        ...usedPresetIds.map((presetId) => {
+          const preset = presetById.get(presetId);
+          if (!preset) return null;
+          return buildPresetFontFaceApiSpec(preset);
+        }).filter((spec): spec is FontFaceApiSpec => Boolean(spec)),
+      ].map((spec) => loadFontViaFontFaceApi(spec))
     );
 
     for (const result of results) {
       if (result.status === 'rejected') {
         console.warn('[fontSettings] FontFace API load failed:', result.reason);
+      }
+    }
+  }
+
+  if (shouldLoadKatexViaFontFaceApi) {
+    const results = await Promise.allSettled(
+      KATEX_TAURI_FONT_SPECS.map((spec) => loadFontViaFontFaceApi(spec))
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.warn('[fontSettings] KaTeX FontFace API load failed:', result.reason);
       }
     }
   }

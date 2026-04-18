@@ -1,6 +1,7 @@
 import { renderMarkdown } from '../markdown';
 import { parseFrontmatter } from '../frontmatter';
 import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../fontSettings';
+import { getKatexRenderMode } from '../markdown-extensions';
 import type { ExportOptions } from './types';
 import {
   buildExportStyles,
@@ -31,6 +32,7 @@ export async function exportToHtml(
 
   const { frontmatter, body } = parseFrontmatter(content);
   const htmlContent = renderMarkdown(body, { highlighter, themeMode: theme });
+  const katexRenderMode = getKatexRenderMode();
 
   // Generate table of contents if requested
   const toc = includeTOC ? generateTOC(body) : '';
@@ -42,7 +44,7 @@ export async function exportToHtml(
   const documentMarkup = buildExportDocument(`${propertiesHtml}<article class="markdown-body">${htmlContent}</article>`, toc);
 
   const html = `<!DOCTYPE html>
-<html lang="en" data-theme="${theme}">
+<html lang="en" data-theme="${theme}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ''}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
