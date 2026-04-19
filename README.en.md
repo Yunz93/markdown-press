@@ -8,7 +8,7 @@
 
 M記 is a desktop Markdown editor designed for local knowledge-base writing, with a strong focus on editing ergonomics, preview fidelity, and wiki-style navigation.
 
-![M記 preview](docs/assets/markdown-press-preview.png)
+![M記 preview](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
 
 ## Download
 
@@ -86,12 +86,6 @@ npm run typecheck
 npm test
 npm run build
 ```
-
-## Screenshot
-
-### Main Workspace
-
-![M記 workspace](docs/assets/markdown-press-preview.png)
 
 ## Keyboard Shortcuts
 
