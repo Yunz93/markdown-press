@@ -5,8 +5,15 @@ import { analyzeMarkdownWithProvider, ensureAIConfiguration, generateWikiFromSel
 import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
 import { generateFrontmatter, parseFrontmatter } from '../utils/frontmatter';
 import { parseMetadataTemplateValue } from '../utils/metadataFields';
-import { type Frontmatter } from '../types';
+import { type AppLanguage, type Frontmatter } from '../types';
 import { getFileSystem } from '../types/filesystem';
+import { joinFsPath } from '../utils/pathHelpers';
+import {
+  buildWikiSupplementSections,
+  normalizeWikiFolder,
+  sanitizeWikiArchiveSegment,
+  stripDuplicateWikiSupplementSections,
+} from '../utils/wikiGeneration';
 import { localizeKnownError, t } from '../utils/i18n';
 
 function getFrontmatterBlockLength(content: string): number {
@@ -22,14 +29,6 @@ function getFileNameFromPath(path: string | null): string {
 
 function stripMarkdownExtension(fileName: string): string {
   return fileName.replace(/\.(md|markdown)$/i, '');
-}
-
-function getParentPath(path: string | null): string | undefined {
-  if (!path) return undefined;
-  const normalized = path.replace(/\\/g, '/');
-  const index = normalized.lastIndexOf('/');
-  if (index <= 0) return undefined;
-  return normalized.slice(0, index);
 }
 
 function sanitizeWikiFileName(input: string): string {
@@ -110,13 +109,17 @@ function ensureHeading(markdown: string, title: string): string {
 }
 
 function buildGeneratedWikiContent(options: {
+  language: AppLanguage;
   title: string;
   summary: string;
+  category: string;
   tags: string[];
   selectedText: string;
   markdown: string;
   sourceWikiTarget: string;
   metadataFields: { key: string; defaultValue: string }[];
+  references: { title: string; url?: string; note?: string }[];
+  citations: string[];
 }) {
   const frontmatter: Frontmatter = {};
 
@@ -126,6 +129,7 @@ function buildGeneratedWikiContent(options: {
 
   frontmatter.title = options.title;
   frontmatter.description = options.summary;
+  frontmatter.category = options.category;
   frontmatter.tags = options.tags;
   if (options.selectedText.trim() && options.selectedText.trim() !== options.title.trim()) {
     frontmatter.aliases = [sanitizeWikiLinkAlias(options.selectedText)];
@@ -134,8 +138,21 @@ function buildGeneratedWikiContent(options: {
   const backlink = options.sourceWikiTarget
     ? `\n\n---\n\n关联原文：[[${options.sourceWikiTarget}]]\n`
     : '\n';
+  const supplementSections = buildWikiSupplementSections(
+    options.language,
+    options.references,
+    options.citations
+  );
 
-  return `${generateFrontmatter(frontmatter)}${ensureHeading(options.markdown, options.title).trimEnd()}${backlink}`;
+  const normalizedMarkdown = stripDuplicateWikiSupplementSections(
+    ensureHeading(options.markdown, options.title).trimEnd()
+  );
+
+  return `${generateFrontmatter(frontmatter)}${normalizedMarkdown}${backlink}${supplementSections}`;
+}
+
+function getDefaultWikiCategory(language: AppLanguage): string {
+  return language === 'en' ? 'Uncategorized' : '未分类';
 }
 
 /**
@@ -153,7 +170,7 @@ export function useAIAnalyze() {
     rootFolderPath,
   } = useAppStore();
   const content = useAppStore(selectContent);
-  const { createFile } = useFileSystem();
+  const { createFile, refreshFileTree } = useFileSystem();
 
   const handleAIAnalyze = useCallback(async () => {
     if (!content || !activeTabId) return;
@@ -197,7 +214,12 @@ export function useAIAnalyze() {
       showNotification(t(hydratedSettings.language, 'notifications_aiEnhanced'), 'success');
     } catch (error) {
       console.error('AI analysis failed:', error);
-      showNotification(t(hydratedSettings.language, 'notifications_aiEnhanceFailed'), 'error');
+      showNotification(
+        error instanceof Error
+          ? localizeKnownError(hydratedSettings.language, error.message)
+          : t(hydratedSettings.language, 'notifications_aiEnhanceFailed'),
+        'error'
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -224,8 +246,7 @@ export function useAIAnalyze() {
       return null;
     }
 
-    const targetFolder = getParentPath(currentFilePath) || rootFolderPath || undefined;
-    if (!targetFolder) {
+    if (!rootFolderPath) {
       showNotification(t(hydratedSettings.language, 'notifications_noKnowledgeBaseForWiki'), 'error');
       return null;
     }
@@ -245,16 +266,30 @@ export function useAIAnalyze() {
         isFrontmatterSelection: selection.to <= getFrontmatterBlockLength(content),
       }, hydratedSettings);
 
+      const wikiFolder = normalizeWikiFolder(hydratedSettings.wikiFolder);
+      const archiveCategory = sanitizeWikiArchiveSegment(
+        result.category,
+        getDefaultWikiCategory(hydratedSettings.language)
+      );
+      const targetFolder = joinFsPath(rootFolderPath, wikiFolder, archiveCategory);
+      const fs = await getFileSystem();
+      await fs.createDirectory(targetFolder);
+      await refreshFileTree();
+
       const targetFileName = await resolveUniqueWikiFileName(result.title || selectedText, targetFolder);
-      const wikiTarget = stripMarkdownExtension(targetFileName);
+      const wikiTarget = `${wikiFolder}/${archiveCategory}/${stripMarkdownExtension(targetFileName)}`;
       const nextFileContent = buildGeneratedWikiContent({
+        language: hydratedSettings.language,
         title: result.title || selectedText,
         summary: result.summary || '',
+        category: archiveCategory,
         tags: result.suggestedTags || [],
         selectedText,
         markdown: result.markdown || '',
         sourceWikiTarget,
         metadataFields: hydratedSettings.metadataFields,
+        references: result.references || [],
+        citations: result.citations || [],
       });
 
       const newFile = await createFile(targetFileName, nextFileContent, targetFolder);
@@ -266,12 +301,17 @@ export function useAIAnalyze() {
       return `[[${wikiTarget}|${selectedText}]]`;
     } catch (error) {
       console.error('AI wiki generation failed:', error);
-      showNotification(t(hydratedSettings.language, 'notifications_wikiCreateFailed'), 'error');
+      showNotification(
+        error instanceof Error
+          ? localizeKnownError(hydratedSettings.language, error.message)
+          : t(hydratedSettings.language, 'notifications_wikiCreateFailed'),
+        'error'
+      );
       return null;
     } finally {
       setAnalyzing(false);
     }
-  }, [content, currentFilePath, rootFolderPath, setAnalyzing, showNotification, setSettingsOpen, createFile]);
+  }, [content, currentFilePath, rootFolderPath, setAnalyzing, showNotification, setSettingsOpen, createFile, refreshFileTree]);
 
   return {
     handleAIAnalyze,

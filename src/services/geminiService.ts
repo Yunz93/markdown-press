@@ -205,13 +205,30 @@ export async function generateGeminiWikiArticle(
       properties: {
         title: { type: Type.STRING },
         summary: { type: Type.STRING },
+        category: { type: Type.STRING },
         suggestedTags: {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        markdown: { type: Type.STRING }
+        markdown: { type: Type.STRING },
+        references: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              url: { type: Type.STRING },
+              note: { type: Type.STRING }
+            },
+            required: ["title"]
+          }
+        },
+        citations: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
       },
-      required: ["title", "summary", "suggestedTags", "markdown"]
+      required: ["title", "summary", "category", "suggestedTags", "markdown", "references", "citations"]
     }
   });
 }

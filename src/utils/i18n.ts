@@ -226,12 +226,21 @@ const translations = {
     settings_openaiApiKey: 'OpenAI API 密钥',
     settings_openaiApiKeyPaste: '在此粘贴 OpenAI API 密钥...',
     settings_openaiApiKeyLocalOnly: '仅在本地存储。使用标准 OpenAI API 密钥。',
+    settings_openaiBillingHint: '注意：这里调用的是 OpenAI API，不会使用 ChatGPT 订阅额度。计费以当前 API key 所属的 Platform 项目/组织为准。',
+    settings_wikiFolder: 'Wiki 目录',
+    settings_wikiFolderPlaceholder: '例如：wiki',
+    settings_wikiFolderDesc: '相对知识库根目录；留空时回退为 `wiki`，生成时会自动按 AI 分类归档。',
     settings_modelsLoaded: '已加载 {count} 个{provider}模型。',
     settings_noAvailableModels: '接口已返回，但没有筛到可用模型。',
     settings_modelLoadFailed: '加载模型列表失败。',
     settings_systemPrompt: 'System Prompt',
-    settings_systemPromptDesc: '默认会使用内置预设。这里的修改会同时应用到 AI 增强和 Wiki 生成。',
+    settings_systemPromptDesc: '默认会使用内置预设。这里的修改会应用到全文增强和通用 AI 行为。',
     settings_systemPromptPlaceholder: '输入 system prompt...',
+    settings_promptChinese: '中文版本',
+    settings_promptEnglish: '英文版本',
+    settings_wikiPrompt: 'Wiki Prompt',
+    settings_wikiPromptDesc: '默认会使用内置 wiki 词条模板。这里可以修改 wiki 生成的结构、语气和边界约束。',
+    settings_wikiPromptPlaceholder: '输入 wiki prompt 模板...',
     settings_resetDefaultPrompt: '恢复默认',
 
     settings_typography: '字体排版',
@@ -339,6 +348,11 @@ const translations = {
     notifications_aiConfigFirst: '请先配置 AI 设置。',
     notifications_aiEnhanced: 'AI 已完成内容增强。',
     notifications_aiEnhanceFailed: 'AI 内容增强失败，请检查设置后再试。',
+    notifications_aiOpenAIQuotaExceeded: 'OpenAI API 配额不足。ChatGPT 订阅和 API 额度分开计算；请检查当前 API key 所属项目的 billing、credits 或月度 spend limit。',
+    notifications_aiOpenAIUnauthorized: 'OpenAI API 认证失败。请检查 API Key 是否正确、是否仍有效。',
+    notifications_aiOpenAIForbidden: '当前 OpenAI API key 没有权限访问这个资源或模型。请检查项目权限、组织归属或模型可用性。',
+    notifications_aiOpenAIRateLimited: 'OpenAI API 请求过于频繁，或当前项目已触发速率限制。请稍后重试。',
+    notifications_aiOpenAIModelUnavailable: '当前 OpenAI 模型不可用。请在设置里重新选择一个可用模型。',
     notifications_noKnowledgeBaseForWiki: '当前没有可用于创建 Wiki 文件的知识库目录。',
     notifications_wikiCreated: 'Wiki 已创建：{name}',
     notifications_wikiCreateFailed: '生成 Wiki 失败，请检查 AI 设置后再试。',
@@ -622,12 +636,21 @@ const translations = {
     settings_openaiApiKey: 'OpenAI API key',
     settings_openaiApiKeyPaste: 'Paste OpenAI API key here...',
     settings_openaiApiKeyLocalOnly: 'Stored locally only. Uses a standard OpenAI API key.',
+    settings_openaiBillingHint: 'Note: this uses the OpenAI API, not ChatGPT subscription usage. Billing is determined by the Platform project or org behind the current API key.',
+    settings_wikiFolder: 'Wiki folder',
+    settings_wikiFolderPlaceholder: 'Example: wiki',
+    settings_wikiFolderDesc: 'Relative to the knowledge base root. Falls back to `wiki` when empty, then auto-archives generated articles by AI category.',
     settings_modelsLoaded: 'Loaded {count} {provider} model(s).',
     settings_noAvailableModels: 'The API responded, but no usable models were found.',
     settings_modelLoadFailed: 'Failed to load models.',
     settings_systemPrompt: 'System prompt',
-    settings_systemPromptDesc: 'Uses the built-in preset by default. Changes here apply to both AI enhancement and wiki generation.',
+    settings_systemPromptDesc: 'Uses the built-in preset by default. Changes here apply to full-note enhancement and general AI behavior.',
     settings_systemPromptPlaceholder: 'Enter a system prompt...',
+    settings_promptChinese: 'Chinese version',
+    settings_promptEnglish: 'English version',
+    settings_wikiPrompt: 'Wiki prompt',
+    settings_wikiPromptDesc: 'Uses the built-in wiki entry template by default. Edit this to change wiki generation structure, tone, and scope constraints.',
+    settings_wikiPromptPlaceholder: 'Enter a wiki prompt template...',
     settings_resetDefaultPrompt: 'Reset default',
 
     settings_typography: 'Typography',
@@ -735,6 +758,11 @@ const translations = {
     notifications_aiConfigFirst: 'Please configure AI settings first.',
     notifications_aiEnhanced: 'Content enhanced with AI.',
     notifications_aiEnhanceFailed: 'Failed to enhance content with AI. Check your settings and try again.',
+    notifications_aiOpenAIQuotaExceeded: 'OpenAI API quota has been exceeded. ChatGPT subscriptions and API credits are billed separately; check billing, credits, or the monthly spend limit for the project behind this API key.',
+    notifications_aiOpenAIUnauthorized: 'OpenAI API authentication failed. Check whether the API key is correct and still active.',
+    notifications_aiOpenAIForbidden: 'This OpenAI API key does not have access to the requested resource or model. Check project permissions, org ownership, or model availability.',
+    notifications_aiOpenAIRateLimited: 'The OpenAI API request was rate limited, or the current project hit a throughput limit. Please try again later.',
+    notifications_aiOpenAIModelUnavailable: 'The selected OpenAI model is unavailable. Pick another model in settings.',
     notifications_noKnowledgeBaseForWiki: 'No knowledge base folder is available for creating the wiki file.',
     notifications_wikiCreated: 'Wiki created: {name}',
     notifications_wikiCreateFailed: 'Failed to generate the wiki article. Check your AI settings and try again.',
@@ -819,7 +847,46 @@ const knownErrorMessages: Record<string, TranslationKey> = {
 };
 
 export function localizeKnownError(language: AppLanguage, message: string): string {
-  const exactKey = knownErrorMessages[message];
+  const normalizedMessage = message.trim();
+  const exactKey = knownErrorMessages[normalizedMessage];
   if (exactKey) return t(language, exactKey);
-  return message;
+
+  if (
+    /exceeded your current quota/i.test(normalizedMessage)
+    || /insufficient_quota/i.test(normalizedMessage)
+  ) {
+    return t(language, 'notifications_aiOpenAIQuotaExceeded');
+  }
+
+  if (
+    /incorrect api key/i.test(normalizedMessage)
+    || /invalid_api_key/i.test(normalizedMessage)
+    || /\b401\b/.test(normalizedMessage)
+    || /unauthorized/i.test(normalizedMessage)
+  ) {
+    return t(language, 'notifications_aiOpenAIUnauthorized');
+  }
+
+  if (/\b403\b/.test(normalizedMessage) || /forbidden/i.test(normalizedMessage)) {
+    return t(language, 'notifications_aiOpenAIForbidden');
+  }
+
+  if (
+    /\b429\b/.test(normalizedMessage)
+    || /rate limit/i.test(normalizedMessage)
+    || /too many requests/i.test(normalizedMessage)
+  ) {
+    return t(language, 'notifications_aiOpenAIRateLimited');
+  }
+
+  if (
+    /model .*not found/i.test(normalizedMessage)
+    || /does not exist/i.test(normalizedMessage)
+    || /unsupported model/i.test(normalizedMessage)
+    || /model unavailable/i.test(normalizedMessage)
+  ) {
+    return t(language, 'notifications_aiOpenAIModelUnavailable');
+  }
+
+  return normalizedMessage;
 }

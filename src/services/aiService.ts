@@ -1,6 +1,7 @@
 import type { AIAnalysisResult, AIWikiGenerationResult, AppSettings } from '../types';
 import { analyzeContent, generateGeminiWikiArticle } from './geminiService';
 import { analyzeContentWithCodex, generateCodexWikiArticle } from './codexService';
+import { resolveAISystemPrompt, resolveWikiPromptTemplate } from './aiPrompts';
 
 function looksLikeGeminiModel(modelName: string): boolean {
   return /^gemini(?:-|$)/i.test(modelName.trim());
@@ -10,14 +11,22 @@ function looksLikeCodexModel(modelName: string): boolean {
   return /^(gpt-|o[1-9]\b|o[1-9]-|codex\b|computer-use\b)/i.test(modelName.trim());
 }
 
-function buildWikiPrompt(options: {
+export function buildWikiPrompt(
+  options: {
   selectedText: string;
   contextBefore: string;
   contextAfter: string;
   documentTitle: string;
   currentFileName: string;
   isFrontmatterSelection: boolean;
-}) {
+},
+  customTemplate?: string | {
+    language?: AppSettings['language'];
+    zhCN?: string;
+    en?: string;
+    legacy?: string;
+  }
+) {
   const {
     selectedText,
     contextBefore,
@@ -26,24 +35,20 @@ function buildWikiPrompt(options: {
     currentFileName,
     isFrontmatterSelection,
   } = options;
+  const wikiPromptTemplate = resolveWikiPromptTemplate(customTemplate);
 
   return `
 You are helping maintain a markdown-based knowledge base.
-Write a standalone explainer wiki article for the selected text.
-
-Requirements:
-1. Keep the article in the main language used by the selected text and surrounding context. If ambiguous, prefer Simplified Chinese.
-2. Explain the concept, why it matters in the current article, key points, and common misunderstandings.
-3. Use Markdown headings and concise paragraphs.
-4. The first heading in markdown must be "# {title}" using the same title you return in JSON.
-5. Do not mention that you are an AI model.
-6. Keep the article practical and suitable for an internal wiki.
+${wikiPromptTemplate}
 
 Return a JSON object with:
 - title: string
 - summary: string
+- category: string
 - suggestedTags: string[]
 - markdown: string
+- references: Array<{ title: string; url?: string; note?: string }>
+- citations: string[]
 
 Current note title: ${documentTitle || currentFileName || 'Untitled'}
 Current file name: ${currentFileName || 'Untitled'}
@@ -92,7 +97,12 @@ export async function analyzeMarkdownWithProvider(
     content,
     settings.geminiApiKey || '',
     settings.geminiModel || 'gemini-2.0-flash-exp',
-    settings.aiSystemPrompt
+    resolveAISystemPrompt({
+      language: settings.language,
+      zhCN: settings.aiSystemPromptZh,
+      en: settings.aiSystemPromptEn,
+      legacy: settings.aiSystemPrompt,
+    })
   );
 }
 
@@ -107,7 +117,12 @@ export async function generateWikiFromSelectionWithProvider(
   },
   settings: AppSettings
 ): Promise<AIWikiGenerationResult> {
-  const prompt = buildWikiPrompt(options);
+  const prompt = buildWikiPrompt(options, {
+    language: settings.language,
+    zhCN: settings.wikiPromptTemplateZh,
+    en: settings.wikiPromptTemplateEn,
+    legacy: settings.wikiPromptTemplate,
+  });
 
   if (settings.aiProvider === 'codex') {
     return generateCodexWikiArticle(prompt, settings);
@@ -117,6 +132,11 @@ export async function generateWikiFromSelectionWithProvider(
     prompt,
     settings.geminiApiKey || '',
     settings.geminiModel || 'gemini-2.0-flash-exp',
-    settings.aiSystemPrompt
+    resolveAISystemPrompt({
+      language: settings.language,
+      zhCN: settings.aiSystemPromptZh,
+      en: settings.aiSystemPromptEn,
+      legacy: settings.aiSystemPrompt,
+    })
   );
 }

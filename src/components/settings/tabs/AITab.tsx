@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import type { AppSettings } from '../../../types';
-import { DEFAULT_AI_SYSTEM_PROMPT } from '../../../services/aiPrompts';
+import {
+  DEFAULT_AI_SYSTEM_PROMPT,
+  DEFAULT_AI_SYSTEM_PROMPT_EN,
+  DEFAULT_WIKI_PROMPT_TEMPLATE,
+  DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
+} from '../../../services/aiPrompts';
 import { fetchAvailableModels, type ModelOption } from '../../../services/modelCatalogService';
 import { hydrateSensitiveSettingsIntoStore } from '../../../services/secureSettingsService';
 import { useI18n } from '../../../hooks/useI18n';
@@ -13,6 +18,13 @@ export const AITab: React.FC<SettingsTabProps> = ({
   onUpdateSettings,
 }) => {
   const { t } = useI18n();
+  const currentLanguage = settings.language === 'en' ? 'en' : 'zh-CN';
+  const currentSystemPrompt = currentLanguage === 'en'
+    ? (settings.aiSystemPromptEn || DEFAULT_AI_SYSTEM_PROMPT_EN)
+    : (settings.aiSystemPromptZh || DEFAULT_AI_SYSTEM_PROMPT);
+  const currentWikiPrompt = currentLanguage === 'en'
+    ? (settings.wikiPromptTemplateEn || DEFAULT_WIKI_PROMPT_TEMPLATE_EN)
+    : (settings.wikiPromptTemplateZh || DEFAULT_WIKI_PROMPT_TEMPLATE);
   const { handleSecureSettingChange, renderSecureSaveState } = useSecureSettings(onUpdateSettings);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
@@ -190,6 +202,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-400">{t('settings_openaiApiKeyLocalOnly')}</p>
+                <p className="text-[10px] text-amber-600 dark:text-amber-300">{t('settings_openaiBillingHint')}</p>
                 {renderSecureSaveState('codexApiKey')}
               </div>
             </>
@@ -202,25 +215,75 @@ export const AITab: React.FC<SettingsTabProps> = ({
           )}
 
           <div className="space-y-2 pt-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_wikiFolder')}</label>
+            <input
+              type="text"
+              value={settings.wikiFolder}
+              onChange={(e) => onUpdateSettings({ wikiFolder: e.target.value })}
+              placeholder={t('settings_wikiFolderPlaceholder')}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_wikiFolderDesc')}</p>
+          </div>
+
+          <div className="space-y-2 pt-2">
             <div className="flex items-center justify-between gap-3">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_systemPrompt')}</label>
               <button
                 type="button"
-                onClick={() => onUpdateSettings({ aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT })}
+                onClick={() => onUpdateSettings(
+                  currentLanguage === 'en'
+                    ? { aiSystemPromptEn: DEFAULT_AI_SYSTEM_PROMPT_EN }
+                    : { aiSystemPromptZh: DEFAULT_AI_SYSTEM_PROMPT }
+                )}
                 className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
               >
                 {t('settings_resetDefaultPrompt')}
               </button>
             </div>
             <textarea
-              value={settings.aiSystemPrompt || DEFAULT_AI_SYSTEM_PROMPT}
-              onChange={(e) => onUpdateSettings({ aiSystemPrompt: e.target.value })}
+              value={currentSystemPrompt}
+              onChange={(e) => onUpdateSettings(
+                currentLanguage === 'en'
+                  ? { aiSystemPromptEn: e.target.value }
+                  : { aiSystemPromptZh: e.target.value }
+              )}
               placeholder={t('settings_systemPromptPlaceholder')}
-              rows={10}
+              rows={8}
               spellCheck={false}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono resize-y min-h-[220px]"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono resize-y min-h-[180px]"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_systemPromptDesc')}</p>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_wikiPrompt')}</label>
+              <button
+                type="button"
+                onClick={() => onUpdateSettings(
+                  currentLanguage === 'en'
+                    ? { wikiPromptTemplateEn: DEFAULT_WIKI_PROMPT_TEMPLATE_EN }
+                    : { wikiPromptTemplateZh: DEFAULT_WIKI_PROMPT_TEMPLATE }
+                )}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
+              >
+                {t('settings_resetDefaultPrompt')}
+              </button>
+            </div>
+            <textarea
+              value={currentWikiPrompt}
+              onChange={(e) => onUpdateSettings(
+                currentLanguage === 'en'
+                  ? { wikiPromptTemplateEn: e.target.value }
+                  : { wikiPromptTemplateZh: e.target.value }
+              )}
+              placeholder={t('settings_wikiPromptPlaceholder')}
+              rows={12}
+              spellCheck={false}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono resize-y min-h-[260px]"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_wikiPromptDesc')}</p>
           </div>
         </div>
       </div>

@@ -14,6 +14,8 @@ interface CodexResponseMessage {
 interface CodexResponsePayload {
   error?: {
     message?: string;
+    type?: string;
+    code?: string;
   } | null;
   output?: CodexResponseMessage[];
 }
@@ -55,6 +57,19 @@ function stripJsonFence(text: string): string {
     .trim();
 }
 
+function buildOpenAIHttpErrorMessage(status: number): string {
+  switch (status) {
+    case 401:
+      return 'OpenAI request failed with status 401.';
+    case 403:
+      return 'OpenAI request failed with status 403.';
+    case 429:
+      return 'OpenAI request failed with status 429.';
+    default:
+      return `OpenAI request failed with status ${status}.`;
+  }
+}
+
 export async function generateCodexJson<T>(
   prompt: string,
   settings: AppSettings
@@ -72,7 +87,12 @@ export async function generateCodexJson<T>(
     },
     body: JSON.stringify({
       model: settings.codexModel?.trim() || 'gpt-5.2-codex',
-      instructions: resolveAISystemPrompt(settings.aiSystemPrompt),
+      instructions: resolveAISystemPrompt({
+        language: settings.language,
+        zhCN: settings.aiSystemPromptZh,
+        en: settings.aiSystemPromptEn,
+        legacy: settings.aiSystemPrompt,
+      }),
       input: `${prompt}\n\nReturn JSON only.`,
       reasoning: {
         effort: 'medium',
@@ -88,7 +108,13 @@ export async function generateCodexJson<T>(
 
   const payload = await response.json() as CodexResponsePayload;
   if (!response.ok) {
-    throw new Error(payload.error?.message || `Codex request failed with status ${response.status}.`);
+    console.error('OpenAI responses request failed:', {
+      status: response.status,
+      error: payload.error ?? null,
+      model: settings.codexModel?.trim() || 'gpt-5.2-codex',
+      baseUrl: normalizeBaseUrl(settings.codexApiBaseUrl),
+    });
+    throw new Error(payload.error?.message || buildOpenAIHttpErrorMessage(response.status));
   }
 
   const text = stripJsonFence(extractOutputText(payload));

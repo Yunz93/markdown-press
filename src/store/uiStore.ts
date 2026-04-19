@@ -1,6 +1,11 @@
 import type { AppSettings, ImageHostingConfig, Notification } from '../types';
 import type { HeadingNode } from '../utils/outline';
-import { DEFAULT_AI_SYSTEM_PROMPT } from '../services/aiPrompts';
+import {
+  DEFAULT_AI_SYSTEM_PROMPT,
+  DEFAULT_AI_SYSTEM_PROMPT_EN,
+  DEFAULT_WIKI_PROMPT_TEMPLATE,
+  DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
+} from '../services/aiPrompts';
 import {
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_EDITOR_FONT_FAMILY,
@@ -8,6 +13,7 @@ import {
   DEFAULT_UI_FONT_FAMILY,
 } from '../utils/fontSettings';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
+import { normalizeWikiFolder } from '../utils/wikiGeneration';
 import { normalizeTrashFolder } from '../utils/trashFolder';
 import { getPreferredShortcutModifierToken } from '../utils/shortcuts';
 
@@ -83,6 +89,7 @@ export const defaultSettings: AppSettings = {
   wordWrap: true,
   formatMarkdownOnManualSave: false,
   resourceFolder: 'resources',
+  wikiFolder: 'wiki',
   trashFolder: '.trash',
   attachmentPasteFormat: 'obsidian',
   orderedListMode: 'strict',
@@ -94,7 +101,12 @@ export const defaultSettings: AppSettings = {
   codexApiBaseUrl: 'https://api.openai.com/v1',
   codexApiKey: '',
   codexModel: 'gpt-5.2-codex',
-  aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
+  aiSystemPrompt: '',
+  aiSystemPromptZh: DEFAULT_AI_SYSTEM_PROMPT,
+  aiSystemPromptEn: DEFAULT_AI_SYSTEM_PROMPT_EN,
+  wikiPromptTemplate: '',
+  wikiPromptTemplateZh: DEFAULT_WIKI_PROMPT_TEMPLATE,
+  wikiPromptTemplateEn: DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
   imageHosting: defaultImageHostingConfig,
   shortcuts: {
     save: `${primaryShortcutModifier}+S`,
@@ -164,6 +176,7 @@ export function createUISlice(
         ...settings,
         language: normalizeLanguage(settings.language),
         themeMode: normalizeThemeMode(settings.themeMode),
+        wikiFolder: normalizeWikiFolder(settings.wikiFolder),
         trashFolder: normalizeTrashFolder(settings.trashFolder),
       }
     })),
@@ -176,6 +189,7 @@ export function createUISlice(
           ...updates,
           language: normalizeLanguage(updates.language ?? state.settings.language),
           themeMode: normalizeThemeMode(updates.themeMode ?? state.settings.themeMode),
+          wikiFolder: normalizeWikiFolder(updates.wikiFolder ?? state.settings.wikiFolder),
           trashFolder: normalizeTrashFolder(updates.trashFolder ?? state.settings.trashFolder),
         }
       };

@@ -45,11 +45,20 @@ export interface AIAnalysisResult {
   optimizedMarkdown: string;
 }
 
+export interface AIWikiReference {
+  title: string;
+  url?: string;
+  note?: string;
+}
+
 export interface AIWikiGenerationResult {
   title: string;
   summary: string;
+  category: string;
   suggestedTags: string[];
   markdown: string;
+  references: AIWikiReference[];
+  citations: string[];
 }
 
 export type AIProvider = 'gemini' | 'codex';
@@ -154,6 +163,7 @@ export interface AppSettings {
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;
   resourceFolder: string;
+  wikiFolder: string;
   trashFolder: string;
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
@@ -166,6 +176,11 @@ export interface AppSettings {
   codexApiKey?: string;
   codexModel?: string;
   aiSystemPrompt?: string;
+  aiSystemPromptZh?: string;
+  aiSystemPromptEn?: string;
+  wikiPromptTemplate?: string;
+  wikiPromptTemplateZh?: string;
+  wikiPromptTemplateEn?: string;
   imageHosting: ImageHostingConfig;
   imageHostingGithubToken?: string;
   imageHostingS3SecretAccessKey?: string;

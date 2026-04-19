@@ -307,7 +307,7 @@
 .preview-pane-document.markdown-body pre.shiki,
 .preview-pane-document.markdown-body pre.shiki code,
 .preview-pane-document.markdown-body pre.shiki .line {
-  line-height: 1.15;
+  line-height: 1.75;
 }
 
 .preview-pane-document-compact.markdown-body pre,
@@ -315,7 +315,7 @@
 .preview-pane-document-compact.markdown-body pre.shiki,
 .preview-pane-document-compact.markdown-body pre.shiki code,
 .preview-pane-document-compact.markdown-body pre.shiki .line {
-  line-height: 1.1;
+  line-height: 1.75;
 }
 
 .preview-pane-document.markdown-body pre:not(.shiki) code {

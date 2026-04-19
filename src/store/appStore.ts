@@ -19,6 +19,7 @@ import {
 import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
 import { normalizeMetadataFields } from '../utils/metadataFields';
 import { normalizeTrashFolder } from '../utils/trashFolder';
+import { normalizeWikiFolder } from '../utils/wikiGeneration';
 import { normalizeShortcutConfigForPlatform } from '../utils/shortcuts';
 
 // Re-export types from slice stores
@@ -103,6 +104,37 @@ function resolvePersistedBlogSiteUrl(persistedSettings: Record<string, unknown>)
   }
 
   return '';
+}
+
+function resolveLocalizedPrompts(persistedSettings: Record<string, unknown>) {
+  const legacySystemPrompt = typeof persistedSettings.aiSystemPrompt === 'string'
+    ? persistedSettings.aiSystemPrompt
+    : '';
+  const legacyWikiPrompt = typeof persistedSettings.wikiPromptTemplate === 'string'
+    ? persistedSettings.wikiPromptTemplate
+    : '';
+
+  const aiSystemPromptZh = typeof persistedSettings.aiSystemPromptZh === 'string' && persistedSettings.aiSystemPromptZh.trim()
+    ? persistedSettings.aiSystemPromptZh
+    : legacySystemPrompt;
+  const aiSystemPromptEn = typeof persistedSettings.aiSystemPromptEn === 'string' && persistedSettings.aiSystemPromptEn.trim()
+    ? persistedSettings.aiSystemPromptEn
+    : legacySystemPrompt;
+  const wikiPromptTemplateZh = typeof persistedSettings.wikiPromptTemplateZh === 'string' && persistedSettings.wikiPromptTemplateZh.trim()
+    ? persistedSettings.wikiPromptTemplateZh
+    : legacyWikiPrompt;
+  const wikiPromptTemplateEn = typeof persistedSettings.wikiPromptTemplateEn === 'string' && persistedSettings.wikiPromptTemplateEn.trim()
+    ? persistedSettings.wikiPromptTemplateEn
+    : legacyWikiPrompt;
+
+  return {
+    aiSystemPrompt: legacySystemPrompt,
+    aiSystemPromptZh,
+    aiSystemPromptEn,
+    wikiPromptTemplate: legacyWikiPrompt,
+    wikiPromptTemplateZh,
+    wikiPromptTemplateEn,
+  };
 }
 
 function looksLikeGeminiModel(value: unknown): boolean {
@@ -203,6 +235,7 @@ export const useAppStore = create<AppState>()(
       merge: (persistedState, currentState) => {
         const persistedSettings = stripSensitiveSettings((persistedState as any)?.settings ?? {});
         const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
+        const resolvedLocalizedPrompts = resolveLocalizedPrompts(persistedSettings);
         const legacyContentFontFamily = resolveFirstValidString(
           persistedSettings, ['chineseFontFamily', 'englishFontFamily', 'fontFamily'],
         ) || DEFAULT_EDITOR_FONT_FAMILY;
@@ -234,8 +267,14 @@ export const useAppStore = create<AppState>()(
             : DEFAULT_CODE_FONT_FAMILY,
           fontSize: resolvedSharedFontSize,
           ...resolvedAISettings,
+          ...resolvedLocalizedPrompts,
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
+          wikiFolder: normalizeWikiFolder(
+            typeof persistedSettings.wikiFolder === 'string'
+              ? persistedSettings.wikiFolder
+              : defaultSettings.wikiFolder
+          ),
           trashFolder: normalizeTrashFolder(persistedSettings.trashFolder ?? defaultSettings.trashFolder),
           metadataFields: normalizeMetadataFields(persistedSettings.metadataFields),
           shortcuts: resolvePersistedShortcuts(persistedSettings),
