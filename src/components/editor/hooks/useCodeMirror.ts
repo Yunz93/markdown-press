@@ -33,14 +33,17 @@ import {
   getStrictOrderedListNormalizationChanges,
   LIST_INDENT_UNIT,
 } from '../behavior';
-import { markdownSelectionSurroundInputHandler } from '../behavior/surroundInput';
+import { handleStructuredPaste } from '../behavior/input';
+import { markdownFenceLanguageCompletion } from '../behavior/fenceLanguageCompletion';
+import { markdownFencedCodeInputHandler } from '../behavior/fencedCodeInput';
 import { markdownHighlightStyle } from '../decorations';
 import {
   frontmatterDecorations,
   fencedCodeDecorations,
   markdownListDecorations,
 } from '../decorations';
-import type { OrderedListMode } from '../../../types';
+import type { OrderedListMode, ThemeMode } from '../../../types';
+import { editorAutocompletePanelBaseTheme } from '../editorAutocompleteTheme';
 
 export interface UseCodeMirrorOptions {
   content: string;
@@ -48,6 +51,8 @@ export interface UseCodeMirrorOptions {
   placeholder?: string;
   wordWrap?: boolean;
   orderedListMode?: OrderedListMode;
+  /** 与 html.dark / 应用主题一致，供补全浮层等 CodeMirror 主题作用域使用 */
+  themeMode?: ThemeMode;
   onChange: (content: string) => void;
   onScroll?: () => void;
   completionSource?: CompletionSource;
@@ -100,6 +105,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     placeholder = '在此输入...',
     wordWrap = true,
     orderedListMode = 'strict',
+    themeMode = 'light',
     onChange,
     onScroll,
     completionSource,
@@ -128,6 +134,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     wrap: new Compartment(),
     placeholder: new Compartment(),
     keymap: new Compartment(),
+    darkTheme: new Compartment(),
   }), []);
 
   // Track if we're currently syncing content to avoid loops
@@ -182,21 +189,33 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     onContextMenuRef.current = onContextMenu;
   }, [onContextMenu]);
 
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.darkTheme.reconfigure(EditorView.darkTheme.of(themeMode === 'dark')),
+    });
+  }, [themeMode, compartments.darkTheme]);
+
   // Initialize editor as soon as the DOM node is ready.
   useLayoutEffect(() => {
     if (!editorElementReady || !editorRef.current || viewRef.current) return;
 
     try {
-      const customCompletion: CompletionSource = completionSourceRef.current
-        ? (ctx: CompletionContext) => completionSourceRef.current?.(ctx) ?? null
-        : () => null;
+      const customCompletion: CompletionSource = (ctx: CompletionContext) => {
+        const fence = markdownFenceLanguageCompletion(ctx);
+        if (fence) return fence;
+        return completionSourceRef.current?.(ctx) ?? null;
+      };
 
       const view = new EditorView({
         state: EditorState.create({
           doc: initialContentRef.current,
           extensions: [
             history(),
-            EditorView.inputHandler.of(markdownSelectionSurroundInputHandler),
+            compartments.darkTheme.of(EditorView.darkTheme.of(themeMode === 'dark')),
+            editorAutocompletePanelBaseTheme,
+            EditorView.inputHandler.of(markdownFencedCodeInputHandler),
             keymap.of([
               ...completionKeymap,
               ...defaultKeymap,
@@ -241,8 +260,9 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
                 };
               })(),
               paste: (event, view) => {
-                // Handle structured paste (lists, links)
-                // Note: This is handled separately in useStructuredPaste
+                if (handleStructuredPaste(view, event)) {
+                  return true;
+                }
 
                 // Handle image paste
                 const pasteImage = onPasteImageRef.current;

@@ -292,6 +292,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     placeholder: resolvedPlaceholder,
     wordWrap: settings.wordWrap,
     orderedListMode: settings.orderedListMode,
+    themeMode: settings.themeMode as 'light' | 'dark',
     onChange: updateContent,
     onScroll: scrollSync.handleScroll,
     completionSource: wikiLinks.completionSource,

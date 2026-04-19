@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAppStore, selectContent, defaultSettings } from './store/appStore';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useViewMode } from './hooks/useViewMode';
@@ -28,6 +28,7 @@ import { getResolvedUiFontFamily } from './utils/fontSettings';
 import { logEnvironment } from './utils/environment';
 import { useI18n } from './hooks/useI18n';
 import { getPathBasename, findFileInTree } from './app/appShellUtils';
+import { getResolvedEditorFontFamily } from './utils/fontSettings';
 import { useAppBootstrap } from './app/useAppBootstrap';
 import { useActiveFileWatch } from './app/useActiveFileWatch';
 import { useWorkspaceLayout } from './app/useWorkspaceLayout';
@@ -119,6 +120,10 @@ const App: React.FC = () => {
   useUndoRedo();
 
   useThemeSync(settings.themeMode);
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--editor-font-size', `${settings.fontSize}px`);
+    document.documentElement.style.setProperty('--editor-font-family', getResolvedEditorFontFamily(settings));
+  }, [settings.fontSize, settings.editorFontFamily]);
   useAppBootstrap({
     settings,
     settingsHydrated,

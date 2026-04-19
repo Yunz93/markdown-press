@@ -127,11 +127,10 @@ export function removeIndentUnit(indent: string, unit: string = LIST_INDENT_UNIT
 
 // ==================== 代码块检测 ====================
 
-export function isInsideFencedCode(state: EditorState, position: number): boolean {
-  const currentLine = state.doc.lineAt(position).number;
+function walkFenceStackForLines(state: EditorState, upToLineInclusive: number): Array<{ fenceChar: string; fenceLength: number }> {
   const stack: Array<{ fenceChar: string; fenceLength: number }> = [];
 
-  for (let lineNumber = 1; lineNumber <= currentLine; lineNumber += 1) {
+  for (let lineNumber = 1; lineNumber <= upToLineInclusive; lineNumber += 1) {
     const lineText = state.doc.line(lineNumber).text;
     const match = lineText.match(/^([ \t]*)(`{3,}|~{3,})(.*)$/);
     if (!match) continue;
@@ -148,7 +147,21 @@ export function isInsideFencedCode(state: EditorState, position: number): boolea
     }
   }
 
+  return stack;
+}
+
+export function isInsideFencedCode(state: EditorState, position: number): boolean {
+  const currentLine = state.doc.lineAt(position).number;
+  const stack = walkFenceStackForLines(state, currentLine);
   return stack.length > 0;
+}
+
+/** True when a fenced block is still open before the given line (lines above only). */
+export function hasOpenFencedBlockBeforeLine(state: EditorState, lineNumber: number): boolean {
+  if (lineNumber <= 1) {
+    return false;
+  }
+  return walkFenceStackForLines(state, lineNumber - 1).length > 0;
 }
 
 export function getFrontmatterRange(state: EditorState): { from: number; to: number; closingLineNumber: number } | null {

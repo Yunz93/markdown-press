@@ -299,8 +299,29 @@ export function handleStructuredPaste(view: EditorView, event: ClipboardEvent): 
   const state = view.state;
   const selection = state.selection.main;
 
-  // URL 自动转链接
+  // 仅粘贴 URL、无选区 → [](url)，光标在 [] 之间以便填写链接文字
+  if (selection.empty && looksLikeUrl(normalized)) {
+    if (isInsideFencedCode(state, selection.from) || isInsideFrontmatter(state, selection.from)) {
+      return false;
+    }
+    event.preventDefault();
+    const url = normalized.trim();
+    view.dispatch(
+      state.update({
+        changes: { from: selection.from, to: selection.to, insert: `[](${url})` },
+        selection: EditorSelection.cursor(selection.from + 1),
+        scrollIntoView: true,
+        userEvent: 'input.paste',
+      }),
+    );
+    return true;
+  }
+
+  // 有选区且粘贴内容为 URL → [选区文本](url)
   if (!selection.empty && looksLikeUrl(normalized)) {
+    if (isInsideFencedCode(state, selection.from) || isInsideFrontmatter(state, selection.from)) {
+      return false;
+    }
     const selectedText = state.doc.sliceString(selection.from, selection.to);
     event.preventDefault();
     insertText(view, `[${selectedText}](${normalized.trim()})`);

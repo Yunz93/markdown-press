@@ -40,6 +40,11 @@ export function markdownSelectionSurroundInputHandler(
     return true;
   }
 
+  if (text === '~~') {
+    unwrapInline(state, view.dispatch, '~~', '~~');
+    return true;
+  }
+
   if (text === '[') {
     insertLink({ state, dispatch: view.dispatch });
     return true;

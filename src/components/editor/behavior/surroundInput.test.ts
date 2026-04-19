@@ -33,4 +33,10 @@ describe('markdownSelectionSurroundInputHandler', () => {
     const view = viewWithSelection(doc, from, to);
     expect(markdownSelectionSurroundInputHandler(view, from, to, '*')).toBe(false);
   });
+
+  it('wraps selection with ~~ for strikethrough', () => {
+    const view = viewWithSelection('done', 0, 4);
+    expect(markdownSelectionSurroundInputHandler(view, 0, 4, '~~')).toBe(true);
+    expect(view.state.doc.toString()).toBe('~~done~~');
+  });
 });

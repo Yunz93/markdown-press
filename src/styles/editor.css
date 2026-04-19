@@ -252,7 +252,7 @@
 }
 
 .editor-pane-layout .cm-tooltip,
-.cm-tooltip.editor-autocomplete-panel {
+.cm-tooltip-autocomplete.editor-autocomplete-panel {
   border: 1px solid rgba(226, 232, 240, 0.72);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.94);
@@ -262,16 +262,16 @@
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete,
-.cm-tooltip.editor-autocomplete-panel {
+.cm-tooltip-autocomplete.editor-autocomplete-panel {
   padding: 0.4rem;
   min-width: 19rem;
   max-width: min(32rem, calc(100vw - 1.5rem));
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete > ul,
-.cm-tooltip.editor-autocomplete-panel > ul {
+.cm-tooltip-autocomplete.editor-autocomplete-panel > ul {
   font-family: var(--editor-font-family);
-  font-size: 0.94rem;
+  font-size: var(--editor-font-size);
   line-height: 1.45;
   padding: 0;
   margin: 0;
@@ -279,13 +279,13 @@
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete ul,
-.cm-tooltip.editor-autocomplete-panel ul {
+.cm-tooltip-autocomplete.editor-autocomplete-panel ul {
   display: grid;
   gap: 0.2rem;
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete ul li,
-.cm-tooltip.editor-autocomplete-panel ul li {
+.cm-tooltip-autocomplete.editor-autocomplete-panel ul li {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -297,21 +297,21 @@
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete ul li[aria-selected],
-.cm-tooltip.editor-autocomplete-panel ul li[aria-selected] {
+.cm-tooltip-autocomplete.editor-autocomplete-panel ul li[aria-selected] {
   background: rgba(15, 23, 42, 0.06);
   color: #0f172a;
   transform: translateX(1px);
 }
 
 .editor-pane-layout .cm-completionIcon,
-.cm-tooltip.editor-autocomplete-panel .cm-completionIcon {
+.cm-tooltip-autocomplete.editor-autocomplete-panel .cm-completionIcon {
   flex: 0 0 auto;
   opacity: 0.48;
   transform: scale(0.92);
 }
 
 .editor-pane-layout .cm-completionLabel,
-.cm-tooltip.editor-autocomplete-panel .cm-completionLabel {
+.cm-tooltip-autocomplete.editor-autocomplete-panel .cm-completionLabel {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -320,7 +320,7 @@
 }
 
 .editor-pane-layout .cm-completionDetail,
-.cm-tooltip.editor-autocomplete-panel .cm-completionDetail {
+.cm-tooltip-autocomplete.editor-autocomplete-panel .cm-completionDetail {
   margin-left: auto;
   flex: 0 0 auto;
   color: #64748b;
@@ -329,7 +329,7 @@
 }
 
 .editor-pane-layout .cm-completionMatchedText,
-.cm-tooltip.editor-autocomplete-panel .cm-completionMatchedText {
+.cm-tooltip-autocomplete.editor-autocomplete-panel .cm-completionMatchedText {
   color: inherit;
   font-weight: 700;
   text-decoration: none;
@@ -609,19 +609,19 @@
 }
 
 .dark .editor-pane-layout .cm-tooltip,
-.dark .cm-tooltip.editor-autocomplete-panel {
+.dark .cm-tooltip-autocomplete.editor-autocomplete-panel {
   border-color: rgba(255, 255, 255, 0.08);
   background: rgba(17, 24, 39, 0.94);
   box-shadow: 0 22px 56px rgba(2, 6, 23, 0.42);
 }
 
 .dark .editor-pane-layout .cm-tooltip-autocomplete ul li,
-.dark .cm-tooltip.editor-autocomplete-panel ul li {
+.dark .cm-tooltip-autocomplete.editor-autocomplete-panel ul li {
   color: #e5e7eb;
 }
 
 .dark .editor-pane-layout .cm-tooltip-autocomplete ul li[aria-selected],
-.dark .cm-tooltip.editor-autocomplete-panel ul li[aria-selected] {
+.dark .cm-tooltip-autocomplete.editor-autocomplete-panel ul li[aria-selected] {
   background: rgba(255, 255, 255, 0.08);
   color: #f8fafc;
 }
