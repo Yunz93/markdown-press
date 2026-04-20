@@ -170,6 +170,8 @@ export interface AppSettings {
   blogRepoUrl: string;
   blogSiteUrl: string;
   blogGithubToken?: string;
+  wechatAppId: string;
+  wechatAppSecret?: string;
   geminiApiKey?: string;
   geminiModel?: string;
   codexApiBaseUrl?: string;

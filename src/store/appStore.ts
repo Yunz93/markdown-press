@@ -38,7 +38,7 @@ export interface AppState extends
   EditorActions,
   UIActions {}
 
-const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'geminiApiKey', 'codexApiKey'] as const;
+const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey'] as const;
 
 function clampPersistedNumber(value: unknown, min: number, max: number, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;

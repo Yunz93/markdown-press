@@ -17,6 +17,7 @@ export function useSecureSettings(
   const [secureSaveStates, setSecureSaveStates] = useState<Partial<Record<SensitiveSettingKey, SecureSaveState>>>({});
   const secureSaveRequestIdRef = useRef<Record<SensitiveSettingKey, number>>({
     blogGithubToken: 0,
+    wechatAppSecret: 0,
     geminiApiKey: 0,
     codexApiKey: 0,
     imageHostingGithubToken: 0,

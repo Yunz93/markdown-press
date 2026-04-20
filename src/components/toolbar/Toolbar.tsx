@@ -16,7 +16,7 @@ interface ToolbarProps {
   onMenuClick: () => void;
   onToggleTheme: () => void;
   themeMode: ThemeMode;
-  onPublishBlog?: () => void;
+  onPublish?: () => void;
   onExportPdf?: () => void;
 }
 
@@ -32,7 +32,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onMenuClick,
   onToggleTheme,
   themeMode,
-  onPublishBlog,
+  onPublish,
   onExportPdf,
 }) => {
   const { t } = useI18n();
@@ -107,14 +107,14 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
           <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
         </div>
 
-        {(onPublishBlog || onExportPdf) && (
+        {(onPublish || onExportPdf) && (
           <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
-            {onPublishBlog && (
+            {onPublish && (
               <button
-                onClick={onPublishBlog}
+                onClick={onPublish}
                 disabled={isPublishing}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                title={isPublishing ? t('toolbar_publishingBlog') : t('toolbar_publishBlog')}
+                title={isPublishing ? t('toolbar_publishing') : t('toolbar_publish')}
               >
                 {isPublishing ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

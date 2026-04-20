@@ -20,6 +20,8 @@ import { OutlinePanel } from './components/outline/OutlinePanel';
 import { ContentSearch } from './components/search/ContentSearch';
 import { TabBar } from './components/tabs/TabBar';
 import { PromptDialog } from './components/ui/Dialog';
+import { PublishTargetDialog } from './components/publish/PublishTargetDialog';
+import { WechatDraftDialog } from './components/publish/WechatDraftDialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
@@ -33,6 +35,7 @@ import { useAppBootstrap } from './app/useAppBootstrap';
 import { useActiveFileWatch } from './app/useActiveFileWatch';
 import { useWorkspaceLayout } from './app/useWorkspaceLayout';
 import { useAttachmentCleanup } from './app/useAttachmentCleanup';
+import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
@@ -132,12 +135,18 @@ const App: React.FC = () => {
   });
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
-  const { handleExportToPdf, handlePublishBlog } = useExportActions(forceSave, highlighter);
+  const {
+    handleExportToPdf,
+    handlePublishSimpleBlog,
+    handlePublishWechatDraft,
+  } = useExportActions(forceSave, highlighter);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
+  const [isPublishTargetDialogOpen, setIsPublishTargetDialogOpen] = useState(false);
+  const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
   const {
     contentDensity,
     canShowOutlinePanel,
@@ -267,7 +276,35 @@ const App: React.FC = () => {
     await openDirectory();
   }, [openDirectory]);
 
+  const handleOpenPublishDialog = useCallback(() => {
+    setIsPublishTargetDialogOpen(true);
+  }, []);
+
+  const handleSelectSimpleBlogPublish = useCallback(() => {
+    setIsPublishTargetDialogOpen(false);
+    void handlePublishSimpleBlog();
+  }, [handlePublishSimpleBlog]);
+
+  const handleSelectWechatDraftPublish = useCallback(() => {
+    setIsPublishTargetDialogOpen(false);
+    setIsWechatDraftDialogOpen(true);
+  }, []);
+
+  const handleSubmitWechatDraft = useCallback(async (input: WechatDraftPublishInput) => {
+    const published = await handlePublishWechatDraft(input);
+    if (published) {
+      setIsWechatDraftDialogOpen(false);
+    }
+  }, [handlePublishWechatDraft]);
+
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
+  const wechatDraftDefaults = useMemo(() => {
+    if (!activeFile || !content) {
+      return null;
+    }
+
+    return extractWechatDraftDefaults(content, activeFile.path);
+  }, [activeFile, content]);
   const notification = useAppStore(state => state.notification);
   const currentKnowledgeBaseName = useMemo(() => getPathBasename(rootFolderPath), [rootFolderPath]);
   const uiFontFamily = useMemo(() => getResolvedUiFontFamily(settings), [settings.uiFontFamily]);
@@ -340,7 +377,7 @@ const App: React.FC = () => {
           onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
           onToggleTheme={toggleTheme}
           themeMode={settings.themeMode}
-          onPublishBlog={handlePublishBlog}
+          onPublish={handleOpenPublishDialog}
           onExportPdf={handleExportToPdf}
         />
 
@@ -387,6 +424,21 @@ const App: React.FC = () => {
         label={t('app_fileName')}
         defaultValue={t('app_untitled')}
         submitText={t('common_create')}
+      />
+
+      <PublishTargetDialog
+        isOpen={isPublishTargetDialogOpen}
+        onClose={() => setIsPublishTargetDialogOpen(false)}
+        onSelectSimpleBlog={handleSelectSimpleBlogPublish}
+        onSelectWechatDraft={handleSelectWechatDraftPublish}
+      />
+
+      <WechatDraftDialog
+        isOpen={isWechatDraftDialogOpen}
+        isSubmitting={isPublishing}
+        defaults={wechatDraftDefaults}
+        onClose={() => setIsWechatDraftDialogOpen(false)}
+        onSubmit={(input) => { void handleSubmitWechatDraft(input); }}
       />
 
       {notification && (

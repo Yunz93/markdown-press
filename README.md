@@ -76,6 +76,7 @@ xattr -cr /Applications/M記.app
 - AI 从选中文本生成 Wiki 词条并自动回链
 - 支持 PDF 导出
 - 支持发布到 `simple-blog` 关联的 GitHub 仓库，并直接触发 Vercel 部署
+- 支持发布到微信公众号草稿箱，并对同一篇笔记再次更新原草稿
 
 
 ## 常用快捷键
@@ -144,6 +145,28 @@ xattr -cr /Applications/M記.app
 `GitHub Token` 需要使用 Fine-grained Personal Access Token，并为目标仓库开启 `Contents: Read and write` 权限。
 
 发布时会继续处理图片类附件与标准 Markdown 图片引用；对于 Obsidian 风格的普通 wiki 链接，如果目标笔记已经发布（存在 `link`，或 `is_publish: true` 且可推导出博客地址），会自动转换成可点击跳转的普通链接。
+
+## 发布到微信公众号草稿箱
+
+在 `Settings -> Publishing` 中额外配置：
+
+- `公众号 AppID`
+- `公众号 AppSecret`
+
+点击工具栏发布按钮后，可以选择 `微信公众号草稿`。首版行为如下：
+
+- 发布前会弹窗填写或确认标题、作者、摘要、原文链接
+- 封面图在发布时临时选择
+- 正文里的本地图片会自动上传为微信公众号正文可用图片
+- 第一次发布会新建草稿，并把 `wechat_draft_media_id` 回填到当前笔记 frontmatter
+- 再次发布同一篇笔记时，如果存在 `wechat_draft_media_id`，会直接更新原草稿
+
+说明：
+
+- 当前只支持一个公众号账号
+- 当前只支持单图文草稿
+- `AppSecret` 仅保存在本机安全存储中，不进入普通设置持久化
+- 公众号接口通常要求服务器出口 IP 已加入微信公众平台白名单
 
 ## 许可证
 

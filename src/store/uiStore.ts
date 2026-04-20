@@ -96,6 +96,8 @@ export const defaultSettings: AppSettings = {
   blogRepoUrl: '',
   blogSiteUrl: '',
   blogGithubToken: '',
+  wechatAppId: '',
+  wechatAppSecret: '',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash-exp',
   codexApiBaseUrl: 'https://api.openai.com/v1',

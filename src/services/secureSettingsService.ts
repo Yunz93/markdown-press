@@ -7,7 +7,7 @@ const SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 const SECURE_SETTINGS_WAIT_MS = 5000;
 
 export const SENSITIVE_SETTING_KEYS = [
-  'blogGithubToken', 'geminiApiKey', 'codexApiKey',
+  'blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey',
   'imageHostingGithubToken', 'imageHostingS3SecretAccessKey',
   'imageHostingOssAccessKeySecret', 'imageHostingQiniuSecretKey',
 ] as const;
@@ -17,6 +17,7 @@ export type SensitiveSettings = Pick<AppSettings, SensitiveSettingKey>;
 
 interface SecureSettingsPayload {
   blogGithubToken?: string | null;
+  wechatAppSecret?: string | null;
   geminiApiKey?: string | null;
   codexApiKey?: string | null;
   imageHostingGithubToken?: string | null;
@@ -118,6 +119,7 @@ export async function loadSecureSettings(): Promise<Partial<SensitiveSettings>> 
     const payload = await invokeSecureSettingsCommand<SecureSettingsPayload>('get_secure_settings');
     secureSettingsCache = {
       blogGithubToken: normalizeSecretValue(payload.blogGithubToken),
+      wechatAppSecret: normalizeSecretValue(payload.wechatAppSecret),
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
       imageHostingGithubToken: normalizeSecretValue(payload.imageHostingGithubToken),

@@ -17,12 +17,18 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
   const { t } = useI18n();
   const { handleSecureSettingChange, renderSecureSaveState } = useSecureSettings(onUpdateSettings);
   const [showGithubToken, setShowGithubToken] = useState(false);
+  const [showWechatSecret, setShowWechatSecret] = useState(false);
 
   return (
     <div className="space-y-6 animate-fade-in-02s">
       <div>
         <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('settings_publishingTitle')}</h3>
         <div className="space-y-4">
+          <div className="rounded-2xl border border-gray-200/70 bg-white/70 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{t('settings_simpleBlogSectionTitle')}</h4>
+            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{t('settings_simpleBlogSectionDesc')}</p>
+
+            <div className="mt-4 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {t('settings_blogRepoUrl')}
@@ -143,6 +149,76 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
             <p className="mt-2">{t('settings_publishGuide3')}</p>
             <p className="mt-2">{t('settings_publishGuide4')}</p>
             <p className="mt-2">{t('settings_publishGuide5')}</p>
+          </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200/70 bg-white/70 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{t('settings_wechatSectionTitle')}</h4>
+            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{t('settings_wechatSectionDesc')}</p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {t('settings_wechatAppId')}
+                </label>
+                <input
+                  type="text"
+                  value={settings.wechatAppId}
+                  onChange={(e) => onUpdateSettings({ wechatAppId: e.target.value })}
+                  placeholder={t('settings_wechatAppIdPlaceholder')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl font-mono"
+                />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('settings_wechatAppIdDesc')}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {t('settings_wechatAppSecret')}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showWechatSecret ? 'text' : 'password'}
+                    value={settings.wechatAppSecret ?? ''}
+                    onChange={(e) => handleSecureSettingChange('wechatAppSecret', e.target.value)}
+                    placeholder={t('settings_wechatAppSecretPlaceholder')}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowWechatSecret((value) => !value)}
+                    className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    title={showWechatSecret ? t('settings_hideToken') : t('settings_showToken')}
+                    aria-label={showWechatSecret ? t('settings_hideToken') : t('settings_showToken')}
+                  >
+                    {showWechatSecret ? (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('settings_wechatAppSecretDesc')}</p>
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{t('settings_wechatAppSecretHint')}</p>
+                {renderSecureSaveState('wechatAppSecret')}
+              </div>
+
+              <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
+                <p>{t('settings_wechatGuide1')}</p>
+                <p className="mt-2">{t('settings_wechatGuide2')}</p>
+                <p className="mt-2">{t('settings_wechatGuide3')}</p>
+              </div>
+            </div>
           </div>
 
           {!isTauriEnvironment() && (

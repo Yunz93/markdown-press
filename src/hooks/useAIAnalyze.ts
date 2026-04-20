@@ -9,6 +9,7 @@ import { type AppLanguage, type Frontmatter } from '../types';
 import { getFileSystem } from '../types/filesystem';
 import { joinFsPath } from '../utils/pathHelpers';
 import {
+  buildWikiBacklink,
   buildWikiSupplementSections,
   normalizeWikiFolder,
   sanitizeWikiArchiveSegment,
@@ -135,9 +136,7 @@ function buildGeneratedWikiContent(options: {
     frontmatter.aliases = [sanitizeWikiLinkAlias(options.selectedText)];
   }
 
-  const backlink = options.sourceWikiTarget
-    ? `\n\n---\n\n关联原文：[[${options.sourceWikiTarget}]]\n`
-    : '\n';
+  const backlink = buildWikiBacklink(options.language, options.sourceWikiTarget);
   const supplementSections = buildWikiSupplementSections(
     options.language,
     options.references,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildWikiBacklink,
   buildWikiSupplementSections,
   normalizeWikiFolder,
   sanitizeWikiArchiveSegment,
@@ -61,6 +62,20 @@ describe('buildWikiSupplementSections', () => {
 
   it('returns empty string when no supplement data exists', () => {
     expect(buildWikiSupplementSections('zh-CN', [], [])).toBe('');
+  });
+});
+
+describe('buildWikiBacklink', () => {
+  it('localizes the backlink label for Chinese entries', () => {
+    expect(buildWikiBacklink('zh-CN', '原始文档')).toBe('\n\n---\n\n关联原文：[[原始文档]]\n');
+  });
+
+  it('localizes the backlink label for English entries', () => {
+    expect(buildWikiBacklink('en', 'Source Note')).toBe('\n\n---\n\nRelated source: [[Source Note]]\n');
+  });
+
+  it('returns a trailing newline when no backlink target exists', () => {
+    expect(buildWikiBacklink('en', '')).toBe('\n');
   });
 });
 

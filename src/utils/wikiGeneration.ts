@@ -101,6 +101,17 @@ export function buildWikiSupplementSections(
   return `\n\n${sections.join('\n\n')}\n`;
 }
 
+export function buildWikiBacklink(language: AppLanguage, sourceWikiTarget: string): string {
+  if (!sourceWikiTarget) {
+    return '\n';
+  }
+
+  const label = language === 'en' ? 'Related source' : '关联原文';
+  const separator = language === 'en' ? ':' : '：';
+  const space = language === 'en' ? ' ' : '';
+  return `\n\n---\n\n${label}${separator}${space}[[${sourceWikiTarget}]]\n`;
+}
+
 const DUPLICATE_WIKI_SECTION_PATTERNS = [
   /^##\s*参考资料[\t ]*$/im,
   /^##\s*引用说明[\t ]*$/im,

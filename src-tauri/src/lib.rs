@@ -27,10 +27,13 @@ const LEGACY_SAMPLE_NOTES_RENAMES: [(&str, &str); 1] =
     [("02-Obsidian-内联语法.md", "02-Obsidian-内联语法示例.md")];
 const GITHUB_API_CONNECT_TIMEOUT_SECS: u64 = 10;
 const GITHUB_API_REQUEST_TIMEOUT_SECS: u64 = 30;
+const WECHAT_API_CONNECT_TIMEOUT_SECS: u64 = 10;
+const WECHAT_API_REQUEST_TIMEOUT_SECS: u64 = 30;
 const SECURE_SETTINGS_FILE_NAME: &str = "secure-settings.json";
 const SECURE_SETTINGS_KEY_FILE_NAME: &str = "secure-settings.key";
 const SECURE_SETTINGS_VERSION: u8 = 1;
 const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
+const SECRET_KEY_WECHAT_APP_SECRET: &str = "wechatAppSecret";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
 const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
 const SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN: &str = "imageHostingGithubToken";
@@ -83,6 +86,14 @@ struct PublishSimpleBlogAsset {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct PublishWechatLocalImageAsset {
+    placeholder: String,
+    source_path: Option<String>,
+    source_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PublishSimpleBlogRequest {
     blog_repo_url: String,
     blog_github_token: Option<String>,
@@ -92,12 +103,34 @@ struct PublishSimpleBlogRequest {
     assets: Vec<PublishSimpleBlogAsset>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PublishWechatDraftRequest {
+    wechat_app_id: String,
+    wechat_app_secret: Option<String>,
+    draft_media_id: Option<String>,
+    title: String,
+    author: Option<String>,
+    digest: Option<String>,
+    content_source_url: Option<String>,
+    show_cover_pic: bool,
+    cover_image_path: String,
+    content_html: String,
+    image_assets: Vec<PublishWechatLocalImageAsset>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PublishSimpleBlogResult {
     deployment_url: Option<String>,
     build_output: String,
     deploy_output: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PublishWechatDraftResult {
+    media_id: String,
 }
 
 #[derive(Debug)]
@@ -199,6 +232,63 @@ struct GitHubApiErrorResponse {
     message: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct WechatAccessTokenResponse {
+    access_token: Option<String>,
+    errcode: Option<i64>,
+    errmsg: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WechatUploadImageResponse {
+    url: Option<String>,
+    errcode: Option<i64>,
+    errmsg: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WechatAddMaterialResponse {
+    media_id: Option<String>,
+    errcode: Option<i64>,
+    errmsg: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WechatDraftAddResponse {
+    media_id: Option<String>,
+    errcode: Option<i64>,
+    errmsg: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WechatCommonResponse {
+    errcode: Option<i64>,
+    errmsg: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct WechatDraftArticleRequest {
+    title: String,
+    author: String,
+    digest: String,
+    content: String,
+    content_source_url: String,
+    thumb_media_id: String,
+    show_cover_pic: u8,
+}
+
+#[derive(Debug, Serialize)]
+struct WechatDraftAddPayload {
+    articles: Vec<WechatDraftArticleRequest>,
+}
+
+#[derive(Debug, Serialize)]
+struct WechatDraftUpdatePayload {
+    media_id: String,
+    index: u8,
+    articles: WechatDraftArticleRequest,
+}
+
 #[derive(Debug, Clone)]
 struct AllowedPathEntry {
     path: PathBuf,
@@ -214,6 +304,7 @@ struct SecurityState {
 #[serde(rename_all = "camelCase")]
 struct SecureSettingsResult {
     blog_github_token: Option<String>,
+    wechat_app_secret: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
     image_hosting_github_token: Option<String>,
@@ -226,6 +317,7 @@ struct SecureSettingsResult {
 #[serde(rename_all = "camelCase")]
 struct SecureSettingsFile {
     blog_github_token: Option<String>,
+    wechat_app_secret: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
     image_hosting_github_token: Option<String>,
@@ -527,6 +619,7 @@ fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String
     let settings = read_secure_settings_file(app)?;
     Ok(match key {
         SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token,
+        SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token,
@@ -547,6 +640,7 @@ fn write_secure_secret(
 
     match key {
         SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token = normalized,
+        SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret = normalized,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token = normalized,
@@ -562,6 +656,7 @@ fn write_secure_secret(
 fn resolve_secret_key(key: &str) -> Option<&'static str> {
     match key {
         SECRET_KEY_BLOG_GITHUB_TOKEN => Some(SECRET_KEY_BLOG_GITHUB_TOKEN),
+        SECRET_KEY_WECHAT_APP_SECRET => Some(SECRET_KEY_WECHAT_APP_SECRET),
         SECRET_KEY_GEMINI_API_KEY => Some(SECRET_KEY_GEMINI_API_KEY),
         SECRET_KEY_CODEX_API_KEY => Some(SECRET_KEY_CODEX_API_KEY),
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => Some(SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN),
@@ -602,6 +697,7 @@ pub fn run() {
             reveal_in_explorer,
             copy_sample_notes,
             publish_simple_blog,
+            publish_wechat_draft,
             upload_image_to_hosting
         ])
         .setup(|app| {
@@ -633,9 +729,19 @@ async fn publish_simple_blog(
 }
 
 #[tauri::command]
+async fn publish_wechat_draft(
+    request: PublishWechatDraftRequest,
+    security_state: tauri::State<'_, SecurityState>,
+) -> Result<PublishWechatDraftResult, String> {
+    validate_wechat_publish_request_access(security_state.inner(), &request)?;
+    publish_remote_wechat_draft(&request).await
+}
+
+#[tauri::command]
 fn get_secure_settings(app: tauri::AppHandle) -> Result<SecureSettingsResult, String> {
     Ok(SecureSettingsResult {
         blog_github_token: read_secure_secret(&app, SECRET_KEY_BLOG_GITHUB_TOKEN)?,
+        wechat_app_secret: read_secure_secret(&app, SECRET_KEY_WECHAT_APP_SECRET)?,
         gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
         codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
         image_hosting_github_token: read_secure_secret(&app, SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN)?,
@@ -910,6 +1016,28 @@ fn validate_publish_request_access(
     for asset in &request.assets {
         let source_path = canonicalize_existing_path(&asset.source_path)?;
         ensure_path_allowed(security_state, &source_path)?;
+    }
+
+    Ok(())
+}
+
+fn validate_wechat_publish_request_access(
+    security_state: &SecurityState,
+    request: &PublishWechatDraftRequest,
+) -> Result<(), String> {
+    let cover_image_path = canonicalize_existing_path(&request.cover_image_path)?;
+    ensure_path_allowed(security_state, &cover_image_path)?;
+
+    for asset in &request.image_assets {
+        if let Some(source_path) = asset
+            .source_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let source_path = canonicalize_existing_path(source_path)?;
+            ensure_path_allowed(security_state, &source_path)?;
+        }
     }
 
     Ok(())
@@ -1564,6 +1692,366 @@ async fn github_api_json<T: DeserializeOwned, B: Serialize>(
         .json::<T>()
         .await
         .map_err(|e| format!("Failed to decode GitHub API response for {}: {}", path, e))
+}
+
+async fn publish_remote_wechat_draft(
+    request: &PublishWechatDraftRequest,
+) -> Result<PublishWechatDraftResult, String> {
+    publish_log("publish_wechat_draft: start request");
+
+    let app_id = request.wechat_app_id.trim();
+    if app_id.is_empty() {
+        return Err("WeChat AppID is required for publishing.".to_string());
+    }
+
+    let app_secret = request
+        .wechat_app_secret
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "WeChat AppSecret is required for publishing.".to_string())?;
+
+    if request.title.trim().is_empty() {
+        return Err("WeChat draft title is required.".to_string());
+    }
+
+    let client = create_wechat_api_client()?;
+    let access_token = fetch_wechat_access_token(&client, app_id, app_secret).await?;
+    publish_log("publish_wechat_draft: access token ready");
+
+    let mut content_html = request.content_html.clone();
+    for asset in &request.image_assets {
+        let url = upload_wechat_article_image(&client, &access_token, asset).await?;
+        content_html = content_html.replace(&asset.placeholder, &url);
+    }
+
+    let thumb_media_id = upload_wechat_thumb_image(
+        &client,
+        &access_token,
+        Path::new(&request.cover_image_path),
+    )
+    .await?;
+
+    let article = WechatDraftArticleRequest {
+        title: request.title.trim().to_string(),
+        author: request.author.as_deref().unwrap_or("").trim().to_string(),
+        digest: request.digest.as_deref().unwrap_or("").trim().to_string(),
+        content: content_html,
+        content_source_url: request
+            .content_source_url
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .to_string(),
+        thumb_media_id,
+        show_cover_pic: if request.show_cover_pic { 1 } else { 0 },
+    };
+
+    let media_id = if let Some(existing_media_id) = request
+        .draft_media_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        update_wechat_draft(&client, &access_token, existing_media_id, &article).await?;
+        existing_media_id.to_string()
+    } else {
+        create_wechat_draft(&client, &access_token, &article).await?
+    };
+
+    publish_log(format!("publish_wechat_draft: finished media_id={}", media_id));
+    Ok(PublishWechatDraftResult { media_id })
+}
+
+fn create_wechat_api_client() -> Result<Client, String> {
+    Client::builder()
+        .connect_timeout(Duration::from_secs(WECHAT_API_CONNECT_TIMEOUT_SECS))
+        .timeout(Duration::from_secs(WECHAT_API_REQUEST_TIMEOUT_SECS))
+        .user_agent("markdown-press")
+        .build()
+        .map_err(|e| format!("Failed to create WeChat API client: {}", e))
+}
+
+fn wechat_api_error(errcode: Option<i64>, errmsg: Option<String>, context: &str) -> Result<(), String> {
+    match errcode.unwrap_or(0) {
+        0 => Ok(()),
+        code => Err(format!(
+            "WeChat API error {} during {}: {}",
+            code,
+            context,
+            errmsg.unwrap_or_else(|| "unknown error".to_string())
+        )),
+    }
+}
+
+async fn fetch_wechat_access_token(
+    client: &Client,
+    app_id: &str,
+    app_secret: &str,
+) -> Result<String, String> {
+    let response = client
+        .get("https://api.weixin.qq.com/cgi-bin/token")
+        .query(&[
+            ("grant_type", "client_credential"),
+            ("appid", app_id),
+            ("secret", app_secret),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("Failed to request WeChat access token: {}", e))?;
+
+    let payload = response
+        .json::<WechatAccessTokenResponse>()
+        .await
+        .map_err(|e| format!("Failed to decode WeChat access token response: {}", e))?;
+
+    wechat_api_error(payload.errcode, payload.errmsg, "fetching access token")?;
+    payload
+        .access_token
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "WeChat access token response did not include access_token.".to_string())
+}
+
+fn guess_mime_type(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("bmp") => "image/bmp",
+        Some("svg") => "image/svg+xml",
+        _ => "application/octet-stream",
+    }
+}
+
+fn guess_mime_type_from_name(name: &str) -> &'static str {
+    match name.rsplit('.').next().map(|ext| ext.to_ascii_lowercase()).as_deref() {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("bmp") => "image/bmp",
+        Some("svg") => "image/svg+xml",
+        _ => "application/octet-stream",
+    }
+}
+
+async fn wechat_api_upload_bytes<T: DeserializeOwned>(
+    client: &Client,
+    url: &str,
+    context: &str,
+    file_name: String,
+    mime_type: &str,
+    bytes: Vec<u8>,
+) -> Result<T, String> {
+    let media = reqwest::multipart::Part::bytes(bytes)
+        .file_name(file_name)
+        .mime_str(mime_type)
+        .map_err(|e| format!("Failed to prepare {} multipart upload: {}", context, e))?;
+    let form = reqwest::multipart::Form::new().part("media", media);
+
+    client
+        .post(url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to upload {} to WeChat API: {}", context, e))?
+        .json::<T>()
+        .await
+        .map_err(|e| format!("Failed to decode WeChat {} upload response: {}", context, e))
+}
+
+async fn wechat_api_upload_file<T: DeserializeOwned>(
+    client: &Client,
+    url: &str,
+    source_path: &Path,
+    context: &str,
+) -> Result<T, String> {
+    let bytes = fs::read(source_path)
+        .map_err(|e| format!("Failed to read {} file {}: {}", context, source_path.display(), e))?;
+    let file_name = source_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("upload.bin")
+        .to_string();
+    wechat_api_upload_bytes(client, url, context, file_name, guess_mime_type(source_path), bytes).await
+}
+
+async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
+    client: &Client,
+    url: &str,
+    remote_url: &str,
+    context: &str,
+) -> Result<T, String> {
+    let response = client
+        .get(remote_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download remote {} {}: {}", context, remote_url, e))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!(
+            "Failed to download remote {} {}: HTTP {}",
+            context, remote_url, status
+        ));
+    }
+
+    let downloaded_url = response.url().clone();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.split(';').next().unwrap_or(value).trim().to_string());
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read remote {} bytes {}: {}", context, remote_url, e))?
+        .to_vec();
+    let file_name = downloaded_url
+        .path_segments()
+        .and_then(|segments| segments.last())
+        .filter(|segment| !segment.trim().is_empty())
+        .unwrap_or("remote-image")
+        .to_string();
+    let mime_type = content_type
+        .as_deref()
+        .filter(|value| value.starts_with("image/"))
+        .unwrap_or_else(|| guess_mime_type_from_name(&file_name));
+
+    wechat_api_upload_bytes(client, url, context, file_name, mime_type, bytes).await
+}
+
+async fn upload_wechat_article_image(
+    client: &Client,
+    access_token: &str,
+    asset: &PublishWechatLocalImageAsset,
+) -> Result<String, String> {
+    let url = format!(
+        "https://api.weixin.qq.com/cgi-bin/media/uploadimg?access_token={}",
+        access_token
+    );
+    let payload: WechatUploadImageResponse = if let Some(source_path) = asset
+        .source_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        wechat_api_upload_file(client, &url, Path::new(source_path), "article image").await?
+    } else if let Some(source_url) = asset
+        .source_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        wechat_api_upload_remote_url(client, &url, source_url, "article image").await?
+    } else {
+        return Err("WeChat article image asset is missing both sourcePath and sourceUrl.".to_string());
+    };
+    wechat_api_error(payload.errcode, payload.errmsg, "uploading article image")?;
+    payload
+        .url
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "WeChat article image upload did not return url.".to_string())
+}
+
+async fn upload_wechat_thumb_image(
+    client: &Client,
+    access_token: &str,
+    source_path: &Path,
+) -> Result<String, String> {
+    let url = format!(
+        "https://api.weixin.qq.com/cgi-bin/material/add_material?access_token={}&type=thumb",
+        access_token
+    );
+    let payload: WechatAddMaterialResponse =
+        wechat_api_upload_file(client, &url, source_path, "thumbnail image").await?;
+    wechat_api_error(payload.errcode, payload.errmsg, "uploading thumbnail image")?;
+    payload
+        .media_id
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "WeChat thumbnail upload did not return media_id.".to_string())
+}
+
+async fn create_wechat_draft(
+    client: &Client,
+    access_token: &str,
+    article: &WechatDraftArticleRequest,
+) -> Result<String, String> {
+    let url = format!(
+        "https://api.weixin.qq.com/cgi-bin/draft/add?access_token={}",
+        access_token
+    );
+    let payload = WechatDraftAddPayload {
+        articles: vec![WechatDraftArticleRequest {
+            title: article.title.clone(),
+            author: article.author.clone(),
+            digest: article.digest.clone(),
+            content: article.content.clone(),
+            content_source_url: article.content_source_url.clone(),
+            thumb_media_id: article.thumb_media_id.clone(),
+            show_cover_pic: article.show_cover_pic,
+        }],
+    };
+
+    let response = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to create WeChat draft: {}", e))?;
+
+    let payload = response
+        .json::<WechatDraftAddResponse>()
+        .await
+        .map_err(|e| format!("Failed to decode WeChat draft/create response: {}", e))?;
+    wechat_api_error(payload.errcode, payload.errmsg, "creating draft")?;
+    payload
+        .media_id
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "WeChat draft/create response did not include media_id.".to_string())
+}
+
+async fn update_wechat_draft(
+    client: &Client,
+    access_token: &str,
+    media_id: &str,
+    article: &WechatDraftArticleRequest,
+) -> Result<(), String> {
+    let url = format!(
+        "https://api.weixin.qq.com/cgi-bin/draft/update?access_token={}",
+        access_token
+    );
+    let payload = WechatDraftUpdatePayload {
+        media_id: media_id.to_string(),
+        index: 0,
+        articles: WechatDraftArticleRequest {
+            title: article.title.clone(),
+            author: article.author.clone(),
+            digest: article.digest.clone(),
+            content: article.content.clone(),
+            content_source_url: article.content_source_url.clone(),
+            thumb_media_id: article.thumb_media_id.clone(),
+            show_cover_pic: article.show_cover_pic,
+        },
+    };
+
+    let response = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to update WeChat draft: {}", e))?;
+
+    let payload = response
+        .json::<WechatCommonResponse>()
+        .await
+        .map_err(|e| format!("Failed to decode WeChat draft/update response: {}", e))?;
+    wechat_api_error(payload.errcode, payload.errmsg, "updating draft")
 }
 
 fn current_tree_blob_map(tree: &GitHubTreeResponse) -> BTreeMap<String, String> {

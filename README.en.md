@@ -75,6 +75,7 @@ Download the `.exe` installer and run it. If Windows SmartScreen blocks the laun
 - Generate wiki article from selected text with automatic back-linking
 - PDF export
 - Publish to a `simple-blog` GitHub repository with automatic Vercel deployment
+- Publish to the WeChat Official Account draft box and update the same draft later
 
 ## Local Validation
 
@@ -132,6 +133,28 @@ Notes:
 - New-note metadata templates include `slug`, `aliases`, `date created`, and `date modified`
 - When a note is edited and saved, `date modified` (or compatible keys such as `update_time`) is refreshed automatically if it exists in frontmatter
 - During publishing, Obsidian-style wiki links are converted into clickable Markdown links when the target note is already published
+
+## Publish to WeChat Drafts
+
+In `Settings -> Publishing`, also configure:
+
+- `WeChat AppID`
+- `WeChat AppSecret`
+
+After clicking the toolbar publish button, choose `WeChat draft`. The first version works like this:
+
+- A dialog lets you review or edit the title, author, digest, and source URL before publishing
+- The cover image is selected at publish time
+- Local images in the article body are uploaded as WeChat-hosted article images automatically
+- The first publish creates a draft and writes `wechat_draft_media_id` back into the note frontmatter
+- Republishing the same note updates the existing draft when `wechat_draft_media_id` is present
+
+Notes:
+
+- Only one Official Account is supported right now
+- Only single-article drafts are supported in this version
+- `AppSecret` is stored in secure local storage only
+- WeChat usually requires your outbound server IP to be allowlisted in the Official Account platform
 
 ## License
 

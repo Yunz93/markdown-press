@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore, defaultSettings } from '../../store/appStore';
+import { getResolvedUiFontFamily } from '../../utils/fontSettings';
 
 interface DialogProps {
   isOpen: boolean;
@@ -22,7 +23,9 @@ export const Dialog: React.FC<DialogProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
-  const uiFontScale = useAppStore((state) => state.settings.uiFontSize / defaultSettings.uiFontSize);
+  const settings = useAppStore((state) => state.settings);
+  const uiFontScale = settings.uiFontSize / defaultSettings.uiFontSize;
+  const uiFontFamily = getResolvedUiFontFamily(settings);
 
   // Handle escape key
   useEffect(() => {
@@ -66,7 +69,10 @@ export const Dialog: React.FC<DialogProps> = ({
   const content = (
     <div
       className="ui-scaled fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ '--ui-font-scale': `${uiFontScale}` } as React.CSSProperties}
+      style={{
+        '--ui-font-scale': `${uiFontScale}`,
+        fontFamily: uiFontFamily,
+      } as React.CSSProperties}
       onClick={handleBackdropClick}
     >
       {/* Backdrop */}
@@ -76,9 +82,10 @@ export const Dialog: React.FC<DialogProps> = ({
       <div
         ref={dialogRef}
         className={`
-          relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl
-          max-w-md w-full max-h-[80vh] overflow-hidden
-          border border-gray-200 dark:border-gray-700
+          relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl
+          border border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl
+          dark:border-white/10 dark:bg-gray-900/95
+          max-h-[88vh]
           animate-scale-in
           focus:outline-none
           ${className}
@@ -90,16 +97,16 @@ export const Dialog: React.FC<DialogProps> = ({
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 id="dialog-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="flex items-center justify-between border-b border-gray-200/50 px-6 py-4 dark:border-white/10">
+            <h2 id="dialog-title" className="text-lg font-bold text-gray-900 dark:text-white">
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
               aria-label="Close dialog"
             >
-              <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -108,7 +115,7 @@ export const Dialog: React.FC<DialogProps> = ({
         )}
 
         {/* Content */}
-        <div className="px-6 py-4 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {children}
         </div>
       </div>
