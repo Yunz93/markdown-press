@@ -90,6 +90,8 @@ npm run build
 
 ## Keyboard Shortcuts
 
+These are the current default shortcuts. Most of them can be customized in `Settings -> Shortcuts`.
+
 | Shortcut | Action |
 | --- | --- |
 | `Cmd/Ctrl + S` | Save current file |
@@ -108,6 +110,8 @@ npm run build
 | `Cmd/Ctrl + Shift + N` | New folder |
 | `Cmd/Ctrl + W` | Close tab |
 | `Cmd + Shift + -` | Cleanup unused attachments |
+| `Enter` / `Shift + Enter` | Next / previous search match |
+| `Escape` | Close the active search panel, dialog, or menu |
 | `Cmd/Ctrl + Z` | Undo |
 | `Cmd/Ctrl + Shift + Z` / `Cmd/Ctrl + Y` | Redo |
 
