@@ -186,7 +186,7 @@ const CODE_FONT_FALLBACK = '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Ca
 export const DEFAULT_UI_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
 export const DEFAULT_EDITOR_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
 export const DEFAULT_PREVIEW_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
-export const DEFAULT_CODE_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
+export const DEFAULT_CODE_FONT_FAMILY = CODE_FONT_FALLBACK;
 export const FONT_SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 
 function getZoneFallback(zone: FontZone): string {

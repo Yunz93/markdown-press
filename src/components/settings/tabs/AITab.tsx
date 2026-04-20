@@ -251,7 +251,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
               placeholder={t('settings_systemPromptPlaceholder')}
               rows={8}
               spellCheck={false}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono resize-y min-h-[180px]"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all resize-y min-h-[180px]"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_systemPromptDesc')}</p>
           </div>
@@ -281,7 +281,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
               placeholder={t('settings_wikiPromptPlaceholder')}
               rows={12}
               spellCheck={false}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono resize-y min-h-[260px]"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all resize-y min-h-[260px]"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings_wikiPromptDesc')}</p>
           </div>

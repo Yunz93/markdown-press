@@ -21,6 +21,12 @@ import { normalizeMetadataFields } from '../utils/metadataFields';
 import { normalizeTrashFolder } from '../utils/trashFolder';
 import { normalizeWikiFolder } from '../utils/wikiGeneration';
 import { normalizeShortcutConfigForPlatform } from '../utils/shortcuts';
+import {
+  DEFAULT_AI_SYSTEM_PROMPT,
+  DEFAULT_AI_SYSTEM_PROMPT_EN,
+  DEFAULT_WIKI_PROMPT_TEMPLATE,
+  DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
+} from '../services/aiPrompts';
 
 // Re-export types from slice stores
 export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
@@ -106,7 +112,26 @@ function resolvePersistedBlogSiteUrl(persistedSettings: Record<string, unknown>)
   return '';
 }
 
-function resolveLocalizedPrompts(persistedSettings: Record<string, unknown>) {
+function resolvePromptVariant(
+  localizedValue: unknown,
+  legacyValue: string,
+  defaultZh: string,
+  defaultEn: string,
+  language: 'zh-CN' | 'en',
+): string {
+  if (typeof localizedValue === 'string' && localizedValue.trim()) {
+    return localizedValue;
+  }
+
+  const trimmedLegacyValue = legacyValue.trim();
+  if (!trimmedLegacyValue || trimmedLegacyValue === defaultZh.trim() || trimmedLegacyValue === defaultEn.trim()) {
+    return language === 'en' ? defaultEn : defaultZh;
+  }
+
+  return legacyValue;
+}
+
+export function resolveLocalizedPrompts(persistedSettings: Record<string, unknown>) {
   const legacySystemPrompt = typeof persistedSettings.aiSystemPrompt === 'string'
     ? persistedSettings.aiSystemPrompt
     : '';
@@ -114,18 +139,34 @@ function resolveLocalizedPrompts(persistedSettings: Record<string, unknown>) {
     ? persistedSettings.wikiPromptTemplate
     : '';
 
-  const aiSystemPromptZh = typeof persistedSettings.aiSystemPromptZh === 'string' && persistedSettings.aiSystemPromptZh.trim()
-    ? persistedSettings.aiSystemPromptZh
-    : legacySystemPrompt;
-  const aiSystemPromptEn = typeof persistedSettings.aiSystemPromptEn === 'string' && persistedSettings.aiSystemPromptEn.trim()
-    ? persistedSettings.aiSystemPromptEn
-    : legacySystemPrompt;
-  const wikiPromptTemplateZh = typeof persistedSettings.wikiPromptTemplateZh === 'string' && persistedSettings.wikiPromptTemplateZh.trim()
-    ? persistedSettings.wikiPromptTemplateZh
-    : legacyWikiPrompt;
-  const wikiPromptTemplateEn = typeof persistedSettings.wikiPromptTemplateEn === 'string' && persistedSettings.wikiPromptTemplateEn.trim()
-    ? persistedSettings.wikiPromptTemplateEn
-    : legacyWikiPrompt;
+  const aiSystemPromptZh = resolvePromptVariant(
+    persistedSettings.aiSystemPromptZh,
+    legacySystemPrompt,
+    DEFAULT_AI_SYSTEM_PROMPT,
+    DEFAULT_AI_SYSTEM_PROMPT_EN,
+    'zh-CN',
+  );
+  const aiSystemPromptEn = resolvePromptVariant(
+    persistedSettings.aiSystemPromptEn,
+    legacySystemPrompt,
+    DEFAULT_AI_SYSTEM_PROMPT,
+    DEFAULT_AI_SYSTEM_PROMPT_EN,
+    'en',
+  );
+  const wikiPromptTemplateZh = resolvePromptVariant(
+    persistedSettings.wikiPromptTemplateZh,
+    legacyWikiPrompt,
+    DEFAULT_WIKI_PROMPT_TEMPLATE,
+    DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
+    'zh-CN',
+  );
+  const wikiPromptTemplateEn = resolvePromptVariant(
+    persistedSettings.wikiPromptTemplateEn,
+    legacyWikiPrompt,
+    DEFAULT_WIKI_PROMPT_TEMPLATE,
+    DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
+    'en',
+  );
 
   return {
     aiSystemPrompt: legacySystemPrompt,

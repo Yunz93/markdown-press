@@ -14,6 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
@@ -32,6 +34,8 @@ const WECHAT_API_REQUEST_TIMEOUT_SECS: u64 = 30;
 const SECURE_SETTINGS_FILE_NAME: &str = "secure-settings.json";
 const SECURE_SETTINGS_KEY_FILE_NAME: &str = "secure-settings.key";
 const SECURE_SETTINGS_VERSION: u8 = 1;
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
 const SECRET_KEY_WECHAT_APP_SECRET: &str = "wechatAppSecret";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
@@ -60,6 +64,11 @@ fn publish_log(message: impl AsRef<str>) {
     {
         let _ = writeln!(file, "{}", line);
     }
+}
+
+#[cfg(target_os = "windows")]
+fn configure_background_command(command: &mut Command) -> &mut Command {
+    command.creation_flags(CREATE_NO_WINDOW)
 }
 
 #[derive(Debug, Serialize)]
@@ -813,7 +822,9 @@ fn collect_system_fonts() -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("powershell")
+        let mut command = Command::new("powershell");
+        configure_background_command(&mut command);
+        let output = command
             .args([
                 "-NoProfile",
                 "-Command",
