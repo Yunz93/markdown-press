@@ -1,6 +1,5 @@
 ---
-
-## category: 示例
+category: 示例
 tags:
   - Markdown
 status: draft
@@ -9,6 +8,7 @@ aliases: ''
 is_publish: false
 "date created": 2026-03-21
 "date modified": "2026-04-15 00:00:00"
+---
 
 ## 主要内容
 
