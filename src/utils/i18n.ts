@@ -314,6 +314,8 @@ const translations = {
     settings_metadataTip: '提示：拖拽可重新排序。使用 {now} 表示日期，{nowDatetime} 表示时间戳。`status` 仅用于编辑状态；发布由 `is_publish` 控制。',
 
     settings_publishingTitle: '发布设置',
+    settings_publishingTabSimpleBlog: 'simple-blog',
+    settings_publishingTabWechat: '微信公众号',
     settings_simpleBlogSectionTitle: 'Simple Blog',
     settings_simpleBlogSectionDesc: '发布到 simple-blog 仓库并触发网站重新部署。',
     settings_blogRepoUrl: '博客仓库地址',
@@ -767,6 +769,8 @@ const translations = {
     settings_metadataTip: 'Tip: drag to reorder. Use {now} for the date and {nowDatetime} for the timestamp. `status` is only for editorial state; publishing is controlled by `is_publish`.',
 
     settings_publishingTitle: 'Publishing',
+    settings_publishingTabSimpleBlog: 'simple-blog',
+    settings_publishingTabWechat: 'WeChat',
     settings_simpleBlogSectionTitle: 'Simple Blog',
     settings_simpleBlogSectionDesc: 'Publish to the simple-blog repository and trigger a new deployment.',
     settings_blogRepoUrl: 'Blog repository URL',

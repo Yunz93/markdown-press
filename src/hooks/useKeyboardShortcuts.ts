@@ -37,6 +37,12 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   'closeTab',
 ]);
 
+const SHORTCUT_ACTION_ALIASES: Partial<Record<keyof ShortcutConfig, string[]>> = {
+  // Cmd+0 can be unreliable in webviews because it commonly overlaps with native zoom reset.
+  // Keep both variants accepted so opening Settings remains reachable across migrations/platform quirks.
+  settings: ['Cmd+0', 'Ctrl+0', 'Cmd+,', 'Ctrl+,', 'Command+,', 'Meta+,'],
+};
+
 function getNextViewMode(
   viewMode: ViewMode,
   lastNonSplitViewMode: ViewMode.EDITOR | ViewMode.PREVIEW
@@ -102,6 +108,14 @@ function matchesShortcut(event: KeyboardEvent, shortcut: string): boolean {
   return normalizeKeyName(event.key) === parsed.key || normalizeCodeName(event.code) === parsed.key;
 }
 
+export function getShortcutCandidates(action: keyof ShortcutConfig, shortcut: string): string[] {
+  const candidates = [shortcut, ...(SHORTCUT_ACTION_ALIASES[action] ?? [])]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(candidates));
+}
+
 function isEditableTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
   if (!element) return false;
@@ -143,7 +157,14 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
     });
 
     for (const entry of shortcutEntries) {
-      if (!entry.handler || !matchesShortcut(event, entry.shortcut)) {
+      if (!entry.handler) {
+        continue;
+      }
+
+      const matched = getShortcutCandidates(entry.action, entry.shortcut)
+        .some((candidate) => matchesShortcut(event, candidate));
+
+      if (!matched) {
         continue;
       }
 
