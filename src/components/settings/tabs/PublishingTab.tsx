@@ -6,6 +6,7 @@ import {
   normalizeBlogRepoUrl,
   normalizeBlogSiteUrl,
 } from '../../../utils/blogRepo';
+import { openExternalUrl } from '../../../utils/externalLinks';
 import { useI18n } from '../../../hooks/useI18n';
 import type { SettingsTabProps } from '../types';
 import { useSecureSettings } from '../useSecureSettings';
@@ -140,8 +141,10 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
             {t('settings_publishGuide1').split('simple-blog')[0]}
             <a
               href="https://github.com/Yunz93/simple-blog"
-              target="_blank"
-              rel="noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                void openExternalUrl('https://github.com/Yunz93/simple-blog');
+              }}
               className="font-medium text-accent-DEFAULT hover:underline"
             >
               simple-blog

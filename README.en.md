@@ -31,6 +31,8 @@ xattr -cr /Applications/M記.app
 
 Download the `.exe` installer and run it. If Windows SmartScreen blocks the launch, click "More info" → "Run anyway".
 
+After the initial install, the Windows build can check for and install later GitHub Release updates from `Settings -> About`.
+
 ## Highlights
 
 ### Editing and Preview

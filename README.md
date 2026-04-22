@@ -29,6 +29,8 @@ xattr -cr /Applications/M記.app
 
 下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
 
+首次安装完成后，Windows 版会在 `Settings -> 关于` 中支持检查并安装后续 GitHub Release 更新。
+
 ## 功能概览
 
 ### 编辑与预览

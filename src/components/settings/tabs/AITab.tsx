@@ -10,6 +10,7 @@ import { fetchAvailableModels, type ModelOption } from '../../../services/modelC
 import { hydrateSensitiveSettingsIntoStore } from '../../../services/secureSettingsService';
 import { useI18n } from '../../../hooks/useI18n';
 import { useAppStore } from '../../../store/appStore';
+import { openExternalUrl } from '../../../utils/externalLinks';
 import type { SettingsTabProps } from '../types';
 import { useSecureSettings } from '../useSecureSettings';
 
@@ -113,7 +114,20 @@ export const AITab: React.FC<SettingsTabProps> = ({
                     <EyeIcon visible={showApiKey} />
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-400">{t('settings_localOnlyGoogle')} <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent-DEFAULT hover:underline">Google AI Studio</a>。</p>
+                <p className="text-[10px] text-gray-400">
+                  {t('settings_localOnlyGoogle')}{' '}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void openExternalUrl('https://aistudio.google.com/app/apikey');
+                    }}
+                    className="text-accent-DEFAULT hover:underline"
+                  >
+                    Google AI Studio
+                  </a>
+                  。
+                </p>
                 {renderSecureSaveState('geminiApiKey')}
               </div>
               <div className="space-y-2">

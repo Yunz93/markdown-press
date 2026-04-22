@@ -33,6 +33,7 @@ import { getPathBasename, findFileInTree } from './app/appShellUtils';
 import { getResolvedEditorFontFamily } from './utils/fontSettings';
 import { useAppBootstrap } from './app/useAppBootstrap';
 import { useActiveFileWatch } from './app/useActiveFileWatch';
+import { useAppUpdater } from './app/useAppUpdater';
 import { useWorkspaceLayout } from './app/useWorkspaceLayout';
 import { useAttachmentCleanup } from './app/useAttachmentCleanup';
 import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
@@ -132,6 +133,15 @@ const App: React.FC = () => {
     settingsHydrated,
     currentFilePath,
     updateSettings,
+  });
+  useAppUpdater({
+    language: settings.language,
+    settingsHydrated,
+    autoCheckForUpdates: settings.autoCheckForUpdates,
+    skippedUpdateVersion: settings.skippedUpdateVersion,
+    updateSettings,
+    showNotification,
+    t,
   });
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });

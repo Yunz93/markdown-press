@@ -226,6 +226,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
     const token = tokens[idx];
     const rawLang = token.info.trim().split(/\s+/)[0] || '';
     const lang = normalizeShikiLanguage(rawLang);
+    const shouldAvoidShellHighlight = rawLang.trim().toLowerCase() === 'shell';
 
     if (lang === 'mermaid' || lang === 'mmd') {
       return baseFence
@@ -238,7 +239,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
     const activeHighlighter = localHighlighter ?? currentHighlighter;
     const activeThemeMode = localThemeMode ?? currentTheme;
 
-    if (activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
+    if (!shouldAvoidShellHighlight && activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
       try {
         const activeTheme = getMarkdownPressShikiTheme(activeThemeMode);
         const shikiHtml = activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme });

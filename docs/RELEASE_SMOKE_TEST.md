@@ -21,3 +21,6 @@ Manual checklist:
 4. Verify Preview navigation and attachments: `[[file]]`, `[[#heading]]`, `![[image.png]]`, and non-image attachments.
 5. Click external links in Preview and confirm the system browser opens.
 6. Resize the window and switch between Editor / Preview / Split. Confirm widths and outline visibility remain stable.
+7. On Windows, open `Settings -> About` and verify the current version is shown correctly.
+8. If the release is intended to support in-app updates, confirm the GitHub Release contains `latest.json` and updater signature assets.
+9. On a Windows machine with an older installed build, confirm the app detects the new release and the in-app update flow completes.

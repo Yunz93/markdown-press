@@ -518,9 +518,12 @@
 }
 
 .editor-pane-layout .cm-fenced-code-line .tok-string,
-.editor-pane-layout .cm-fenced-code-line .mp-tok-code,
 .editor-pane-layout .cm-fenced-code-line .tok-regexp {
   color: var(--editor-code-string);
+}
+
+.editor-pane-layout .cm-fenced-code-line .mp-tok-code {
+  color: var(--editor-code-fg);
 }
 
 .editor-pane-layout .cm-fenced-code-line-body .tok-punctuation,

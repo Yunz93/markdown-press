@@ -166,6 +166,20 @@
   word-break: break-word;
 }
 
+.preview-pane-document.markdown-body p {
+  margin-top: 0;
+  margin-bottom: 0.28em;
+}
+
+.preview-pane-document.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.preview-pane-document.markdown-body li > p {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+
 .preview-pane-document.markdown-body img,
 .preview-pane-document.markdown-body svg,
 .preview-pane-document.markdown-body video,
@@ -345,17 +359,14 @@
   background: transparent !important;
   font-family: var(--preview-code-font-family);
   font-size: var(--preview-code-font-size);
+  white-space: normal;
 }
 
 .preview-pane-document.markdown-body pre.shiki .line {
   display: block;
-}
-
-/* Blank source lines become empty Shiki .line spans; without this each one keeps a full prose strut. */
-.preview-pane-document.markdown-body pre.shiki .line:empty {
-  height: 0.35em;
-  line-height: 0;
-  overflow: hidden;
+  white-space: pre;
+  padding-top: 0.08rem;
+  padding-bottom: 0.08rem;
 }
 
 .preview-pane-document.markdown-body .preview-note-embed {

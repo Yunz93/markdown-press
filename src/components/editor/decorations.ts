@@ -10,7 +10,7 @@
 import { RangeSetBuilder } from '@codemirror/state';
 import type { DecorationSet } from '@codemirror/view';
 import { Decoration, ViewPlugin, type ViewUpdate, type EditorView } from '@codemirror/view';
-import { syntaxTree } from '@codemirror/language';
+import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
 import { HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import {
@@ -138,8 +138,9 @@ export const frontmatterDecorations = ViewPlugin.fromClass(class {
 function buildFencedCodeDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const doc = view.state.doc;
+  const tree = ensureSyntaxTree(view.state, doc.length, 75) ?? syntaxTree(view.state);
 
-  syntaxTree(view.state).iterate({
+  tree.iterate({
     enter: ({ name, from, to }) => {
       if (name !== 'FencedCode') return;
 
@@ -174,7 +175,7 @@ export const fencedCodeDecorations = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
-    if (update.docChanged) {
+    if (update.docChanged || syntaxTree(update.startState) !== syntaxTree(update.state)) {
       this.decorations = buildFencedCodeDecorations(update.view);
     }
   }

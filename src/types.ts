@@ -195,6 +195,9 @@ export interface AppSettings {
   themeMode: ThemeMode;
   metadataFields: MetadataField[];
   autoSaveInterval: number; // Auto-save interval in milliseconds
+  autoCheckForUpdates: boolean;
+  skippedUpdateVersion: string;
+  lastUpdateCheckAt: string;
 }
 
 export interface Notification {

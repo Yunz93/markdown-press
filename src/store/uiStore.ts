@@ -133,6 +133,9 @@ export const defaultSettings: AppSettings = {
   themeMode: 'dark',
   metadataFields: DEFAULT_METADATA_FIELDS,
   autoSaveInterval: 60000,
+  autoCheckForUpdates: true,
+  skippedUpdateVersion: '',
+  lastUpdateCheckAt: '',
 };
 
 /**

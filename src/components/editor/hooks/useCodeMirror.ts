@@ -28,6 +28,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { indentUnit, syntaxHighlighting } from '@codemirror/language';
 import { resolveEditorCodeLanguage } from '../../../utils/editorCodeLanguages';
+import { extractMarkdownFenceLanguages } from '../../../utils/shikiLanguages';
 import {
   createMarkdownKeyBindings,
   getStrictOrderedListNormalizationChanges,
@@ -118,6 +119,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const viewRef = useRef<EditorView | null>(null);
   const [viewReady, setViewReady] = useState(false);
   const [editorElementReady, setEditorElementReady] = useState(false);
+  const [markdownLanguageRevision, setMarkdownLanguageRevision] = useState(0);
   const changeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isApplyingOrderedNormalizationRef = useRef(false);
   const normalizationTimeoutRef = useRef<number | null>(null);
@@ -128,6 +130,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const onPasteImageRef = useRef(onPasteImage);
   const onWikiLinkStartRef = useRef(onWikiLinkStart);
   const onContextMenuRef = useRef(onContextMenu);
+  const loadedMarkdownLanguageKeysRef = useRef<Set<string>>(new Set());
 
   // Compartments for dynamic reconfiguration
   const compartments = useMemo(() => ({
@@ -135,6 +138,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     placeholder: new Compartment(),
     keymap: new Compartment(),
     darkTheme: new Compartment(),
+    markdown: new Compartment(),
   }), []);
 
   // Track if we're currently syncing content to avoid loops
@@ -190,12 +194,55 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   }, [onContextMenu]);
 
   useEffect(() => {
+    const missingDescriptions = extractMarkdownFenceLanguages(content)
+      .map((lang) => ({ key: lang, description: resolveEditorCodeLanguage(lang) }))
+      .filter((entry): entry is { key: string; description: NonNullable<ReturnType<typeof resolveEditorCodeLanguage>> } => (
+        Boolean(entry.description) && !loadedMarkdownLanguageKeysRef.current.has(entry.key)
+      ));
+
+    if (missingDescriptions.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      missingDescriptions.map(async ({ key, description }) => {
+        await description.load();
+        if (!cancelled) {
+          loadedMarkdownLanguageKeysRef.current.add(key);
+        }
+      }),
+    )
+      .then(() => {
+        if (!cancelled) {
+          setMarkdownLanguageRevision((prev) => prev + 1);
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to preload markdown fenced code languages:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [content]);
+
+  useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
       effects: compartments.darkTheme.reconfigure(EditorView.darkTheme.of(themeMode === 'dark')),
     });
   }, [themeMode, compartments.darkTheme]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.markdown.reconfigure(markdown({ codeLanguages: resolveEditorCodeLanguage })),
+    });
+  }, [compartments.markdown, markdownLanguageRevision]);
 
   // Initialize editor as soon as the DOM node is ready.
   useLayoutEffect(() => {
@@ -234,7 +281,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
               parent: editorRef.current.ownerDocument.body,
             }),
             indentUnit.of(LIST_INDENT_UNIT),
-            markdown({ codeLanguages: resolveEditorCodeLanguage }),
+            compartments.markdown.of(markdown({ codeLanguages: resolveEditorCodeLanguage })),
             drawSelection(),
             frontmatterDecorations,
             fencedCodeDecorations,
@@ -368,7 +415,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       viewRef.current = null;
       setViewReady(false);
     };
-  }, [editorElementReady, placeholder, wordWrap, orderedListMode, compartments.wrap, compartments.placeholder, compartments.keymap]);
+  }, [editorElementReady, placeholder, wordWrap, orderedListMode, compartments.wrap, compartments.placeholder, compartments.keymap, compartments.markdown]);
 
   // Sync external content changes (only when not typing)
   useEffect(() => {
