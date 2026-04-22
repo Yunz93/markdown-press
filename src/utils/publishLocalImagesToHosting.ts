@@ -1,6 +1,7 @@
 import { readFile } from '@tauri-apps/plugin-fs';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from './attachmentResolver';
 import { generateFrontmatter, parseFrontmatter } from './frontmatter';
+import { normalizeRemoteImageUrl } from './remoteImageUrl';
 import { parseWikiLinkReference } from './wikiLinks';
 import { uploadImageToHosting } from '../services/imageHostingService';
 import type { AppSettings, FileNode, Frontmatter } from '../types';
@@ -12,19 +13,56 @@ function isRemoteTarget(target: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(target) || target.startsWith('//');
 }
 
-function decodeMarkdownDestination(rawDestination: string): string {
+interface ParsedMarkdownDestination {
+  path: string;
+  angleBrackets: boolean;
+  title: string;
+}
+
+function parseMarkdownDestination(rawDestination: string): ParsedMarkdownDestination {
   const trimmed = rawDestination.trim();
-  if (!trimmed) return '';
+  if (!trimmed) {
+    return { path: '', angleBrackets: false, title: '' };
+  }
 
   if (trimmed.startsWith('<')) {
     const closingIndex = trimmed.indexOf('>');
     if (closingIndex > 0) {
-      return trimmed.slice(1, closingIndex).trim();
+      return {
+        path: trimmed.slice(1, closingIndex).trim(),
+        angleBrackets: true,
+        title: trimmed.slice(closingIndex + 1).trim(),
+      };
     }
   }
 
-  const titleSeparated = trimmed.match(/^(.+?)(?:\s+(?:"[^"]*"|'[^']*'))?$/);
-  return (titleSeparated?.[1] || trimmed).trim();
+  const titleSeparated = trimmed.match(/^(.+?)(\s+(?:"[^"]*"|'[^']*'))?$/);
+  return {
+    path: (titleSeparated?.[1] || trimmed).trim(),
+    angleBrackets: false,
+    title: titleSeparated?.[2]?.trim() || '',
+  };
+}
+
+function decodeMarkdownDestinationPath(rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (!trimmed) return '';
+
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
+function buildMarkdownDestination(
+  path: string,
+  parsedDestination: ParsedMarkdownDestination
+): string {
+  const normalizedPath = parsedDestination.angleBrackets ? `<${path}>` : path;
+  return parsedDestination.title
+    ? `${normalizedPath} ${parsedDestination.title}`
+    : normalizedPath;
 }
 
 function isLikelyRasterOrVectorImagePath(filePath: string): boolean {
@@ -100,7 +138,8 @@ export async function replaceLocalImagesWithHostingForPublish(
     }
 
     for (const match of body.matchAll(MARKDOWN_IMAGE_REGEX)) {
-      const target = decodeMarkdownDestination(match[2]);
+      const destination = parseMarkdownDestination(match[2]);
+      const target = decodeMarkdownDestinationPath(destination.path);
       if (!target || isRemoteTarget(target)) continue;
       const resolved = await resolveAttachmentTarget(resolverContext, target);
       if (resolved && isLikelyRasterOrVectorImagePath(resolved.path)) {
@@ -111,12 +150,8 @@ export async function replaceLocalImagesWithHostingForPublish(
 
     return needs;
   };
-
-  if (!(await collectNeedsHosting())) {
-    return { ok: true, markdown: markdownContent, uploadedCount: 0 };
-  }
-
-  if (!settings.imageHosting?.provider || settings.imageHosting.provider === 'none') {
+  const needsHosting = await collectNeedsHosting();
+  if (needsHosting && (!settings.imageHosting?.provider || settings.imageHosting.provider === 'none')) {
     return { ok: false, reason: 'hosting_not_configured' };
   }
 
@@ -152,9 +187,18 @@ export async function replaceLocalImagesWithHostingForPublish(
 
     transformedBody = await replaceAsync(transformedBody, MARKDOWN_IMAGE_REGEX, async (match) => {
       const altText = match[1] || '';
-      const target = decodeMarkdownDestination(match[2]);
-      if (!target || isRemoteTarget(target)) {
+      const destination = parseMarkdownDestination(match[2]);
+      const target = decodeMarkdownDestinationPath(destination.path);
+      if (!target) {
         return match[0];
+      }
+
+      if (isRemoteTarget(target)) {
+        const normalizedRemoteTarget = normalizeRemoteImageUrl(target);
+        if (normalizedRemoteTarget === target) {
+          return match[0];
+        }
+        return `![${altText}](${buildMarkdownDestination(normalizedRemoteTarget, destination)})`;
       }
 
       const resolved = await resolveAttachmentTarget(resolverContext, target);
@@ -163,7 +207,7 @@ export async function replaceLocalImagesWithHostingForPublish(
       }
 
       const url = await ensureUploaded(resolved.path, resolved.name);
-      return `![${altText}](${url})`;
+      return `![${altText}](${buildMarkdownDestination(url, destination)})`;
     });
 
     return {

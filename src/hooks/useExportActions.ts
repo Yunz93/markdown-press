@@ -257,7 +257,7 @@ export function useExportActions(
       }
 
       let markdownForPublish = hostingResult.markdown;
-      if (hostingResult.uploadedCount > 0) {
+      if (markdownForPublish !== contentToPublish) {
         setContentForFile(activeTabId, markdownForPublish);
         const savedHosting = await forceSave(markdownForPublish);
         if (!savedHosting) {
