@@ -82,6 +82,16 @@ export async function openKnowledgeBaseWorkspace(
   const dirPath = options?.path || await fs.openDirectory();
   if (!dirPath) return null;
 
+  try {
+    await withTimeout(
+      registerAllowedPath(dirPath, true),
+      5000,
+      'Register allowed path'
+    );
+  } catch (error) {
+    console.warn('Failed to register allowed path (continuing):', error);
+  }
+
   if (options?.path && fs.fileExists) {
     const pathExists = await withErrorHandling(
       () => fs.fileExists!(dirPath),
@@ -91,16 +101,6 @@ export async function openKnowledgeBaseWorkspace(
     if (!pathExists) {
       return null;
     }
-  }
-
-  try {
-    await withTimeout(
-      registerAllowedPath(dirPath, true),
-      5000,
-      'Register allowed path'
-    );
-  } catch (error) {
-    console.warn('Failed to register allowed path (continuing):', error);
   }
 
   const trashRootPath = joinFsPath(dirPath, sanitizeTrashFolder(trashFolder));
