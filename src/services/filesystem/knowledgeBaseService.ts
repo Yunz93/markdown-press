@@ -15,6 +15,7 @@ interface OpenKnowledgeBaseParams {
   findInitialOpenableFile: (fileNodes: FileNode[]) => FileNode | null;
   fs: {
     copySampleNotes?: (targetDir: string) => Promise<boolean>;
+    fileExists?: (path: string) => Promise<boolean>;
     openDirectory: () => Promise<string | null>;
     readDirectory: (dirPath: string) => Promise<FileNode[]>;
     readFile: (path: string) => Promise<string>;
@@ -80,6 +81,17 @@ export async function openKnowledgeBaseWorkspace(
 
   const dirPath = options?.path || await fs.openDirectory();
   if (!dirPath) return null;
+
+  if (options?.path && fs.fileExists) {
+    const pathExists = await withErrorHandling(
+      () => fs.fileExists!(dirPath),
+      'Failed to validate knowledge base path'
+    );
+
+    if (!pathExists) {
+      return null;
+    }
+  }
 
   try {
     await withTimeout(

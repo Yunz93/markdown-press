@@ -300,7 +300,7 @@ export function useFileSystem() {
    */
   const openKnowledgeBase = useCallback(async (
     path?: string,
-    options?: { silentSuccess?: boolean; skipSampleNotes?: boolean }
+    options?: { silentSuccess?: boolean; skipSampleNotes?: boolean; suppressErrors?: boolean }
   ): Promise<string | null> => {
     try {
       const fs = await getFileSystem();
@@ -311,7 +311,13 @@ export function useFileSystem() {
         findInitialOpenableFile: findFirstOpenableFile,
         fs,
         hasOpenedKnowledgeBaseBefore,
-        handleInitialFileError: (error) => handleFileSystemError(error, 'Failed to open initial file'),
+        handleInitialFileError: (error) => {
+          if (!options?.suppressErrors) {
+            handleFileSystemError(error, 'Failed to open initial file');
+          } else {
+            console.warn('Failed to open initial file during silent knowledge base restore:', error);
+          }
+        },
         initializeSampleNotes,
         lastOpenedFilePath: useAppStore.getState().settings.lastOpenedFilePath ?? null,
         options: {
@@ -339,7 +345,11 @@ export function useFileSystem() {
       }
       return result.dirPath;
     } catch (error) {
-      handleFileSystemError(error, 'Failed to open knowledge base');
+      if (!options?.suppressErrors) {
+        handleFileSystemError(error, 'Failed to open knowledge base');
+      } else {
+        console.warn('Failed to restore knowledge base silently:', error);
+      }
       return null;
     }
   }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata, initializeSampleNotes, settings.trashFolder]);
