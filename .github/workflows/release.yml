@@ -53,7 +53,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: "-"
-          TAURI_SIGNING_PRIVATE_KEY: ${{ steps.prepare_signing_key.outputs.private_key_path }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ steps.prepare_signing_key.outputs.private_key_path }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
@@ -128,7 +128,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ steps.prepare_signing_key.outputs.private_key_path }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ steps.prepare_signing_key.outputs.private_key_path }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
