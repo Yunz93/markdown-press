@@ -90,6 +90,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     const currentPath = pathRef.current;
 
     if (!currentPath || !activeTabId) return false;
+    if (!isMarkdownDocumentPath(currentPath)) return false;
 
     const shouldFormatBeforeSave = options?.trigger === 'manual'
       && options.formatBeforeSave === true

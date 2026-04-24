@@ -185,6 +185,15 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
+  async readBinaryFile(path: string): Promise<Uint8Array> {
+    try {
+      return await readBinaryFile(path);
+    } catch (error) {
+      console.error(`Failed to read binary file ${path}:`, error);
+      throw error;
+    }
+  }
+
   /**
    * Write content to a file
    */

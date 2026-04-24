@@ -118,6 +118,83 @@ describe('renderMermaidDiagrams', () => {
     expect(el.dataset.mermaidSource).toBeUndefined();
   });
 
+  it('marks a rendered diagram with source and theme metadata', async () => {
+    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
+      nodes.forEach((node) => {
+        node.innerHTML = '<svg viewBox="0 0 120 60"><style>.node{fill:red}</style><text>ok</text></svg>';
+      });
+    });
+    const container = document.createElement('div');
+    const el = createVisibleMermaidHost('flowchart LR\nA-->B');
+    container.appendChild(el);
+
+    await renderMermaidDiagrams(container, { themeMode: 'light' });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(el.querySelector('svg')).not.toBeNull();
+    expect(el.dataset.mermaidRendered).toBe('true');
+    expect(el.dataset.mermaidSource).toBe('flowchart LR\nA-->B');
+    expect(el.dataset.mermaidTheme).toBe('light');
+    expect(el.querySelector('.mermaid-error')).toBeNull();
+  });
+
+  it('normalizes SVGs with empty width and height attributes without keeping invalid dimensions', async () => {
+    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
+      nodes.forEach((node) => {
+        node.innerHTML = '<svg width="" height="" viewBox="0 0 120 60"><text>ok</text></svg>';
+      });
+    });
+    const container = document.createElement('div');
+    const el = createVisibleMermaidHost('flowchart LR\nA-->B');
+    container.appendChild(el);
+
+    await renderMermaidDiagrams(container, { themeMode: 'light' });
+
+    const svg = el.querySelector('svg') as SVGSVGElement | null;
+    expect(svg).not.toBeNull();
+    expect(svg?.hasAttribute('width')).toBe(false);
+    expect(svg?.hasAttribute('height')).toBe(false);
+    expect(svg?.style.aspectRatio).toBe('120 / 60');
+    expect(el.dataset.mermaidRendered).toBe('true');
+  });
+
+  it('shows a deterministic error state when Mermaid does not produce SVG', async () => {
+    run.mockResolvedValue(undefined);
+    const container = document.createElement('div');
+    const el = createVisibleMermaidHost('flowchart LR\nA-->');
+    container.appendChild(el);
+
+    await renderMermaidDiagrams(container, { themeMode: 'dark' });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(el.querySelector('svg')).toBeNull();
+    expect(el.dataset.mermaidRendered).toBe('error');
+    expect(el.dataset.mermaidTheme).toBe('dark');
+    expect(el.querySelector('.mermaid-error')?.textContent).toBe('Failed to render diagram');
+  });
+
+  it('renders more than 20 diagrams in bounded batches instead of skipping all', async () => {
+    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
+      nodes.forEach((node) => {
+        node.innerHTML = '<svg viewBox="0 0 120 60"><text>ok</text></svg>';
+      });
+    });
+    const container = document.createElement('div');
+    for (let index = 0; index < 25; index += 1) {
+      container.appendChild(createVisibleMermaidHost(`flowchart LR\nA${index}-->B${index}`));
+    }
+
+    await renderMermaidDiagrams(container, { themeMode: 'light' });
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run.mock.calls[0][0].nodes).toHaveLength(20);
+    expect(run.mock.calls[1][0].nodes).toHaveLength(5);
+    expect(container.querySelectorAll('.mermaid svg')).toHaveLength(25);
+    expect(Array.from(container.querySelectorAll<HTMLElement>('.mermaid')).every((node) => (
+      node.dataset.mermaidRendered === 'true'
+    ))).toBe(true);
+  });
+
 });
 
 describe('getKatexRenderMode', () => {

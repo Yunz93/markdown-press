@@ -6,6 +6,7 @@ const katexOptions: katex.KatexOptions = {
   throwOnError: false,
   displayMode: false,
   output: 'htmlAndMathml',
+  strict: false,
   trust: false,
 };
 
@@ -184,9 +185,22 @@ function getMermaidDefinition(el: HTMLElement): string {
 }
 
 function parseSvgLength(value: string | null): number | null {
-  if (!value) return null;
+  if (!value?.trim()) return null;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseSvgViewBoxSize(value: string | null): { width: number; height: number } | null {
+  if (!value?.trim()) return null;
+
+  const parts = value.trim().split(/[\s,]+/).map((part) => Number.parseFloat(part));
+  if (parts.length < 4) return null;
+
+  const width = parts[2];
+  const height = parts[3];
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? { width, height }
+    : null;
 }
 
 function getMermaidInlinePalette(themeMode: 'light' | 'dark') {
@@ -222,6 +236,16 @@ function getMermaidDiagramKind(svg: SVGSVGElement): 'flowchart' | 'state' | 'pie
   return 'other';
 }
 
+function getRootMermaidSvg(el: HTMLElement): SVGSVGElement | null {
+  const firstChild = el.firstElementChild;
+  const svg = firstChild?.tagName.toLowerCase() === 'svg'
+    ? firstChild
+    : el.querySelector('svg');
+  return svg?.tagName.toLowerCase() === 'svg'
+    ? svg as SVGSVGElement
+    : null;
+}
+
 function removeMermaidHoistedStyle(el: HTMLElement): void {
   const styleId = el.dataset.mermaidStyleId;
   const doc = el.ownerDocument;
@@ -234,8 +258,8 @@ function hoistMermaidSvgStyle(el: HTMLElement): void {
   const doc = el.ownerDocument;
   if (!doc) return;
 
-  const svg = el.querySelector(':scope > svg');
-  if (!(svg instanceof SVGSVGElement)) return;
+  const svg = getRootMermaidSvg(el);
+  if (!svg) return;
 
   const styleNodes = Array.from(svg.querySelectorAll(':scope > style'));
   if (styleNodes.length === 0) return;
@@ -257,8 +281,8 @@ function hoistMermaidSvgStyle(el: HTMLElement): void {
 }
 
 function inlineMermaidSvgTheme(el: HTMLElement, themeMode: 'light' | 'dark'): void {
-  const svg = el.querySelector(':scope > svg');
-  if (!(svg instanceof SVGSVGElement)) return;
+  const svg = getRootMermaidSvg(el);
+  if (!svg) return;
 
   const palette = getMermaidInlinePalette(themeMode);
   const diagramKind = getMermaidDiagramKind(svg);
@@ -406,18 +430,14 @@ function inlineMermaidSvgTheme(el: HTMLElement, themeMode: 'light' | 'dark'): vo
 }
 
 function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'): void {
-  const svg = el.querySelector(':scope > svg');
-  if (!(svg instanceof SVGSVGElement)) return;
+  const svg = getRootMermaidSvg(el);
+  if (!svg) return;
 
   inlineMermaidSvgTheme(el, themeMode);
 
-  const viewBox = svg.viewBox?.baseVal;
-  const naturalWidth = viewBox?.width && viewBox.width > 0
-    ? viewBox.width
-    : parseSvgLength(svg.getAttribute('width'));
-  const naturalHeight = viewBox?.height && viewBox.height > 0
-    ? viewBox.height
-    : parseSvgLength(svg.getAttribute('height'));
+  const viewBoxSize = parseSvgViewBoxSize(svg.getAttribute('viewBox'));
+  const naturalWidth = viewBoxSize?.width ?? parseSvgLength(svg.getAttribute('width'));
+  const naturalHeight = viewBoxSize?.height ?? parseSvgLength(svg.getAttribute('height'));
 
   svg.removeAttribute('width');
   svg.removeAttribute('height');
@@ -474,11 +494,6 @@ export async function renderMermaidDiagrams(
 
   if (nodeList.length === 0) return;
 
-  if (nodeList.length > 20) {
-    console.warn(`[Mermaid] Too many diagrams (${nodeList.length}), skipping render`);
-    return;
-  }
-
   const mermaid = await ensureMermaidConfigured(themeMode);
   const all = Array.from(nodeList) as HTMLElement[];
   const sourceByEl = new Map<HTMLElement, string>();
@@ -525,13 +540,17 @@ export async function renderMermaidDiagrams(
     el.textContent = src;
   }
 
-  try {
-    await mermaid.run({
-      nodes: pending,
-      suppressErrors: true,
-    });
-  } catch (e) {
-    console.error('Mermaid run failed:', e);
+  const renderBatchSize = 20;
+  for (let start = 0; start < pending.length; start += renderBatchSize) {
+    const batch = pending.slice(start, start + renderBatchSize);
+    try {
+      await mermaid.run({
+        nodes: batch,
+        suppressErrors: true,
+      });
+    } catch (e) {
+      console.error('Mermaid run failed:', e);
+    }
   }
 
   for (const el of pending) {

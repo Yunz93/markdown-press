@@ -130,6 +130,27 @@ export class BrowserFileSystem implements IFileSystem {
     }
   }
 
+  async readBinaryFile(path: string): Promise<Uint8Array> {
+    try {
+      let file: File;
+
+      if (path.startsWith('browser-') && this.fileHandles.has(path)) {
+        file = await this.fileHandles.get(path)!.getFile();
+      } else if (this.directoryHandle) {
+        const relativePath = this.getRelativePath(path);
+        const fileHandle = await this.getFileHandle(this.directoryHandle, relativePath);
+        file = await fileHandle.getFile();
+      } else {
+        throw new Error('File not found');
+      }
+
+      return new Uint8Array(await file.arrayBuffer());
+    } catch (error) {
+      console.error(`Failed to read binary file ${path}:`, error);
+      throw error;
+    }
+  }
+
   /**
    * Write content to a file
    */

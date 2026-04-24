@@ -31,7 +31,10 @@
       "Bash(mv /tmp/useExportActions.ts /Users/yunz/Code/VibeCoding/markdown-press/src/hooks/useExportActions.ts)",
       "Bash(hdiutil attach:*)",
       "Bash(xargs -I{} find {} -name \"TsangerJinKai02-W04.ttf\" -o -type d -name \"resources\")",
-      "Bash(cat /Users/yunz/Code/VibeCoding/markdown-press/src-tauri/capabilities/*.json)"
+      "Bash(cat /Users/yunz/Code/VibeCoding/markdown-press/src-tauri/capabilities/*.json)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

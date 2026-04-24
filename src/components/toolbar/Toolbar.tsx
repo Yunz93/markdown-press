@@ -18,6 +18,7 @@ interface ToolbarProps {
   themeMode: ThemeMode;
   onPublish?: () => void;
   onExportPdf?: () => void;
+  isPreviewOnlyFile?: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = React.memo(({
@@ -34,6 +35,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   themeMode,
   onPublish,
   onExportPdf,
+  isPreviewOnlyFile = false,
 }) => {
   const { t } = useI18n();
   const isDark = themeMode === 'dark';
@@ -101,10 +103,10 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
           <AIButton
             onClick={onAIAnalyze}
             isLoading={isAnalyzing}
-            disabled={!fileName}
+            disabled={!fileName || isPreviewOnlyFile}
           />
 
-          <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+          <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} previewOnly={isPreviewOnlyFile} />
         </div>
 
         {(onPublish || onExportPdf) && (

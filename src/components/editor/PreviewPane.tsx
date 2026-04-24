@@ -14,6 +14,7 @@ import { useFileOperations } from '../../hooks/useFileOperations';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { getResolvedCodeFontFamily, getResolvedPreviewFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
+import { mountPdfPreview } from '../../utils/pdfPreview';
 import { throttle } from '../../utils/throttle';
 import { useThrottledResize } from '../../utils/performance';
 import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
@@ -508,6 +509,48 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     return () => { cancelled = true; };
   }, [currentFilePath, isHtmlPreview, isMarkdownPreview, previewFileType]);
 
+  useEffect(() => {
+    const container = previewRef.current;
+    if (!container || previewLayoutActive === false) return;
+
+    const mountedPreviews = new Map<HTMLElement, () => void>();
+
+    const mountDiscoveredPdfPreviews = () => {
+      const pdfNodes = Array.from(container.querySelectorAll<HTMLElement>('.preview-pdfjs[data-pdf-src]'));
+      for (const node of pdfNodes) {
+        if (mountedPreviews.has(node)) continue;
+
+        const src = node.dataset.pdfSrc?.trim() ?? '';
+        const title = node.dataset.pdfTitle?.trim() || currentFilePath?.split(/[\\/]/).pop() || t('preview_pdfTitle');
+        const pdfPath = node.dataset.pdfPath?.trim() || undefined;
+        if (!src) continue;
+
+        mountedPreviews.set(node, mountPdfPreview(node, src, title, pdfPath));
+      }
+    };
+
+    mountDiscoveredPdfPreviews();
+
+    const observer = typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(mountDiscoveredPdfPreviews)
+      : null;
+    observer?.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      observer?.disconnect();
+      mountedPreviews.forEach((cleanup) => cleanup());
+      mountedPreviews.clear();
+    };
+  }, [
+    assetPreviewSrc,
+    currentFilePath,
+    isMarkdownPreview,
+    markdownPreviewMarkup,
+    previewFileType,
+    previewLayoutActive,
+    t,
+  ]);
+
   // Handle click events
   const handlePreviewClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -710,13 +753,15 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
                 />
               </div>
             ) : previewFileType === 'pdf' && assetPreviewSrc ? (
-              <div className="editor-pane-width-constrained mx-auto w-full py-3">
-                <iframe
-                  src={`${assetPreviewSrc}#toolbar=0&navpanes=0&scrollbar=1`}
-                  sandbox="allow-scripts allow-same-origin"
-                  title={currentFilePath?.split(/[\\/]/).pop() || t('preview_pdfTitle')}
-                  className="h-[78vh] w-full rounded-2xl bg-white dark:bg-black/30"
-                />
+              <div className="editor-pane-width-constrained mx-auto w-full h-full flex flex-col py-3">
+                <div
+                  className="preview-attachment-pdf preview-pdfjs flex-1 min-h-0 w-full rounded-2xl bg-white dark:bg-black/30"
+                  data-pdf-src={assetPreviewSrc}
+                  data-pdf-title={currentFilePath?.split(/[\\/]/).pop() || t('preview_pdfTitle')}
+                  data-pdf-path={currentFilePath ?? undefined}
+                >
+                  {t('preview_loading')}
+                </div>
               </div>
             ) : previewFileType === 'image' || previewFileType === 'video' || previewFileType === 'pdf' ? (
               <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">

@@ -17,6 +17,7 @@ import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 import {
   buildIframeEmbed,
   configurePreviewImageElement,
+  createPreviewPdfContainer,
   hasEmbeddableMediaLinksInHtml,
   hasUriScheme,
   hasWikiEmbedsInHtml,
@@ -54,7 +55,6 @@ export interface UsePreviewRendererReturn {
   parsedContent: { frontmatter: Record<string, unknown> | null; bodyHTML: string };
   enhancedBodyHtml: string;
   sanitizedHtmlPreview: string;
-  assetPreviewSrc: string;
   requiresAsyncEnhancement: boolean;
 }
 
@@ -114,7 +114,6 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
   );
 
   const [enhancedBodyHtml, setEnhancedBodyHtml] = useState(() => basePreviewHtml);
-  const [assetPreviewSrc, setAssetPreviewSrc] = useState('');
   const basePreviewHtmlRef = useRef(basePreviewHtml);
   const enhancedBodyHtmlRef = useRef(enhancedBodyHtml);
   useEffect(() => {
@@ -423,15 +422,12 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
           // PDF embed
           if (isPdfAttachment(resolvedTarget.name)) {
-            const pdfFrame = document.createElement('iframe');
-            pdfFrame.className = 'preview-attachment-pdf';
-            pdfFrame.title = label || resolvedTarget.name;
-            if (embedWidth) pdfFrame.style.width = `${embedWidth}px`;
-            if (embedHeight) pdfFrame.style.height = `${embedHeight}px`;
-
             try {
-              pdfFrame.src = await resolvePreviewSource(resolvedTarget.path, currentFilePath || undefined);
-              embed.replaceWith(pdfFrame);
+              const pdfSrc = await resolvePreviewSource(resolvedTarget.path, currentFilePath || undefined);
+              const pdfContainer = createPreviewPdfContainer(document, pdfSrc, label || resolvedTarget.name, resolvedTarget.path);
+              if (embedWidth) pdfContainer.style.width = `${embedWidth}px`;
+              if (embedHeight) pdfContainer.style.height = `${embedHeight}px`;
+              embed.replaceWith(pdfContainer);
             } catch {
               embed.className = 'preview-attachment-file preview-attachment-file-missing';
               embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
@@ -493,20 +489,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     themeMode,
   ]);
 
-  // Asset preview (image/PDF)
-  useEffect(() => {
-    let cancelled = false;
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return {
     parsedContent,
     enhancedBodyHtml,
     sanitizedHtmlPreview,
-    assetPreviewSrc,
     requiresAsyncEnhancement,
   };
 }

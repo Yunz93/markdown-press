@@ -42,6 +42,22 @@ function readEntrypointAssets() {
   };
 }
 
+function assertReleaseWorkflowUsesTauriSigningEnv() {
+  const workflowPath = join(projectRoot, '.github', 'workflows', 'release.yml');
+  const workflow = readFileSync(workflowPath, 'utf8');
+
+  if (workflow.includes('TAURI_SIGNING_PRIVATE_KEY_PATH')) {
+    console.error('release.yml must pass the prepared updater key path through TAURI_SIGNING_PRIVATE_KEY, not TAURI_SIGNING_PRIVATE_KEY_PATH.');
+    process.exit(1);
+  }
+
+  if (!workflow.includes('TAURI_SIGNING_PRIVATE_KEY: ${{ steps.prepare_signing_key.outputs.private_key_path }}')) {
+    console.error('release.yml is missing TAURI_SIGNING_PRIVATE_KEY for tauri build.');
+    process.exit(1);
+  }
+}
+
+assertReleaseWorkflowUsesTauriSigningEnv();
 run('npm', ['run', 'build']);
 
 assertExists(distDir, 'dist output');
@@ -67,10 +83,14 @@ const checklist = [
   'Cold launch the packaged app and verify the first opened file has correct editor width.',
   'In Preview mode, open Outline in a non-fullscreen window and confirm the panel renders and headings jump correctly.',
   'Open a note with fenced code blocks and confirm syntax highlighting still works in the packaged app.',
+  'Open a note with valid and invalid Mermaid diagrams; confirm valid diagrams render as SVG and invalid diagrams show an error state.',
+  'Open a PDF directly from the sidebar and confirm the PDF.js canvas preview renders instead of staying on the loading state.',
+  'Open a Markdown note with ![[sample.pdf]] and confirm the embedded PDF.js canvas preview renders like direct preview.',
   'Compare Editor mode styling against dev: caret, frontmatter colors, markdown token colors, and line wrapping.',
   'Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.',
   'Click external links from Preview and confirm the system browser opens.',
   'Switch between Editor / Preview / Split, resize the window, and confirm layout widths stay stable.',
+  'For tagged releases, confirm updater signature assets and latest.json are attached to the GitHub Release.',
 ];
 
 console.log('\nRelease smoke check passed.\n');

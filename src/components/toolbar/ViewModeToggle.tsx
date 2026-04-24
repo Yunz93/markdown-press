@@ -5,11 +5,13 @@ import { useI18n } from '../../hooks/useI18n';
 interface ViewModeToggleProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  previewOnly?: boolean;
 }
 
 export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
   viewMode,
-  onViewModeChange
+  onViewModeChange,
+  previewOnly = false,
 }) => {
   const { t } = useI18n();
 
@@ -17,10 +19,13 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
     <div className="flex items-center gap-0.5">
       <button
         onClick={() => onViewModeChange(ViewMode.EDITOR)}
+        disabled={previewOnly}
         className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
           viewMode === ViewMode.EDITOR
             ? 'bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white'
-            : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
+            : previewOnly
+              ? 'text-gray-200 dark:text-gray-700 cursor-not-allowed'
+              : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
         }`}
         title={t('view_editorOnly')}
       >
@@ -32,10 +37,13 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
 
       <button
         onClick={() => onViewModeChange(ViewMode.SPLIT)}
+        disabled={previewOnly}
         className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
           viewMode === ViewMode.SPLIT
             ? 'bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white'
-            : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
+            : previewOnly
+              ? 'text-gray-200 dark:text-gray-700 cursor-not-allowed'
+              : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5'
         }`}
         title={t('view_split')}
       >

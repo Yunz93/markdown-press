@@ -20,6 +20,19 @@ export function isPdfAttachment(fileName: string): boolean {
   return /\.pdf$/i.test(fileName);
 }
 
+export function createPreviewPdfContainer(document: Document, src: string, title: string, path?: string): HTMLDivElement {
+  const container = document.createElement('div');
+  container.className = 'preview-attachment-pdf preview-pdfjs';
+  container.dataset.pdfSrc = src;
+  container.dataset.pdfTitle = title;
+  if (path) {
+    container.dataset.pdfPath = path;
+  }
+  container.dataset.pdfjsState = 'pending';
+  container.textContent = 'Loading PDF...';
+  return container;
+}
+
 export function isVideoAttachment(fileName: string): boolean {
   return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
 }

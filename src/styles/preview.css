@@ -209,15 +209,72 @@
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
+.preview-attachment-pdf,
 .preview-pane-document.markdown-body .preview-attachment-pdf {
   display: block;
   width: 100%;
   min-height: 420px;
+  max-height: 85vh;
+  overflow: auto;
   margin: 1rem 0;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(248, 250, 252, 0.92);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.preview-pdfjs-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.preview-pdfjs-page {
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  flex-shrink: 0;
+}
+
+.preview-pdfjs-page-placeholder {
+  display: flex;
+  min-height: inherit;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.preview-pdfjs-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.preview-pdfjs-status {
+  display: flex;
+  min-height: inherit;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.preview-pdfjs-error {
+  color: #dc2626;
+}
+
+.preview-attachment-pdf-fallback-link {
+  display: inline-flex;
+  margin: 1rem;
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
 .preview-pane-document.markdown-body .preview-external-video-embed {
@@ -553,10 +610,16 @@
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
 }
 
+.dark .preview-attachment-pdf,
 .dark .preview-pane-document.markdown-body .preview-attachment-pdf {
   border-color: rgba(148, 163, 184, 0.16);
   background: rgba(15, 23, 42, 0.82);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
+}
+
+.dark .preview-pdfjs-page {
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
 }
 
 .dark .preview-pane-document.markdown-body .preview-attachment-file {

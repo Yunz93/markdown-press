@@ -39,6 +39,22 @@ import { useAttachmentCleanup } from './app/useAttachmentCleanup';
 import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
 import { isTauriEnvironment } from './types/filesystem';
 
+function isImageFile(name: string): boolean {
+  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
+}
+
+function isPdfFile(name: string): boolean {
+  return /\.pdf$/i.test(name);
+}
+
+function isHtmlFile(name: string): boolean {
+  return /\.html?$/i.test(name);
+}
+
+function isPreviewOnlyFile(name: string): boolean {
+  return isImageFile(name) || isPdfFile(name) || isHtmlFile(name);
+}
+
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
 
@@ -230,6 +246,9 @@ const App: React.FC = () => {
     t,
   });
 
+  const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
+  const isPreviewOnlyActiveFile = activeFile ? isPreviewOnlyFile(activeFile.name) : false;
+
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts(
     async () => {
@@ -266,8 +285,15 @@ const App: React.FC = () => {
       },
       onOpenKnowledgeBase: () => { void handleSwitchKnowledgeBase(); },
       onExportPdf: () => { void handleExportToPdf(); },
+      onToggleView: isPreviewOnlyActiveFile ? () => {} : undefined,
     }
   );
+
+  useEffect(() => {
+    if (isPreviewOnlyActiveFile && viewMode !== ViewMode.PREVIEW) {
+      setViewMode(ViewMode.PREVIEW, 'direct');
+    }
+  }, [isPreviewOnlyActiveFile, viewMode, setViewMode]);
 
   const handleHeadingClick = useCallback((id: string, line: number) => {
     setActiveHeadingId(id);
@@ -340,7 +366,6 @@ const App: React.FC = () => {
     }
   }, [handlePublishWechatDraft]);
 
-  const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const wechatDraftDefaults = useMemo(() => {
     if (!activeFile || !content) {
       return null;
@@ -482,6 +507,7 @@ const App: React.FC = () => {
           themeMode={settings.themeMode}
           onPublish={handleOpenPublishDialog}
           onExportPdf={handleExportToPdf}
+          isPreviewOnlyFile={isPreviewOnlyActiveFile}
         />
 
         <TabBar onToggleSidebar={() => setSidebarOpen(true)} />

@@ -26,7 +26,7 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
 
 - `failed to decode base64 secret key` usually means `TAURI_SIGNING_PRIVATE_KEY` contains raw text that was pasted into a field expecting the CI-formatted base64 value.
 - `Missing comment in secret key` means the decoded private key is incomplete or malformed. This often happens when only the payload line was saved and the leading `untrusted comment:` line was dropped.
-- The release workflow now validates the secret before invoking `tauri-action` and will fail early with a clearer message when the key is malformed.
+- The release workflow validates the secret, writes it to a temporary key file, then passes that file path to Tauri through `TAURI_SIGNING_PRIVATE_KEY`. Do not rename this build env var to `TAURI_SIGNING_PRIVATE_KEY_PATH`; Tauri expects `TAURI_SIGNING_PRIVATE_KEY`.
 
 ## Per-release checklist
 
