@@ -491,6 +491,7 @@ const translations = {
     notifications_languageSwitched: '界面语言已切换为 {language}。',
 
     editor_emptyState: '选择文件开始编辑',
+    editor_placeholder: '开始输入...',
     editor_uploadToHosting: '上传到图床',
     preview_loading: '加载中...',
     preview_doubleClickReveal: '双击可在 Finder 中定位',
@@ -987,6 +988,7 @@ const translations = {
     notifications_languageSwitched: 'Interface language switched to {language}.',
 
     editor_emptyState: 'Select a file to start editing',
+    editor_placeholder: 'Start writing...',
     editor_uploadToHosting: 'Upload to hosting',
     preview_loading: 'Loading...',
     preview_doubleClickReveal: 'Double-click to reveal in Finder',

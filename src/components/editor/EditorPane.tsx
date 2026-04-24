@@ -169,7 +169,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     files,
     fileContents,
   } = useAppStore();
-  const resolvedPlaceholder = placeholder ?? t('editor_emptyState');
+  const resolvedPlaceholder = placeholder ?? t('editor_placeholder');
 
   const editorFontFamily = useMemo(() => getResolvedEditorFontFamily(settings), [settings.editorFontFamily]);
   const codeFontFamily = useMemo(() => getResolvedCodeFontFamily(settings), [settings.codeFontFamily]);
