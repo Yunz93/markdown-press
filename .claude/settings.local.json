@@ -34,7 +34,10 @@
       "Bash(cat /Users/yunz/Code/VibeCoding/markdown-press/src-tauri/capabilities/*.json)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git revert *)",
+      "Bash(git rm *)",
+      "Bash(git tag *)"
     ]
   }
 }

@@ -60,13 +60,13 @@ function writeGithubOutput(name, value) {
   writeFileSync(outputPath, `${name}=${value}\n`, { flag: 'a' });
 }
 
-function writeGithubOutputMultiline(name, value) {
-  const outputPath = process.env.GITHUB_OUTPUT;
-  if (!outputPath) {
+function writeGithubEnv(name, value) {
+  const envPath = process.env.GITHUB_ENV;
+  if (!envPath) {
     return;
   }
 
-  writeFileSync(outputPath, `${name}<<EOF\n${value}\nEOF\n`, { flag: 'a' });
+  writeFileSync(envPath, `${name}<<EOF\n${value}\nEOF\n`, { flag: 'a' });
 }
 
 const input = process.env.TAURI_SIGNING_PRIVATE_KEY_INPUT;
@@ -94,6 +94,6 @@ const keyPath = join(keyDir, 'updater.key');
 
 writeFileSync(keyPath, `${rawKey}\n`, 'utf8');
 writeGithubOutput('private_key_path', keyPath);
-writeGithubOutputMultiline('private_key', rawKey);
+writeGithubEnv('TAURI_SIGNING_PRIVATE_KEY', rawKey);
 
 console.log(`Prepared Tauri updater private key at ${keyPath}`);
