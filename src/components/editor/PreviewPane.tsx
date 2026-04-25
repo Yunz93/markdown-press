@@ -351,12 +351,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const container = previewRef.current;
     if (!container) return;
 
-    const mermaidCount = container.querySelectorAll('.mermaid').length;
-    if (mermaidCount > 20) {
-      console.warn(`[PreviewPane] Too many Mermaid diagrams (${mermaidCount}), skipping render`);
-      return;
-    }
-
     if (mermaidRenderRunningRef.current) {
       mermaidRenderQueuedRef.current = true;
       return;
