@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { DynamicImportLanguageRegistration, LanguageInput } from 'shiki/core';
 import { extractMarkdownFenceLanguages, SHIKI_CORE_LANGS } from '../utils/shikiLanguages';
 import { MARKDOWN_PRESS_SHIKI_THEMES } from '../utils/shikiTheme';
-
-/** Language input type for Shiki loadLanguage */
-type LanguageInput = string | {
-  name: string;
-  displayName?: string;
-  [key: string]: unknown;
-};
 
 /** Shiki highlighter interface for syntax highlighting */
 export interface ShikiHighlighter {
@@ -22,25 +16,39 @@ export interface ShikiHighlighter {
 let cachedHighlighter: ShikiHighlighter | null = null;
 let cachedHighlighterPromise: Promise<ShikiHighlighter | null> | null = null;
 
+function getBundledLanguageLoader(
+  bundledLanguages: Record<string, unknown>,
+  lang: string,
+): LanguageInput | null {
+  const loader = bundledLanguages[lang];
+  return typeof loader === 'function' ? loader as DynamicImportLanguageRegistration : null;
+}
+
 async function createShikiHighlighter(): Promise<ShikiHighlighter | null> {
   try {
-    // Dynamic import to handle potential failures gracefully
-    const shiki = await import('shiki/bundle/web');
-    const { bundledLanguages, createHighlighter } = shiki;
-    
+    const [{ createHighlighterCore }, { bundledLanguages }, { createJavaScriptRegexEngine }] = await Promise.all([
+      import('shiki/core'),
+      import('shiki/langs'),
+      import('shiki/engine/javascript'),
+    ]);
+
     const bundledLanguageIds = new Set(Object.keys(bundledLanguages ?? {}));
     const supportedLangs = SHIKI_CORE_LANGS.filter((lang) => bundledLanguageIds.has(lang));
+    const initialLanguageLoaders = supportedLangs
+      .map((lang) => getBundledLanguageLoader(bundledLanguages, lang))
+      .filter((loader): loader is NonNullable<typeof loader> => Boolean(loader));
 
     if (supportedLangs.length !== SHIKI_CORE_LANGS.length) {
       const unsupportedLangs = SHIKI_CORE_LANGS.filter((lang) => !bundledLanguageIds.has(lang));
       console.warn('Skipping unsupported Shiki bundle languages:', unsupportedLangs);
     }
 
-    const highlighter = await createHighlighter({
+    const highlighter = await createHighlighterCore({
       themes: MARKDOWN_PRESS_SHIKI_THEMES,
-      langs: supportedLangs,
+      langs: initialLanguageLoaders,
+      engine: createJavaScriptRegexEngine(),
     });
-    
+
     return {
       codeToHtml: highlighter.codeToHtml.bind(highlighter),
       getLoadedLanguages: highlighter.getLoadedLanguages?.bind(highlighter),
@@ -99,8 +107,7 @@ export function useShikiHighlighter(markdownContent = '') {
 
     const supportsLanguage = highlighterInstance.supportsLanguage ?? (() => true);
     const loadedLanguages = new Set(highlighterInstance.getLoadedLanguages?.() ?? []);
-    const missingLanguages = extractMarkdownFenceLanguages(markdownContent)
-      .filter((lang) => !loadedLanguages.has(lang) && supportsLanguage(lang));
+    let cancelled = false;
     const unsupportedLanguages = extractMarkdownFenceLanguages(markdownContent)
       .filter((lang) => !supportsLanguage(lang));
 
@@ -108,18 +115,32 @@ export function useShikiHighlighter(markdownContent = '') {
       console.warn('Skipping Shiki languages not available in this bundle:', unsupportedLanguages);
     }
 
-    if (missingLanguages.length === 0) return;
+    const missingLanguages = extractMarkdownFenceLanguages(markdownContent)
+      .filter((lang) => !loadedLanguages.has(lang) && supportsLanguage(lang));
 
-    let cancelled = false;
-    highlighterInstance.loadLanguage(...missingLanguages)
-      .then(() => {
+    if (missingLanguages.length > 0) {
+      void Promise.all([
+        import('shiki/langs'),
+      ]).then(([{ bundledLanguages }]) => {
+        if (cancelled) return;
+
+        const languageLoaders = missingLanguages
+          .map((lang) => getBundledLanguageLoader(bundledLanguages, lang))
+          .filter((loader): loader is NonNullable<typeof loader> => Boolean(loader));
+
+        if (languageLoaders.length === 0) {
+          return;
+        }
+
+        return highlighterInstance.loadLanguage?.(...languageLoaders);
+      }).then(() => {
         if (!cancelled) {
           setHighlighterRevision((prev) => prev + 1);
         }
-      })
-      .catch((error) => {
+      }).catch((error) => {
         console.error('Failed to load additional Shiki languages:', missingLanguages, error);
       });
+    }
 
     return () => {
       cancelled = true;

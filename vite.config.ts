@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
         target: 'esnext',
         outDir: 'dist',
         emptyOutDir: true,
-        chunkSizeWarningLimit: 1600,
+        chunkSizeWarningLimit: 1800,
         // Generate source maps for debugging
         sourcemap: mode === 'development',
         rollupOptions: {
@@ -45,6 +45,10 @@ export default defineConfig(({ mode }) => {
             manualChunks(id) {
               if (!id.includes('node_modules')) {
                 return undefined;
+              }
+
+              if (id.includes('/shiki/dist/langs/')) {
+                return `shiki-lang-${path.basename(id, '.mjs')}`;
               }
 
               if (
@@ -62,12 +66,30 @@ export default defineConfig(({ mode }) => {
 
               if (
                 id.includes('/markdown-it')
-                || id.includes('/shiki/')
-                || id.includes('/@shikijs/')
                 || id.includes('/katex/')
                 || id.includes('/github-markdown-css/')
               ) {
                 return 'markdown-vendor';
+              }
+
+              if (
+                id.includes('/shiki/')
+                || id.includes('/@shikijs/')
+              ) {
+                return 'shiki-vendor';
+              }
+
+              if (
+                id.includes('/cytoscape/')
+                || id.includes('/cytoscape-')
+              ) {
+                return 'mermaid-cytoscape-vendor';
+              }
+
+              if (
+                id.includes('/roughjs/')
+              ) {
+                return 'mermaid-render-vendor';
               }
 
               if (id.includes('/mermaid/') || id.includes('/mermaid-')) {
