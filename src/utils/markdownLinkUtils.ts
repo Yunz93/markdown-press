@@ -1,4 +1,5 @@
 import type { FileNode } from '../types';
+import { stripMarkdownDestination } from './markdownDestination';
 import { parseWikiLinkReference } from './wikiLinks';
 
 export const WIKI_LINK_REGEX = /!?\[\[([^[\]]+)\]\]/g;
@@ -15,18 +16,6 @@ export function flattenFiles(nodes: FileNode[]): FileNode[] {
 
 export function isMarkdownFile(node: FileNode): boolean {
   return /\.(md|markdown)$/i.test(node.name);
-}
-
-export function stripMarkdownDestination(rawDestination: string): string | null {
-  const trimmed = rawDestination.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
-    return trimmed.slice(1, -1).trim() || null;
-  }
-
-  const titleMatch = trimmed.match(/^(\S+)\s+(?:"[^"]*"|'[^']*')\s*$/);
-  return titleMatch?.[1] ?? trimmed;
 }
 
 export function extractAttachmentTargets(content: string): string[] {

@@ -21,6 +21,7 @@ import { useCodeMirror, useWikiLinks, useImagePaste, useScrollSync } from './hoo
 import type { WikiLinkPreviewData } from './hooks';
 import { throttle } from '../../utils/throttle';
 import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
+import { parseMarkdownDestination } from '../../utils/markdownDestination';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 import { uploadImageToHosting, isImageHostingEnabled } from '../../services/imageHostingService';
@@ -101,7 +102,7 @@ interface LocalImageMatch {
   to: number;
 }
 
-const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\(<?([^)\s>]+)>?\)/g;
+const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\(([^)\n]+)\)/g;
 const OBSIDIAN_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]*?))?\]\]/g;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
@@ -109,7 +110,7 @@ function isRemoteUrl(src: string): boolean {
   return /^(https?:|data:|blob:)/i.test(src) || src.startsWith('//');
 }
 
-function findLocalImageAtPos(docText: string, lineFrom: number, lineText: string, pos: number): LocalImageMatch | null {
+function findLocalImageAtPos(lineFrom: number, lineText: string, pos: number): LocalImageMatch | null {
   let match: RegExpExecArray | null;
 
   STANDARD_IMAGE_RE.lastIndex = 0;
@@ -117,7 +118,7 @@ function findLocalImageAtPos(docText: string, lineFrom: number, lineText: string
     const mFrom = lineFrom + match.index;
     const mTo = mFrom + match[0].length;
     if (pos >= mFrom && pos <= mTo) {
-      const src = match[2].trim();
+      const src = parseMarkdownDestination(match[2]).path.trim();
       if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
         return { src, alt: match[1] || src.split('/').pop()?.replace(/\.[^.]+$/, '') || 'image', from: mFrom, to: mTo };
       }
@@ -253,7 +254,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
 
     if (clickPos != null) {
       const line = view.state.doc.lineAt(clickPos);
-      const imgMatch = findLocalImageAtPos(view.state.doc.toString(), line.from, line.text, clickPos);
+      const imgMatch = findLocalImageAtPos(line.from, line.text, clickPos);
       if (imgMatch) {
         event.preventDefault();
         closeSelectionMenu();

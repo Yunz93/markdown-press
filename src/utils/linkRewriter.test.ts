@@ -105,6 +105,27 @@ describe('linkRewriter', () => {
       expect(result.modifiedFiles[0].newContent).toBe('![alt](../resources/new/img.png "my title")');
     });
 
+    it('rewrites angle-bracket paths while preserving titles', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/new/my file.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {
+          '/vault/resources/my file.png': '/vault/resources/new/my file.png',
+        },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '![alt](<../resources/my file.png> "cover title")',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(1);
+      expect(result.modifiedFiles[0].newContent).toBe(
+        '![alt](<../resources/new/my file.png> "cover title")'
+      );
+    });
+
     it('preserves fragment identifiers', async () => {
       const files = [
         file('/vault/notes/a.md'),

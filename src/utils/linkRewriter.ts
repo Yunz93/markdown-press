@@ -3,6 +3,7 @@ import {
   flattenFiles,
   isMarkdownFile,
 } from './markdownLinkUtils';
+import { buildMarkdownDestination, parseMarkdownDestination } from './markdownDestination';
 import { normalizeSlashes, getRelativePath, getPathDirname, getPathBasename } from './pathHelpers';
 import { parseWikiLinkReference } from './wikiLinks';
 
@@ -197,27 +198,6 @@ function computeNewLinkPath(
   return getRelativePath(currentFilePath, resolved.finalTarget);
 }
 
-// ── Markdown destination parsing ────────────────────────────────────────
-
-function parseMarkdownDestination(rawDest: string): {
-  path: string;
-  angleBrackets: boolean;
-  title: string;
-} {
-  const trimmed = rawDest.trim();
-
-  if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
-    return { path: trimmed.slice(1, -1).trim(), angleBrackets: true, title: '' };
-  }
-
-  const titleMatch = trimmed.match(/^(\S+)\s+("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*$/);
-  if (titleMatch) {
-    return { path: titleMatch[1], angleBrackets: false, title: titleMatch[2] };
-  }
-
-  return { path: trimmed, angleBrackets: false, title: '' };
-}
-
 // ── Rewriters ───────────────────────────────────────────────────────────
 
 export function rewriteMarkdownLinks(
@@ -244,11 +224,11 @@ export function rewriteMarkdownLinks(
     const newPath = computeNewLinkPath(resolved, currentFilePath, ctx);
     if (normalizeSlashes(newPath) === normalizeSlashes(decoded)) return match;
 
-    const newDest = angleBrackets
-      ? `<${newPath}${fragment}>`
-      : title
-        ? `${newPath}${fragment} ${title}`
-        : `${newPath}${fragment}`;
+    const newDest = buildMarkdownDestination(`${newPath}${fragment}`, {
+      path: linkPath,
+      angleBrackets,
+      title,
+    });
 
     return `${prefix}${newDest}${suffix}`;
   });
