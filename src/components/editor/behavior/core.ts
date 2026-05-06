@@ -8,7 +8,7 @@ import type { OrderedListMode } from '../../../types';
 
 // ==================== 常量定义 ====================
 
-// 默认缩进单位（4空格），实际使用时应从 EditorState 获取 tabSize
+// 默认缩进单位：4 空格
 export const LIST_INDENT_UNIT = '    ';
 export const LIST_INDENT_SIZE = 4;
 
@@ -24,12 +24,10 @@ export const EMPTY_LINE_REGEX = /^[ \t]*$/;
 // ==================== 缩进单位工具 ====================
 
 /**
- * 从 EditorState 获取缩进单位
+ * 获取统一缩进单位。
  */
-export function getIndentUnit(state: EditorState): string {
-  // CodeMirror 的 EditorState 有 tabSize 属性
-  const tabSize = (state as any).tabSize ?? LIST_INDENT_SIZE;
-  return ' '.repeat(Math.max(2, Math.min(4, tabSize)));
+export function getIndentUnit(_state: EditorState): string {
+  return LIST_INDENT_UNIT;
 }
 
 /**

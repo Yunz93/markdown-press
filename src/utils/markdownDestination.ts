@@ -21,7 +21,7 @@ export function parseMarkdownDestination(rawDestination: string): ParsedMarkdown
     }
   }
 
-  const titleMatch = trimmed.match(/^(\S+)(\s+(?:"[^"]*"|'[^']*'))?\s*$/);
+  const titleMatch = trimmed.match(/^(\S+)(\s+(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'))?\s*$/);
   return {
     path: (titleMatch?.[1] ?? trimmed).trim(),
     angleBrackets: false,

@@ -37,6 +37,24 @@ describe('formatMarkdownForSave', () => {
     expect(out.trimEnd()).toBe('- UI\n    - child one\n    - child two');
   });
 
+  it('renumbers indented ordered list items during format-on-save', () => {
+    const input = ['10. parent', '    3. child one', '    9. child two', '11. next', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe('1. parent\n    1. child one\n    2. child two\n2. next');
+  });
+
+  it('preserves indented code lines that look like ordered lists', () => {
+    const input = ['before', '', '    1. not a list', '    2. still code', '', 'after', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out).toContain('    1. not a list\n    2. still code');
+  });
+
+  it('renumbers ordered lists inside blockquotes during format-on-save', () => {
+    const input = ['> 1. quote one', '> 3. quote two', '', '1. root', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe('> 1. quote one\n> 2. quote two\n\n1. root');
+  });
+
   it('joins pipe table rows and normalizes Unicode dashes in separator rows', () => {
     const input = [
       '| 左对齐 | 居中 | 右对齐 |',

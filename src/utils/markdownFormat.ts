@@ -148,10 +148,14 @@ function isThematicBreak(line: string): boolean {
   return /^\s{0,3}(?:(?:-\s*){3,}|(?:_\s*){3,}|(?:\*\s*){3,})$/.test(line);
 }
 
-function isListItem(line: string): boolean {
-  // Any leading indent: nested list lines use 4+ spaces and must stay `list`, not `indentedCode`,
-  // or format-on-save inserts a blank line between parent and child (list vs indentedCode boundary).
-  return /^\s*(?:[-+*]|\d+[.)])\s+\S/.test(line);
+function isListItem(line: string, previousNonBlankKind: MarkdownLineKind | null = null): boolean {
+  const match = line.match(/^(\s*)(?:[-+*]|\d+[.)])\s+\S/);
+  if (!match) return false;
+
+  const indent = match[1];
+  if (indent.length <= 3) return true;
+
+  return previousNonBlankKind === 'list';
 }
 
 function isBlockquote(line: string): boolean {
@@ -177,12 +181,18 @@ function stripOneLeadingIndent(line: string): string {
 function unwrapOrphanIndentedCodeLines(lines: string[]): string[] {
   if (lines.length === 0) return lines;
 
-  const prevNonBlankLine = (index: number): string | null => {
-    for (let j = index - 1; j >= 0; j -= 1) {
-      if (lines[j].trim() !== '') return lines[j];
+  const kinds: MarkdownLineKind[] = [];
+  let previousNonBlankLine: string | null = null;
+  let previousNonBlankKind: MarkdownLineKind | null = null;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const kind = classifyMarkdownLine(lines[i], previousNonBlankLine, previousNonBlankKind);
+    kinds[i] = kind;
+    if (kind !== 'blank') {
+      previousNonBlankLine = lines[i];
+      previousNonBlankKind = kind;
     }
-    return null;
-  };
+  }
 
   const prevNonBlankIndex = (index: number): number | null => {
     for (let j = index - 1; j >= 0; j -= 1) {
@@ -199,15 +209,13 @@ function unwrapOrphanIndentedCodeLines(lines: string[]): string[] {
   };
 
   return lines.map((line, i) => {
-    const kind = classifyMarkdownLine(line, prevNonBlankLine(i));
+    const kind = kinds[i];
     if (kind !== 'indentedCode') return line;
 
     const pi = prevNonBlankIndex(i);
     const ni = nextNonBlankIndex(i);
-    const prevKind =
-      pi === null ? null : classifyMarkdownLine(lines[pi], prevNonBlankLine(pi));
-    const nextKind =
-      ni === null ? null : classifyMarkdownLine(lines[ni], prevNonBlankLine(ni));
+    const prevKind = pi === null ? null : kinds[pi];
+    const nextKind = ni === null ? null : kinds[ni];
 
     if (prevKind !== 'indentedCode' && nextKind !== 'indentedCode') {
       return stripOneLeadingIndent(line);
@@ -243,7 +251,7 @@ function normalizeUnorderedList(line: string): string {
 }
 
 function normalizeOrderedList(line: string): string {
-  return line.replace(/^(\s{0,3})(\d+)[\.)]\s+/, '$1$2. ');
+  return line.replace(/^(\s*)(\d+)[\.)]\s+/, '$1$2. ');
 }
 
 function normalizeTaskList(line: string): string {
@@ -276,11 +284,25 @@ function normalizeFootnoteDefinition(line: string): string {
 }
 
 function getOrderedListInfo(line: string): { indentLength: number; number: number } | null {
-  const match = line.match(/^(\s{0,3})(\d+)[\.)]\s+/);
+  const match = line.match(/^(\s*)(\d+)[\.)]\s+/);
   if (!match) return null;
   return {
     indentLength: match[1].length,
     number: Number(match[2]),
+  };
+}
+
+function getBlockquoteOrderedListInfo(line: string): {
+  prefix: string;
+  indentLength: number;
+  number: number;
+} | null {
+  const match = line.match(/^(\s{0,3}>+\s?)(\s*)(\d+)[\.)]\s+/);
+  if (!match) return null;
+  return {
+    prefix: match[1],
+    indentLength: match[2].length,
+    number: Number(match[3]),
   };
 }
 
@@ -299,7 +321,11 @@ function isTableLine(line: string, previousNonBlankLine: string | null): boolean
   );
 }
 
-function classifyMarkdownLine(line: string, previousNonBlankLine: string | null): MarkdownLineKind {
+function classifyMarkdownLine(
+  line: string,
+  previousNonBlankLine: string | null,
+  previousNonBlankKind: MarkdownLineKind | null = null,
+): MarkdownLineKind {
   if (line.trim() === '') return 'blank';
   if (isHtmlCommentLine(line)) return 'htmlComment';
   if (isFootnoteDefinition(line)) return 'footnoteDefinition';
@@ -309,7 +335,7 @@ function classifyMarkdownLine(line: string, previousNonBlankLine: string | null)
     isSetextHeadingUnderline(line) &&
     !isAtxHeading(previousNonBlankLine) &&
     !isThematicBreak(previousNonBlankLine) &&
-    !isListItem(previousNonBlankLine) &&
+    previousNonBlankKind !== 'list' &&
     !isBlockquote(previousNonBlankLine) &&
     !isIndentedCode(previousNonBlankLine)
   ) {
@@ -318,7 +344,7 @@ function classifyMarkdownLine(line: string, previousNonBlankLine: string | null)
   if (isAtxHeading(line)) return 'heading';
   if (isThematicBreak(line)) return 'thematicBreak';
   if (isTableLine(line, previousNonBlankLine)) return 'table';
-  if (isListItem(line)) return 'list';
+  if (isListItem(line, previousNonBlankKind)) return 'list';
   if (isBlockquote(line)) return 'blockquote';
   if (isIndentedCode(line)) return 'indentedCode';
   return 'paragraph';
@@ -411,10 +437,40 @@ function shouldInsertBlankLineBetween(
   return false;
 }
 
+function normalizeOrderedCounterKey(prefix: string, indentLength: number): string {
+  return `${prefix}:${indentLength}`;
+}
+
+function pruneDeeperOrderedCounters(
+  counters: Map<string, number>,
+  prefix: string,
+  indentLength: number,
+): void {
+  const keyPrefix = `${prefix}:`;
+  for (const key of [...counters.keys()]) {
+    if (!key.startsWith(keyPrefix)) continue;
+    const keyIndentLength = Number(key.slice(keyPrefix.length));
+    if (keyIndentLength > indentLength) {
+      counters.delete(key);
+    }
+  }
+}
+
+function nextOrderedNumber(
+  counters: Map<string, number>,
+  prefix: string,
+  indentLength: number,
+): number {
+  const key = normalizeOrderedCounterKey(prefix, indentLength);
+  const nextNumber = (counters.get(key) ?? 0) + 1;
+  counters.set(key, nextNumber);
+  return nextNumber;
+}
+
 function normalizeMarkdownLine(
   line: string,
   kind: MarkdownLineKind,
-  orderedListCounters: Map<number, number>,
+  orderedListCounters: Map<string, number>,
   orderedListMode: OrderedListMode
 ): string {
   switch (kind) {
@@ -431,22 +487,33 @@ function normalizeMarkdownLine(
           return normalized;
         }
 
-        for (const indentLength of [...orderedListCounters.keys()]) {
-          if (indentLength > orderedInfo.indentLength) {
-            orderedListCounters.delete(indentLength);
-          }
-        }
-
-        const nextNumber = (orderedListCounters.get(orderedInfo.indentLength) ?? 0) + 1;
-        orderedListCounters.set(orderedInfo.indentLength, nextNumber);
-        return normalized.replace(/^(\s{0,3})\d+\.\s+/, `$1${nextNumber}. `);
+        pruneDeeperOrderedCounters(orderedListCounters, 'root', orderedInfo.indentLength);
+        const nextNumber = nextOrderedNumber(orderedListCounters, 'root', orderedInfo.indentLength);
+        return normalized.replace(/^(\s*)\d+\.\s+/, `$1${nextNumber}. `);
       }
 
       orderedListCounters.clear();
       return normalizeTaskList(normalizeUnorderedList(line));
     }
     case 'blockquote':
-      return normalizeBlockquote(line);
+      {
+        const blockquoteOrderedInfo = getBlockquoteOrderedListInfo(line);
+        if (!blockquoteOrderedInfo || orderedListMode !== 'strict') {
+          return normalizeBlockquote(line);
+        }
+
+        const counterPrefix = `quote:${blockquoteOrderedInfo.prefix}`;
+        pruneDeeperOrderedCounters(orderedListCounters, counterPrefix, blockquoteOrderedInfo.indentLength);
+        const nextNumber = nextOrderedNumber(
+          orderedListCounters,
+          counterPrefix,
+          blockquoteOrderedInfo.indentLength,
+        );
+        return normalizeBlockquote(line).replace(
+          /^(\s{0,3}>+\s?\s*)\d+\.\s+/,
+          `$1${nextNumber}. `,
+        );
+      }
     case 'linkDefinition':
       orderedListCounters.clear();
       return normalizeLinkDefinition(line);
@@ -466,11 +533,11 @@ function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions):
   const output: string[] = [];
   let previousNonBlankLine: string | null = null;
   let previousKind: MarkdownLineKind = 'blank';
-  const orderedListCounters = new Map<number, number>();
+  const orderedListCounters = new Map<string, number>();
   let deferredBlankAfterTable = false;
 
   for (const line of lines) {
-    const currentKind = classifyMarkdownLine(line, previousNonBlankLine);
+    const currentKind = classifyMarkdownLine(line, previousNonBlankLine, previousKind);
 
     if (currentKind === 'blank') {
       if (previousKind === 'table') {

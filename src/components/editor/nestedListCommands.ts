@@ -12,14 +12,14 @@ import {
   parseListItem,
   getListInfoAtLine,
   getSelectedListItems,
-  adjustListItemLevel,
   formatListItem,
   isEmptyListItem,
   findPreviousSiblingItem,
   getStrictOrderedListNormalizationChanges,
   LIST_INDENT_SIZE,
   LIST_INDENT_UNIT,
-  getIndentFromLevel,
+  getLevelFromIndent,
+  getIndentColumnWidth,
 } from './nestedListBehavior';
 
 // ==================== 辅助函数 ====================
@@ -30,6 +30,22 @@ function isBlankLine(lineText: string): boolean {
 
 function getLeadingIndent(lineText: string): string {
   return lineText.match(/^[ \t]*/)![0];
+}
+
+function getMarkerText(item: ListItemInfo): string {
+  if (item.type === 'ordered') {
+    return `${item.number ?? 1}${item.delimiter ?? '.'}`;
+  }
+
+  if (item.type === 'task') {
+    return `${item.marker} ${item.checkbox ?? '[ ]'}`;
+  }
+
+  return item.marker;
+}
+
+function getIndentByColumn(width: number): string {
+  return ' '.repeat(Math.max(0, width));
 }
 
 function replaceCurrentLine(
@@ -51,6 +67,152 @@ function replaceCurrentLine(
   return true;
 }
 
+function getListContentStartColumn(item: ListItemInfo): number {
+  const quoteLength = item.quotePrefix?.length ?? 0;
+  const markerText = getMarkerText(item);
+  return quoteLength + item.indent.length + markerText.length + 1;
+}
+
+function getChildIndentForParent(parent: ListItemInfo): string {
+  const parentWidth = getIndentColumnWidth(parent.indent);
+  const markerContentOffset = getMarkerText(parent).length + 1;
+  return getIndentByColumn(parentWidth + Math.max(LIST_INDENT_UNIT.length, markerContentOffset));
+}
+
+function withIndent(item: ListItemInfo, indent: string): ListItemInfo {
+  return {
+    ...item,
+    level: getLevelFromIndent(indent),
+    indent,
+    number: item.type === 'ordered' ? 1 : item.number,
+  };
+}
+
+function findPreviousListItem(
+  state: EditorState,
+  lineNumber: number,
+  quotePrefix: string,
+  overrides?: Map<number, ListItemInfo>,
+): ListItemInfo | null {
+  for (let current = lineNumber - 1; current >= 1; current -= 1) {
+    const overridden = overrides?.get(current);
+    if (overridden) {
+      if ((overridden.quotePrefix ?? '') === quotePrefix) return overridden;
+      continue;
+    }
+
+    const line = state.doc.line(current);
+    if (isBlankLine(line.text)) break;
+
+    const item = parseListItem(line.text, current, line.from);
+    if (item && (item.quotePrefix ?? '') === quotePrefix) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
+function findOutdentIndent(state: EditorState, item: ListItemInfo): string {
+  const currentWidth = getIndentColumnWidth(item.indent);
+
+  for (let current = item.lineNumber - 1; current >= 1; current -= 1) {
+    const line = state.doc.line(current);
+    if (isBlankLine(line.text)) break;
+
+    const candidate = parseListItem(line.text, current, line.from);
+    if (!candidate || (candidate.quotePrefix ?? '') !== (item.quotePrefix ?? '')) continue;
+
+    if (getIndentColumnWidth(candidate.indent) < currentWidth) {
+      return candidate.indent;
+    }
+  }
+
+  return '';
+}
+
+function mapListCursorColumn(
+  oldItem: ListItemInfo,
+  newItem: ListItemInfo,
+  newText: string,
+  oldColumn: number
+): number {
+  const oldContentStart = getListContentStartColumn(oldItem);
+  const newContentStart = getListContentStartColumn(newItem);
+
+  if (oldColumn <= oldContentStart) {
+    return Math.min(newText.length, newContentStart);
+  }
+
+  return Math.min(newText.length, newContentStart + (oldColumn - oldContentStart));
+}
+
+function dispatchListItemLevelChanges(
+  state: EditorState,
+  dispatch: (tr: Transaction) => void,
+  updates: Array<{ item: ListItemInfo; newItem: ListItemInfo; newText: string }>,
+  options?: { strictMode?: boolean },
+): boolean {
+  if (updates.length === 0) return false;
+
+  const updatesByLine = new Map<number, (typeof updates)[number]>();
+  const changes = updates.map((update) => {
+    const line = state.doc.line(update.item.lineNumber);
+    updatesByLine.set(update.item.lineNumber, update);
+    return {
+      from: line.from,
+      to: line.to,
+      insert: update.newText,
+    };
+  });
+
+  const changeSet = state.changes(changes);
+  const hasExpandedSelection = state.selection.ranges.some((range) => !range.empty);
+  const selection = hasExpandedSelection
+    ? undefined
+    : EditorSelection.create(
+      state.selection.ranges.map((range) => {
+        const line = state.doc.lineAt(range.from);
+        const update = updatesByLine.get(line.number);
+        if (!update) {
+          return EditorSelection.cursor(changeSet.mapPos(range.from, 1));
+        }
+
+        const newLineFrom = changeSet.mapPos(line.from, 1);
+        const oldColumn = range.from - line.from;
+        return EditorSelection.cursor(newLineFrom + mapListCursorColumn(
+          update.item,
+          update.newItem,
+          update.newText,
+          oldColumn,
+        ));
+      }),
+      state.selection.mainIndex,
+    );
+
+  let finalChanges = changeSet;
+  let finalSelection = selection;
+
+  if (options?.strictMode) {
+    const intermediate = state.update({ changes, selection });
+    const normalizationChanges = getStrictOrderedListNormalizationChanges(intermediate.state);
+    if (normalizationChanges) {
+      const normalizationChangeSet = intermediate.state.changes(normalizationChanges);
+      finalChanges = changeSet.compose(normalizationChangeSet);
+      finalSelection = (finalSelection ?? intermediate.state.selection).map(normalizationChangeSet);
+    }
+  }
+
+  dispatch(state.update({
+    changes: finalChanges,
+    selection: finalSelection,
+    scrollIntoView: true,
+    userEvent: 'input',
+  }));
+
+  return true;
+}
+
 // ==================== Enter 处理 ====================
 
 export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
@@ -63,13 +225,41 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
   // 空列表项：退出列表
   if (isEmptyListItem(item) && main.from === line.to) {
     // 移除 marker，回退一级或转为普通行
-    if (item.level > 0) {
-      const newItem = adjustListItemLevel(item, -1);
+    if (getIndentColumnWidth(item.indent) > 0) {
+      const newItem = withIndent(item, findOutdentIndent(state, item));
       newItem.content = '';
-      return replaceCurrentLine(state, dispatch, formatListItem(newItem), newItem.indent.length);
+      const next = formatListItem(newItem);
+      const selectionColumn = getListContentStartColumn(newItem);
+      const initialChanges = { from: line.from, to: line.to, insert: next };
+      const initialSelection = EditorSelection.cursor(line.from + selectionColumn);
+      const intermediate = state.update({
+        changes: initialChanges,
+        selection: initialSelection,
+      });
+      const normalizationChanges = getStrictOrderedListNormalizationChanges(intermediate.state);
+
+      if (!normalizationChanges) {
+        dispatch(state.update({
+          changes: initialChanges,
+          selection: initialSelection,
+          scrollIntoView: true,
+          userEvent: 'input',
+        }));
+        return true;
+      }
+
+      const normalizationChangeSet = intermediate.state.changes(normalizationChanges);
+      dispatch(state.update({
+        changes: state.changes(initialChanges).compose(normalizationChangeSet),
+        selection: initialSelection.map(normalizationChangeSet),
+        scrollIntoView: true,
+        userEvent: 'input',
+      }));
+      return true;
     } else {
-      // 转为普通行
-      return replaceCurrentLine(state, dispatch, '', 0);
+      // 转为普通行（引用块内则保留引用前缀）
+      const replacement = item.quotePrefix ? item.quotePrefix : '';
+      return replaceCurrentLine(state, dispatch, replacement, replacement.length);
     }
   }
 
@@ -139,26 +329,29 @@ export const handleListBackspace: StateCommand = ({ state, dispatch }): boolean 
   if (!item) return false;
 
   // 计算 marker 后的边界位置
-  let markerEnd = line.from + item.indent.length + item.marker.length + 1; // +1 for space
+  const quoteLen = item.quotePrefix?.length ?? 0;
+  let markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1; // +1 for space
 
   if (item.type === 'ordered') {
-    markerEnd = line.from + item.indent.length + `${item.number}${item.delimiter} `.length;
+    markerEnd = line.from + quoteLen + item.indent.length + `${item.number}${item.delimiter} `.length;
   } else if (item.type === 'task') {
-    markerEnd = line.from + item.indent.length + item.marker.length + 1 + (item.checkbox?.length ?? 3) + 1;
+    markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1 + (item.checkbox?.length ?? 3) + 1;
   }
 
   // 光标不在 marker 边界处，不处理
   if (main.from !== markerEnd) return false;
 
   // 有缩进时，先减少缩进
-  if (item.level > 0) {
-    const newItem = adjustListItemLevel(item, -1);
-    return replaceCurrentLine(state, dispatch, formatListItem(newItem), markerEnd - line.from - LIST_INDENT_SIZE);
+  if (getIndentColumnWidth(item.indent) > 0) {
+    const newItem = withIndent(item, findOutdentIndent(state, item));
+    const removedColumns = getIndentColumnWidth(item.indent) - getIndentColumnWidth(newItem.indent);
+    const next = formatListItem(newItem);
+    return replaceCurrentLine(state, dispatch, next, markerEnd - line.from - removedColumns);
   }
 
   // 无缩进时，移除列表 marker
-  const plainText = item.content;
-  return replaceCurrentLine(state, dispatch, plainText, 0);
+  const plainText = `${item.quotePrefix ?? ''}${item.content}`;
+  return replaceCurrentLine(state, dispatch, plainText, (item.quotePrefix?.length ?? 0));
 };
 
 // ==================== Tab / Shift-Tab 处理 ====================
@@ -170,27 +363,22 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
 
     // 有列表项被选中
     if (items.length > 0) {
-      const changes: { from: number; to: number; insert: string }[] = [];
+      const updates: Array<{ item: ListItemInfo; newItem: ListItemInfo; newText: string }> = [];
+      const plannedItems = new Map<number, ListItemInfo>();
 
       for (const item of items) {
-        const line = state.doc.line(item.lineNumber);
-        const newItem = adjustListItemLevel(item, +1);
-        // Ensure output uses spaces only, replace any tabs with 4 spaces
+        const parent = findPreviousListItem(state, item.lineNumber, item.quotePrefix ?? '', plannedItems);
+        const nextIndent = parent
+          ? getChildIndentForParent(parent)
+          : `${item.indent}${LIST_INDENT_UNIT}`;
+        const newItem = withIndent(item, nextIndent);
+        // Ensure output uses spaces only, replace any tabs with the editor indent unit.
         const formatted = formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
-        changes.push({
-          from: line.from,
-          to: line.to,
-          insert: formatted,
-        });
+        updates.push({ item, newItem, newText: formatted });
+        plannedItems.set(item.lineNumber, newItem);
       }
 
-      dispatch(state.update({
-        changes,
-        scrollIntoView: true,
-        userEvent: 'input',
-      }));
-
-      return true;
+      return dispatchListItemLevelChanges(state, dispatch, updates, { strictMode: options?.strictMode });
     }
 
     // 普通文本：有选区时按行首缩进，避免整段替换为一段空格
@@ -214,29 +402,20 @@ export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCom
 
     // 有列表项被选中
     if (items.length > 0) {
-      const changes: { from: number; to: number; insert: string }[] = [];
+      const updates: Array<{ item: ListItemInfo; newItem: ListItemInfo; newText: string }> = [];
 
       for (const item of items) {
-        if (item.level === 0) continue; // 无法继续减少缩进
+        if (getIndentColumnWidth(item.indent) === 0) continue; // 无法继续减少缩进
 
-        const line = state.doc.line(item.lineNumber);
-        const newItem = adjustListItemLevel(item, -1);
-        changes.push({
-          from: line.from,
-          to: line.to,
-          insert: formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT),
+        const newItem = withIndent(item, findOutdentIndent(state, item));
+        updates.push({
+          item,
+          newItem,
+          newText: formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT),
         });
       }
 
-      if (changes.length === 0) return false;
-
-      dispatch(state.update({
-        changes,
-        scrollIntoView: true,
-        userEvent: 'input',
-      }));
-
-      return true;
+      return dispatchListItemLevelChanges(state, dispatch, updates, { strictMode: options?.strictMode });
     }
 
     // 普通文本：删除缩进
@@ -244,11 +423,11 @@ export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCom
       const indent = getLeadingIndent(lineText);
       if (indent.length === 0) return lineText;
 
-      // 删除最多 4 个空格或一个 tab
+      // 删除最多一个缩进单位或一个 tab
       if (indent.startsWith('\t')) {
         return lineText.slice(1);
       }
-      const toRemove = Math.min(4, indent.match(/^ */)?.[0].length ?? 0);
+      const toRemove = Math.min(LIST_INDENT_SIZE, indent.match(/^ */)?.[0].length ?? 0);
       return lineText.slice(toRemove);
     });
   };
@@ -293,43 +472,34 @@ export const toggleOrderedList = (options?: { strictMode?: boolean }): StateComm
     // 如果选中的都是有序列表，则取消列表
     const allOrdered = items.length > 0 && items.every(i => i.type === 'ordered');
 
-    const handled = updateSelectedLinesWithSelectionMap(state, dispatch, (lineText, { lineNumber }) => {
-      const item = parseListItem(lineText, lineNumber, 0);
+    return updateSelectedLinesWithSelectionMap(
+      state,
+      dispatch,
+      (lineText, { lineNumber }) => {
+        const item = parseListItem(lineText, lineNumber, 0);
 
-      if (allOrdered && item?.type === 'ordered') {
-        // 取消列表
-        return item.content;
-      }
+        if (allOrdered && item?.type === 'ordered') {
+          // 取消列表
+          return item.content;
+        }
 
-      if (item) {
-        // 转换为有序列表，保持层级，编号重置为 1
-        const newItem: ListItemInfo = {
-          ...item,
-          type: 'ordered',
-          number: 1,
-          delimiter: '.',
-        };
-        return formatListItem(newItem);
-      }
+        if (item) {
+          // 转换为有序列表，保持层级，编号重置为 1
+          const newItem: ListItemInfo = {
+            ...item,
+            type: 'ordered',
+            number: 1,
+            delimiter: '.',
+          };
+          return formatListItem(newItem);
+        }
 
-      // 普通文本转为列表
-      const indent = getLeadingIndent(lineText);
-      return `${indent}1. ${lineText.slice(indent.length)}`;
-    });
-
-    // 严格模式下重新编号
-    if (handled && options?.strictMode) {
-      const renumberChanges = getStrictOrderedListNormalizationChanges(state);
-      if (renumberChanges) {
-        dispatch(state.update({
-          changes: renumberChanges,
-          scrollIntoView: true,
-          userEvent: 'input',
-        }));
-      }
-    }
-
-    return handled;
+        // 普通文本转为列表
+        const indent = getLeadingIndent(lineText);
+        return `${indent}1. ${lineText.slice(indent.length)}`;
+      },
+      options?.strictMode ? { normalizeOrderedNumbers: 'document' } : undefined,
+    );
   };
 };
 

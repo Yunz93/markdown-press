@@ -4,7 +4,7 @@
  * 提供视觉装饰：
  * - Frontmatter 高亮
  * - 代码块高亮
- * - 列表缩进指示
+ * - 列表标记高亮
  */
 
 import { RangeSetBuilder } from '@codemirror/state';
@@ -16,8 +16,6 @@ import { tags } from '@lezer/highlight';
 import {
   UNORDERED_LIST_REGEX,
   ORDERED_LIST_REGEX,
-  getIndentColumnWidth,
-  LIST_INDENT_UNIT,
 } from './behavior';
 
 // ==================== 语法高亮样式 ====================
@@ -197,24 +195,6 @@ function buildMarkdownListDecorations(view: EditorView): DecorationSet {
 
     if (!match) {
       continue;
-    }
-
-    const indentWidth = getIndentColumnWidth(match[1]);
-    const depth = Math.floor(indentWidth / LIST_INDENT_UNIT.length);
-    // Guides only for *ancestor* indent columns; `depth` stripes put a line on the marker column.
-    const guideDepth = Math.max(0, depth - 1);
-
-    if (guideDepth > 0) {
-      builder.add(
-        line.from,
-        line.from,
-        Decoration.line({
-          class: 'cm-markdown-list-line',
-          attributes: {
-            style: `--cm-list-depth:${guideDepth};`,
-          },
-        }),
-      );
     }
 
     const markerText = orderedMatch ? `${orderedMatch[2]}${orderedMatch[3]}` : unorderedMatch![2];

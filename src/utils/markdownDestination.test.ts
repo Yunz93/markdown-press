@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildMarkdownDestination, parseMarkdownDestination } from './markdownDestination';
+import { buildMarkdownDestination, parseMarkdownDestination, stripMarkdownDestination } from './markdownDestination';
 
-describe('parseMarkdownDestination', () => {
+describe('markdownDestination', () => {
   it('parses angle-bracket paths with titles', () => {
     expect(parseMarkdownDestination('<../resources/my file.png> "cover title"')).toEqual({
       path: '../resources/my file.png',
@@ -24,5 +24,9 @@ describe('parseMarkdownDestination', () => {
       angleBrackets: true,
       title: '"cover title"',
     })).toBe('<../resources/new/my file.png> "cover title"');
+  });
+
+  it('strips angle-bracket destinations with titles to the path', () => {
+    expect(stripMarkdownDestination('<../resources/my file.png> "cover title"')).toBe('../resources/my file.png');
   });
 });

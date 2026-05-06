@@ -346,16 +346,17 @@ export function handleStructuredPaste(view: EditorView, event: ClipboardEvent): 
 
   // 构建续行前缀
   const buildContinuation = (index: number): string => {
+    const quotePrefix = item.quotePrefix ?? '';
     if (item.type === 'ordered') {
-      return `${item.indent}${(item.number ?? 0) + index}. `;
+      return `${quotePrefix}${item.indent}${(item.number ?? 0) + index}. `;
     }
 
     if (item.type === 'task') {
       const checkbox = item.checkbox ?? '[ ]';
-      return `${item.indent}${item.marker} ${checkbox} `;
+      return `${quotePrefix}${item.indent}${item.marker} ${checkbox} `;
     }
 
-    return `${item.indent}${item.marker} `;
+    return `${quotePrefix}${item.indent}${item.marker} `;
   };
 
   const insert = lines

@@ -2,7 +2,7 @@
  * 多级列表行为处理模块
  * 
  * 设计原则：
- * 1. 层级由缩进决定，每级 4 空格
+ * 1. 层级由缩进决定，普通缩进单位为 4 空格
  * 2. 有序列表编号按层级独立计算
  * 3. Tab/Shift-Tab 调整缩进并重新计算编号
  * 4. Enter 续写保持当前层级
@@ -32,6 +32,7 @@ export type ListType = 'unordered' | 'ordered' | 'task';
 export interface ListItemInfo {
   type: ListType;
   level: number;           // 层级 (0, 1, 2, ...)
+  quotePrefix: string;     // 引用前缀（含缩进与 > 标记），如 "> " 或 ""（非引用）
   indent: string;          // 前导空格
   marker: string;          // -, *, +, 1., 2), 等
   content: string;         // 内容部分
@@ -62,6 +63,10 @@ export function getLevelFromIndent(indent: string, tabSize: number = LIST_INDENT
  */
 export function getIndentFromLevel(level: number, tabSize: number = LIST_INDENT_SIZE): string {
   return getIndentFromLevelFromCore(level, tabSize);
+}
+
+export function getIndentColumnWidth(indent: string, tabSize: number = LIST_INDENT_SIZE): number {
+  return getIndentColumnWidthFromCore(indent, tabSize);
 }
 
 /**
@@ -123,6 +128,19 @@ function parseRomanNumeral(roman: string): number {
  * 扩展支持字母和罗马数字的有序列表
  */
 export function parseListItem(lineText: string, lineNumber: number, startPos: number): ListItemInfo | null {
+  // 支持引用块内列表："> - item" / "> 1. item"
+  // 这里不要依赖 behavior/quotes.ts 以避免循环依赖，使用与 core.ts 同形的正则。
+  const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
+  let quotePrefix = '';
+  let text = lineText;
+  const quoteMatch = text.match(BLOCKQUOTE_REGEX);
+  if (quoteMatch) {
+    const [, indent, raw, rest] = quoteMatch;
+    quotePrefix = `${indent}${raw}`;
+    text = rest;
+  }
+  quotePrefix = quotePrefix || '';
+
   // 导入 core.ts 的正则以确保一致性
   const TASK_LIST_REGEX = /^([ \t]*)([-+*]) (\[[ xX]\])(?: (.*)|$)$/;
   // 扩展有序列表正则：支持 1., a., i., I. 等格式
@@ -130,12 +148,13 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
   const UNORDERED_LIST_REGEX = /^([ \t]*)([-+*]) (.*)$/;
   
   // 任务列表: - [ ] content 或 * [x] content
-  const taskMatch = lineText.match(TASK_LIST_REGEX);
+  const taskMatch = text.match(TASK_LIST_REGEX);
   if (taskMatch) {
     const [, indent, marker, checkbox, content = ''] = taskMatch;
     return {
       type: 'task',
       level: getLevelFromIndent(indent),
+      quotePrefix,
       indent,
       marker,
       content: content.trimStart(),
@@ -146,7 +165,7 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
   }
 
   // 有序列表: 支持 1., a., i., I. 等格式，统一转换为阿拉伯数字
-  const orderedMatch = lineText.match(ORDERED_LIST_REGEX);
+  const orderedMatch = text.match(ORDERED_LIST_REGEX);
   if (orderedMatch) {
     const [, indent, markerPart, delimiter, content] = orderedMatch;
     const markerInfo = parseOrderedListMarker(`${markerPart}${delimiter}`);
@@ -154,6 +173,7 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
       return {
         type: 'ordered',
         level: getLevelFromIndent(indent),
+        quotePrefix,
         indent,
         marker: `${markerInfo.value}${markerInfo.delimiter}`, // 统一使用阿拉伯数字格式
         content: content.trimStart(),
@@ -166,12 +186,13 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
   }
 
   // 无序列表: - content 或 * content 或 + content
-  const unorderedMatch = lineText.match(UNORDERED_LIST_REGEX);
+  const unorderedMatch = text.match(UNORDERED_LIST_REGEX);
   if (unorderedMatch) {
     const [, indent, marker, content] = unorderedMatch;
     return {
       type: 'unordered',
       level: getLevelFromIndent(indent),
+      quotePrefix,
       indent,
       marker,
       content: content.trimStart(),
@@ -282,9 +303,11 @@ export function calculateOrderedListNumbers(
     // 是有序列表项
     consecutiveBlankLines = 0;
 
-    // 构建计数器 key: 基于父级上下文
-    const parentKey = findParentCounterKey(state, i, item.level);
-    const key = `${parentKey}:${item.level}`;
+    // 构建计数器 key: 基于父级上下文。用真实缩进列宽，避免 `1.` 子项的 3 空格缩进被当作同级。
+    const itemDepth = getIndentColumnWidth(item.indent);
+    const quoteKey = item.quotePrefix ?? '';
+    const parentKey = findParentCounterKey(state, i, itemDepth, quoteKey);
+    const key = `${quoteKey}:${parentKey}:${itemDepth}`;
 
     const current = (counters.get(key) ?? 0) + 1;
     counters.set(key, current);
@@ -297,7 +320,7 @@ export function calculateOrderedListNumbers(
 /**
  * 查找父级计数器 key
  */
-function findParentCounterKey(state: EditorState, lineNumber: number, level: number): string {
+function findParentCounterKey(state: EditorState, lineNumber: number, depth: number, quotePrefix: string): string {
   for (let i = lineNumber - 1; i >= 1; i--) {
     const line = state.doc.line(i);
     const item = parseListItem(line.text, i, line.from);
@@ -307,7 +330,11 @@ function findParentCounterKey(state: EditorState, lineNumber: number, level: num
       continue;
     }
 
-    if (item.level < level) {
+    if ((item.quotePrefix ?? '') !== quotePrefix) {
+      continue;
+    }
+
+    if (getIndentColumnWidth(item.indent) < depth) {
       return `${i}:${item.type}`;
     }
   }
@@ -332,10 +359,10 @@ export function getStrictOrderedListNormalizationChanges(
     const correctNumber = correctNumbers.get(i);
     if (correctNumber === undefined || correctNumber === item.number) continue;
 
-    const newText = line.text.replace(
-      new RegExp(`^([ \\t]*)${item.number}([.)])`),
-      `$1${correctNumber}$2`
-    );
+    const markerColumn = (item.quotePrefix?.length ?? 0) + item.indent.length;
+    const newText = `${line.text.slice(0, markerColumn)}${line.text
+      .slice(markerColumn)
+      .replace(/^(\d+|[a-z]|[ivxlcdm]+)([.)]) /i, `${correctNumber}$2 `)}`;
 
     if (newText !== line.text) {
       changes.push({
@@ -369,22 +396,23 @@ export function adjustListItemLevel(
  * 格式化列表项为文本
  */
 export function formatListItem(item: ListItemInfo): string {
-  const indent = getIndentFromLevel(item.level);
+  const indent = item.indent;
   // 确保内容没有前导空格，避免格式化后出现多余空格
   const content = item.content.trimStart();
+  const quotePrefix = item.quotePrefix ?? '';
 
   if (item.type === 'ordered') {
     const number = item.number ?? 1;
     const delimiter = item.delimiter ?? '.';
-    return `${indent}${number}${delimiter} ${content}`;
+    return `${quotePrefix}${indent}${number}${delimiter} ${content}`;
   }
 
   if (item.type === 'task') {
     const checkbox = item.checkbox ?? '[ ]';
-    return `${indent}${item.marker} ${checkbox} ${content}`;
+    return `${quotePrefix}${indent}${item.marker} ${checkbox} ${content}`;
   }
 
-  return `${indent}${item.marker} ${content}`;
+  return `${quotePrefix}${indent}${item.marker} ${content}`;
 }
 
 /**

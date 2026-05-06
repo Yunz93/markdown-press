@@ -280,6 +280,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
             tooltips({
               parent: editorRef.current.ownerDocument.body,
             }),
+            EditorState.tabSize.of(LIST_INDENT_UNIT.length),
             indentUnit.of(LIST_INDENT_UNIT),
             compartments.markdown.of(markdown({ codeLanguages: resolveEditorCodeLanguage })),
             drawSelection(),
