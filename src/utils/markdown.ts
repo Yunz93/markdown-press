@@ -23,6 +23,12 @@ interface MarkdownRenderEnv {
   shikiBlocks?: string[];
 }
 
+function wrapShikiBlockHtml(shikiPreHtml: string): string {
+  // Wrap Shiki's `<pre class="shiki"...>` so we can reliably apply rounded corners
+  // even if the embedded `<pre>` gets overridden by third-party markdown CSS.
+  return `<div class="mp-shiki-block">${shikiPreHtml}</div>`;
+}
+
 // Create markdown-it instance with configuration
 const createMarkdownIt = () => {
   const md = new MarkdownIt({
@@ -193,6 +199,7 @@ let currentTheme: ThemeMode = 'light';
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
+const MARKDOWN_RENDERER_CACHE_VERSION = 2;
 
 function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string): boolean {
   if (!highlighter || !lang) return false;
@@ -242,12 +249,35 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
     if (!shouldAvoidShellHighlight && activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
       try {
         const activeTheme = getMarkdownPressShikiTheme(activeThemeMode);
-        const shikiHtml = activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme });
+        const shikiHtml = wrapShikiBlockHtml(
+          activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme }),
+        );
         const shikiBlocks = env.shikiBlocks ?? (env.shikiBlocks = []);
         const blockIndex = shikiBlocks.push(shikiHtml) - 1;
         return `<div data-shiki-block="${blockIndex}"></div>`;
       } catch (error) {
         console.warn(`Shiki failed for ${lang}:`, error);
+        // In release .app builds, DevTools may be unavailable. Persist the error to app data dir
+        // so we can diagnose why Shiki falls back to the base fence renderer.
+        void (async () => {
+          try {
+            const [{ writeTextFile, mkdir }, { appDataDir, join }] = await Promise.all([
+              import('@tauri-apps/plugin-fs'),
+              import('@tauri-apps/api/path'),
+            ]);
+            const dir = await appDataDir();
+            const folder = await join(dir, 'MarkdownPress');
+            const file = await join(folder, 'shiki-diagnostics.log');
+            const now = new Date().toISOString();
+            const details = error instanceof Error
+              ? `${error.message}\n${error.stack ?? ''}`.trim()
+              : String(error ?? '').trim();
+            await mkdir(folder, { recursive: true });
+            await writeTextFile(file, `[${now}] Shiki failed for ${lang}\n${details}\n\n`, { append: true });
+          } catch {
+            // ignore
+          }
+        })();
         // Log detailed error in build mode
         if (typeof window !== 'undefined') {
           console.warn('[Shiki Error Details]', {
@@ -282,7 +312,7 @@ function createCacheKey(markdown: string, options: MarkdownRenderOptions): strin
   const hlToken = hl
     ? `1_${typeof hl.__revision === 'number' ? hl.__revision : 0}`
     : '0';
-  return `${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}`;
+  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}`;
 }
 
 /**

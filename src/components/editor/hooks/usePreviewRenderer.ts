@@ -35,6 +35,10 @@ import {
   sanitizeHtmlPreview,
   shouldUseAsyncPreviewEnhancement,
 } from '../preview/previewRenderCore';
+import {
+  protectShikiPresInHtmlString,
+  restoreShikiPresFromSnapshots,
+} from '../preview/shikiHtmlSnapshots';
 
 export interface UsePreviewRendererOptions {
   content: string;
@@ -174,11 +178,12 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
     void (async () => {
       try {
-        // Use an in-memory div instead of DOMParser: some release WebViews (e.g. WKWebView)
-        // normalize or drop inline token styles on Shiki output when round-tripping via
-        // parseFromString → innerHTML, which makes syntax highlighting appear broken.
+        // WKWebView can strip Shiki token inline styles when reading subtree HTML back via
+        // `innerHTML` after mutations (same symptom DomParser round-trips had). Substitute
+        // `<pre class="shiki">` fragments from the source strings and restore after readback.
         const host = document.createElement('div');
-        host.innerHTML = basePreviewHtml;
+        const shikiSnapshots: string[] = [];
+        host.innerHTML = protectShikiPresInHtmlString(basePreviewHtml, shikiSnapshots);
         const embeds = isMarkdownPreview
           ? Array.from(host.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
           : [];
@@ -286,7 +291,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
       if (embeds.length === 0) {
         if (!cancelled) {
-          const nextHtml = host.innerHTML;
+          const nextHtml = restoreShikiPresFromSnapshots(host.innerHTML, shikiSnapshots);
           if (nextHtml !== enhancedBodyHtmlRef.current) {
             setEnhancedBodyHtml(nextHtml);
           }
@@ -369,7 +374,11 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             const body = document.createElement('article');
             body.className = 'markdown-body preview-note-embed-body';
             try {
-              body.innerHTML = renderMarkdown(fragment.markdown, { highlighter, themeMode });
+              const noteHtml = protectShikiPresInHtmlString(
+                renderMarkdown(fragment.markdown, { highlighter, themeMode }),
+                shikiSnapshots,
+              );
+              body.innerHTML = noteHtml;
             } catch {
               body.innerHTML = `<p>Error rendering content</p>`;
             }
@@ -459,7 +468,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       }));
 
       if (!cancelled) {
-        const nextHtml = host.innerHTML;
+        const nextHtml = restoreShikiPresFromSnapshots(host.innerHTML, shikiSnapshots);
         if (nextHtml !== enhancedBodyHtmlRef.current) {
           setEnhancedBodyHtml(nextHtml);
         }

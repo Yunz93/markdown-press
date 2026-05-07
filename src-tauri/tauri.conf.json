@@ -5,8 +5,8 @@
   "identifier": "com.bxyz.markdown-press",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3002",
+    "beforeDevCommand": "npm run dev -- --port 3002 --strictPort",
     "beforeBuildCommand": "npm run build",
     "removeUnusedCommands": true
   },

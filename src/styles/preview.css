@@ -137,6 +137,16 @@
   overflow-x: auto;
 }
 
+.preview-html-document pre.shiki {
+  border-radius: 1rem !important;
+  overflow: hidden;
+}
+
+.preview-html-document pre.shiki code {
+  display: block;
+  overflow-x: auto;
+}
+
 .preview-pane-document.markdown-body pre,
 .preview-pane-document.markdown-body table,
 .preview-pane-document.markdown-body blockquote,
@@ -364,12 +374,35 @@
 .preview-pane-document.markdown-body pre {
   background: rgba(248, 250, 252, 0.96);
   color: #1f2937;
+  /* Match editor rhythm: one blank line ≈ 1 editor line-height (1.95) */
+  margin: 1.95em 0;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 1rem;
   padding: 0;
   overflow: hidden;
   max-width: 100%;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* Shiki fences are wrapped so rounded corners always apply. */
+.markdown-body .mp-shiki-block {
+  margin: 1.95em 0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.markdown-body .mp-shiki-block > pre.shiki {
+  margin: 0 !important;
+  border: 0;
+  border-radius: 0 !important;
+  padding: 1rem 1.1rem;
+}
+
+.markdown-body .mp-shiki-block > pre.shiki code {
+  display: block;
+  overflow-x: auto;
 }
 
 /* Prose line-height (1.95) must not apply inside fences — Shiki uses .line { display:block }. */
@@ -401,15 +434,30 @@
   font-size: var(--preview-code-font-size);
 }
 
-.preview-pane-document.markdown-body pre.shiki {
-  margin: 0;
+.preview-pane-document.markdown-body pre.shiki,
+.markdown-body pre.shiki {
   padding: 1rem 1.1rem;
-  overflow-x: auto;
-  border-radius: inherit;
-  background: transparent !important;
+  border-radius: 1rem !important;
+  -webkit-clip-path: inset(0 round 1rem);
+  clip-path: inset(0 round 1rem);
+  overflow: hidden;
+  /* Keep Shiki's inline background-color so rounded corners are visible. */
 }
 
-.preview-pane-document.markdown-body pre.shiki code {
+.markdown-body .shiki {
+  border-radius: 1rem !important;
+  -webkit-clip-path: inset(0 round 1rem);
+  clip-path: inset(0 round 1rem);
+  overflow: hidden;
+}
+
+.markdown-body .shiki code {
+  display: block;
+  overflow-x: auto;
+}
+
+.preview-pane-document.markdown-body pre.shiki code,
+.markdown-body pre.shiki code {
   display: block;
   padding: 0;
   color: inherit;
@@ -417,9 +465,11 @@
   font-family: var(--preview-code-font-family);
   font-size: var(--preview-code-font-size);
   white-space: normal;
+  overflow-x: auto;
 }
 
-.preview-pane-document.markdown-body pre.shiki .line {
+.preview-pane-document.markdown-body pre.shiki .line,
+.markdown-body pre.shiki .line {
   display: block;
   white-space: pre;
   padding-top: 0.08rem;
@@ -667,6 +717,11 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
+.dark .markdown-body .mp-shiki-block {
+  border-color: rgba(148, 163, 184, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
 .dark .preview-pane-document.markdown-body pre:not(.shiki) code {
   color: inherit;
   background: transparent;
@@ -674,7 +729,6 @@
 
 .dark .preview-pane-document.markdown-body pre.shiki,
 .dark .preview-pane-document.markdown-body pre.shiki code {
-  background: transparent !important;
   color: inherit;
 }
 

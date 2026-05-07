@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DynamicImportLanguageRegistration, LanguageInput } from 'shiki/core';
 import { extractMarkdownFenceLanguages, SHIKI_CORE_LANGS } from '../utils/shikiLanguages';
 import { MARKDOWN_PRESS_SHIKI_THEMES } from '../utils/shikiTheme';
+import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
+import { useAppStore } from '../store/appStore';
 
 /** Shiki highlighter interface for syntax highlighting */
 export interface ShikiHighlighter {
@@ -15,6 +17,42 @@ export interface ShikiHighlighter {
 
 let cachedHighlighter: ShikiHighlighter | null = null;
 let cachedHighlighterPromise: Promise<ShikiHighlighter | null> | null = null;
+
+async function persistShikiDiagnostics(message: string, error?: unknown) {
+  // Don't trust environment detection in release — try best-effort anyway.
+  if (isTauriEnvironment()) {
+    const ready = await waitForTauri(2500);
+    if (!ready) return;
+  }
+
+  const payload = (() => {
+    const now = new Date().toISOString();
+    const details = error instanceof Error
+      ? `${error.message}\n${error.stack ?? ''}`.trim()
+      : String(error ?? '').trim();
+    return `[${now}] ${message}\n${details}\n\n`;
+  })();
+
+  try {
+    const [{ writeTextFile, mkdir }, { appDataDir, join }] = await Promise.all([
+      import('@tauri-apps/plugin-fs'),
+      import('@tauri-apps/api/path'),
+    ]);
+
+    const dir = await appDataDir();
+    const folder = await join(dir, 'MarkdownPress');
+    const file = await join(folder, 'shiki-diagnostics.log');
+    await mkdir(folder, { recursive: true });
+    await writeTextFile(file, payload, { append: true });
+
+    if (!(globalThis as any).__mp_shiki_diag_toast_shown) {
+      (globalThis as any).__mp_shiki_diag_toast_shown = true;
+      useAppStore.getState().showNotification(`Shiki 初始化失败，已写入日志：${file}`, 'error');
+    }
+  } catch {
+    // ignore
+  }
+}
 
 function getBundledLanguageLoader(
   bundledLanguages: Record<string, unknown>,
@@ -57,6 +95,7 @@ async function createShikiHighlighter(): Promise<ShikiHighlighter | null> {
     };
   } catch (error) {
     console.error('Failed to initialize Shiki highlighter:', error);
+    void persistShikiDiagnostics('Failed to initialize Shiki highlighter', error);
     return null;
   }
 }
@@ -74,6 +113,7 @@ function ensureHighlighter(): Promise<ShikiHighlighter | null> {
       })
       .catch((error) => {
         console.error('Failed to load shiki:', error);
+        void persistShikiDiagnostics('Failed to load shiki', error);
         cachedHighlighterPromise = null;
         return null;
       });
