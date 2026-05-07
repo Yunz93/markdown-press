@@ -108,7 +108,7 @@ npm run smoke:release
 - `.trash` 为应用内部回收站目录，不应手动编辑
 - 预览层支持 wiki link、heading link、block ref 与附件解析
 - 设置页支持分别配置界面字体、编辑字体、预览字体和代码字体
-- 内置中文默认字体为霞鹜文楷，许可证见 `src/assets/fonts/LXGWWenKai-OFL.txt`
+- 内置中文默认字体为 Tsanger JinKai 02
 - 支持外部文件变更监听，如果文件在外部被修改且无未保存编辑，会自动重新加载
 
 ## 贡献

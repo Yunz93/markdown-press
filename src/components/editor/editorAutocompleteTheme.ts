@@ -1,6 +1,30 @@
 import { Prec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 
+export const autocompletePanelShellStyle = {
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  padding: '0.4rem',
+  minWidth: 'min(19rem, calc(100% - 1.5rem))',
+  maxWidth: 'min(32rem, calc(100% - 1.5rem))',
+} as const;
+
+export const autocompletePanelListStyle = {
+  boxSizing: 'border-box',
+  width: '100%',
+  height: '100%',
+  maxWidth: '100%',
+  fontFamily: 'var(--editor-font-family)',
+  fontSize: 'var(--editor-font-size)',
+  lineHeight: 1.45,
+  padding: 0,
+  margin: 0,
+  listStyle: 'none',
+  overflowX: 'hidden',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+} as const;
+
 /**
  * CodeMirror 的补全浮层通过 style-mod 注入，与 `&light` / `&dark` 作用域绑定。
  * 仅写在全局 editor.css 里无法压过 @codemirror/view 与 @codemirror/autocomplete 的默认主题，
@@ -25,22 +49,10 @@ export const editorAutocompletePanelBaseTheme = Prec.high(
       WebkitBackdropFilter: 'blur(18px)',
     },
     '.cm-tooltip.cm-tooltip-autocomplete.editor-autocomplete-panel': {
-      boxSizing: 'border-box',
-      padding: '0.4rem',
-      minWidth: 'min(19rem, calc(100% - 1.5rem))',
-      maxWidth: 'min(32rem, calc(100% - 1.5rem))',
+      ...autocompletePanelShellStyle,
     },
     '.cm-tooltip.cm-tooltip-autocomplete.editor-autocomplete-panel > ul': {
-      boxSizing: 'border-box',
-      width: '100%',
-      maxWidth: '100%',
-      fontFamily: 'var(--editor-font-family)',
-      fontSize: 'var(--editor-font-size)',
-      lineHeight: 1.45,
-      padding: 0,
-      margin: 0,
-      listStyle: 'none',
-      overflow: 'hidden auto',
+      ...autocompletePanelListStyle,
     },
     '.cm-tooltip.cm-tooltip-autocomplete.editor-autocomplete-panel ul': {
       display: 'grid',

@@ -2,7 +2,6 @@ import type { AppSettings } from '../types';
 import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
 import { getKatexRenderMode } from './markdown-extensions';
 
-const lxgwWenKaiAssetUrl = new URL('../assets/fonts/LXGWWenKai-Regular.ttf', import.meta.url).href;
 const tsangerJinKaiAssetUrl = new URL('../assets/fonts/TsangerJinKai02-W04.ttf', import.meta.url).href;
 
 const DYNAMIC_FONT_STYLE_ID = 'markdown-press-dynamic-font-faces';
@@ -31,13 +30,6 @@ interface FontFaceApiSpec {
 }
 
 export const BUNDLED_FONT_PRESETS: BundledFontPreset[] = [
-  {
-    id: `${PRESET_PREFIX}lxgw-wenkai`,
-    label: 'LXGW WenKai',
-    assetUrl: lxgwWenKaiAssetUrl,
-    fontFaceFamily: 'MarkdownPressPresetLXGWWenKai',
-    familyNames: ['LXGW WenKai', '霞鹜文楷'],
-  },
   {
     id: `${PRESET_PREFIX}tsanger-jinkai`,
     label: 'Tsanger JinKai 02',
@@ -183,9 +175,9 @@ const UI_FONT_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
 const CONTENT_FONT_FALLBACK = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
 const CODE_FONT_FALLBACK = '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace';
 
-export const DEFAULT_UI_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
-export const DEFAULT_EDITOR_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
-export const DEFAULT_PREVIEW_FONT_FAMILY = `${PRESET_PREFIX}lxgw-wenkai`;
+export const DEFAULT_UI_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
+export const DEFAULT_EDITOR_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
+export const DEFAULT_PREVIEW_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
 export const DEFAULT_CODE_FONT_FAMILY = CODE_FONT_FALLBACK;
 export const FONT_SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 
@@ -261,7 +253,11 @@ function normalizeSingleFontSetting(value: string | undefined, fallback: string)
   const trimmed = value?.trim();
   if (!trimmed) return fallback;
 
-  if (trimmed.startsWith(PRESET_PREFIX) || trimmed.startsWith(SYSTEM_PREFIX)) {
+  if (trimmed.startsWith(PRESET_PREFIX)) {
+    return presetById.has(trimmed) ? trimmed : fallback;
+  }
+
+  if (trimmed.startsWith(SYSTEM_PREFIX)) {
     return trimmed;
   }
 

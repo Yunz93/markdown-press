@@ -247,6 +247,7 @@
 .editor-pane-layout .cm-tooltip-autocomplete,
 .cm-tooltip-autocomplete.editor-autocomplete-panel {
   box-sizing: border-box;
+  overflow: hidden;
   padding: 0.4rem;
   min-width: min(19rem, calc(100% - 1.5rem));
   max-width: min(32rem, calc(100% - 1.5rem));
@@ -256,6 +257,7 @@
 .cm-tooltip-autocomplete.editor-autocomplete-panel > ul {
   box-sizing: border-box;
   width: 100%;
+  height: 100%;
   max-width: 100%;
   font-family: var(--editor-font-family);
   font-size: var(--editor-font-size);
@@ -263,7 +265,9 @@
   padding: 0;
   margin: 0;
   list-style: none;
-  overflow: hidden auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete ul,

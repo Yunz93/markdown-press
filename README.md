@@ -64,7 +64,7 @@ xattr -cr /Applications/M記.app
 ### 写作体验
 
 - 支持分别配置界面字体/编辑字体/预览字体/代码字体，以及界面字体大小
-- 内置中文默认字体霞鹜文楷
+- 内置中文默认字体 Tsanger JinKai 02
 - 默认暗色主题，支持亮色/暗色主题切换
 - 支持常用快捷键，并可在设置页调整核心快捷键
 - 支持手动保存时格式化 Markdown（有序列表严格/宽松模式）
@@ -176,7 +176,7 @@ xattr -cr /Applications/M記.app
 
 ## 许可证
 
-本项目代码基于 [MIT License](./LICENSE) 开源；随应用分发的 `LXGWWenKai-Regular.ttf` 字体基于 [SIL Open Font License 1.1](./src/assets/fonts/LXGWWenKai-OFL.txt) 授权。
+本项目代码基于 [MIT License](./LICENSE) 开源。
 
 ## 致谢
 

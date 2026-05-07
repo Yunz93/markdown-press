@@ -63,7 +63,7 @@ After the initial install, the Windows build can check for and install later Git
 - Unused attachment cleanup (`Cmd+Shift+-`)
 
 ### Writing Experience
-- Independent UI, editor, preview, and code font configuration, with bundled LXGW WenKai as the default Chinese font
+- Independent UI, editor, preview, and code font configuration, with bundled Tsanger JinKai 02 as the default Chinese font
 - Configurable UI font size
 - Dark mode as the default theme
 - Configurable core keyboard shortcuts in settings
@@ -164,7 +164,7 @@ Notes:
 
 ## License
 
-The application code is licensed under the [MIT License](./LICENSE). The bundled `LXGWWenKai-Regular.ttf` font is distributed under the [SIL Open Font License 1.1](./src/assets/fonts/LXGWWenKai-OFL.txt).
+The application code is licensed under the [MIT License](./LICENSE).
 
 ## Acknowledgements
 
