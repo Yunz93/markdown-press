@@ -11,6 +11,7 @@ const distAssetsDir = join(distDir, 'assets');
 const appBundlePath = join(projectRoot, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'M記.app');
 
 const shouldBuildApp = process.argv.includes('--app');
+const workflowOnly = process.argv.includes('--workflow-only');
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -42,7 +43,7 @@ function readEntrypointAssets() {
   };
 }
 
-function assertReleaseWorkflowUsesTauriSigningEnv() {
+function assertReleaseWorkflowConfig() {
   const workflowPath = join(projectRoot, '.github', 'workflows', 'release.yml');
   const workflow = readFileSync(workflowPath, 'utf8');
 
@@ -51,13 +52,32 @@ function assertReleaseWorkflowUsesTauriSigningEnv() {
     process.exit(1);
   }
 
-  if (!workflow.includes('TAURI_SIGNING_PRIVATE_KEY: ${{ steps.prepare_signing_key.outputs.private_key_path }}')) {
-    console.error('release.yml is missing TAURI_SIGNING_PRIVATE_KEY for tauri build.');
+  if (workflow.includes('steps.prepare_signing_key.outputs.private_key')) {
+    console.error('release.yml must not read a non-existent prepare_signing_key private_key output; the script writes TAURI_SIGNING_PRIVATE_KEY through GITHUB_ENV.');
+    process.exit(1);
+  }
+
+  if (workflow.includes('releaseAssetNamePattern')) {
+    console.error('tauri-action@v0 ignores releaseAssetNamePattern; use assetNamePattern for release asset names.');
+    process.exit(1);
+  }
+
+  const releaseAssetPattern = 'assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]';
+  const patternCount = workflow.split(releaseAssetPattern).length - 1;
+
+  if (patternCount !== 2) {
+    console.error(`release.yml must set "${releaseAssetPattern}" for both macOS and Windows release jobs.`);
     process.exit(1);
   }
 }
 
-assertReleaseWorkflowUsesTauriSigningEnv();
+assertReleaseWorkflowConfig();
+
+if (workflowOnly) {
+  console.log('Release workflow config check passed.');
+  process.exit(0);
+}
+
 run('npm', ['run', 'build']);
 
 assertExists(distDir, 'dist output');

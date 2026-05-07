@@ -203,6 +203,16 @@ function parseSvgViewBoxSize(value: string | null): { width: number; height: num
     : null;
 }
 
+function removeSvgLengthAttribute(svg: SVGSVGElement, name: 'width' | 'height'): void {
+  const value = svg.getAttribute(name);
+  if (value === null) return;
+
+  if (!value.trim()) {
+    svg.setAttribute(name, '1');
+  }
+  svg.removeAttribute(name);
+}
+
 function getMermaidInlinePalette(themeMode: 'light' | 'dark') {
   if (themeMode === 'dark') {
     return {
@@ -433,15 +443,15 @@ function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'): void
   const svg = getRootMermaidSvg(el);
   if (!svg) return;
 
-  inlineMermaidSvgTheme(el, themeMode);
-
   const viewBoxSize = parseSvgViewBoxSize(svg.getAttribute('viewBox'));
   const naturalWidth = viewBoxSize?.width ?? parseSvgLength(svg.getAttribute('width'));
   const naturalHeight = viewBoxSize?.height ?? parseSvgLength(svg.getAttribute('height'));
 
-  svg.removeAttribute('width');
-  svg.removeAttribute('height');
+  removeSvgLengthAttribute(svg, 'width');
+  removeSvgLengthAttribute(svg, 'height');
   svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
+
+  inlineMermaidSvgTheme(el, themeMode);
 
   if (naturalWidth && naturalHeight) {
     svg.style.width = `min(100%, ${naturalWidth}px)`;

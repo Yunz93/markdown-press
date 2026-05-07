@@ -60,6 +60,18 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
+            ### 功能发布
+
+            #### 新增功能
+
+            - 支持更稳定的 wikilink 标题跳转与标题属性识别，预览内 `[[#heading]]` / `[[file#heading]]` 跳转更可靠。
+            - 优化编辑器自动补全弹层布局，降低候选项溢出或遮挡编辑区域的概率。
+
+            #### 问题修复
+
+            - 修复 GitHub Release 产物命名没有使用 ASCII 覆盖规则，导致 `M記` 被显示成 `M.` 的问题。
+            - 修复 Mermaid SVG 输出空 `width` / `height` 时的尺寸归一化问题，避免图表渲染尺寸异常。
+
             ### macOS 安装说明
 
             由于本应用未经 Apple 签名公证，macOS 可能会提示"已损坏"或"无法验证开发者"。请按以下步骤操作：
@@ -81,7 +93,7 @@ jobs:
             下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
           releaseDraft: false
           prerelease: false
-          releaseAssetNamePattern: MarkdownPress_[version]_[arch][ext]
+          assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]
           args: --bundles app,dmg
 
   build-windows:
@@ -127,13 +139,24 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ steps.prepare_signing_key.outputs.private_key }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}
           releaseBody: |
             See the assets to download this version and install.
+
+            ### 功能发布
+
+            #### 新增功能
+
+            - 支持更稳定的 wikilink 标题跳转与标题属性识别，预览内 `[[#heading]]` / `[[file#heading]]` 跳转更可靠。
+            - 优化编辑器自动补全弹层布局，降低候选项溢出或遮挡编辑区域的概率。
+
+            #### 问题修复
+
+            - 修复 GitHub Release 产物命名没有使用 ASCII 覆盖规则，导致 `M記` 被显示成 `M.` 的问题。
+            - 修复 Mermaid SVG 输出空 `width` / `height` 时的尺寸归一化问题，避免图表渲染尺寸异常。
 
             ### macOS 安装说明
 
@@ -156,5 +179,5 @@ jobs:
             下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
           releaseDraft: false
           prerelease: false
-          releaseAssetNamePattern: MarkdownPress_[version]_[arch][ext]
+          assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]
           args: --bundles nsis

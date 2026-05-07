@@ -139,6 +139,15 @@ describe('renderMermaidDiagrams', () => {
   });
 
   it('normalizes SVGs with empty width and height attributes without keeping invalid dimensions', async () => {
+    const removeAttribute = SVGSVGElement.prototype.removeAttribute;
+    const directEmptyDimensionRemovals: string[] = [];
+    const removeAttributeSpy = vi.spyOn(SVGSVGElement.prototype, 'removeAttribute').mockImplementation(function removeSvgAttribute(this: SVGSVGElement, name: string) {
+      if ((name === 'width' || name === 'height') && this.getAttribute(name) === '') {
+        directEmptyDimensionRemovals.push(name);
+      }
+      return removeAttribute.call(this, name);
+    });
+
     run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
       nodes.forEach((node) => {
         node.innerHTML = '<svg width="" height="" viewBox="0 0 120 60"><text>ok</text></svg>';
@@ -148,7 +157,11 @@ describe('renderMermaidDiagrams', () => {
     const el = createVisibleMermaidHost('flowchart LR\nA-->B');
     container.appendChild(el);
 
-    await renderMermaidDiagrams(container, { themeMode: 'light' });
+    try {
+      await renderMermaidDiagrams(container, { themeMode: 'light' });
+    } finally {
+      removeAttributeSpy.mockRestore();
+    }
 
     const svg = el.querySelector('svg') as SVGSVGElement | null;
     expect(svg).not.toBeNull();
@@ -156,6 +169,7 @@ describe('renderMermaidDiagrams', () => {
     expect(svg?.hasAttribute('height')).toBe(false);
     expect(svg?.style.aspectRatio).toBe('120 / 60');
     expect(el.dataset.mermaidRendered).toBe('true');
+    expect(directEmptyDimensionRemovals).toEqual([]);
   });
 
   it('shows a deterministic error state when Mermaid does not produce SVG', async () => {
