@@ -20,7 +20,8 @@ import { useThrottledResize } from '../../utils/performance';
 import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
 import { renderMermaidDiagrams, resetMermaidPlaceholders } from '../../utils/markdown-extensions';
-import { createHeadingSlug, flattenHeadingNodes, parseHeadings } from '../../utils/outline';
+import { flattenHeadingNodes, parseHeadings } from '../../utils/outline';
+import { applyPreviewHeadingAttributes } from '../../utils/previewHeadingAttributes';
 import { parseFrontmatter } from '../../utils/frontmatter';
 import { isWindowsPlatform } from '../../utils/platform';
 import type { FileNode, Frontmatter } from '../../types';
@@ -312,24 +313,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     if (!container) return;
 
     const applyHeadingAttributes = () => {
-      const headingElements = Array.from(container.querySelectorAll<HTMLElement>(
-        'article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6'
-      ));
-
-      headingElements.forEach((element: HTMLElement, index) => {
-        const heading = flattenedHeadings[index];
-        if (!heading) {
-          element.removeAttribute('data-heading-id');
-          element.removeAttribute('data-heading-slug');
-          element.removeAttribute('data-heading-text');
-          return;
-        }
-
-        element.id = heading.id;
-        element.dataset.headingId = heading.id;
-        element.dataset.headingSlug = createHeadingSlug(heading.text);
-        element.dataset.headingText = heading.text;
-      });
+      applyPreviewHeadingAttributes(container, flattenedHeadings, activeTabId);
     };
 
     // Use requestIdleCallback for non-critical updates

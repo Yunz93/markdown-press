@@ -22,6 +22,7 @@ import {
   keymap,
   placeholder as cmPlaceholder,
   tooltips,
+  type Rect,
   type ViewUpdate,
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
@@ -96,6 +97,16 @@ function getDocumentReplacementRange(currentContent: string, nextContent: string
     from: prefixLength,
     to: currentSuffixLength,
     insert: nextContent.slice(prefixLength, nextSuffixLength),
+  };
+}
+
+export function getEditorTooltipSpace(view: Pick<EditorView, 'dom'>): Rect {
+  const rect = view.dom.getBoundingClientRect();
+  return {
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    bottom: rect.bottom,
   };
 }
 
@@ -278,7 +289,9 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
               tooltipClass: () => 'editor-autocomplete-panel',
             }),
             tooltips({
-              parent: editorRef.current.ownerDocument.body,
+              parent: editorRef.current,
+              position: 'absolute',
+              tooltipSpace: getEditorTooltipSpace,
             }),
             EditorState.tabSize.of(LIST_INDENT_UNIT.length),
             indentUnit.of(LIST_INDENT_UNIT),

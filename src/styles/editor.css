@@ -246,19 +246,24 @@
 
 .editor-pane-layout .cm-tooltip-autocomplete,
 .cm-tooltip-autocomplete.editor-autocomplete-panel {
+  box-sizing: border-box;
   padding: 0.4rem;
-  min-width: 19rem;
-  max-width: min(32rem, calc(100vw - 1.5rem));
+  min-width: min(19rem, calc(100% - 1.5rem));
+  max-width: min(32rem, calc(100% - 1.5rem));
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete > ul,
 .cm-tooltip-autocomplete.editor-autocomplete-panel > ul {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   font-family: var(--editor-font-family);
   font-size: var(--editor-font-size);
   line-height: 1.45;
   padding: 0;
   margin: 0;
   list-style: none;
+  overflow: hidden auto;
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete ul,
@@ -273,6 +278,7 @@
   align-items: center;
   gap: 0.7rem;
   min-width: 0;
+  overflow: hidden;
   border-radius: 14px;
   padding: 0.55rem 0.75rem;
   color: #1f2937;
@@ -295,6 +301,7 @@
 
 .editor-pane-layout .cm-completionLabel,
 .cm-tooltip-autocomplete.editor-autocomplete-panel .cm-completionLabel {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -305,7 +312,11 @@
 .editor-pane-layout .cm-completionDetail,
 .cm-tooltip-autocomplete.editor-autocomplete-panel .cm-completionDetail {
   margin-left: auto;
-  flex: 0 0 auto;
+  flex: 0 1 48%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #64748b;
   font-size: 0.78em;
   letter-spacing: 0.01em;
