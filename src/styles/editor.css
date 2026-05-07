@@ -272,7 +272,8 @@
 
 .editor-pane-layout .cm-tooltip-autocomplete ul,
 .cm-tooltip-autocomplete.editor-autocomplete-panel ul {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.2rem;
 }
 
@@ -282,7 +283,10 @@
   align-items: center;
   gap: 0.7rem;
   min-width: 0;
-  overflow: hidden;
+  min-height: min-content;
+  flex-shrink: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
   border-radius: 14px;
   padding: 0.55rem 0.75rem;
   color: #1f2937;

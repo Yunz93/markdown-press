@@ -52,7 +52,7 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
-  if (workflow.includes('steps.prepare_signing_key.outputs.private_key')) {
+  if (/\${{\s*steps\.prepare_signing_key\.outputs\.private_key\s*}}/.test(workflow)) {
     console.error('release.yml must not read a non-existent prepare_signing_key private_key output; the script writes TAURI_SIGNING_PRIVATE_KEY through GITHUB_ENV.');
     process.exit(1);
   }
