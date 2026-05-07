@@ -71,7 +71,7 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
-  private async registerAllowedPath(path: string, recursive: boolean): Promise<void> {
+  async registerAllowedPath(path: string, recursive: boolean): Promise<void> {
     await invoke('register_allowed_path', { path, recursive });
   }
 

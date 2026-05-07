@@ -5,10 +5,25 @@ interface BasicCapableFileSystem {
   createFile(path: string, content?: string): Promise<string>;
   openFile(): Promise<string | null>;
   readFile(path: string): Promise<string>;
+  registerAllowedPath?(path: string, recursive: boolean): Promise<void>;
   revealInExplorer?: (path: string) => Promise<void>;
 }
 
 type AsyncGuard = <T>(fn: () => Promise<T>, context: string) => Promise<T>;
+
+function isMarkdownFilePath(path: string): boolean {
+  return /\.(md|markdown)$/i.test(path);
+}
+
+function createStandaloneFileNode(path: string, getPathBasename: (path: string) => string): FileNode {
+  return {
+    id: path,
+    name: getPathBasename(path),
+    type: 'file',
+    path,
+    isTrash: false,
+  };
+}
 
 export async function openStandaloneFile(
   fs: BasicCapableFileSystem,
@@ -24,13 +39,35 @@ export async function openStandaloneFile(
   );
 
   return {
-    file: {
-      id: path,
-      name: getPathBasename(path),
-      type: 'file',
-      path,
-      isTrash: false,
-    },
+    file: createStandaloneFileNode(path, getPathBasename),
+    content,
+  };
+}
+
+export async function openStandaloneFileByPath(
+  fs: BasicCapableFileSystem,
+  path: string,
+  getPathBasename: (path: string) => string,
+  withErrorHandling: AsyncGuard
+): Promise<{ file: FileNode; content: string }> {
+  if (!isMarkdownFilePath(path)) {
+    throw new Error('Only Markdown files can be opened directly.');
+  }
+
+  if (fs.registerAllowedPath) {
+    await withErrorHandling(
+      () => fs.registerAllowedPath!(path, false),
+      'Failed to authorize file'
+    );
+  }
+
+  const content = await withErrorHandling(
+    () => fs.readFile(path),
+    'Failed to read file'
+  );
+
+  return {
+    file: createStandaloneFileNode(path, getPathBasename),
     content,
   };
 }

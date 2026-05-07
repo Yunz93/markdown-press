@@ -14,6 +14,7 @@ export interface IFileSystem {
   openDirectory(): Promise<string | null>;
   readFile(path: string): Promise<string>;
   readBinaryFile?(path: string): Promise<Uint8Array>;
+  registerAllowedPath?(path: string, recursive: boolean): Promise<void>;
   writeFile(path: string, content: string): Promise<void>;
   writeBinaryFile?(path: string, content: Uint8Array): Promise<void>;
   getFileObjectUrl?(path: string): Promise<string>;

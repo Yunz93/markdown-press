@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
@@ -309,6 +310,11 @@ struct SecurityState {
     allowed_paths: Mutex<Vec<AllowedPathEntry>>,
 }
 
+#[derive(Debug, Default)]
+struct OpenedFilesState {
+    paths: Mutex<Vec<String>>,
+}
+
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SecureSettingsResult {
@@ -389,6 +395,65 @@ fn ensure_path_allowed(state: &SecurityState, path: &Path) -> Result<(), String>
         "Access denied for path outside the authorized workspace: {}",
         path.display()
     ))
+}
+
+fn is_markdown_file_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "md" | "markdown"))
+        .unwrap_or(false)
+}
+
+fn normalize_opened_file_path(path: PathBuf) -> Option<String> {
+    let canonical = fs::canonicalize(path).ok()?;
+    if !canonical.is_file() || !is_markdown_file_path(&canonical) {
+        return None;
+    }
+    Some(canonical.to_string_lossy().into_owned())
+}
+
+fn opened_file_paths_from_urls(urls: &[tauri::Url]) -> Vec<String> {
+    urls.iter()
+        .filter_map(|url| url.to_file_path().ok())
+        .filter_map(normalize_opened_file_path)
+        .collect()
+}
+
+fn opened_file_paths_from_args(args: &[String], cwd: &str) -> Vec<String> {
+    let cwd = PathBuf::from(cwd);
+
+    args.iter()
+        .filter(|arg| !arg.starts_with('-'))
+        .filter_map(|arg| {
+            if let Ok(url) = tauri::Url::parse(arg) {
+                return url.to_file_path().ok();
+            }
+
+            let candidate = PathBuf::from(arg);
+            Some(if candidate.is_absolute() {
+                candidate
+            } else {
+                cwd.join(candidate)
+            })
+        })
+        .filter_map(normalize_opened_file_path)
+        .collect()
+}
+
+fn queue_opened_file_paths(app: &tauri::AppHandle, paths: Vec<String>) {
+    if paths.is_empty() {
+        return;
+    }
+
+    if let Ok(mut queued_paths) = app.state::<OpenedFilesState>().paths.lock() {
+        for path in &paths {
+            if !queued_paths.contains(path) {
+                queued_paths.push(path.clone());
+            }
+        }
+    }
+
+    let _ = app.emit("opened-files", paths);
 }
 
 fn normalize_secret_value(value: Option<&str>) -> Option<String> {
@@ -691,8 +756,26 @@ async fn upload_image_to_hosting(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            let _ = app
+                .get_webview_window("main")
+                .map(|window| {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                });
+
+            let paths = opened_file_paths_from_args(&args, &cwd);
+            queue_opened_file_paths(app, paths);
+        }));
+    }
+
+    builder
         .manage(SecurityState::default())
+        .manage(OpenedFilesState::default())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -700,6 +783,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             ping,
+            take_opened_files,
             get_secure_settings,
             set_secure_secret,
             list_system_fonts,
@@ -721,13 +805,33 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+            {
+                if let tauri::RunEvent::Opened { urls } = event {
+                    let paths = opened_file_paths_from_urls(&urls);
+                    queue_opened_file_paths(app, paths);
+                }
+            }
+        });
 }
 
 #[tauri::command]
 fn ping() -> Result<String, String> {
     Ok("pong".to_string())
+}
+
+#[tauri::command]
+fn take_opened_files(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let opened_files_state = app.state::<OpenedFilesState>();
+    let mut paths = opened_files_state
+        .paths
+        .lock()
+        .map_err(|_| "Failed to acquire opened files lock.".to_string())?;
+
+    Ok(paths.drain(..).collect())
 }
 
 #[tauri::command]
@@ -2345,6 +2449,54 @@ mod tests {
         assert!(!legacy_path.exists());
         assert!(current_path.exists());
         assert!(state.files.get(current_relative_path).is_none());
+
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn opened_file_paths_from_args_resolves_relative_markdown_paths() {
+        let temp_dir = create_test_directory("opened-file-args");
+        let note_path = temp_dir.join("note.md");
+        let text_path = temp_dir.join("note.txt");
+        fs::write(&note_path, "# note\n").expect("write note");
+        fs::write(&text_path, "plain text\n").expect("write text");
+
+        let paths = opened_file_paths_from_args(
+            &[
+                "note.md".to_string(),
+                "note.txt".to_string(),
+                "--flag".to_string(),
+            ],
+            temp_dir.to_str().expect("temp dir path"),
+        );
+
+        assert_eq!(
+            paths,
+            vec![fs::canonicalize(&note_path)
+                .expect("canonical note path")
+                .to_string_lossy()
+                .into_owned()]
+        );
+
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn opened_file_paths_from_urls_accepts_file_urls() {
+        let temp_dir = create_test_directory("opened-file-url");
+        let note_path = temp_dir.join("note.markdown");
+        fs::write(&note_path, "# note\n").expect("write note");
+        let url = tauri::Url::from_file_path(&note_path).expect("file url");
+
+        let paths = opened_file_paths_from_urls(&[url]);
+
+        assert_eq!(
+            paths,
+            vec![fs::canonicalize(&note_path)
+                .expect("canonical note path")
+                .to_string_lossy()
+                .into_owned()]
+        );
 
         cleanup_test_directory(&temp_dir);
     }

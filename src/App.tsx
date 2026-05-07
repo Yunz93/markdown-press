@@ -36,6 +36,7 @@ import { useActiveFileWatch } from './app/useActiveFileWatch';
 import { useAppUpdater } from './app/useAppUpdater';
 import { useWorkspaceLayout } from './app/useWorkspaceLayout';
 import { useAttachmentCleanup } from './app/useAttachmentCleanup';
+import { useExternalFileOpen } from './app/useExternalFileOpen';
 import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
 import { isTauriEnvironment } from './types/filesystem';
 
@@ -159,7 +160,7 @@ const App: React.FC = () => {
 
   const content = useAppStore(selectContent);
 
-  const { openDirectory, openKnowledgeBase, readFile, moveToTrash, refreshFileTree, watchFile } = useFileSystem();
+  const { openDirectory, openKnowledgeBase, openFilePath, readFile, moveToTrash, refreshFileTree, watchFile } = useFileSystem();
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
@@ -206,6 +207,10 @@ const App: React.FC = () => {
   const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
   const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] = useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] = useState(false);
+  const externalFileOpen = useExternalFileOpen({
+    settingsHydrated,
+    openFilePath,
+  });
   const {
     contentDensity,
     canShowOutlinePanel,
@@ -383,6 +388,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!settingsHydrated) return;
+    if (!externalFileOpen.hasCheckedExternalFiles) return;
+    if (externalFileOpen.hasHandledExternalFile) {
+      setHasResolvedStartupKnowledgeBase(true);
+      return;
+    }
     if (rootFolderPath) {
       setHasResolvedStartupKnowledgeBase(true);
       return;
@@ -425,7 +435,15 @@ const App: React.FC = () => {
       cancelled = true;
       setIsRestoringStartupKnowledgeBase(false);
     };
-  }, [openKnowledgeBase, rootFolderPath, settings.lastKnowledgeBasePath, settingsHydrated, updateSettings]);
+  }, [
+    externalFileOpen.hasCheckedExternalFiles,
+    externalFileOpen.hasHandledExternalFile,
+    openKnowledgeBase,
+    rootFolderPath,
+    settings.lastKnowledgeBasePath,
+    settingsHydrated,
+    updateSettings,
+  ]);
 
   const shouldShowKnowledgeBaseLoading =
     settingsHydrated &&

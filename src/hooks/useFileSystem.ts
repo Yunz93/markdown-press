@@ -13,7 +13,7 @@ import { openKnowledgeBaseWorkspace } from '../services/filesystem/knowledgeBase
 import { initializeSampleNotesIfSupported } from '../services/filesystem/sampleNotesService';
 import { moveItemToTrash, restoreItemFromTrash } from '../services/filesystem/trashService';
 import { deleteFileAndCleanupTrash, moveFilePath } from '../services/filesystem/fileMutationService';
-import { createFileNode, createFolderNode, openStandaloneFile, revealFileInExplorer } from '../services/filesystem/basicFileService';
+import { createFileNode, createFolderNode, openStandaloneFile, openStandaloneFileByPath, revealFileInExplorer } from '../services/filesystem/basicFileService';
 import { readFileContent, saveFileContent, writeBinaryFileContent, writeFileContent } from '../services/filesystem/ioService';
 
 const TRASH_ROOT_MARKER = '__root__';
@@ -212,6 +212,7 @@ export function useFileSystem() {
     clearAllCache,
     showNotification,
     addTab,
+    setActiveTab,
     setViewMode,
     settings,
   } = useAppStore();
@@ -273,6 +274,45 @@ export function useFileSystem() {
       handleFileSystemError(error, 'Failed to open file');
     }
   }, [setFiles, addTab, setCurrentFilePath, showNotification, handleFileSystemError]);
+
+  const openFilePath = useCallback(async (
+    path: string,
+    options?: { silentSuccess?: boolean; suppressErrors?: boolean }
+  ): Promise<string | null> => {
+    try {
+      const existingState = useAppStore.getState();
+      if (existingState.openTabs.includes(path)) {
+        setActiveTab(path);
+        setCurrentFilePath(path);
+        return path;
+      }
+
+      const fs = await getFileSystem();
+      const result = await openStandaloneFileByPath(fs, path, getPathBasename, withErrorHandling);
+      const state = useAppStore.getState();
+      const fileExistsInTree = Boolean(findFileInTree(state.files, result.file.id));
+
+      if (!fileExistsInTree) {
+        setFiles([...state.files, result.file]);
+      }
+
+      addTab(result.file.id, result.content);
+      setCurrentFilePath(result.file.path);
+
+      if (!options?.silentSuccess) {
+        showNotification(t(settings.language, 'notifications_fileOpenedSuccessfully'), 'success');
+      }
+
+      return result.file.path;
+    } catch (error) {
+      if (!options?.suppressErrors) {
+        handleFileSystemError(error, 'Failed to open file');
+      } else {
+        console.warn('Failed to open external file:', error);
+      }
+      return null;
+    }
+  }, [setActiveTab, setCurrentFilePath, setFiles, addTab, showNotification, handleFileSystemError, settings.language]);
 
   /**
    * Initialize sample notes for first-time users
@@ -689,6 +729,7 @@ export function useFileSystem() {
     files,
     refreshFileTree,
     openFile,
+    openFilePath,
     openDirectory,
     openKnowledgeBase,
     initializeSampleNotes,
