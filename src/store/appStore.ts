@@ -20,6 +20,7 @@ import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
 import { normalizeMetadataFields } from '../utils/metadataFields';
 import { normalizeTrashFolder } from '../utils/trashFolder';
 import { normalizeWikiFolder } from '../utils/wikiGeneration';
+import { normalizeMarkdownStylePreset } from '../utils/markdownStyle';
 import { normalizeShortcutConfigForPlatform } from '../utils/shortcuts';
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
@@ -311,6 +312,7 @@ export const useAppStore = create<AppState>()(
           ...resolvedLocalizedPrompts,
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
+          markdownStylePreset: normalizeMarkdownStylePreset(persistedSettings.markdownStylePreset),
           wikiFolder: normalizeWikiFolder(
             typeof persistedSettings.wikiFolder === 'string'
               ? persistedSettings.wikiFolder

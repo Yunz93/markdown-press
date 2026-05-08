@@ -1,5 +1,6 @@
 import type { FontSettings } from '../fontSettings';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
+import type { MarkdownStylePreset } from '../../types';
 
 export interface ExportOptions {
   title?: string;
@@ -12,6 +13,7 @@ export interface ExportOptions {
   codeFontSize?: number;
   includeProperties?: boolean;
   highlighter?: ShikiHighlighter | null;
+  markdownStylePreset?: MarkdownStylePreset;
 }
 
 export interface SaveExportOptions {

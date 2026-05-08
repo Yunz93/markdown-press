@@ -82,6 +82,21 @@ export const EditorTab: React.FC<EditorTabProps> = ({
             </button>
           </div>
 
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_markdownStyle')}</label>
+            <select
+              value={settings.markdownStylePreset}
+              onChange={(e) => onUpdateSettings({ markdownStylePreset: e.target.value as AppSettings['markdownStylePreset'] })}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+            >
+              <option value="nord">{t('settings_markdownStyleNord')}</option>
+              <option value="topaz">{t('settings_markdownStyleTopaz')}</option>
+              <option value="typewriter">{t('settings_markdownStyleTypewriter')}</option>
+              <option value="primary">{t('settings_markdownStylePrimary')}</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_markdownStyleDesc')}</p>
+          </div>
+
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_editorFont')}</label>

@@ -5,7 +5,7 @@ import { isImageAttachment, isMarkdownNote, isPdfAttachment } from './previewUti
 import { warmPreviewImage, resolvePreviewSource } from '../../utils/previewImageCache';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
-import type { FileNode } from '../../types';
+import type { FileNode, MarkdownStylePreset, ThemeMode } from '../../types';
 
 interface WikiLinkHandlerProps {
   target: string;
@@ -54,7 +54,8 @@ export const WikiLinkHandler: React.FC<WikiLinkHandlerProps> = ({
 
 interface RenderMarkdownOptions {
   highlighter?: ShikiHighlighter | null;
-  themeMode?: string;
+  markdownStylePreset?: MarkdownStylePreset;
+  themeMode?: ThemeMode;
 }
 
 interface AttachmentEmbedProps {
@@ -68,7 +69,8 @@ interface AttachmentEmbedProps {
   content?: string;
   readFile?: (node: Pick<FileNode, 'id' | 'name' | 'type' | 'path'>) => Promise<string>;
   renderMarkdown?: (markdown: string, options: RenderMarkdownOptions) => string;
-  themeMode?: string;
+  markdownStylePreset?: MarkdownStylePreset;
+  themeMode?: ThemeMode;
   highlighter?: ShikiHighlighter | null;
 }
 
@@ -83,6 +85,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   content,
   readFile,
   renderMarkdown,
+  markdownStylePreset = 'nord',
   themeMode = 'light',
   highlighter,
 }) => {
@@ -226,7 +229,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
           <article
             className="markdown-body preview-note-embed-body"
             dangerouslySetInnerHTML={{
-              __html: renderMarkdown(resolved.content, { highlighter, themeMode }),
+              __html: renderMarkdown(resolved.content, { highlighter, markdownStylePreset, themeMode }),
             }}
           />
         )}

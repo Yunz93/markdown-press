@@ -10,7 +10,7 @@
 import { useCallback, useMemo, useRef } from 'react';
 import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 import type { Completion, CompletionContext, CompletionSource } from '@codemirror/autocomplete';
-import type { FileNode } from '../../../types';
+import type { FileNode, MarkdownStylePreset } from '../../../types';
 import { renderMarkdown } from '../../../utils/markdown';
 import {
   extractWikiNoteFragment,
@@ -48,6 +48,7 @@ export interface UseWikiLinksOptions {
   files: FileNode[];
   fileContents: Record<string, string>;
   highlighter?: ShikiHighlighter | null;
+  markdownStylePreset?: MarkdownStylePreset;
   themeMode?: 'light' | 'dark';
   readFile: (file: FileNode) => Promise<string>;
 }
@@ -71,6 +72,7 @@ export function useWikiLinks(options: UseWikiLinksOptions): UseWikiLinksReturn {
     files,
     fileContents,
     highlighter,
+    markdownStylePreset = 'nord',
     themeMode = 'light',
     readFile,
   } = options;
@@ -160,7 +162,7 @@ export function useWikiLinks(options: UseWikiLinksOptions): UseWikiLinksReturn {
         return {
           title: matchedHeading.text,
           subtitle: 'Current note',
-          html: renderMarkdown(fragment.markdown, { highlighter, themeMode }),
+          html: renderMarkdown(fragment.markdown, { highlighter, markdownStylePreset, themeMode }),
         };
       }
     }
@@ -173,7 +175,7 @@ export function useWikiLinks(options: UseWikiLinksOptions): UseWikiLinksReturn {
       return {
         title: fragment.title,
         subtitle: 'Current note',
-        html: renderMarkdown(fragment.markdown, { highlighter, themeMode }),
+        html: renderMarkdown(fragment.markdown, { highlighter, markdownStylePreset, themeMode }),
       };
     }
 
@@ -188,9 +190,9 @@ export function useWikiLinks(options: UseWikiLinksOptions): UseWikiLinksReturn {
     return {
       title: fragment.title,
       subtitle: getWikiLinkDisplayPath(matchedFile, rootFolderPath),
-      html: renderMarkdown(fragment.markdown, { highlighter, themeMode }),
+      html: renderMarkdown(fragment.markdown, { highlighter, markdownStylePreset, themeMode }),
     };
-  }, [content, currentFilePath, currentHeadings, files, highlighter, readWikiTargetContent, rootFolderPath, themeMode]);
+  }, [content, currentFilePath, currentHeadings, files, highlighter, markdownStylePreset, readWikiTargetContent, rootFolderPath, themeMode]);
 
   // 自动补全源
   const completionSource = useCallback<CompletionSource>(async (context: CompletionContext) => {

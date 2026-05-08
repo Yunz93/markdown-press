@@ -28,10 +28,11 @@ export async function exportToHtml(
     codeFontSize,
     includeProperties = true,
     highlighter,
+    markdownStylePreset = 'nord',
   } = options;
 
   const { frontmatter, body } = parseFrontmatter(content);
-  const htmlContent = renderMarkdown(body, { highlighter, themeMode: theme });
+  const htmlContent = renderMarkdown(body, { highlighter, markdownStylePreset, themeMode: theme });
   const katexRenderMode = getKatexRenderMode();
 
   // Generate table of contents if requested
@@ -39,12 +40,24 @@ export async function exportToHtml(
   const resolvedFontFamily = fontFamily || (fontSettings ? buildPreviewExportFontFamily(fontSettings) : undefined);
   const resolvedCodeFontFamily = codeFontFamily || (fontSettings ? buildCodeExportFontFamily(fontSettings) : undefined);
   const fontFaceCss = await buildExportFontFaceCss(fontSettings);
-  const styles = buildExportStyles(theme, resolvedFontFamily, fontSize, fontFaceCss, resolvedCodeFontFamily, codeFontSize);
+  const styles = buildExportStyles(
+    theme,
+    resolvedFontFamily,
+    fontSize,
+    fontFaceCss,
+    resolvedCodeFontFamily,
+    codeFontSize,
+    markdownStylePreset,
+  );
   const propertiesHtml = includeProperties ? renderProperties(frontmatter) : '';
-  const documentMarkup = buildExportDocument(`${propertiesHtml}<article class="markdown-body">${htmlContent}</article>`, toc);
+  const documentMarkup = buildExportDocument(
+    `${propertiesHtml}<article class="markdown-body" data-markdown-style="${markdownStylePreset}">${htmlContent}</article>`,
+    toc,
+    markdownStylePreset,
+  );
 
   const html = `<!DOCTYPE html>
-<html lang="en" data-theme="${theme}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ''}>
+	<html lang="en" data-theme="${theme}" class="${theme === 'dark' ? 'dark' : ''}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ''}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

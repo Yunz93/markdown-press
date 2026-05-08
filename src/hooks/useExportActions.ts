@@ -145,6 +145,7 @@ export function useExportActions(
         codeFontSize: Math.max(12, settings.fontSize - 2),
         includeProperties: false,
         highlighter,
+        markdownStylePreset: settings.markdownStylePreset,
       });
       const savedPath = await exportToPdf(htmlContent, activeFile.name, activeFile.path);
       if (savedPath !== null) {
@@ -160,7 +161,7 @@ export function useExportActions(
       console.error('Failed to export PDF:', error);
       showNotification(t(settings.language, 'notifications_exportPdfFailed'), 'error');
     }
-  }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
 
   const handlePublishSimpleBlog = useCallback(async () => {
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();

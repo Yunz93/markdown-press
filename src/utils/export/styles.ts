@@ -7,6 +7,8 @@ import {
   type FontSettings,
   getBundledPresetDataUrlOverrides,
 } from '../fontSettings';
+import { getMarkdownStyleCssVariables, getMarkdownStyleTokens, normalizeMarkdownStylePreset } from '../markdownStyle';
+import type { MarkdownStylePreset } from '../../types';
 
 export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promise<string> {
   if (!fontSettings) {
@@ -47,11 +49,17 @@ export function buildExportStyles(
   fontFaceCss = '',
   codeFontFamily?: string,
   codeFontSize?: number,
+  markdownStylePreset: MarkdownStylePreset = 'nord',
 ): string {
   const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
   const resolvedFontSize = fontSize ?? 16;
   const resolvedCodeFontFamily = codeFontFamily || '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace';
   const resolvedCodeFontSize = codeFontSize ?? Math.max(12, resolvedFontSize - 1);
+  const normalizedStylePreset = normalizeMarkdownStylePreset(markdownStylePreset);
+  const tokens = getMarkdownStyleTokens(normalizedStylePreset, theme);
+  const markdownStyleCssVariables = Object.entries(getMarkdownStyleCssVariables(normalizedStylePreset, theme))
+    .map(([name, value]) => `      ${name}: ${value};`)
+    .join('\n');
 
   return `
     ${fontFaceCss}
@@ -61,11 +69,12 @@ export function buildExportStyles(
     :root {
       --bg-primary: ${theme === 'dark' ? '#0d1117' : '#ffffff'};
       --bg-secondary: ${theme === 'dark' ? '#161b22' : '#f6f8fa'};
-      --text-primary: ${theme === 'dark' ? '#c9d1d9' : '#24292f'};
-      --text-secondary: ${theme === 'dark' ? '#8b949e' : '#57606a'};
-      --border-color: ${theme === 'dark' ? '#30363d' : '#d0d7de'};
-      --accent-color: ${theme === 'dark' ? '#67e8f9' : '#0f9aa8'};
-      --code-bg: ${theme === 'dark' ? '#161b22' : '#f6f8fa'};
+      --text-primary: ${tokens.text};
+      --text-secondary: ${tokens.muted};
+      --border-color: ${tokens.border};
+      --accent-color: ${tokens.accent};
+      --code-bg: ${tokens.codeBg};
+${markdownStyleCssVariables}
     }
 
     * {
@@ -111,16 +120,16 @@ export function buildExportStyles(
     }
 
     html:not(.dark) .export-document .markdown-body,
-    .export-document[data-theme="light"] .markdown-body {
-      color: #000000 !important;
-      --color-fg-default: #000000 !important;
-      --color-fg-muted: #444444 !important;
+    html[data-theme="light"] .export-document .markdown-body {
+      color: var(--mp-doc-text) !important;
+      --color-fg-default: var(--mp-doc-text) !important;
+      --color-fg-muted: var(--mp-doc-muted) !important;
       --color-canvas-default: transparent !important;
     }
 
     html.dark .export-document .markdown-body,
-    .export-document[data-theme="dark"] .markdown-body {
-      color: #c9d1d9;
+    html[data-theme="dark"] .export-document .markdown-body {
+      color: var(--mp-doc-text);
       --color-canvas-default: transparent;
     }
 
@@ -186,8 +195,18 @@ export function buildExportStyles(
     .export-document .markdown-body h4,
     .export-document .markdown-body h5,
     .export-document .markdown-body h6 {
-      color: ${theme === 'dark' ? '#c084fc' : '#7c3aed'};
+      color: var(--mp-doc-accent);
+      background: var(--mp-doc-heading-bg);
+      border-color: var(--mp-doc-heading-border);
+      font-weight: var(--mp-doc-heading-weight);
     }
+
+    .export-document .markdown-body h1 { color: var(--mp-doc-heading-1); }
+    .export-document .markdown-body h2 { color: var(--mp-doc-heading-2); }
+    .export-document .markdown-body h3 { color: var(--mp-doc-heading-3); }
+    .export-document .markdown-body h4 { color: var(--mp-doc-heading-4); }
+    .export-document .markdown-body h5 { color: var(--mp-doc-heading-5); }
+    .export-document .markdown-body h6 { color: var(--mp-doc-heading-6); }
 
     .export-document .markdown-body h2 {
       border-bottom: none;
@@ -199,21 +218,72 @@ export function buildExportStyles(
     }
 
     .export-document .markdown-body a {
-      color: var(--accent-color);
+      color: var(--mp-doc-link);
       text-decoration-thickness: 1.5px;
       text-underline-offset: 0.12em;
     }
 
+    .export-document .markdown-body a:hover {
+      color: var(--mp-doc-link-hover);
+    }
+
+    .export-document .markdown-body .internal-link,
+    .export-document .markdown-body .wiki-link {
+      color: var(--mp-doc-link);
+    }
+
+    .export-document .markdown-body .internal-link.is-unresolved,
+    .export-document .markdown-body .wiki-link.is-unresolved {
+      color: var(--mp-doc-link-unresolved);
+    }
+
+    .export-document .markdown-body .external-link {
+      color: var(--mp-doc-link-external);
+    }
+
+    .export-document .markdown-body strong {
+      color: var(--mp-doc-strong);
+    }
+
+    .export-document .markdown-body em {
+      color: var(--mp-doc-em);
+    }
+
+    .export-document .markdown-body strong em,
+    .export-document .markdown-body em strong {
+      color: var(--mp-doc-strong-em);
+    }
+
+    .export-document .markdown-body del {
+      color: var(--mp-doc-del);
+    }
+
+    .export-document .markdown-body mark {
+      color: var(--mp-doc-mark-text);
+      background: var(--mp-doc-mark-bg);
+    }
+
+    .export-document .markdown-body a.tag,
+    .export-document .markdown-body .tag {
+      color: var(--mp-doc-tag-text);
+      background: var(--mp-doc-tag-bg);
+      border: 1px solid var(--mp-doc-tag-border);
+      border-radius: 0.45rem;
+      padding: 0.08rem 0.36rem;
+      text-decoration: none;
+    }
+
     .export-document .markdown-body blockquote {
-      border-left-color: ${theme === 'dark' ? 'rgba(192, 132, 252, 0.32)' : 'rgba(124, 58, 237, 0.28)'};
-      color: ${theme === 'dark' ? '#ddd6fe' : '#5b21b6'};
-      background: ${theme === 'dark' ? 'rgba(192, 132, 252, 0.06)' : 'rgba(124, 58, 237, 0.04)'};
+      border-left-color: var(--mp-doc-accent);
+      color: var(--mp-doc-quote-text);
+      background: var(--mp-doc-quote-bg);
       border-radius: 0 14px 14px 0;
       padding: 0.9rem 1rem;
     }
 
     .export-document .markdown-body code {
-      background: ${theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)'};
+      color: var(--mp-doc-code-text);
+      background: var(--mp-doc-code-bg);
       border-radius: 0.45rem;
       padding: 0.15rem 0.35rem;
       font-family: ${resolvedCodeFontFamily};
@@ -221,9 +291,9 @@ export function buildExportStyles(
     }
 
     .export-document .markdown-body pre {
-      background: ${theme === 'dark' ? 'rgba(15, 23, 42, 0.82)' : 'rgba(248, 250, 252, 0.96)'};
-      color: ${theme === 'dark' ? '#e5eef9' : '#1f2937'};
-      border: 1px solid ${theme === 'dark' ? 'rgba(148, 163, 184, 0.16)' : 'rgba(148, 163, 184, 0.2)'};
+      background: var(--mp-doc-code-bg);
+      color: var(--mp-doc-code-text);
+      border: 1px solid var(--mp-doc-code-border);
       border-radius: 1rem;
       padding: 0;
       overflow: hidden;
@@ -278,7 +348,21 @@ export function buildExportStyles(
     }
 
     .export-document .markdown-body table tr:nth-child(2n) {
-      background-color: var(--bg-secondary);
+      background-color: var(--mp-doc-table-row-alt-bg);
+    }
+
+    .export-document .markdown-body table tr:hover {
+      background-color: var(--mp-doc-table-hover-bg);
+    }
+
+    .export-document .markdown-body table th {
+      background-color: var(--mp-doc-table-header-bg);
+      color: var(--mp-doc-text);
+    }
+
+    .export-document .markdown-body ul li::marker,
+    .export-document .markdown-body ol li::marker {
+      color: var(--mp-doc-list-marker);
     }
 
     .export-properties {
@@ -401,10 +485,14 @@ export function buildExportStyles(
   `;
 }
 
-export function buildExportDocument(contentHtml: string, toc: string): string {
+export function buildExportDocument(
+  contentHtml: string,
+  toc: string,
+  markdownStylePreset: MarkdownStylePreset = 'nord',
+): string {
   return `
     <div class="export-stage">
-      <div class="export-document">
+      <div class="export-document" data-markdown-style="${normalizeMarkdownStylePreset(markdownStylePreset)}">
         ${toc}
         ${contentHtml}
       </div>

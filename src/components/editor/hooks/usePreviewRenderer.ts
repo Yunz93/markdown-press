@@ -13,6 +13,7 @@ import { resolvePreviewSource, warmPreviewImage } from '../../../utils/previewIm
 import { parseWikiLinkReference, extractWikiNoteFragment } from '../../../utils/wikiLinks';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../../utils/attachmentResolver';
 import type { FileNode } from '../../../types';
+import type { MarkdownStylePreset } from '../../../types';
 import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 import {
   buildIframeEmbed,
@@ -47,6 +48,7 @@ export interface UsePreviewRendererOptions {
   isHtmlPreview: boolean;
   highlighter?: ShikiHighlighter | null;
   themeMode?: 'light' | 'dark';
+  markdownStylePreset?: MarkdownStylePreset;
   files: FileNode[];
   rootFolderPath?: string | null;
   fileContents: Record<string, string>;
@@ -70,6 +72,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     isHtmlPreview,
     highlighter,
     themeMode = 'light',
+    markdownStylePreset = 'nord',
     files,
     rootFolderPath,
     fileContents,
@@ -99,8 +102,9 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       highlighter,
       isMarkdownPreview,
       themeMode,
+      markdownStylePreset,
     });
-  }, [content, currentFilePath, highlighter, isMarkdownPreview, themeMode]);
+  }, [content, currentFilePath, highlighter, isMarkdownPreview, markdownStylePreset, themeMode]);
 
   // Sanitize HTML for HTML preview
   const sanitizedHtmlPreview = useMemo(() => {
@@ -375,7 +379,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             body.className = 'markdown-body preview-note-embed-body';
             try {
               const noteHtml = protectShikiPresInHtmlString(
-                renderMarkdown(fragment.markdown, { highlighter, themeMode }),
+                renderMarkdown(fragment.markdown, { highlighter, themeMode, markdownStylePreset }),
                 shikiSnapshots,
               );
               body.innerHTML = noteHtml;

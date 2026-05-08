@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { ViewMode } from '../../types';
 import { EditorPane, type EditorPaneHandle } from './EditorPane';
@@ -8,6 +8,7 @@ import { throttle } from '../../utils/throttle';
 import type { PaneDensity } from './paneLayout';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
+import { getMarkdownStyleCssVariables } from '../../utils/markdownStyle';
 
 const PANE_TRANSITION_MS = 200;
 const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
@@ -36,7 +37,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
 }) => {
   const { t } = useI18n();
   const MIN_SPLIT_PANE_WIDTH = 360;
-  const { viewMode } = useAppStore();
+  const { settings, viewMode } = useAppStore();
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
@@ -257,6 +258,10 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const editorActive = editorWidth > 0;
   const previewActive = previewWidth > 0;
   const activePaneKey = activeTabId ?? 'no-active-tab';
+  const markdownStyleVariables = useMemo(
+    () => getMarkdownStyleCssVariables(settings.markdownStylePreset, settings.themeMode),
+    [settings.markdownStylePreset, settings.themeMode],
+  );
 
   const editorPaneStyle: React.CSSProperties = {
     width: `${editorWidth}%`,
@@ -275,7 +280,11 @@ export const SplitView: React.FC<SplitViewProps> = ({
   };
 
   return (
-    <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
+    <div
+      className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black transition-colors"
+      data-markdown-style={settings.markdownStylePreset}
+      style={markdownStyleVariables as React.CSSProperties}
+    >
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden relative flex flex-row"

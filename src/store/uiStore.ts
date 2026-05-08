@@ -12,6 +12,7 @@ import {
   DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
 } from '../utils/fontSettings';
+import { DEFAULT_MARKDOWN_STYLE_PRESET, normalizeMarkdownStylePreset } from '../utils/markdownStyle';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
 import { normalizeWikiFolder } from '../utils/wikiGeneration';
 import { normalizeTrashFolder } from '../utils/trashFolder';
@@ -93,6 +94,7 @@ export const defaultSettings: AppSettings = {
   trashFolder: '.trash',
   attachmentPasteFormat: 'obsidian',
   orderedListMode: 'strict',
+  markdownStylePreset: DEFAULT_MARKDOWN_STYLE_PRESET,
   blogRepoUrl: '',
   blogSiteUrl: '',
   blogGithubToken: '',
@@ -181,6 +183,7 @@ export function createUISlice(
         ...settings,
         language: normalizeLanguage(settings.language),
         themeMode: normalizeThemeMode(settings.themeMode),
+        markdownStylePreset: normalizeMarkdownStylePreset(settings.markdownStylePreset),
         wikiFolder: normalizeWikiFolder(settings.wikiFolder),
         trashFolder: normalizeTrashFolder(settings.trashFolder),
       }
@@ -194,6 +197,7 @@ export function createUISlice(
           ...updates,
           language: normalizeLanguage(updates.language ?? state.settings.language),
           themeMode: normalizeThemeMode(updates.themeMode ?? state.settings.themeMode),
+          markdownStylePreset: normalizeMarkdownStylePreset(updates.markdownStylePreset ?? state.settings.markdownStylePreset),
           wikiFolder: normalizeWikiFolder(updates.wikiFolder ?? state.settings.wikiFolder),
           trashFolder: normalizeTrashFolder(updates.trashFolder ?? state.settings.trashFolder),
         }

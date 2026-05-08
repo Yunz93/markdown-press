@@ -96,6 +96,7 @@ export type ThemeMode = 'light' | 'dark';
 export type AppLanguage = 'zh-CN' | 'en';
 export type AttachmentPasteFormat = 'markdown' | 'obsidian';
 export type OrderedListMode = 'strict' | 'loose';
+export type MarkdownStylePreset = 'nord' | 'topaz' | 'typewriter' | 'primary';
 
 export type ImageHostingProvider = 'none' | 'github' | 's3' | 'aliyun_oss' | 'qiniu' | 'custom';
 export type ImagePasteAction = 'local' | 'upload';
@@ -167,6 +168,7 @@ export interface AppSettings {
   trashFolder: string;
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
+  markdownStylePreset: MarkdownStylePreset;
   blogRepoUrl: string;
   blogSiteUrl: string;
   blogGithubToken?: string;

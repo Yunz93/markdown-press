@@ -9,13 +9,14 @@ import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensio
 import { normalizeShikiLanguage } from './shikiLanguages';
 import { getMarkdownPressShikiTheme } from './shikiTheme';
 import { parseWikiLinkReference } from './wikiLinks';
-import type { ThemeMode } from '../types';
+import type { MarkdownStylePreset, ThemeMode } from '../types';
 import { LRUCache, hashContent } from './performance';
 import { normalizeMarkdownTablesForRender } from './markdownTableNormalize';
 import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
 
 interface MarkdownRenderOptions {
   highlighter?: ShikiHighlighter | null;
+  markdownStylePreset?: MarkdownStylePreset;
   themeMode?: ThemeMode;
 }
 
@@ -214,7 +215,12 @@ function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string)
   return false;
 }
 
-function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | null, themeMode: ThemeMode = 'light') {
+function configureFenceRenderer(
+  md: MarkdownIt,
+  highlighter: ShikiHighlighter | null,
+  themeMode: ThemeMode = 'light',
+  markdownStylePreset: MarkdownStylePreset = 'nord',
+) {
   // Always update current highlighter reference for the latest instance
   currentHighlighter = highlighter;
   currentTheme = themeMode;
@@ -248,7 +254,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
 
     if (!shouldAvoidShellHighlight && activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
       try {
-        const activeTheme = getMarkdownPressShikiTheme(activeThemeMode);
+        const activeTheme = getMarkdownPressShikiTheme(activeThemeMode, markdownStylePreset);
         const shikiHtml = wrapShikiBlockHtml(
           activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme }),
         );
@@ -282,7 +288,7 @@ function configureFenceRenderer(md: MarkdownIt, highlighter: ShikiHighlighter | 
         if (typeof window !== 'undefined') {
           console.warn('[Shiki Error Details]', {
             lang,
-            theme: getMarkdownPressShikiTheme(activeThemeMode),
+            theme: getMarkdownPressShikiTheme(activeThemeMode, markdownStylePreset),
             hasHighlighter: !!activeHighlighter,
             highlighterMethods: Object.keys(activeHighlighter || {}),
           });
@@ -312,7 +318,7 @@ function createCacheKey(markdown: string, options: MarkdownRenderOptions): strin
   const hlToken = hl
     ? `1_${typeof hl.__revision === 'number' ? hl.__revision : 0}`
     : '0';
-  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}`;
+  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}_${options.markdownStylePreset ?? 'nord'}`;
 }
 
 /**
@@ -359,9 +365,10 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   const md = getMarkdownIt();
   const highlighter = options.highlighter ?? null;
   const themeMode = options.themeMode ?? 'light';
+  const markdownStylePreset = options.markdownStylePreset ?? 'nord';
 
   // Configure fence renderer with the highlighter
-  configureFenceRenderer(md, highlighter, themeMode);
+  configureFenceRenderer(md, highlighter, themeMode, markdownStylePreset);
 
   const env: MarkdownRenderEnv = {};
   const normalizedMarkdown = normalizeMarkdownTablesForRender(

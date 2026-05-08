@@ -228,6 +228,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
     files,
     fileContents,
     highlighter,
+    markdownStylePreset: settings.markdownStylePreset,
     themeMode: settings.themeMode as 'light' | 'dark',
     readFile,
   });
