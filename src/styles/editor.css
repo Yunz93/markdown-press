@@ -396,6 +396,14 @@
   background: transparent;
 }
 
+.editor-pane-layout .wiki-link-hover-preview-body.preview-pane-document.markdown-body {
+  /* `preview.css` scopes most typography under `.preview-pane-document.markdown-body`,
+     but for this editor-side overlay we keep the smaller card padding. */
+  padding: 0.85rem 0.95rem 0.95rem !important;
+  font-family: var(--preview-font-family, var(--editor-font-family)) !important;
+  font-size: var(--editor-font-size) !important;
+}
+
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body > :first-child {
   margin-top: 0;
 }
@@ -419,31 +427,61 @@
 
 .editor-pane-layout .cm-frontmatter-line,
 .editor-pane-layout .cm-frontmatter-line span {
-  color: #475569 !important;
+  color: var(--mp-doc-muted, #475569) !important;
   font-size: 0.875rem !important;
   line-height: 1.72 !important;
 }
 
 .editor-pane-layout .cm-frontmatter-mark,
 .editor-pane-layout .cm-frontmatter-punctuation {
-  color: #94a3b8 !important;
+  color: var(--mp-doc-muted, #94a3b8) !important;
 }
 
 .editor-pane-layout .cm-frontmatter-key {
-  color: #2563eb !important;
+  color: var(--mp-doc-link, #2563eb) !important;
   font-weight: 600;
 }
 
 .editor-pane-layout .cm-frontmatter-comment,
 .editor-pane-layout .cm-frontmatter-comment span {
-  color: #94a3b8 !important;
+  color: var(--mp-doc-muted, #94a3b8) !important;
   font-style: italic;
 }
 
 .editor-pane-layout .mp-tok-heading,
 .editor-pane-layout .tok-heading {
-  color: var(--mp-doc-heading-3, #4f46e5);
+  color: var(--mp-doc-accent, #4f46e5);
   font-weight: var(--mp-doc-heading-weight, 700);
+}
+
+.editor-pane-layout .mp-tok-heading-1,
+.editor-pane-layout .tok-heading-1 {
+  color: var(--mp-doc-heading-1, var(--mp-doc-accent, #4f46e5));
+}
+
+.editor-pane-layout .mp-tok-heading-2,
+.editor-pane-layout .tok-heading-2 {
+  color: var(--mp-doc-heading-2, var(--mp-doc-accent, #4f46e5));
+}
+
+.editor-pane-layout .mp-tok-heading-3,
+.editor-pane-layout .tok-heading-3 {
+  color: var(--mp-doc-heading-3, var(--mp-doc-accent, #4f46e5));
+}
+
+.editor-pane-layout .mp-tok-heading-4,
+.editor-pane-layout .tok-heading-4 {
+  color: var(--mp-doc-heading-4, var(--mp-doc-accent, #4f46e5));
+}
+
+.editor-pane-layout .mp-tok-heading-5,
+.editor-pane-layout .tok-heading-5 {
+  color: var(--mp-doc-heading-5, var(--mp-doc-accent, #4f46e5));
+}
+
+.editor-pane-layout .mp-tok-heading-6,
+.editor-pane-layout .tok-heading-6 {
+  color: var(--mp-doc-heading-6, var(--mp-doc-accent, #4f46e5));
 }
 
 .editor-pane-layout .mp-tok-strong,
@@ -479,6 +517,11 @@
   color: var(--editor-code-string);
 }
 
+.editor-pane-layout .mp-tok-inline-code,
+.editor-pane-layout .tok-inline-code {
+  color: var(--mp-doc-code-text, var(--editor-code-fg));
+}
+
 .editor-pane-layout .mp-tok-keyword,
 .editor-pane-layout .tok-keyword {
   color: var(--editor-code-keyword);
@@ -487,7 +530,7 @@
 .editor-pane-layout .mp-tok-atom,
 .editor-pane-layout .tok-bool,
 .editor-pane-layout .tok-atom {
-  color: #b45309;
+  color: var(--editor-code-number);
 }
 
 .editor-pane-layout .mp-tok-number,
@@ -664,86 +707,6 @@
   color: #93c5fd !important;
 }
 
-.dark .editor-pane-layout .mp-tok-heading,
-.dark .editor-pane-layout .tok-heading {
-  color: #a5b4fc;
-}
-
-.dark .editor-pane-layout .mp-tok-strong,
-.dark .editor-pane-layout .tok-strong {
-  color: #fdba74;
-}
-
-.dark .editor-pane-layout .mp-tok-emphasis,
-.dark .editor-pane-layout .tok-emphasis {
-  color: #5eead4;
-}
-
-.dark .editor-pane-layout .mp-tok-link,
-.dark .editor-pane-layout .tok-link,
-.dark .editor-pane-layout .tok-url {
-  color: #7dd3fc;
-}
-
-.dark .editor-pane-layout .mp-tok-muted {
-  color: #94a3b8;
-}
-
-.dark .editor-pane-layout .mp-tok-muted-soft,
-.dark .editor-pane-layout .tok-punctuation,
-.dark .editor-pane-layout .tok-meta {
-  color: #64748b;
-}
-
-.dark .editor-pane-layout .mp-tok-code,
-.dark .editor-pane-layout .tok-string {
-  color: #86efac;
-}
-
-.dark .editor-pane-layout .mp-tok-keyword,
-.dark .editor-pane-layout .tok-keyword {
-  color: #fdba74;
-}
-
-.dark .editor-pane-layout .mp-tok-atom,
-.dark .editor-pane-layout .tok-bool,
-.dark .editor-pane-layout .tok-atom {
-  color: #fbbf24;
-}
-
-.dark .editor-pane-layout .mp-tok-number,
-.dark .editor-pane-layout .tok-number {
-  color: #5eead4;
-}
-
-.dark .editor-pane-layout .mp-tok-property,
-.dark .editor-pane-layout .tok-propertyName,
-.dark .editor-pane-layout .tok-labelName {
-  color: #93c5fd;
-}
-
-.dark .editor-pane-layout .mp-tok-variable,
-.dark .editor-pane-layout .tok-variableName,
-.dark .editor-pane-layout .tok-definition {
-  color: #e2e8f0;
-}
-
-.dark .editor-pane-layout .mp-tok-function,
-.dark .editor-pane-layout .tok-function {
-  color: #c084fc;
-}
-
-.dark .editor-pane-layout .mp-tok-type,
-.dark .editor-pane-layout .tok-typeName,
-.dark .editor-pane-layout .tok-className {
-  color: #5eead4;
-}
-
-.dark .editor-pane-layout .mp-tok-operator,
-.dark .editor-pane-layout .tok-operator {
-  color: #fbbf24;
-}
-
 .editor-pane-backdrop {
   position: relative;
   height: 100%;
@@ -898,7 +861,7 @@
 }
 
 .editor-source-fallback {
-  color: #475569;
+  color: var(--mp-doc-text, #475569);
 }
 
 .editor-source-fallback .md-token-delimiter,
@@ -910,58 +873,58 @@
 .editor-source-fallback .md-token-task,
 .editor-source-fallback .md-token-frontmatter-mark,
 .editor-source-fallback .md-token-frontmatter-punctuation {
-  color: #94a3b8;
+  color: var(--mp-doc-muted, #94a3b8);
 }
 
 .editor-source-fallback .md-token-heading-text,
 .editor-source-fallback .md-token-strong {
-  color: #4f46e5;
+  color: var(--mp-doc-heading-3, var(--mp-doc-accent, #4f46e5));
 }
 
 .editor-source-fallback .md-token-emphasis {
-  color: #0f766e;
+  color: var(--mp-doc-em, #0f766e);
 }
 
 .editor-source-fallback .md-token-link-text,
 .editor-source-fallback .md-token-image-alt,
 .editor-source-fallback .md-token-frontmatter-key,
 .editor-source-fallback .md-token-wikilink-target {
-  color: #2563eb;
+  color: var(--mp-doc-link, #2563eb);
 }
 
 .editor-source-fallback .md-token-wikilink-alias {
-  color: #4f46e5;
+  color: var(--mp-doc-heading-3, var(--mp-doc-accent, #4f46e5));
 }
 
 .editor-source-fallback .md-token-link-url,
 .editor-source-fallback .md-token-image-url,
 .editor-source-fallback .md-token-frontmatter-string {
-  color: #0369a1;
+  color: var(--mp-doc-link, #0369a1);
 }
 
 .editor-source-fallback .md-token-frontmatter-value {
-  color: #475569;
+  color: var(--mp-doc-text, #475569);
 }
 
 .editor-source-fallback .md-token-frontmatter-number,
 .editor-source-fallback .md-token-frontmatter-bool {
-  color: #b45309;
+  color: var(--editor-code-number, #b45309);
 }
 
 .editor-source-fallback .md-token-frontmatter-comment {
-  color: #94a3b8;
+  color: var(--mp-doc-muted, #94a3b8);
   font-style: italic;
 }
 
 .editor-source-fallback .md-token-inline-code,
 .editor-source-fallback .md-token-code-block,
 .editor-source-fallback .md-token-fence-info {
-  color: #0f766e;
+  color: var(--mp-doc-code-text, #0f766e);
 }
 
 .editor-source-fallback .md-token-rule,
 .editor-source-fallback .md-token-strike {
-  color: #64748b;
+  color: var(--mp-doc-del, #64748b);
 }
 
 .dark .editor-source-fallback {

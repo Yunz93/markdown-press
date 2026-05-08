@@ -21,13 +21,21 @@ import {
 // ==================== 语法高亮样式 ====================
 
 export const markdownHighlightStyle = HighlightStyle.define([
-  { tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4, tags.heading5, tags.heading6], class: 'tok-heading mp-tok-heading' },
+  { tag: tags.heading1, class: 'tok-heading tok-heading-1 mp-tok-heading mp-tok-heading-1' },
+  { tag: tags.heading2, class: 'tok-heading tok-heading-2 mp-tok-heading mp-tok-heading-2' },
+  { tag: tags.heading3, class: 'tok-heading tok-heading-3 mp-tok-heading mp-tok-heading-3' },
+  { tag: tags.heading4, class: 'tok-heading tok-heading-4 mp-tok-heading mp-tok-heading-4' },
+  { tag: tags.heading5, class: 'tok-heading tok-heading-5 mp-tok-heading mp-tok-heading-5' },
+  { tag: tags.heading6, class: 'tok-heading tok-heading-6 mp-tok-heading mp-tok-heading-6' },
+  { tag: tags.heading, class: 'tok-heading mp-tok-heading' },
   { tag: tags.strong, class: 'tok-strong mp-tok-strong' },
   { tag: tags.emphasis, class: 'tok-emphasis mp-tok-emphasis' },
   { tag: [tags.link, tags.url], class: 'tok-link mp-tok-link' },
   { tag: [tags.quote, tags.list], class: 'mp-tok-muted' },
   { tag: [tags.separator, tags.contentSeparator, tags.punctuation, tags.meta, tags.processingInstruction], class: 'tok-punctuation tok-meta mp-tok-muted-soft' },
-  { tag: [tags.monospace, tags.literal, tags.string], class: 'tok-string mp-tok-code' },
+  // Inline code should follow the markdown style preset code text, not the code-string palette.
+  { tag: tags.monospace, class: 'tok-inline-code mp-tok-inline-code' },
+  { tag: [tags.literal, tags.string], class: 'tok-string mp-tok-code' },
   { tag: [tags.regexp, tags.escape, tags.special(tags.string)], class: 'tok-string tok-regexp mp-tok-code' },
   { tag: [tags.keyword, tags.operatorKeyword], class: 'tok-keyword mp-tok-keyword' },
   { tag: [tags.controlKeyword, tags.definitionKeyword, tags.moduleKeyword, tags.modifier], class: 'tok-keyword tok-definitionKeyword mp-tok-keyword' },

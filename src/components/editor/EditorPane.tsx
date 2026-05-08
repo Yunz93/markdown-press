@@ -27,6 +27,7 @@ import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 import { uploadImageToHosting, isImageHostingEnabled } from '../../services/imageHostingService';
 import { readFile as tauriReadFile } from '@tauri-apps/plugin-fs';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
+import { buildWikiPreviewMarkup } from '../../utils/wikiPreviewMarkup';
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -58,32 +59,7 @@ function isPreviewModifierKey(key: string): boolean {
   return key === 'Meta' || key === 'Control';
 }
 
-function buildWikiPreviewMarkup(preview: WikiLinkPreviewData): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'wiki-link-hover-preview';
-
-  const header = document.createElement('div');
-  header.className = 'wiki-link-hover-preview-header';
-
-  const title = document.createElement('div');
-  title.className = 'wiki-link-hover-preview-title';
-  title.textContent = preview.title;
-  header.appendChild(title);
-
-  if (preview.subtitle) {
-    const subtitle = document.createElement('div');
-    subtitle.className = 'wiki-link-hover-preview-subtitle';
-    subtitle.textContent = preview.subtitle;
-    header.appendChild(subtitle);
-  }
-
-  const body = document.createElement('article');
-  body.className = 'markdown-body wiki-link-hover-preview-body';
-  body.innerHTML = preview.html;
-
-  container.append(header, body);
-  return container;
-}
+// buildWikiPreviewMarkup moved to `src/utils/wikiPreviewMarkup.ts` (shared markup + style domains).
 
 function findWikiLinkNearPosition(text: string, pos: number) {
   const offsets = [0, -1, 1, -2, 2];
