@@ -37,6 +37,7 @@ import { useAppUpdater } from './app/useAppUpdater';
 import { useWorkspaceLayout } from './app/useWorkspaceLayout';
 import { useAttachmentCleanup } from './app/useAttachmentCleanup';
 import { useExternalFileOpen } from './app/useExternalFileOpen';
+import { getStartupKnowledgeBaseGate } from './app/startupKnowledgeBaseGate';
 import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
 import { isTauriEnvironment } from './types/filesystem';
 
@@ -445,17 +446,17 @@ const App: React.FC = () => {
     updateSettings,
   ]);
 
-  const shouldShowKnowledgeBaseLoading =
-    settingsHydrated &&
-    !rootFolderPath &&
-    isRestoringStartupKnowledgeBase &&
-    !hasResolvedStartupKnowledgeBase;
-
-  const shouldShowKnowledgeBaseOnboarding =
-    settingsHydrated &&
-    !rootFolderPath &&
-    files.length === 0 &&
-    hasResolvedStartupKnowledgeBase;
+  const { shouldShowKnowledgeBaseLoading, shouldShowKnowledgeBaseOnboarding } = getStartupKnowledgeBaseGate({
+    settingsHydrated,
+    rootFolderPath,
+    filesLen: files.length,
+    isTauri: isTauriEnvironment(),
+    lastKnowledgeBasePath: settings.lastKnowledgeBasePath ?? '',
+    externalChecked: externalFileOpen.hasCheckedExternalFiles,
+    externalHandled: externalFileOpen.hasHandledExternalFile,
+    isRestoringStartupKnowledgeBase,
+    hasResolvedStartupKnowledgeBase,
+  });
 
   if (shouldShowKnowledgeBaseLoading) {
     return (

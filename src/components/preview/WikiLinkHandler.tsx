@@ -183,8 +183,14 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   }
 
   if (error || !resolved) {
+    const missingStyle: React.CSSProperties = {};
+    if (embedWidth) missingStyle.maxWidth = `${embedWidth}px`;
+    if (embedHeight) {
+      missingStyle.maxHeight = `${embedHeight}px`;
+      missingStyle.overflow = 'auto';
+    }
     return (
-      <span className="preview-attachment-file preview-attachment-file-missing">
+      <span className="preview-attachment-file preview-attachment-file-missing" style={missingStyle}>
         {error || 'Missing attachment'}
       </span>
     );
@@ -203,7 +209,13 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
         src={resolved.path}
         alt={label || resolved.name}
         className="preview-attachment-image"
-        style={{ width: embedWidth, height: embedHeight, objectFit: embedHeight ? 'contain' : undefined }}
+        style={{
+          width: embedWidth,
+          maxWidth: embedWidth,
+          height: embedHeight,
+          maxHeight: embedHeight,
+          objectFit: embedHeight ? 'contain' : undefined,
+        }}
         decoding="async"
       />
     );
@@ -238,6 +250,12 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   }
 
   // Generic file attachment
+  const fileStyle: React.CSSProperties = {};
+  if (embedWidth) fileStyle.maxWidth = `${embedWidth}px`;
+  if (embedHeight) {
+    fileStyle.maxHeight = `${embedHeight}px`;
+    fileStyle.overflow = 'auto';
+  }
   return (
     <a
       className="preview-attachment-file"
@@ -245,6 +263,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
       data-attachment-path={resolved.path}
       data-attachment-name={resolved.name}
       title={`${t('preview_doubleClickReveal')}: ${resolved.name}`}
+      style={fileStyle}
     >
       <span className="preview-attachment-file-name">{label || resolved.name}</span>
       <span className="preview-attachment-file-hint">{t('preview_doubleClickReveal')}</span>

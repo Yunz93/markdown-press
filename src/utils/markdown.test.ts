@@ -15,6 +15,12 @@ describe('renderMarkdown', () => {
     expect(html).toMatch(/My Note/i);
   });
 
+  it('renders wiki embed size attributes from pipe syntax', () => {
+    const html = renderMarkdown('![[resources/test.pg|300]]');
+    expect(html).toContain('data-wiki-embed="true"');
+    expect(html).toContain('data-wiki-width="300"');
+  });
+
   it('renders inline KaTeX and preserves structure after DOMPurify', () => {
     const html = renderMarkdown('Formula $x^2 + y^2 = z^2$ end.');
     expect(html).toContain('katex');

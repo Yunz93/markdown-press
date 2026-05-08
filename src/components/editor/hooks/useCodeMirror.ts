@@ -166,6 +166,32 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     }
   }, [content]);
 
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.placeholder.reconfigure(cmPlaceholder(placeholder)),
+    });
+  }, [compartments.placeholder, placeholder]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.wrap.reconfigure(wordWrap ? EditorView.lineWrapping : []),
+    });
+  }, [compartments.wrap, wordWrap]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.keymap.reconfigure(
+        Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode)))
+      ),
+    });
+  }, [compartments.keymap, orderedListMode]);
+
   // Callback ref to track when editor element is mounted
   const setEditorElement = useCallback((element: HTMLDivElement | null) => {
     editorRef.current = element;
@@ -429,7 +455,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       viewRef.current = null;
       setViewReady(false);
     };
-  }, [editorElementReady, placeholder, wordWrap, orderedListMode, compartments.wrap, compartments.placeholder, compartments.keymap, compartments.markdown]);
+  }, [compartments.markdown, editorElementReady, themeMode]);
 
   // Sync external content changes (only when not typing)
   useEffect(() => {

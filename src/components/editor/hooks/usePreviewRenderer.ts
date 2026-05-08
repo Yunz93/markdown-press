@@ -328,6 +328,11 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
           if (!resolvedTarget) {
             embed.className = 'preview-attachment-file preview-attachment-file-missing';
             embed.textContent = `Missing attachment: ${label || target}`;
+            if (embedWidth) embed.style.maxWidth = `${embedWidth}px`;
+            if (embedHeight) {
+              embed.style.maxHeight = `${embedHeight}px`;
+              embed.style.overflow = 'auto';
+            }
             return;
           }
 
@@ -397,9 +402,15 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             const image = document.createElement('img');
             image.className = 'preview-attachment-image';
             image.alt = label || resolvedTarget.name;
-            if (embedWidth) image.style.width = `${embedWidth}px`;
+            if (embedWidth) {
+              // Inline `!important` guards against preview CSS or WKWebView style quirks
+              // that can otherwise override the embed sizing.
+              image.style.setProperty('width', `${embedWidth}px`, 'important');
+              image.style.setProperty('max-width', `${embedWidth}px`, 'important');
+            }
             if (embedHeight) {
-              image.style.height = `${embedHeight}px`;
+              image.style.setProperty('height', `${embedHeight}px`, 'important');
+              image.style.setProperty('max-height', `${embedHeight}px`, 'important');
               image.style.objectFit = 'contain';
             }
 
@@ -455,6 +466,11 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
           attachment.dataset.attachmentPath = resolvedTarget.path;
           attachment.dataset.attachmentName = resolvedTarget.name;
           attachment.title = `Double-click to reveal ${resolvedTarget.name}`;
+          if (embedWidth) attachment.style.maxWidth = `${embedWidth}px`;
+          if (embedHeight) {
+            attachment.style.maxHeight = `${embedHeight}px`;
+            attachment.style.overflow = 'auto';
+          }
 
           const fileName = document.createElement('span');
           fileName.className = 'preview-attachment-file-name';
