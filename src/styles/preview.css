@@ -207,6 +207,20 @@
   box-shadow: 0 16px 40px color-mix(in srgb, var(--mp-doc-accent, #0f172a) 12%, transparent);
 }
 
+/* Wiki `![[note|100]]` embeds: `data-wiki-embed-w` / `h` are set on <img> after async enhancement.
+   Some WKWebView release paths drop inline `style` when HTML is re-serialized for React; `attr()`
+   keeps the requested size in author CSS. Values are like "100px" on the data attribute. */
+.preview-pane-document.markdown-body img.preview-attachment-image[data-wiki-embed-w] {
+  width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
+  max-width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
+}
+
+.preview-pane-document.markdown-body img.preview-attachment-image[data-wiki-embed-h] {
+  height: attr(data-wiki-embed-h px, auto) !important;
+  max-height: attr(data-wiki-embed-h px, none) !important;
+  object-fit: contain;
+}
+
 .preview-pane-document.markdown-body .preview-attachment-video,
 .preview-pane-video-player {
   display: block;

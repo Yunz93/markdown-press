@@ -1,6 +1,7 @@
 /** @vitest-environment happy-dom */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { shouldUseAsyncPreviewEnhancement } from '../components/editor/preview/previewRenderCore';
 import { clearMarkdownCache, renderMarkdown } from './markdown';
 
 describe('renderMarkdown', () => {
@@ -19,6 +20,11 @@ describe('renderMarkdown', () => {
     const html = renderMarkdown('![[resources/test.pg|300]]');
     expect(html).toContain('data-wiki-embed="true"');
     expect(html).toContain('data-wiki-width="300"');
+  });
+
+  it('wiki-embed-only body still enables async preview enhancement', () => {
+    const html = renderMarkdown('![[note|100]]');
+    expect(shouldUseAsyncPreviewEnhancement(html, true)).toBe(true);
   });
 
   it('renders inline KaTeX and preserves structure after DOMPurify', () => {

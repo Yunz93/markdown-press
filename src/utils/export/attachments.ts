@@ -8,7 +8,7 @@ export async function enhanceExportAttachmentEmbeds(container: HTMLElement, sour
   if (!sourceFilePath) return;
 
   const resolverContext = createAttachmentResolverContext([], null, sourceFilePath);
-  const embeds = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-wiki-embed="true"], article.markdown-body a.markdown-embed'));
+  const embeds = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-wiki-embed], article.markdown-body a.markdown-embed'));
 
   for (const embed of embeds) {
     const target = embed.dataset.wikiTarget?.trim() || embed.dataset.wikilink?.trim();

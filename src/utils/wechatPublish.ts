@@ -334,7 +334,7 @@ export async function prepareWechatDraftPublish(
     return placeholder;
   };
 
-  const wikiEmbeds = Array.from(host.querySelectorAll<HTMLAnchorElement>('a[data-wiki-embed="true"]'));
+  const wikiEmbeds = Array.from(host.querySelectorAll<HTMLAnchorElement>('a[data-wiki-embed]'));
   for (const embed of wikiEmbeds) {
     const target = embed.getAttribute('data-wiki-target')?.trim() || embed.getAttribute('data-wikilink')?.trim() || '';
     if (!target) {

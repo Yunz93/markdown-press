@@ -42,7 +42,12 @@ export function isHtmlDocument(fileName: string): boolean {
 }
 
 export function hasWikiEmbedsInHtml(html: string): boolean {
-  return html.includes('data-wiki-embed="true"') || html.includes('class="markdown-link markdown-embed"');
+  if (!html) return false;
+  // Do not match exact attribute/class strings: DOMPurify may reorder class tokens
+  // (`markdown-embed` before `markdown-link`) or normalize `data-wiki-embed` across
+  // engines. If this returns false, preview skips async embed enhancement entirely
+  // (release WKWebView then shows unsized placeholder links).
+  return /\bdata-wiki-embed\b/i.test(html);
 }
 
 export function hasEmbeddableMediaLinksInHtml(html: string): boolean {

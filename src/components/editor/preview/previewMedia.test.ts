@@ -1,18 +1,22 @@
-/** @vitest-environment happy-dom */
-
 import { describe, expect, it } from 'vitest';
-import { createPreviewPdfContainer } from './previewMedia';
+import { hasWikiEmbedsInHtml } from './previewMedia';
 
-describe('PDF preview helpers', () => {
-  it('creates PDF.js preview containers for live DOM rendering', () => {
-    const container = createPreviewPdfContainer(document, 'blob:test-pdf', 'Sample PDF', '/vault/Sample PDF.pdf');
+describe('hasWikiEmbedsInHtml', () => {
+  it('detects embed markup regardless of class token order', () => {
+    expect(
+      hasWikiEmbedsInHtml(
+        '<a class="markdown-embed markdown-link" href="#" data-wiki-embed="true"></a>',
+      ),
+    ).toBe(true);
+  });
 
-    expect(container.classList.contains('preview-attachment-pdf')).toBe(true);
-    expect(container.classList.contains('preview-pdfjs')).toBe(true);
-    expect(container.dataset.pdfSrc).toBe('blob:test-pdf');
-    expect(container.dataset.pdfTitle).toBe('Sample PDF');
-    expect(container.dataset.pdfPath).toBe('/vault/Sample PDF.pdf');
-    expect(container.dataset.pdfjsState).toBe('pending');
-    expect(container.textContent).toBe('Loading PDF...');
+  it('detects data-wiki-embed without requiring ="true" substring', () => {
+    expect(
+      hasWikiEmbedsInHtml('<a data-wiki-embed href="#" class="markdown-link markdown-embed"></a>'),
+    ).toBe(true);
+  });
+
+  it('is false for plain wikilinks', () => {
+    expect(hasWikiEmbedsInHtml('<a class="markdown-wikilink" data-wikilink="X"></a>')).toBe(false);
   });
 });

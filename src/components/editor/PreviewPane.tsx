@@ -541,7 +541,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const target = event.target as HTMLElement | null;
     
     // Ignore embed link clicks
-    const embedLink = target?.closest('a[data-wiki-embed="true"], a.markdown-embed') as HTMLAnchorElement | null;
+    const embedLink = target?.closest('a[data-wiki-embed], a.markdown-embed') as HTMLAnchorElement | null;
     if (embedLink) {
       event.preventDefault();
       return;
@@ -591,7 +591,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     const target = event.target as HTMLElement | null;
     
     // Embed link double click
-    const embedLink = target?.closest('a[data-wiki-embed="true"], a.markdown-embed') as HTMLAnchorElement | null;
+    const embedLink = target?.closest('a[data-wiki-embed], a.markdown-embed') as HTMLAnchorElement | null;
     const embedTarget = embedLink?.dataset.wikiTarget?.trim() || embedLink?.dataset.wikilink?.trim();
     if (embedTarget) {
       event.preventDefault();

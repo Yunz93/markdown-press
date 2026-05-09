@@ -189,7 +189,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
         const shikiSnapshots: string[] = [];
         host.innerHTML = protectShikiPresInHtmlString(basePreviewHtml, shikiSnapshots);
         const embeds = isMarkdownPreview
-          ? Array.from(host.querySelectorAll<HTMLElement>('[data-wiki-embed="true"], a.markdown-embed'))
+          ? Array.from(host.querySelectorAll<HTMLElement>('[data-wiki-embed], a.markdown-embed'))
           : [];
         const markdownImages = Array.from(host.querySelectorAll<HTMLImageElement>('img'));
         const markdownVideos = Array.from(host.querySelectorAll<HTMLVideoElement>('video'));
@@ -407,11 +407,15 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
               // that can otherwise override the embed sizing.
               image.style.setProperty('width', `${embedWidth}px`, 'important');
               image.style.setProperty('max-width', `${embedWidth}px`, 'important');
+              // Survives innerHTML → dangerouslySetInnerHTML round-trips better than style alone
+              // in some WKWebView release builds; sized via preview.css `attr(...)`.
+              image.setAttribute('data-wiki-embed-w', `${embedWidth}px`);
             }
             if (embedHeight) {
               image.style.setProperty('height', `${embedHeight}px`, 'important');
               image.style.setProperty('max-height', `${embedHeight}px`, 'important');
               image.style.objectFit = 'contain';
+              image.setAttribute('data-wiki-embed-h', `${embedHeight}px`);
             }
 
             try {
