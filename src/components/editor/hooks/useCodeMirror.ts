@@ -455,7 +455,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       viewRef.current = null;
       setViewReady(false);
     };
-  }, [compartments.markdown, editorElementReady, themeMode]);
+  }, [compartments.markdown, editorElementReady]);
 
   // Sync external content changes (only when not typing)
   useEffect(() => {
