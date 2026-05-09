@@ -211,15 +211,21 @@ export function useFileOperations() {
       });
 
       for (const item of trashItems) {
-        await deleteFile(item);
+        await deleteFile(item, { skipRefresh: true });
       }
+      await refreshFileTree();
 
       affectedTabIds.forEach((tabId) => closeTab(tabId));
       showNotification(t(settings.language, 'notifications_trashEmptied'), 'success');
     } catch {
+      try {
+        await refreshFileTree();
+      } catch {
+        // best-effort resync after partial delete
+      }
       showNotification(t(settings.language, 'notifications_failedEmptyTrash'), 'error');
     }
-  }, [files, openTabs, deleteFile, closeTab, showNotification]);
+  }, [files, openTabs, deleteFile, refreshFileTree, closeTab, showNotification]);
 
   const remapPathReferencesAfterMove = useCallback((pathMap: Record<string, string>) => {
     useAppStore.setState((state) => {

@@ -664,7 +664,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       onScroll={handleScroll}
       onClick={handlePreviewClick}
       onDoubleClick={handlePreviewDoubleClick}
-      className={`editor-pane-layout preview-scroll-container h-full min-w-0 overflow-y-auto transition-colors ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
+      className={`editor-pane-layout preview-scroll-container h-full min-w-0 overflow-y-auto ${hasActiveFile ? '' : 'preview-pane-empty-state'}`}
       style={{ pointerEvents: 'auto', ...layoutStyle }}
     >
       <div className={`editor-pane-backdrop min-h-full ${hasActiveFile ? '' : 'h-full'}`}>

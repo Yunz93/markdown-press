@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { ThemeMode } from '../types';
 import { isTauriEnvironment } from '../types/filesystem';
 
@@ -6,24 +7,46 @@ import { isTauriEnvironment } from '../types/filesystem';
  * Syncs the active theme to the DOM during render so descendants (e.g. preview layout effects,
  * KaTeX) see the same `html.dark` state as `settings.themeMode` in the same commit.
  *
- * A post-paint `useEffect` runs too late: child layout/effects can observe a stale class until the
- * user toggles theme again.
+ * Native chrome (`setTheme`) runs in `useLayoutEffect` so it is scheduled with this commit and
+ * before paint, matching the DOM flip as closely as the async IPC allows (no `useEffect` + import lag).
  */
 export function useThemeSync(themeMode: ThemeMode): void {
   if (typeof document !== 'undefined') {
     document.documentElement.classList.toggle('dark', themeMode === 'dark');
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      root.setAttribute('data-theme-switching', 'true');
+      const raf1 = requestAnimationFrame(() => {
+        const raf2 = requestAnimationFrame(() => {
+          root.removeAttribute('data-theme-switching');
+        });
+        // ensure cleanup if unmounted before raf2
+        (root as any).__themeSwitchRaf2 = raf2;
+      });
+      (root as any).__themeSwitchRaf1 = raf1;
+    }
+
     if (!isTauriEnvironment()) return;
 
     void (async () => {
       try {
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
         await getCurrentWindow().setTheme(themeMode === 'dark' ? 'dark' : 'light');
-      } catch {
-        // Web build or API unavailable
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[useThemeSync] Native window theme sync failed.', error);
+        }
       }
     })();
+
+    return () => {
+      if (typeof document === 'undefined') return;
+      const root = document.documentElement as any;
+      if (root.__themeSwitchRaf1) cancelAnimationFrame(root.__themeSwitchRaf1);
+      if (root.__themeSwitchRaf2) cancelAnimationFrame(root.__themeSwitchRaf2);
+      document.documentElement.removeAttribute('data-theme-switching');
+    };
   }, [themeMode]);
 }

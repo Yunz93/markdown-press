@@ -528,9 +528,12 @@ export function useFileSystem() {
   }, [handleFileSystemError]);
 
   /**
-   * Delete a file
+   * Delete a file. Pass `skipRefresh: true` when batching deletes under the same root so the caller can call `refreshFileTree()` once at the end.
    */
-  const deleteFile = useCallback(async (file: FileNode): Promise<void> => {
+  const deleteFile = useCallback(async (
+    file: FileNode,
+    options?: { skipRefresh?: boolean }
+  ): Promise<void> => {
     try {
       const rootPath = useAppStore.getState().rootFolderPath;
       const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
@@ -546,7 +549,9 @@ export function useFileSystem() {
       });
 
       if (cleanedTrashContainer) {
-        await refreshFileTree();
+        if (!options?.skipRefresh) {
+          await refreshFileTree();
+        }
       } else {
         useAppStore.getState().removeFile(file.id);
       }

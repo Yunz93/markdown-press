@@ -3,6 +3,8 @@ import { ViewMode, type ThemeMode } from '../../types';
 import { ViewModeToggle } from '../toolbar/ViewModeToggle';
 import { AIButton } from '../toolbar/AIButton';
 import { useI18n } from '../../hooks/useI18n';
+import { isTauriEnvironment } from '../../types/filesystem';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface ToolbarProps {
   fileName: string;
@@ -42,11 +44,25 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   const displayFileName = fileName.replace(/\.md$/i, '');
 
   return (
-    <div className="ui-scaled sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-transparent bg-gray-50 dark:bg-black px-4 py-3 transition-colors md:px-6 md:py-2">
-      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden md:gap-4">
+    <div
+      className="ui-scaled sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-transparent bg-gray-50 dark:bg-black px-4 py-3 md:px-6 md:py-2"
+      data-tauri-drag-region
+    >
+      <div
+        className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden md:gap-4"
+        onMouseDown={(event) => {
+          if (event.button !== 0) return;
+          const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform ?? '');
+          if (!isMac || !isTauriEnvironment()) return;
+          const target = event.target as HTMLElement | null;
+          if (target?.closest('button, input, textarea, select, a, [role=\"button\"]')) return;
+          void getCurrentWindow().startDragging();
+        }}
+      >
         <button
           type="button"
           onClick={onMenuClick}
+          data-tauri-drag-region="false"
           className="inline-flex h-8 w-8 items-center justify-center -ml-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
           title={isSidebarOpen ? t('toolbar_hideSidebar') : t('toolbar_showSidebar')}
           aria-label={isSidebarOpen ? t('toolbar_hideSidebar') : t('toolbar_showSidebar')}
@@ -82,7 +98,10 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
         </div>
       </div>
 
-      <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+      <div
+        className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap"
+        data-tauri-drag-region="false"
+      >
         <button
           onClick={onToggleTheme}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"

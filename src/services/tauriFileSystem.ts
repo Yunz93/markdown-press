@@ -499,10 +499,27 @@ export class TauriFileSystem implements IFileSystem {
           }
         } catch (error) {
           const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-          const isMissingFile = message.includes('not found') || message.includes('no such file');
+          const isMissingFile =
+            message.includes('not found') ||
+            message.includes('no such file') ||
+            message.includes('cannot find the path') ||
+            message.includes('路径') && message.includes('找不到');
           if (isMissingFile) {
             callback({ path, type: 'deleted' });
             window.clearInterval(timer);
+            return;
+          }
+          // Windows often returns transient sharing/access errors while the file is being deleted or replaced; skip one poll instead of surfacing "watch failed".
+          const isTransientRead =
+            message.includes('access') ||
+            message.includes('denied') ||
+            message.includes('busy') ||
+            message.includes('sharing') ||
+            message.includes('being used') ||
+            message.includes('resource temporarily unavailable') ||
+            message.includes('interrupted') ||
+            message.includes('os error 32');
+          if (isTransientRead) {
             return;
           }
           callback({ path, type: 'error', error });

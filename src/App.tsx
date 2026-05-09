@@ -40,6 +40,7 @@ import { useExternalFileOpen } from './app/useExternalFileOpen';
 import { getStartupKnowledgeBaseGate } from './app/startupKnowledgeBaseGate';
 import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
 import { isTauriEnvironment } from './types/filesystem';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 function isImageFile(name: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
@@ -479,83 +480,101 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="flex h-screen overflow-hidden text-sm"
+      className="flex h-screen flex-col overflow-hidden text-sm"
       style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
     >
-      <Sidebar
-        files={files}
-        activeFileId={activeTabId}
-        onFileSelect={fileOps.handleFileSelect}
-        onCreateFile={(folder, fileName) => fileOps.handleCreateFile(folder, fileName)}
-        onNewFolder={(folder, name) => fileOps.handleNewFolder(folder, name)}
-        onRename={fileOps.handleRename}
-        onDelete={fileOps.handleDelete}
-        onReveal={fileOps.handleRevealInExplorer}
-        onMoveToTrash={fileOps.handleMoveToTrash}
-        onRestoreFromTrash={fileOps.handleRestoreFromTrash}
-        onDeleteForever={fileOps.handleDeleteForever}
-        onEmptyTrash={fileOps.handleEmptyTrash}
-        onMoveNode={fileOps.handleMoveNode}
-        onMoveToRoot={fileOps.handleMoveToRoot}
-        currentKnowledgeBaseName={currentKnowledgeBaseName}
-        currentKnowledgeBasePath={rootFolderPath ?? undefined}
-        onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
-        isOpen={isSidebarOpen}
-        searchFocusRequestKey={sidebarSearchRequestKey}
-        locateCurrentFileRequestKey={sidebarLocateRequestKey}
-        width={responsiveSidebarWidth}
-        onWidthChange={handleSidebarWidthChange}
-        onClose={() => setSidebarOpen(false)}
-      />
+      {(() => {
+        const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform ?? '');
+        const shouldInsetForMacOverlayTitlebar = isMac && isTauriEnvironment();
+        if (!shouldInsetForMacOverlayTitlebar) return null;
+        return (
+          <div
+            className="h-[28px] w-full shrink-0 bg-gray-50 dark:bg-black"
+            data-tauri-drag-region
+            onMouseDown={(event) => {
+              if (event.button !== 0) return;
+              void getCurrentWindow().startDragging();
+            }}
+          />
+        );
+      })()}
 
-      <main
-        ref={mainContentRef}
-        className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black transition-colors duration-300"
-      >
-        <Toolbar
-          fileName={activeFile?.name || ''}
-          viewMode={viewMode}
-          onViewModeChange={handleToolbarViewModeChange}
-          onAIAnalyze={handleAIAnalyze}
-          isAnalyzing={isAnalyzing}
-          isSaving={isSaving}
-          isPublishing={isPublishing}
-          isSidebarOpen={isSidebarOpen}
-          onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
-          onToggleTheme={toggleTheme}
-          themeMode={settings.themeMode}
-          onPublish={handleOpenPublishDialog}
-          onExportPdf={handleExportToPdf}
-          isPreviewOnlyFile={isPreviewOnlyActiveFile}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <Sidebar
+          files={files}
+          activeFileId={activeTabId}
+          onFileSelect={fileOps.handleFileSelect}
+          onCreateFile={(folder, fileName) => fileOps.handleCreateFile(folder, fileName)}
+          onNewFolder={(folder, name) => fileOps.handleNewFolder(folder, name)}
+          onRename={fileOps.handleRename}
+          onDelete={fileOps.handleDelete}
+          onReveal={fileOps.handleRevealInExplorer}
+          onMoveToTrash={fileOps.handleMoveToTrash}
+          onRestoreFromTrash={fileOps.handleRestoreFromTrash}
+          onDeleteForever={fileOps.handleDeleteForever}
+          onEmptyTrash={fileOps.handleEmptyTrash}
+          onMoveNode={fileOps.handleMoveNode}
+          onMoveToRoot={fileOps.handleMoveToRoot}
+          currentKnowledgeBaseName={currentKnowledgeBaseName}
+          currentKnowledgeBasePath={rootFolderPath ?? undefined}
+          onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
+          isOpen={isSidebarOpen}
+          searchFocusRequestKey={sidebarSearchRequestKey}
+          locateCurrentFileRequestKey={sidebarLocateRequestKey}
+          width={responsiveSidebarWidth}
+          onWidthChange={handleSidebarWidthChange}
+          onClose={() => setSidebarOpen(false)}
         />
 
-        <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
-
-        <div className="flex-1 min-w-0 flex overflow-hidden relative">
-          <SplitView
-            highlighter={highlighter}
-            onContentChange={handleContentChange}
-            onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
-            isOutlineOpen={isOutlineOpen}
-            canShowOutline={canShowOutlinePanel}
-            canShowOutlineToggle={canShowOutlineToggle}
-            contentDensity={contentDensity}
-            onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
+        <main
+          ref={mainContentRef}
+          className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black"
+        >
+          <Toolbar
+            fileName={activeFile?.name || ''}
+            viewMode={viewMode}
+            onViewModeChange={handleToolbarViewModeChange}
+            onAIAnalyze={handleAIAnalyze}
+            isAnalyzing={isAnalyzing}
+            isSaving={isSaving}
+            isPublishing={isPublishing}
+            isSidebarOpen={isSidebarOpen}
+            onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
+            onToggleTheme={toggleTheme}
+            themeMode={settings.themeMode}
+            onPublish={handleOpenPublishDialog}
+            onExportPdf={handleExportToPdf}
+            isPreviewOnlyFile={isPreviewOnlyActiveFile}
           />
-          {isOutlineVisible && (
-            <OutlinePanel
-              headings={outlineHeadings}
-              activeHeadingId={activeHeadingId}
-              onHeadingClick={handleHeadingClick}
-              width={responsiveOutlineWidth}
-              onWidthChange={handleOutlineWidthChange}
+
+          <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
+
+          <div className="flex-1 min-w-0 flex overflow-hidden relative">
+            <SplitView
+              highlighter={highlighter}
+              onContentChange={handleContentChange}
+              onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
+              isOutlineOpen={isOutlineOpen}
+              canShowOutline={canShowOutlinePanel}
+              canShowOutlineToggle={canShowOutlineToggle}
+              contentDensity={contentDensity}
+              onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
             />
-          )}
-          {isSearchBarOpen && (
-            <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
-          )}
-        </div>
-      </main>
+            {isOutlineVisible && (
+              <OutlinePanel
+                headings={outlineHeadings}
+                activeHeadingId={activeHeadingId}
+                onHeadingClick={handleHeadingClick}
+                width={responsiveOutlineWidth}
+                onWidthChange={handleOutlineWidthChange}
+              />
+            )}
+            {isSearchBarOpen && (
+              <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
+            )}
+          </div>
+        </main>
+      </div>
 
       <SettingsModal
         isOpen={isSettingsOpen}

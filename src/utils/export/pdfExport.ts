@@ -4,6 +4,57 @@ import { saveExportFile } from './core';
 import { enhanceExportAttachmentEmbeds, type ExportAttachmentContext } from './attachments';
 import { prepareExportImages, waitForImages, waitForNextPaint } from './images';
 
+/**
+ * Largest single-canvas dimension html2canvas can safely allocate.
+ *
+ * Chromium's per-dimension canvas/GPU-texture cap is 16384px on most Windows
+ * GPU drivers (and in WebView2). Going past it blanks the canvas or crashes
+ * the renderer. We leave ~2.3k px headroom for resampling and rounding.
+ */
+const MAX_CANVAS_DIMENSION = 14000;
+
+/** Default rasterization scale; chosen for crisp PDF output on short documents. */
+const REQUESTED_RENDER_SCALE = 2.5;
+
+/**
+ * Absolute floor on the render scale. We allow sub-1.0 scales for very long
+ * documents because a grainy PDF is strictly better than a Windows WebView2
+ * renderer crash from canvas-dimension overflow. Below ~0.1 the output is
+ * not legible at all, so we cap there.
+ */
+const MIN_RENDER_SCALE = 0.1;
+
+/**
+ * Clamp the html2canvas `scale` so neither dimension of the resulting canvas
+ * exceeds the per-dimension canvas limit. Long documents otherwise allocate a
+ * single canvas of `width*scale × height*scale` px which freezes the main
+ * thread on macOS and crashes the WebView renderer on Windows.
+ *
+ * Exported for testing.
+ */
+export function computeSafePdfRenderScale(
+  containerWidthPx: number,
+  containerHeightPx: number,
+  requestedScale: number = REQUESTED_RENDER_SCALE,
+  maxCanvasDimension: number = MAX_CANVAS_DIMENSION,
+): number {
+  const safeWidth = containerWidthPx > 0 ? maxCanvasDimension / containerWidthPx : requestedScale;
+  const safeHeight = containerHeightPx > 0 ? maxCanvasDimension / containerHeightPx : requestedScale;
+  const bounded = Math.min(requestedScale, safeWidth, safeHeight);
+  return Math.max(MIN_RENDER_SCALE, bounded);
+}
+
+/** Yield to the event loop so the spinner can paint before the synchronous html2canvas freeze. */
+async function yieldToEventLoop(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
+}
+
 export async function exportToPdf(
   htmlContent: string,
   filename: string,
@@ -55,13 +106,20 @@ export async function exportToPdf(
     }
     await waitForNextPaint(3);
 
+    const safeScale = computeSafePdfRenderScale(
+      renderTarget.scrollWidth,
+      renderTarget.scrollHeight,
+    );
+
     const pdfOptions: Html2PdfSetOptions & Html2PdfPagebreakOptions = {
       margin: [12, 12, 12, 12],
       filename: filename.endsWith('.pdf') ? filename : `${filename}.pdf`,
-      image: { type: 'jpeg', quality: 1 },
+      // quality 1 is uncompressed and produces giant base64 strings per page;
+      // 0.92 is visually identical for text/diagrams and several times smaller.
+      image: { type: 'jpeg', quality: 0.92 },
       enableLinks: true,
       html2canvas: {
-        scale: 2.5,
+        scale: safeScale,
         useCORS: true,
         backgroundColor,
         windowWidth: renderTarget.scrollWidth,
@@ -78,6 +136,9 @@ export async function exportToPdf(
         avoid: ['pre', 'blockquote', 'table', 'img', '.export-properties']
       }
     };
+
+    // Let the export spinner paint before html2canvas grabs the main thread.
+    await yieldToEventLoop();
 
     const worker = html2pdf()
       .set(pdfOptions as Html2PdfSetOptions)

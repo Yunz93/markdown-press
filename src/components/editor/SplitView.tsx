@@ -277,7 +277,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
   return (
     <div
-      className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black transition-colors"
+      className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black"
       data-markdown-style={settings.markdownStylePreset}
       style={markdownStyleVariables as React.CSSProperties}
     >
@@ -322,7 +322,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
         <div
           aria-hidden={!previewActive}
-          className="h-full min-w-0 overflow-hidden transition-colors"
+          className="h-full min-w-0 overflow-hidden"
           style={previewPaneStyle}
         >
           <PreviewPane

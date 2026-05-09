@@ -48,6 +48,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme-switching='true'] *,
+:root[data-theme-switching='true'] *::before,
+:root[data-theme-switching='true'] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 :root {
   --ui-font-size: 18px;
   --ui-font-scale: 1;
