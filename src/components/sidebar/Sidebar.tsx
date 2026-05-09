@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FileTreeItem } from './FileTree';
 import { TrashView } from './TrashView';
@@ -28,6 +28,7 @@ import {
   highlightSearchText,
 } from './utils';
 import { useI18n } from '../../hooks/useI18n';
+import { applyFixedMenuViewportFit } from '../../utils/fitFixedMenuToViewport';
 
 export interface SidebarProps {
   files: FileNode[];
@@ -122,6 +123,13 @@ const RootContextMenu: React.FC<{
   onCreateFolder: () => void;
 }> = ({ x, y, onClose, onCreateFile, onCreateFolder }) => {
   const { t } = useI18n();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    applyFixedMenuViewportFit(el, x, y);
+  }, [x, y]);
 
   React.useEffect(() => {
     const handleClick = () => onClose();
@@ -138,6 +146,7 @@ const RootContextMenu: React.FC<{
 
   return (
     <div
+      ref={menuRef}
       className="fixed z-[150] min-w-[180px] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/70 dark:border-white/10 py-1.5 animate-scale-in"
       style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
@@ -329,9 +338,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const handleRootContextMenu = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('[data-file-tree-item]')) return;
     e.preventDefault();
-    const x = Math.min(e.clientX, window.innerWidth - 220);
-    const y = Math.min(e.clientY, window.innerHeight - 200);
-    setRootContextMenu({ x, y });
+    setRootContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
   const closeRootContextMenu = useCallback(() => {

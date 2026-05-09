@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { FileNode } from '../../../types';
 import { useI18n } from '../../../hooks/useI18n';
+import { applyFixedMenuViewportFit } from '../../../utils/fitFixedMenuToViewport';
 
 export interface ContextMenuProps {
   x: number;
@@ -35,6 +36,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onDeleteForever,
 }) => {
   const { t } = useI18n();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    applyFixedMenuViewportFit(el, x, y);
+  }, [x, y, node.id, node.type, node.isTrash]);
+
   // Close menu when clicking outside
   React.useEffect(() => {
     const handleClick = () => onClose();
@@ -53,6 +62,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
   const menu = (
     <div
+      ref={menuRef}
       className="fixed z-[150] min-w-[180px] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/70 dark:border-white/10 py-1.5 animate-scale-in"
       style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}

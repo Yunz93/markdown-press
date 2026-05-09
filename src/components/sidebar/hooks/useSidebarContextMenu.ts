@@ -22,9 +22,7 @@ export function useSidebarContextMenu(): UseSidebarContextMenuReturn {
 
     // Small delay to avoid conflict with click handlers
     requestAnimationFrame(() => {
-      const x = Math.min(event.clientX, window.innerWidth - 220);
-      const y = Math.min(event.clientY, window.innerHeight - 200);
-      setContextMenu({ x, y, node });
+      setContextMenu({ x: event.clientX, y: event.clientY, node });
     });
   }, []);
 
