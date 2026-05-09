@@ -456,6 +456,31 @@ fn queue_opened_file_paths(app: &tauri::AppHandle, paths: Vec<String>) {
     let _ = app.emit("opened-files", paths);
 }
 
+#[tauri::command]
+fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let Some(normalized) = normalize_opened_file_path(PathBuf::from(path)) else {
+        return Err("Only existing Markdown files can be opened.".to_string());
+    };
+
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| "Failed to read system time.".to_string())?
+        .as_millis();
+    let label = format!("file-{}", now_ms);
+
+    let encoded = urlencoding::encode(&normalized);
+    let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
+    let window = tauri::WebviewWindowBuilder::new(&app, label, url)
+        .title("Markdown Press")
+        .build()
+        .map_err(|e| format!("Failed to create window: {}", e))?;
+
+    let _ = window.show();
+    let _ = window.set_focus();
+
+    Ok(())
+}
+
 fn normalize_secret_value(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
@@ -784,6 +809,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ping,
             take_opened_files,
+            open_file_in_new_window,
             get_secure_settings,
             set_secure_secret,
             list_system_fonts,

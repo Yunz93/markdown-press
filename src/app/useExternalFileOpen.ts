@@ -29,6 +29,22 @@ export function useExternalFileOpen({
     hasHandledExternalFile: false,
   });
 
+  const takeFileFromQuery = (): string | null => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const url = new URL(window.location.href);
+      const openFile = url.searchParams.get('openFile')?.trim() ?? '';
+      if (!openFile) return null;
+
+      // Prevent reopening on refresh.
+      url.searchParams.delete('openFile');
+      window.history.replaceState({}, '', url.toString());
+      return openFile;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (!settingsHydrated) return;
 
@@ -69,8 +85,9 @@ export function useExternalFileOpen({
           void openPaths(normalizeOpenedFilePayload(event.payload));
         });
 
+        const queryPath = takeFileFromQuery();
         const initialPaths = normalizeOpenedFilePayload(await invoke('take_opened_files'));
-        await openPaths(initialPaths);
+        await openPaths(queryPath ? [queryPath, ...initialPaths] : initialPaths);
       } catch (error) {
         console.warn('Failed to initialize external file open handling:', error);
       } finally {

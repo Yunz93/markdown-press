@@ -210,9 +210,21 @@ const App: React.FC = () => {
   const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
   const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] = useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] = useState(false);
+
+  const openFilePathForExternalOpen = useCallback(async (path: string, options?: { silentSuccess?: boolean; suppressErrors?: boolean }) => {
+    // If a knowledge base is already open, open external files in a new window
+    // (matches macOS "double click file" expectations for library-style apps).
+    if (isTauriEnvironment() && rootFolderPath) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('open_file_in_new_window', { path });
+      return path;
+    }
+    return openFilePath(path, options);
+  }, [openFilePath, rootFolderPath]);
+
   const externalFileOpen = useExternalFileOpen({
     settingsHydrated,
-    openFilePath,
+    openFilePath: openFilePathForExternalOpen,
   });
   const {
     contentDensity,
