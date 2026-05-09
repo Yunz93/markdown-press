@@ -113,30 +113,26 @@ export const SplitView: React.FC<SplitViewProps> = ({
     return () => resizeObserver.disconnect();
   }, [viewMode]);
 
-  const isSplitModeRef = useRef(viewMode === ViewMode.SPLIT);
-
   // Keep `visualMode` in lockstep with `viewMode` before paint so pane widths (and
   // `previewLayoutActive`) match the store on the same frame as preview layout effects.
   useLayoutEffect(() => {
     setVisualMode(viewMode);
   }, [viewMode]);
 
-  // Keep ref in sync with current view mode
-  useEffect(() => {
-    isSplitModeRef.current = viewMode === ViewMode.SPLIT;
-  }, [viewMode]);
-
-  // Handle editor scroll - sync to preview in split mode
-  // Using ref to avoid re-creating callback and reduce latency
+  // Handle editor scroll - sync to preview in split mode.
+  // Read view mode from the store inside the handler so it stays correct even when
+  // useScrollSync's onScroll ref has not yet been updated after a view-mode change
+  // (scroll events can fire before child useEffects run).
   const handleEditorScroll = useCallback((percentage: number) => {
     editorScrollPercentageRef.current = percentage;
-    if (viewMode !== ViewMode.PREVIEW) {
+    const mode = useAppStore.getState().viewMode;
+    if (mode !== ViewMode.PREVIEW) {
       previewScrollPercentageRef.current = percentage;
     }
-    if (isSplitModeRef.current) {
+    if (mode === ViewMode.SPLIT) {
       previewPaneRef.current?.syncScrollTo(percentage, { immediate: true });
     }
-  }, [viewMode]);
+  }, []);
 
   const handlePreviewScroll = useCallback((percentage: number) => {
     previewScrollPercentageRef.current = percentage;
