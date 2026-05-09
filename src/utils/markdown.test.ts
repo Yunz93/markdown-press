@@ -76,6 +76,13 @@ describe('renderMarkdown', () => {
     expect(html).toContain('task-list-item');
   });
 
+  it('renders markdown images with lazy async defaults', () => {
+    const html = renderMarkdown('![Poster](poster.png)');
+    expect(html).toContain('decoding="async"');
+    expect(html).toContain('loading="lazy"');
+    expect(html).toContain('fetchpriority="auto"');
+  });
+
   it('renders GFM/Obsidian footnotes as superscript refs and a footnotes section', () => {
     const md = 'Text[^a] end.\n\n[^a]: https://example.com/doc';
     const html = renderMarkdown(md);

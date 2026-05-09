@@ -153,9 +153,9 @@ const createMarkdownIt = () => {
         token.attrs[srcIdx][1] = normalizeHttpUrlForHtmlAttribute(raw);
       }
     }
-    token.attrSet('decoding', 'sync');
-    token.attrSet('loading', 'eager');
-    token.attrSet('fetchpriority', 'high');
+    token.attrSet('decoding', 'async');
+    token.attrSet('loading', 'lazy');
+    token.attrSet('fetchpriority', 'auto');
 
     if (defaultImageRenderer) {
       return defaultImageRenderer(tokens, idx, options, env, self);
@@ -385,6 +385,7 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
       'allow',
       'allowfullscreen',
       'frameborder',
+      'fetchpriority',
       'height',
       'scrolling',
       'style',

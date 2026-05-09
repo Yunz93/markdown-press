@@ -92,6 +92,19 @@ describe('parseHeadings', () => {
     expect(headings[0].line).toBe(1);
     expect(headings[0].children[0].line).toBe(5);
   });
+
+  it('keeps line numbers correct after frontmatter and many previous headings', () => {
+    const sections = Array.from({ length: 20 }, (_, index) => (
+      `## Section ${index + 1}\n\nParagraph ${index + 1}`
+    ));
+    const content = ['---', 'title: Test', '---', '', '# Title', '', ...sections].join('\n');
+    const headings = parseHeadings(content);
+    const flattened = flattenHeadingNodes(headings);
+
+    expect(flattened[0].line).toBe(5);
+    expect(flattened[1].line).toBe(7);
+    expect(flattened[20].line).toBe(64);
+  });
 });
 
 describe('flattenHeadingNodes', () => {

@@ -8,6 +8,16 @@ export interface HeadingNode {
 
 const FRONTMATTER_REGEX = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/;
 
+function countNewlinesInRange(value: string, from: number, to: number): number {
+  let count = 0;
+  for (let index = from; index < to; index += 1) {
+    if (value.charCodeAt(index) === 10 /* \n */) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 export function createHeadingSlug(text: string): string {
   const slug = text
     .trim()
@@ -49,15 +59,18 @@ export const parseHeadings = (content: string): HeadingNode[] => {
   const headings: HeadingNode[] = [];
   const stack: HeadingNode[] = [];
   const slugCounts = new Map<string, number>();
+  let scannedBodyOffset = 0;
+  let currentLine = countNewlinesInRange(content, 0, bodyStartOffset) + 1;
 
   let match;
   while ((match = headingRegex.exec(bodyContent)) !== null) {
+    currentLine += countNewlinesInRange(bodyContent, scannedBodyOffset, match.index);
+    scannedBodyOffset = match.index;
+
     const level = match[1].length as HeadingNode['level'];
     const text = match[2].trim();
     const id = createUniqueHeadingId(text, slugCounts);
-    const line = content
-      .substring(0, bodyStartOffset + match.index)
-      .split('\n').length;
+    const line = currentLine;
 
     const node: HeadingNode = { id, level, text, children: [], line };
 

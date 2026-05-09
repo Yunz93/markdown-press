@@ -176,7 +176,7 @@ export function configurePreviewImageElement(image: HTMLImageElement, src: strin
   image.setAttribute('src', src);
   image.setAttribute('data-original-src', originalSrc);
   image.setAttribute('data-preview-warmed', 'true');
-  image.setAttribute('decoding', 'sync');
-  image.setAttribute('loading', 'eager');
-  image.setAttribute('fetchpriority', 'high');
+  image.setAttribute('decoding', 'async');
+  image.setAttribute('loading', 'lazy');
+  image.setAttribute('fetchpriority', 'auto');
 }

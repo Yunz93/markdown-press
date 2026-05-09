@@ -46,6 +46,11 @@ import {
 } from '../decorations';
 import type { OrderedListMode, ThemeMode } from '../../../types';
 import { editorAutocompletePanelBaseTheme } from '../editorAutocompleteTheme';
+import { LARGE_FILE_THRESHOLDS } from '../../../utils/performance';
+
+export interface CodeMirrorContentChangeMeta {
+  skipHistory?: boolean;
+}
 
 export interface UseCodeMirrorOptions {
   content: string;
@@ -55,7 +60,7 @@ export interface UseCodeMirrorOptions {
   orderedListMode?: OrderedListMode;
   /** 与 html.dark / 应用主题一致，供补全浮层等 CodeMirror 主题作用域使用 */
   themeMode?: ThemeMode;
-  onChange: (content: string) => void;
+  onChange: (content: string, meta?: CodeMirrorContentChangeMeta) => void;
   onScroll?: () => void;
   completionSource?: CompletionSource;
   onPasteImage?: (file: File, view: EditorView) => boolean | Promise<boolean>;
@@ -100,6 +105,11 @@ function getDocumentReplacementRange(currentContent: string, nextContent: string
   };
 }
 
+function isLargeEditorState(state: EditorState): boolean {
+  return state.doc.lines > LARGE_FILE_THRESHOLDS.LINE_COUNT
+    || state.doc.length > LARGE_FILE_THRESHOLDS.CHAR_COUNT;
+}
+
 export function getEditorTooltipSpace(view: Pick<EditorView, 'dom'>): Rect {
   const rect = view.dom.getBoundingClientRect();
   return {
@@ -142,6 +152,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const onWikiLinkStartRef = useRef(onWikiLinkStart);
   const onContextMenuRef = useRef(onContextMenu);
   const loadedMarkdownLanguageKeysRef = useRef<Set<string>>(new Set());
+  const pendingContentChangeIsLargeRef = useRef(false);
 
   // Compartments for dynamic reconfiguration
   const compartments = useMemo(() => ({
@@ -229,6 +240,20 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   useEffect(() => {
     onContextMenuRef.current = onContextMenu;
   }, [onContextMenu]);
+
+  const flushPendingContentChange = useCallback(() => {
+    if (changeTimeoutRef.current) {
+      clearTimeout(changeTimeoutRef.current);
+      changeTimeoutRef.current = null;
+    }
+
+    const view = viewRef.current;
+    if (!view || isSyncingContentRef.current) return;
+
+    const isLarge = pendingContentChangeIsLargeRef.current || isLargeEditorState(view.state);
+    pendingContentChangeIsLargeRef.current = false;
+    onChangeRef.current(view.state.doc.toString(), { skipHistory: isLarge });
+  }, []);
 
   useEffect(() => {
     const missingDescriptions = extractMarkdownFenceLanguages(content)
@@ -370,6 +395,17 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
                 const handler = onContextMenuRef.current;
                 return handler ? handler(event, view) : false;
               },
+              blur: () => {
+                flushPendingContentChange();
+                return false;
+              },
+              keydown: (event) => {
+                const isSaveShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
+                if (isSaveShortcut) {
+                  flushPendingContentChange();
+                }
+                return false;
+              },
             }),
             EditorView.updateListener.of((update: ViewUpdate) => {
               if (!update.docChanged) return;
@@ -386,6 +422,11 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
                   normalizationTimeoutRef.current = window.setTimeout(() => {
                     const view = viewRef.current;
                     if (!view || isApplyingOrderedNormalizationRef.current) return;
+                    if (isLargeEditorState(view.state)) {
+                      normalizationTimeoutRef.current = null;
+                      return;
+                    }
+
                     const normalizationChanges = getStrictOrderedListNormalizationChanges(view.state);
                     if (normalizationChanges) {
                       isApplyingOrderedNormalizationRef.current = true;
@@ -407,11 +448,17 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
                   clearTimeout(changeTimeoutRef.current);
                 }
 
-                const nextContent = update.state.doc.toString();
+                const isLarge = isLargeEditorState(update.state);
+                pendingContentChangeIsLargeRef.current = isLarge;
                 changeTimeoutRef.current = setTimeout(() => {
-                  onChangeRef.current(nextContent);
+                  const view = viewRef.current;
+                  if (view && !isSyncingContentRef.current) {
+                    const shouldSkipHistory = pendingContentChangeIsLargeRef.current || isLargeEditorState(view.state);
+                    pendingContentChangeIsLargeRef.current = false;
+                    onChangeRef.current(view.state.doc.toString(), { skipHistory: shouldSkipHistory });
+                  }
                   changeTimeoutRef.current = null;
-                }, 16);
+                }, isLarge ? 240 : 16);
               }
 
               // Auto-trigger completion for wiki links
@@ -440,6 +487,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     }
 
     return () => {
+      flushPendingContentChange();
       if (changeTimeoutRef.current) {
         clearTimeout(changeTimeoutRef.current);
         changeTimeoutRef.current = null;
@@ -455,7 +503,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       viewRef.current = null;
       setViewReady(false);
     };
-  }, [compartments.markdown, editorElementReady]);
+  }, [compartments.markdown, editorElementReady, flushPendingContentChange]);
 
   // Sync external content changes (only when not typing)
   useEffect(() => {

@@ -18,6 +18,7 @@ import { EditorView } from '@codemirror/view';
 import { getResolvedCodeFontFamily, getResolvedEditorFontFamily } from '../../utils/fontSettings';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { useCodeMirror, useWikiLinks, useImagePaste, useScrollSync } from './hooks';
+import type { CodeMirrorContentChangeMeta } from './hooks/useCodeMirror';
 import type { WikiLinkPreviewData } from './hooks';
 import { throttle } from '../../utils/throttle';
 import { findOpenWikiLinkAt } from '../../utils/wikiLinkEditor';
@@ -31,7 +32,7 @@ import { buildWikiPreviewMarkup } from '../../utils/wikiPreviewMarkup';
 
 interface EditorPaneProps {
   placeholder?: string;
-  onContentChange?: (content: string) => void;
+  onContentChange?: (content: string, meta?: CodeMirrorContentChangeMeta) => void;
   onScroll?: (percentage: number) => void;
   onGenerateWikiFromSelection?: (selection: { text: string; from: number; to: number }) => Promise<string | null>;
   highlighter?: ShikiHighlighter | null;
@@ -133,19 +134,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
 }, ref) => {
   const { t } = useI18n();
   const content = useAppStore(selectContent);
-  const {
-    setContent,
-    setContentForFile,
-    settings,
-    isSaving,
-    activeTabId,
-    viewMode,
-    currentFilePath,
-    rootFolderPath,
-    showNotification,
-    files,
-    fileContents,
-  } = useAppStore();
+  const setContent = useAppStore((state) => state.setContent);
+  const setContentForFile = useAppStore((state) => state.setContentForFile);
+  const settings = useAppStore((state) => state.settings);
+  const isSaving = useAppStore((state) => state.isSaving);
+  const activeTabId = useAppStore((state) => state.activeTabId);
+  const viewMode = useAppStore((state) => state.viewMode);
+  const currentFilePath = useAppStore((state) => state.currentFilePath);
+  const rootFolderPath = useAppStore((state) => state.rootFolderPath);
+  const showNotification = useAppStore((state) => state.showNotification);
+  const files = useAppStore((state) => state.files);
+  const fileContents = useAppStore((state) => state.fileContents);
   const resolvedPlaceholder = placeholder ?? t('editor_placeholder');
 
   const editorFontFamily = useMemo(() => getResolvedEditorFontFamily(settings), [settings.editorFontFamily]);
@@ -182,18 +181,18 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(({
   }, []);
 
   // Content change handler
-  const updateContent = useCallback((nextContent: string) => {
+  const updateContent = useCallback((nextContent: string, meta?: CodeMirrorContentChangeMeta) => {
     if (onContentChange) {
-      onContentChange(nextContent);
+      onContentChange(nextContent, meta);
       return;
     }
 
     if (!activeTabId) {
-      setContent(nextContent);
+      setContent(nextContent, meta?.skipHistory);
       return;
     }
 
-    setContentForFile(activeTabId, nextContent);
+    setContentForFile(activeTabId, nextContent, meta?.skipHistory);
   }, [activeTabId, onContentChange, setContent, setContentForFile]);
 
   // WikiLinks hook

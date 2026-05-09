@@ -67,7 +67,6 @@ export async function exportToPdf(
   type Html2PdfPagebreakOptions = {
     pagebreak?: {
       mode?: Array<'avoid-all' | 'css' | 'legacy'>;
-      avoid?: string[];
     };
   };
   const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
@@ -132,8 +131,10 @@ export async function exportToPdf(
         orientation: 'portrait'
       },
       pagebreak: {
+        // Rely on CSS `@media print` rules instead of html2pdf's `avoid` selector.
+        // The `avoid` list frequently creates huge blank gaps by pushing entire
+        // blocks to the next page.
         mode: ['css', 'legacy'],
-        avoid: ['pre', 'blockquote', 'table', 'img', '.export-properties']
       }
     };
 

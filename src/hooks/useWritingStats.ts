@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { useAppStore, selectContent } from '../store/appStore';
 import { parseFrontmatter } from '../utils/frontmatter';
+import { isLargeFile } from '../utils/performance';
 
 export interface WritingStats {
   characters: number;
@@ -13,10 +14,12 @@ export interface WritingStats {
 
 export const useWritingStats = () => {
   const content = useAppStore(selectContent);
+  const deferredContent = useDeferredValue(content);
+  const statsContent = isLargeFile(content) ? deferredContent : content;
 
   const stats: WritingStats = useMemo(() => {
     // Exclude code blocks and frontmatter
-    const textWithoutCode = content.replace(/```[\s\S]*?```/g, '');
+    const textWithoutCode = statsContent.replace(/```[\s\S]*?```/g, '');
     const textWithoutFrontmatter = parseFrontmatter(textWithoutCode).body;
 
     const characters = textWithoutFrontmatter.length;
@@ -41,7 +44,7 @@ export const useWritingStats = () => {
       headings,
       readingTimeMinutes,
     };
-  }, [content]);
+  }, [statsContent]);
 
   return stats;
 };

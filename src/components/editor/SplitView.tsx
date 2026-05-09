@@ -9,6 +9,7 @@ import type { PaneDensity } from './paneLayout';
 import { useI18n } from '../../hooks/useI18n';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
 import { getMarkdownStyleCssVariables } from '../../utils/markdownStyle';
+import type { CodeMirrorContentChangeMeta } from './hooks/useCodeMirror';
 
 const PANE_TRANSITION_MS = 200;
 const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
@@ -16,7 +17,7 @@ const DIVIDER_TRANSITION = `left ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0
 
 interface SplitViewProps {
   highlighter?: ShikiHighlighter | null;
-  onContentChange?: (content: string) => void;
+  onContentChange?: (content: string, meta?: CodeMirrorContentChangeMeta) => void;
   onGenerateWikiFromSelection?: (selection: { text: string; from: number; to: number }) => Promise<string | null>;
   isOutlineOpen: boolean;
   canShowOutline: boolean;
@@ -37,7 +38,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
 }) => {
   const { t } = useI18n();
   const MIN_SPLIT_PANE_WIDTH = 360;
-  const { settings, viewMode } = useAppStore();
+  const settings = useAppStore((state) => state.settings);
+  const viewMode = useAppStore((state) => state.viewMode);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
@@ -253,6 +255,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const previewWidth = visualMode === ViewMode.PREVIEW ? 100 : visualMode === ViewMode.SPLIT ? 100 - splitRatio : 0;
   const editorActive = editorWidth > 0;
   const previewActive = previewWidth > 0;
+  const previewRenderActive = viewMode !== ViewMode.EDITOR || previewActive;
   const activePaneKey = activeTabId ?? 'no-active-tab';
   const markdownStyleVariables = useMemo(
     () => getMarkdownStyleCssVariables(settings.markdownStylePreset, settings.themeMode),
@@ -332,6 +335,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
             density={contentDensity}
             onScroll={handlePreviewScroll}
             previewLayoutActive={previewActive}
+            previewRenderActive={previewRenderActive}
           />
         </div>
       </div>

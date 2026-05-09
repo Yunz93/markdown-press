@@ -78,13 +78,13 @@ export function createEditorSlice(
 
     const current = state.fileContents[fileId] ?? '';
 
+    if (current === content) return {};
+
     if (skipHistory) {
       return {
         fileContents: { ...state.fileContents, [fileId]: content },
       };
     }
-
-    if (current === content) return {};
 
     const existingHistory = state.fileHistories[fileId] || { past: [], future: [], maxHistory: 100 };
     const newPast = [...existingHistory.past, current];

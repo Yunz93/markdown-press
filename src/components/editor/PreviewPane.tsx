@@ -15,7 +15,7 @@ import { useFileSystem } from '../../hooks/useFileSystem';
 import { getResolvedCodeFontFamily, getResolvedPreviewFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
 import { mountPdfPreview } from '../../utils/pdfPreview';
-import { throttle } from '../../utils/throttle';
+import { debounce, throttle } from '../../utils/throttle';
 import { useThrottledResize } from '../../utils/performance';
 import { resolvePreviewSource, warmPreviewImage } from '../../utils/previewImageCache';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../utils/attachmentResolver';
@@ -35,6 +35,8 @@ interface PreviewPaneProps {
   syncedPercentage?: number | null;
   /** False when SplitView gives the preview column 0 width (e.g. editor-only). Synced to layout, not just store viewMode. */
   previewLayoutActive?: boolean;
+  /** False when the preview pane should keep mounted state but avoid expensive render work. */
+  previewRenderActive?: boolean;
 }
 
 export interface PreviewPaneHandle {
@@ -118,9 +120,15 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   density = 'comfortable' as PaneDensity,
   syncedPercentage = null,
   previewLayoutActive = true,
+  previewRenderActive = true,
 }, ref) => {
   const { t } = useI18n();
-  const { settings, currentFilePath, rootFolderPath, files, showNotification, activeTabId } = useAppStore();
+  const settings = useAppStore((state) => state.settings);
+  const currentFilePath = useAppStore((state) => state.currentFilePath);
+  const rootFolderPath = useAppStore((state) => state.rootFolderPath);
+  const files = useAppStore((state) => state.files);
+  const showNotification = useAppStore((state) => state.showNotification);
+  const activeTabId = useAppStore((state) => state.activeTabId);
   const content = useAppStore(selectContent);
   const previewContent = useDeferredValue(content);
   const previewFontFamily = useMemo(() => getResolvedPreviewFontFamily(settings), [settings.previewFontFamily]);
@@ -138,8 +146,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   const isMarkdownPreview = previewFileType === 'markdown';
   const isHtmlPreview = previewFileType === 'html';
   const flattenedHeadings = useMemo(() => (
-    isMarkdownPreview ? flattenHeadingNodes(parseHeadings(previewContent)) : []
-  ), [isMarkdownPreview, previewContent]);
+    isMarkdownPreview && previewRenderActive ? flattenHeadingNodes(parseHeadings(previewContent)) : []
+  ), [isMarkdownPreview, previewContent, previewRenderActive]);
 
   // Pane layout state - use ref to avoid re-render
   const [layoutMetrics, setLayoutMetrics] = useState(() => getPaneLayoutMetrics(0, density));
@@ -188,6 +196,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     fileContents: {},
     activeTabId,
     readFile,
+    enabled: previewRenderActive,
   });
 
   /** Same string the markdown `<article>` uses via `dangerouslySetInnerHTML` (sync + async paths). */
@@ -263,19 +272,19 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
   useLayoutEffect(() => {
     const element = previewRef.current;
-    if (!element) return;
+    if (!element || !previewRenderActive) return;
     scroll.flushPendingScrollSync(element);
-  }, [scroll, renderer.enhancedBodyHtml, renderer.parsedContent.bodyHTML, activeTabId]);
+  }, [scroll, renderer.enhancedBodyHtml, renderer.parsedContent.bodyHTML, activeTabId, previewRenderActive]);
 
   useEffect(() => {
     const element = previewRef.current;
-    if (!element) return;
+    if (!element || !previewRenderActive) return;
     const ro = new ResizeObserver(() => {
       scroll.flushPendingScrollSync(element);
     });
     ro.observe(element);
     return () => ro.disconnect();
-  }, [scroll]);
+  }, [scroll, previewRenderActive]);
 
   useEffect(() => {
     const element = previewRef.current;
@@ -309,7 +318,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
   // Apply heading attributes after render - use requestIdleCallback for better performance
   useEffect(() => {
-    if (!isMarkdownPreview) return;
+    if (!isMarkdownPreview || !previewRenderActive) return;
     const container = previewRef.current;
     if (!container) return;
 
@@ -325,14 +334,14 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       const id = setTimeout(applyHeadingAttributes, 0);
         return () => clearTimeout(id);
     }
-  }, [activeTabId, flattenedHeadings, renderer.enhancedBodyHtml, isMarkdownPreview]);
+  }, [activeTabId, flattenedHeadings, renderer.enhancedBodyHtml, isMarkdownPreview, previewRenderActive]);
 
   const prevPreviewLayoutActiveRef = useRef<boolean | null>(null);
   const mermaidRenderRunningRef = useRef(false);
   const mermaidRenderQueuedRef = useRef(false);
 
   const runMermaidInPreview = useCallback(() => {
-    if (!isMarkdownPreview || previewLayoutActive === false) return;
+    if (!isMarkdownPreview || !previewRenderActive || previewLayoutActive === false) return;
     const container = previewRef.current;
     if (!container) return;
 
@@ -361,13 +370,14 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     };
 
     void flush();
-  }, [isMarkdownPreview, previewLayoutActive, settings.themeMode]);
+  }, [isMarkdownPreview, previewLayoutActive, previewRenderActive, settings.themeMode]);
 
-  // Run Mermaid after the preview DOM is committed (layout phase avoids races with deferred
-  // markdown HTML and removes the visible "raw text in gray box" flash from setTimeout).
+  // When re-enabling the preview column after it was width-0, reset Mermaid placeholders so a
+  // later render pass re-parses from source. Avoid doing heavy work in layout effects so
+  // view-mode switches don't block a frame.
   useLayoutEffect(() => {
     const container = previewRef.current;
-    if (!isMarkdownPreview || !container) {
+    if (!isMarkdownPreview || !previewRenderActive || !container) {
       prevPreviewLayoutActiveRef.current = previewLayoutActive;
       return;
     }
@@ -378,31 +388,30 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     if (previewLayoutActive && prev === false) {
       resetMermaidPlaceholders(container);
     }
-
-    runMermaidInPreview();
-  }, [isMarkdownPreview, markdownPreviewMarkup, previewLayoutActive, runMermaidInPreview]);
+  }, [isMarkdownPreview, markdownPreviewMarkup, previewLayoutActive, previewRenderActive, runMermaidInPreview]);
 
   // Second pass after paint: Shiki/highlighter hydration and first-paint batching can leave the
   // first layout effect without diagram nodes; rAF runs after the current frame settles.
   useEffect(() => {
     let cancelled = false;
     const frame = requestAnimationFrame(() => {
-      if (!cancelled) runMermaidInPreview();
+      if (!cancelled && previewRenderActive) runMermaidInPreview();
     });
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
     };
-  }, [markdownPreviewMarkup, previewLayoutActive, runMermaidInPreview]);
+  }, [markdownPreviewMarkup, previewLayoutActive, previewRenderActive, runMermaidInPreview]);
 
   // Width animates after view mode changes; first flex pass can still be 0px — keep polling layout.
   useEffect(() => {
     const el = layoutRef.current;
-    if (!el || !isMarkdownPreview || previewLayoutActive === false) return;
+    if (!el || !isMarkdownPreview || !previewRenderActive || previewLayoutActive === false) return;
 
-    const schedule = throttle(() => {
+    // Debounce during width transitions so we render Mermaid once after layout settles.
+    const schedule = debounce(() => {
       runMermaidInPreview();
-    }, 120);
+    }, 220);
 
     const ro = new ResizeObserver(() => {
       schedule();
@@ -412,13 +421,13 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     return () => {
       ro.disconnect();
     };
-  }, [isMarkdownPreview, previewLayoutActive, runMermaidInPreview]);
+  }, [isMarkdownPreview, previewLayoutActive, previewRenderActive, runMermaidInPreview]);
 
   // Some preview flows asynchronously rewrite the article subtree after Mermaid has rendered
   // (e.g. attachment/media enhancement). Watch for Mermaid placeholders reappearing and heal them.
   useEffect(() => {
     const container = previewRef.current;
-    if (!container || !isMarkdownPreview || previewLayoutActive === false) return;
+    if (!container || !isMarkdownPreview || !previewRenderActive || previewLayoutActive === false) return;
 
     const schedule = throttle(() => {
       const hasPendingMermaid = Array.from(container.querySelectorAll<HTMLElement>('.mermaid')).some((el) => (
@@ -456,7 +465,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     return () => {
       observer.disconnect();
     };
-  }, [isMarkdownPreview, previewLayoutActive, runMermaidInPreview]);
+  }, [isMarkdownPreview, previewLayoutActive, previewRenderActive, runMermaidInPreview]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -474,7 +483,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
   useEffect(() => {
     let cancelled = false;
 
-    if (isMarkdownPreview || isHtmlPreview || previewFileType === 'unsupported') {
+    if (!previewRenderActive || isMarkdownPreview || isHtmlPreview || previewFileType === 'unsupported') {
       setAssetPreviewSrc('');
       return;
     }
@@ -492,11 +501,11 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     })();
 
     return () => { cancelled = true; };
-  }, [currentFilePath, isHtmlPreview, isMarkdownPreview, previewFileType]);
+  }, [currentFilePath, isHtmlPreview, isMarkdownPreview, previewFileType, previewRenderActive]);
 
   useEffect(() => {
     const container = previewRef.current;
-    if (!container || previewLayoutActive === false) return;
+    if (!container || !previewRenderActive || previewLayoutActive === false) return;
 
     const mountedPreviews = new Map<HTMLElement, () => void>();
 
@@ -533,6 +542,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     markdownPreviewMarkup,
     previewFileType,
     previewLayoutActive,
+    previewRenderActive,
     t,
   ]);
 
@@ -633,10 +643,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
   // Parse frontmatter for display
   const parsedFrontmatter = useMemo(() => {
-    if (!isMarkdownPreview || !previewContent) return null;
+    if (!isMarkdownPreview || !previewRenderActive || !previewContent) return null;
     const { frontmatter } = parseFrontmatter(previewContent);
     return frontmatter;
-  }, [isMarkdownPreview, previewContent]);
+  }, [isMarkdownPreview, previewContent, previewRenderActive]);
   const frontmatterEntries = useMemo(() => (
     parsedFrontmatter ? Object.entries(parsedFrontmatter) as Array<[string, FrontmatterValue]> : []
   ), [parsedFrontmatter]);

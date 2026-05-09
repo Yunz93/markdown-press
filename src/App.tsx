@@ -16,6 +16,7 @@ import { Sidebar } from './components/sidebar/Sidebar';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { SplitView } from './components/editor/SplitView';
+import type { CodeMirrorContentChangeMeta } from './components/editor/hooks/useCodeMirror';
 import { OutlinePanel } from './components/outline/OutlinePanel';
 import { ContentSearch } from './components/search/ContentSearch';
 import { TabBar } from './components/tabs/TabBar';
@@ -319,13 +320,13 @@ const App: React.FC = () => {
     }
   }, [activeTabId, content, setActiveHeadingId, viewMode]);
 
-  const handleContentChange = useCallback((newContent: string) => {
+  const handleContentChange = useCallback((newContent: string, meta?: CodeMirrorContentChangeMeta) => {
     if (!activeTabId) {
-      setContent(newContent);
+      setContent(newContent, meta?.skipHistory);
       return;
     }
 
-    setContentForFile(activeTabId, newContent);
+    setContentForFile(activeTabId, newContent, meta?.skipHistory);
   }, [activeTabId, setContent, setContentForFile]);
 
   const handleToolbarViewModeChange = useCallback((mode: ViewMode) => {

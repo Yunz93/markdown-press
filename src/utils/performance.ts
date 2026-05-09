@@ -26,9 +26,9 @@ export function countLines(content: string): number {
  */
 export function isLargeFile(content: string): boolean {
   if (!content) return false;
+  if (content.length > LARGE_FILE_THRESHOLDS.CHAR_COUNT) return true;
   const lineCount = countLines(content);
-  return lineCount > LARGE_FILE_THRESHOLDS.LINE_COUNT ||
-         content.length > LARGE_FILE_THRESHOLDS.CHAR_COUNT;
+  return lineCount > LARGE_FILE_THRESHOLDS.LINE_COUNT;
 }
 
 /**

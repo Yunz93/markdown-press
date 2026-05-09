@@ -54,6 +54,7 @@ export interface UsePreviewRendererOptions {
   fileContents: Record<string, string>;
   activeTabId?: string | null;
   readFile: (file: FileNode) => Promise<string>;
+  enabled?: boolean;
 }
 
 export interface UsePreviewRendererReturn {
@@ -78,6 +79,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     fileContents,
     activeTabId,
     readFile,
+    enabled = true,
   } = options;
 
   // Initialize markdown renderer
@@ -96,6 +98,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
 
   // Parse markdown content
   const parsedContent = useMemo(() => {
+    if (!enabled) {
+      return { frontmatter: null, bodyHTML: '' };
+    }
+
     return renderMarkdownPreview({
       content,
       currentFilePath,
@@ -104,12 +110,13 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       themeMode,
       markdownStylePreset,
     });
-  }, [content, currentFilePath, highlighter, isMarkdownPreview, markdownStylePreset, themeMode]);
+  }, [content, currentFilePath, enabled, highlighter, isMarkdownPreview, markdownStylePreset, themeMode]);
 
   // Sanitize HTML for HTML preview
   const sanitizedHtmlPreview = useMemo(() => {
+    if (!enabled) return '';
     return sanitizeHtmlPreview(content, isHtmlPreview);
-  }, [content, isHtmlPreview]);
+  }, [content, enabled, isHtmlPreview]);
 
   const basePreviewHtml = useMemo(
     () => getBasePreviewHtml(isMarkdownPreview, parsedContent.bodyHTML, sanitizedHtmlPreview),
@@ -140,6 +147,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       return;
     }
 
+    if (!enabled) {
+      return;
+    }
+
     if (!basePreviewHtml || typeof document === 'undefined') {
       basePreviewHtmlRef.current = basePreviewHtml;
       setEnhancedBodyHtml(basePreviewHtml);
@@ -152,7 +163,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     } else {
       basePreviewHtmlRef.current = basePreviewHtml;
     }
-  }, [basePreviewHtml, isHtmlPreview, isMarkdownPreview, requiresAsyncEnhancement]);
+  }, [basePreviewHtml, enabled, isHtmlPreview, isMarkdownPreview, requiresAsyncEnhancement]);
 
   // Attachment resolver context
   const attachmentResolverContext = useMemo(
@@ -165,6 +176,10 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     if (!isMarkdownPreview && !isHtmlPreview) {
       setEnhancedBodyHtml('');
       enhancedBodyHtmlRef.current = '';
+      return;
+    }
+
+    if (!enabled) {
       return;
     }
 
@@ -512,6 +527,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     attachmentResolverContext,
     content,
     currentFilePath,
+    enabled,
     fileContents,
     highlighter,
     isHtmlPreview,
