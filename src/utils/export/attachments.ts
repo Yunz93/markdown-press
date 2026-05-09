@@ -1,13 +1,28 @@
+import type { FileNode } from '../../types';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../attachmentResolver';
 import { parseWikiLinkReference } from '../wikiLinks';
 import { renderMermaidDiagrams } from '../markdown-extensions';
 import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import { prepareExportImages, waitForImages, waitForNextPaint, isImageAttachmentName } from './images';
 
-export async function enhanceExportAttachmentEmbeds(container: HTMLElement, sourceFilePath?: string): Promise<void> {
+/** Vault context so wiki-style image embeds resolve the same way as in preview (not only beside the note). */
+export type ExportAttachmentContext = {
+  files: FileNode[];
+  rootFolderPath: string | null;
+};
+
+export async function enhanceExportAttachmentEmbeds(
+  container: HTMLElement,
+  sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
+): Promise<void> {
   if (!sourceFilePath) return;
 
-  const resolverContext = createAttachmentResolverContext([], null, sourceFilePath);
+  const resolverContext = createAttachmentResolverContext(
+    attachmentContext?.files ?? [],
+    attachmentContext?.rootFolderPath ?? null,
+    sourceFilePath,
+  );
   const embeds = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-wiki-embed], article.markdown-body a.markdown-embed'));
 
   for (const embed of embeds) {
@@ -40,7 +55,11 @@ export async function enhanceExportAttachmentEmbeds(container: HTMLElement, sour
   }
 }
 
-export async function prepareHtmlForDownload(htmlContent: string, sourceFilePath?: string): Promise<string> {
+export async function prepareHtmlForDownload(
+  htmlContent: string,
+  sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
+): Promise<string> {
   const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
   const styleContent = Array.from(parsed.head.querySelectorAll('style'))
     .map((style) => style.textContent || '')
@@ -67,7 +86,7 @@ export async function prepareHtmlForDownload(htmlContent: string, sourceFilePath
     const renderTarget = exportRoot || host;
 
     renderTarget.setAttribute('data-theme', theme);
-    await enhanceExportAttachmentEmbeds(renderTarget, sourceFilePath);
+    await enhanceExportAttachmentEmbeds(renderTarget, sourceFilePath, attachmentContext);
     await prepareExportImages(renderTarget, sourceFilePath);
     await renderMermaidDiagrams(renderTarget, { themeMode: theme === 'dark' ? 'dark' : 'light' });
     await waitForImages(renderTarget);

@@ -1,9 +1,15 @@
 import { renderMermaidDiagrams } from '../markdown-extensions';
 import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import { saveExportFile } from './core';
+import { enhanceExportAttachmentEmbeds, type ExportAttachmentContext } from './attachments';
 import { prepareExportImages, waitForImages, waitForNextPaint } from './images';
 
-export async function exportToPdf(htmlContent: string, filename: string, sourceFilePath?: string): Promise<string | null> {
+export async function exportToPdf(
+  htmlContent: string,
+  filename: string,
+  sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
+): Promise<string | null> {
   const { default: html2pdf } = await import('html2pdf.js');
   type Html2PdfWorker = InstanceType<typeof html2pdf.Worker>;
   type Html2PdfSetOptions = Parameters<Html2PdfWorker['set']>[0];
@@ -40,6 +46,7 @@ export async function exportToPdf(htmlContent: string, filename: string, sourceF
   try {
     renderTarget.setAttribute('data-theme', theme);
 
+    await enhanceExportAttachmentEmbeds(renderTarget, sourceFilePath, attachmentContext);
     await prepareExportImages(renderTarget, sourceFilePath);
     await renderMermaidDiagrams(renderTarget, { themeMode: theme === 'dark' ? 'dark' : 'light' });
     await waitForImages(renderTarget);

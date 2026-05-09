@@ -11,7 +11,7 @@ import {
   generateTOC,
 } from './styles';
 import { saveExportFile } from './core';
-import { prepareHtmlForDownload } from './attachments';
+import { prepareHtmlForDownload, type ExportAttachmentContext } from './attachments';
 
 export async function exportToHtml(
   content: string,
@@ -74,9 +74,14 @@ export async function exportToHtml(
   return html;
 }
 
-export async function downloadHtml(htmlContent: string, filename: string, sourceFilePath?: string): Promise<string | null> {
+export async function downloadHtml(
+  htmlContent: string,
+  filename: string,
+  sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
+): Promise<string | null> {
   return saveExportFile({
-    content: await prepareHtmlForDownload(htmlContent, sourceFilePath),
+    content: await prepareHtmlForDownload(htmlContent, sourceFilePath, attachmentContext),
     filename,
     defaultExtension: '.html',
     mimeType: 'text/html;charset=utf-8',

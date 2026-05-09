@@ -147,7 +147,10 @@ export function useExportActions(
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
       });
-      const savedPath = await exportToPdf(htmlContent, activeFile.name, activeFile.path);
+      const savedPath = await exportToPdf(htmlContent, activeFile.name, activeFile.path, {
+        files,
+        rootFolderPath,
+      });
       if (savedPath !== null) {
         showNotification(t(settings.language, 'notifications_pdfExported'), 'success');
         if (savedPath) {
@@ -161,7 +164,7 @@ export function useExportActions(
       console.error('Failed to export PDF:', error);
       showNotification(t(settings.language, 'notifications_exportPdfFailed'), 'error');
     }
-  }, [activeTabId, content, files, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, rootFolderPath, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
 
   const handlePublishSimpleBlog = useCallback(async () => {
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();

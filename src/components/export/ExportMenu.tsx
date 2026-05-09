@@ -28,7 +28,7 @@ function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
 export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose, highlighter = null }) => {
   const { t } = useI18n();
   const content = useAppStore(selectContent);
-  const { activeTabId, files, settings, showNotification } = useAppStore();
+  const { activeTabId, files, rootFolderPath, settings, showNotification } = useAppStore();
   const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
   const previewFontFamily = buildPreviewExportFontFamily(settings);
   const codeFontFamily = buildCodeExportFontFamily(settings);
@@ -58,7 +58,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose, highlighter = n
           highlighter,
           markdownStylePreset: settings.markdownStylePreset,
         });
-        const savedPath = await exportToPdf(html, filename, activeFile?.path);
+        const savedPath = await exportToPdf(html, filename, activeFile?.path, {
+          files,
+          rootFolderPath,
+        });
         if (savedPath !== null) {
           showNotification(t('export_pdfExported'), 'success');
           if (savedPath) {
@@ -83,7 +86,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose, highlighter = n
       setFormat(null);
       onClose?.();
     }
-  }, [content, activeFile, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.fontSize, settings.markdownStylePreset, showNotification, highlighter, t]);
+  }, [content, activeFile, files, rootFolderPath, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.fontSize, settings.markdownStylePreset, showNotification, highlighter, t]);
 
   const fileName = activeFile?.name?.replace('.md', '') || 'document';
 

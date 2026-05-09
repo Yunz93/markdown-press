@@ -601,21 +601,18 @@ export function applyKatexDarkTheme(): void {
 
 export function getKatexRenderMode(
   options: {
-    isProd?: boolean;
     isTauri?: boolean;
     protocol?: string;
   } = {},
 ): KatexRenderMode | null {
-  const isProd = options.isProd ?? __PROD__;
   const isTauri = options.isTauri ?? isTauriEnvironment();
   const protocol = options.protocol ?? (typeof window !== 'undefined' ? window.location.protocol : '');
 
-  const shouldUseMathMlFallback = isProd && (
+  const shouldUseMathMlFallback =
     isTauri
     || protocol === 'tauri:'
     || protocol === 'asset:'
-    || protocol === 'app:'
-  );
+    || protocol === 'app:';
 
   return shouldUseMathMlFallback ? 'mathml' : null;
 }

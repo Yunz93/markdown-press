@@ -212,17 +212,22 @@ describe('renderMermaidDiagrams', () => {
 });
 
 describe('getKatexRenderMode', () => {
-  it('enables MathML fallback for production Tauri-like surfaces', () => {
+  it('enables MathML fallback for Tauri-like surfaces', () => {
     expect(getKatexRenderMode({
-      isProd: true,
       isTauri: true,
+      protocol: 'tauri:',
+    })).toBe('mathml');
+  });
+
+  it('enables MathML fallback for custom app protocols without relying on production build', () => {
+    expect(getKatexRenderMode({
+      isTauri: false,
       protocol: 'tauri:',
     })).toBe('mathml');
   });
 
   it('does not enable MathML fallback for non-Tauri web builds', () => {
     expect(getKatexRenderMode({
-      isProd: true,
       isTauri: false,
       protocol: 'https:',
     })).toBeNull();

@@ -50,6 +50,7 @@ export {
 } from './images';
 
 // Export attachment utilities
+export type { ExportAttachmentContext } from './attachments';
 export {
   enhanceExportAttachmentEmbeds,
   prepareHtmlForDownload,

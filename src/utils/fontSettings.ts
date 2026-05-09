@@ -508,7 +508,7 @@ async function loadFontViaFontFaceApi(spec: FontFaceApiSpec): Promise<void> {
 export async function ensureDynamicFontFaces(settings: FontSettings): Promise<void> {
   if (typeof document === 'undefined') return;
 
-  if (__PROD__) {
+  if (isTauriEnvironment()) {
     try {
       await waitForTauri(800);
     } catch {
