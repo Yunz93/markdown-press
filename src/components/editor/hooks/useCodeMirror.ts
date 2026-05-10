@@ -214,14 +214,6 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   }, []);
 
   useEffect(() => {
-    onChangeRef.current = onChange;
-    if (changeTimeoutRef.current) {
-      clearTimeout(changeTimeoutRef.current);
-      changeTimeoutRef.current = null;
-    }
-  }, [onChange]);
-
-  useEffect(() => {
     completionSourceRef.current = completionSource;
   }, [completionSource]);
 
@@ -254,6 +246,13 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
     pendingContentChangeIsLargeRef.current = false;
     onChangeRef.current(view.state.doc.toString(), { skipHistory: isLarge });
   }, []);
+
+  useEffect(() => {
+    if (onChangeRef.current !== onChange && changeTimeoutRef.current) {
+      flushPendingContentChange();
+    }
+    onChangeRef.current = onChange;
+  }, [flushPendingContentChange, onChange]);
 
   useEffect(() => {
     const missingDescriptions = extractMarkdownFenceLanguages(content)

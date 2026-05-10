@@ -1,22 +1,30 @@
 /** @vitest-environment happy-dom */
 
-import React from 'react';
-import { describe, expect, it } from 'vitest';
+import React, { useEffect } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { render, act, waitFor } from '@testing-library/react';
 import { useCodeMirror } from './useCodeMirror';
+import type { EditorView } from '@codemirror/view';
 
 function Harness(props: {
   content: string;
   placeholder: string;
+  documentKey?: string;
   themeMode?: 'light' | 'dark';
+  onChange?: (content: string) => void;
+  onView?: (view: EditorView | null) => void;
 }) {
   const cm = useCodeMirror({
     content: props.content,
-    documentKey: 'file-1',
+    documentKey: props.documentKey ?? 'file-1',
     placeholder: props.placeholder,
     themeMode: props.themeMode ?? 'light',
-    onChange: () => {},
+    onChange: props.onChange ?? (() => {}),
   });
+
+  useEffect(() => {
+    props.onView?.(cm.view);
+  }, [cm.view, props]);
 
   return <div ref={cm.editorRef} />;
 }
@@ -49,5 +57,50 @@ describe('useCodeMirror', () => {
     });
     await waitFor(() => expect(container.querySelector('.cm-content')?.textContent ?? '').toContain('hello'));
   });
-});
 
+  it('flushes pending large-file edits before switching to a new document', async () => {
+    const largeContent = `${Array.from({ length: 5001 }, () => 'line').join('\n')}\n`;
+    const nextContent = 'next document';
+    const firstOnChange = vi.fn();
+    const secondOnChange = vi.fn();
+    let view: EditorView | null = null;
+
+    const { rerender } = render(
+      <Harness
+        content={largeContent}
+        documentKey="file-1"
+        placeholder="x"
+        onChange={firstOnChange}
+        onView={(instance) => {
+          view = instance;
+        }}
+      />
+    );
+
+    await waitFor(() => expect(view).not.toBeNull());
+
+    act(() => {
+      view!.dispatch({
+        changes: { from: view!.state.doc.length, insert: '!' },
+      });
+    });
+
+    act(() => {
+      rerender(
+        <Harness
+          content={nextContent}
+          documentKey="file-2"
+          placeholder="x"
+          onChange={secondOnChange}
+          onView={(instance) => {
+            view = instance;
+          }}
+        />
+      );
+    });
+
+    await waitFor(() => expect(firstOnChange).toHaveBeenCalledTimes(1));
+    expect(firstOnChange).toHaveBeenCalledWith(`${largeContent}!`, { skipHistory: true });
+    expect(secondOnChange).not.toHaveBeenCalled();
+  });
+});
