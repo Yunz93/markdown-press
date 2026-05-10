@@ -60,19 +60,22 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
-            ### 功能发布
+            ### 0.9.2
 
-            #### 新增功能
+            #### 改进
 
-            - 新增多套 Markdown 样式预设（nord/topaz/typewriter/primary），并与代码高亮主题联动。
-            - 支持将 `.md` / `.markdown` 作为默认打开方式（文件关联 + 外部打开流程更完整）。
-            - 编辑区与预览区 Markdown 预置样式对齐：标题/行内代码/Frontmatter/基础 token 颜色统一由 preset 驱动。
+            - 优化长文档场景下的编辑与预览更新性能，减少卡顿。
+            - 正式包默认关闭 WebView 开发者工具；本地开发请继续使用 `npm run tauri:dev`（会通过合并配置启用调试）。
+            - 博客/公众号发布相关的服务端调试日志改为写入应用配置目录下的 `publish-debug.log`，便于在 Windows 与多用户环境下排查（不再依赖 Unix `/tmp`）。
 
-            #### 问题修复
+            #### 修复
 
-            - 修复 WikiLink 悬停预览排版与预览区不一致的问题，减少样式割裂。
-            - 修复并加固 Shiki 预览渲染稳定性，补充回归测试。
-            - 清理不必要文件与维护性改进。
+            - 从外部打开 Markdown 时在新窗口中加载。
+            - 视图切换、分屏滚动同步、主题切换与编辑稳定性多项修复。
+            - macOS 叠加标题栏与 PDF 导出相关修复。
+            - 侧边栏右键菜单在靠近屏幕边缘时自动收敛到视口内。
+            - 预览 Wiki 嵌入、PDF 导出中的图片及渲染链路加固。
+            - KaTeX MathML 输出与 Tauri 主题同步等问题修复。
 
             ### macOS 安装说明
 
@@ -148,19 +151,22 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
-            ### 功能发布
+            ### 0.9.2
 
-            #### 新增功能
+            #### 改进
 
-            - 新增多套 Markdown 样式预设（nord/topaz/typewriter/primary），并与代码高亮主题联动。
-            - 支持将 `.md` / `.markdown` 作为默认打开方式（文件关联 + 外部打开流程更完整）。
-            - 编辑区与预览区 Markdown 预置样式对齐：标题/行内代码/Frontmatter/基础 token 颜色统一由 preset 驱动。
+            - 优化长文档场景下的编辑与预览更新性能，减少卡顿。
+            - 正式包默认关闭 WebView 开发者工具；本地开发请继续使用 `npm run tauri:dev`（会通过合并配置启用调试）。
+            - 博客/公众号发布相关的服务端调试日志改为写入应用配置目录下的 `publish-debug.log`，便于在 Windows 与多用户环境下排查（不再依赖 Unix `/tmp`）。
 
-            #### 问题修复
+            #### 修复
 
-            - 修复 WikiLink 悬停预览排版与预览区不一致的问题，减少样式割裂。
-            - 修复并加固 Shiki 预览渲染稳定性，补充回归测试。
-            - 清理不必要文件与维护性改进。
+            - 从外部打开 Markdown 时在新窗口中加载。
+            - 视图切换、分屏滚动同步、主题切换与编辑稳定性多项修复。
+            - macOS 叠加标题栏与 PDF 导出相关修复。
+            - 侧边栏右键菜单在靠近屏幕边缘时自动收敛到视口内。
+            - 预览 Wiki 嵌入、PDF 导出中的图片及渲染链路加固。
+            - KaTeX MathML 输出与 Tauri 主题同步等问题修复。
 
             ### macOS 安装说明
 
