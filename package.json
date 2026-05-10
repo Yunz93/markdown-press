@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
     "build": "npm run typecheck && vite build",
     "analyze": "npm run typecheck && ANALYZE=1 vite build",

@@ -18,7 +18,7 @@ use std::io::Write;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
 use tauri::Manager;
@@ -46,6 +46,21 @@ const SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY: &str = "imageHostingS3Secre
 const SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET: &str = "imageHostingOssAccessKeySecret";
 const SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY: &str = "imageHostingQiniuSecretKey";
 
+/// Matches `identifier` in `tauri.conf.json` — log path aligns with Tauri app config folder layout.
+const APP_CONFIG_DIR_NAME: &str = "com.bxyz.markdown-press";
+
+fn publish_log_file_path() -> Option<PathBuf> {
+    static CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let mut path = dirs::config_dir()?;
+            path.push(APP_CONFIG_DIR_NAME);
+            path.push("publish-debug.log");
+            Some(path)
+        })
+        .clone()
+}
+
 fn publish_log(message: impl AsRef<str>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -58,12 +73,17 @@ fn publish_log(message: impl AsRef<str>) {
     );
     println!("{}", line);
     log::info!("{}", line);
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/markdown-press-publish.log")
-    {
-        let _ = writeln!(file, "{}", line);
+    if let Some(path) = publish_log_file_path() {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let _ = writeln!(file, "{}", line);
+        }
     }
 }
 
