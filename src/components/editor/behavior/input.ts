@@ -25,6 +25,7 @@ import {
 import { buildQuotePrefix, buildQuoteRaw } from './quotes';
 import {
   parseListItem,
+  formatOrderedMarkerValue,
   getOrderedListParentForContinuation,
   isLaterLineOfMarkdownListItem,
 } from '../nestedListBehavior';
@@ -366,7 +367,9 @@ export function handleStructuredPaste(view: EditorView, event: ClipboardEvent): 
   const buildContinuation = (index: number): string => {
     const quotePrefix = item.quotePrefix ?? '';
     if (item.type === 'ordered') {
-      return `${quotePrefix}${item.indent}${(item.number ?? 0) + index}. `;
+      const n = (item.number ?? 0) + index;
+      const seg = formatOrderedMarkerValue(n, item.markerStyle ?? 'decimal', item.delimiter ?? '.');
+      return `${quotePrefix}${item.indent}${seg} `;
     }
 
     if (item.type === 'task') {

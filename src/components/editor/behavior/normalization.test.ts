@@ -21,4 +21,12 @@ describe('getStrictOrderedListNormalizationChanges', () => {
   it('does not restart numbering after an indented continuation paragraph under an ordered item', () => {
     expect(normalize('1. one\n\tcontinuation\n2. two')).toBe('1. one\n\tcontinuation\n2. two');
   });
+
+  it('renumbers a decimal marker to match alphabetic siblings (A. B. → C.)', () => {
+    expect(normalize('A. one\nB. two\n1. three')).toBe('A. one\nB. two\nC. three');
+  });
+
+  it('rewrites a correct numeric index to letters when the list uses letters', () => {
+    expect(normalize('A. one\nB. two\n3. three')).toBe('A. one\nB. two\nC. three');
+  });
 });

@@ -13,6 +13,7 @@ import {
   getListInfoAtLine,
   getSelectedListItems,
   formatListItem,
+  formatOrderedMarkerValue,
   isEmptyListItem,
   findPreviousSiblingItem,
   getStrictOrderedListNormalizationChanges,
@@ -35,7 +36,7 @@ function getLeadingIndent(lineText: string): string {
 
 function getMarkerText(item: ListItemInfo): string {
   if (item.type === 'ordered') {
-    return `${item.number ?? 1}${item.delimiter ?? '.'}`;
+    return formatOrderedMarkerValue(item.number ?? 1, item.markerStyle ?? 'decimal', item.delimiter ?? '.');
   }
 
   if (item.type === 'task') {
@@ -361,7 +362,8 @@ export const handleListBackspace: StateCommand = ({ state, dispatch }): boolean 
   let markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1; // +1 for space
 
   if (item.type === 'ordered') {
-    markerEnd = line.from + quoteLen + item.indent.length + `${item.number}${item.delimiter} `.length;
+    const seg = formatOrderedMarkerValue(item.number ?? 1, item.markerStyle ?? 'decimal', item.delimiter ?? '.');
+    markerEnd = line.from + quoteLen + item.indent.length + seg.length + 1;
   } else if (item.type === 'task') {
     markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1 + (item.checkbox?.length ?? 3) + 1;
   }
@@ -517,6 +519,7 @@ export const toggleOrderedList = (options?: { strictMode?: boolean }): StateComm
             ...item,
             type: 'ordered',
             number: 1,
+            markerStyle: 'decimal',
             delimiter: '.',
           };
           return formatListItem(newItem);

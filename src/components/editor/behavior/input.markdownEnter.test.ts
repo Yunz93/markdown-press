@@ -33,4 +33,10 @@ describe('handleSmartEnter ordered list continuation with markdown syntax tree',
     expect(next.doc.toString()).toContain('note');
     expect(next.doc.toString()).toMatch(/\n2\.[ )]/);
   });
+
+  it('continues upper-case alphabetic ordered lists with the next letter', () => {
+    const doc = 'A. first line';
+    const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
+    expect(next.doc.toString()).toMatch(/\nB\.[ )]/);
+  });
 });

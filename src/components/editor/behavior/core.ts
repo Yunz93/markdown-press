@@ -82,6 +82,8 @@ export interface ListInfo {
   content: string;
   number?: number;
   delimiter?: string;
+  /** 有序列表标记样式（与 nestedListBehavior 一致） */
+  markerStyle?: 'decimal' | 'lower-alpha' | 'upper-alpha' | 'lower-roman' | 'upper-roman';
   checkbox?: string;
 }
 

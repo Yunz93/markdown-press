@@ -32,6 +32,14 @@ export const LIST_INDENT_SIZE = 4;
 // 列表类型定义
 export type ListType = 'unordered' | 'ordered' | 'task';
 
+/** 有序列表标记在源码中的「样式」，用于续行/重编号时与同级已有项一致 */
+export type OrderedListMarkerStyle =
+  | 'decimal'
+  | 'lower-alpha'
+  | 'upper-alpha'
+  | 'lower-roman'
+  | 'upper-roman';
+
 export interface ListItemInfo {
   type: ListType;
   level: number;           // 层级 (0, 1, 2, ...)
@@ -41,6 +49,8 @@ export interface ListItemInfo {
   content: string;         // 内容部分
   number?: number;         // 有序列表编号
   delimiter?: string;      // . 或 )
+  /** 仅 ordered：与源码标记样式一致，供 formatListItem / 重编号输出 */
+  markerStyle?: OrderedListMarkerStyle;
   checkbox?: string;       // [ ], [x], [X]
   lineNumber: number;      // 行号
   startPos: number;        // 行起始位置
@@ -125,6 +135,91 @@ function parseRomanNumeral(roman: string): number {
   return total;
 }
 
+function formatRomanNumeral(value: number, uppercase: boolean): string {
+  if (value < 1 || value > 3999) {
+    return String(value);
+  }
+  const numerals: Array<[number, string]> = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let n = value;
+  let s = '';
+  for (const [v, sym] of numerals) {
+    while (n >= v) {
+      s += sym;
+      n -= v;
+    }
+  }
+  return uppercase ? s : s.toLowerCase();
+}
+
+function inferOrderedMarkerStyleFromRawPart(markerPart: string): OrderedListMarkerStyle {
+  if (/^\d+$/.test(markerPart)) {
+    return 'decimal';
+  }
+  if (/^[ivxlcdm]{2,}$/i.test(markerPart) && parseRomanNumeral(markerPart) > 0) {
+    return markerPart === markerPart.toUpperCase() && markerPart.toLowerCase() !== markerPart
+      ? 'upper-roman'
+      : 'lower-roman';
+  }
+  if (/^[a-zA-Z]$/.test(markerPart)) {
+    return markerPart === markerPart.toUpperCase() && markerPart !== markerPart.toLowerCase()
+      ? 'upper-alpha'
+      : 'lower-alpha';
+  }
+  return 'decimal';
+}
+
+/** 将有序序号按样式格式化为「数字/字母/罗马 + 分隔符」 */
+export function formatOrderedMarkerValue(
+  value: number,
+  style: OrderedListMarkerStyle,
+  delimiter: string,
+): string {
+  let body: string;
+  switch (style) {
+    case 'lower-alpha':
+      body = value >= 1 && value <= 26 ? String.fromCharCode(96 + value) : String(value);
+      break;
+    case 'upper-alpha':
+      body = value >= 1 && value <= 26 ? String.fromCharCode(64 + value) : String(value);
+      break;
+    case 'lower-roman':
+      body = formatRomanNumeral(value, false);
+      break;
+    case 'upper-roman':
+      body = formatRomanNumeral(value, true);
+      break;
+    default:
+      body = String(value);
+  }
+  return `${body}${delimiter}`;
+}
+
+function extractOrderedMarkerRawPartFromLineText(lineText: string): string | null {
+  const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
+  let text = lineText;
+  const quoteMatch = text.match(BLOCKQUOTE_REGEX);
+  if (quoteMatch) {
+    text = quoteMatch[3];
+  }
+  const ORDERED_HEAD = /^([ \t]*)(\d+|[a-z]|[ivxlcdm]+)([.)]) /i;
+  const m = text.match(ORDERED_HEAD);
+  return m ? m[2] : null;
+}
+
 /**
  * 解析单行列表项
  * 使用与 behavior/core.ts 一致的正则表达式
@@ -167,21 +262,24 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
     };
   }
 
-  // 有序列表: 支持 1., a., i., I. 等格式，统一转换为阿拉伯数字
+  // 有序列表: 支持 1., a., i., I. 等格式；数值统一为序号的整数值，样式单独保留
   const orderedMatch = text.match(ORDERED_LIST_REGEX);
   if (orderedMatch) {
     const [, indent, markerPart, delimiter, content] = orderedMatch;
     const markerInfo = parseOrderedListMarker(`${markerPart}${delimiter}`);
     if (markerInfo) {
+      const markerStyle = inferOrderedMarkerStyleFromRawPart(markerPart);
+      const marker = formatOrderedMarkerValue(markerInfo.value, markerStyle, markerInfo.delimiter);
       return {
         type: 'ordered',
         level: getLevelFromIndent(indent),
         quotePrefix,
         indent,
-        marker: `${markerInfo.value}${markerInfo.delimiter}`, // 统一使用阿拉伯数字格式
+        marker,
         content: content.trimStart(),
         number: markerInfo.value,
         delimiter: markerInfo.delimiter,
+        markerStyle,
         lineNumber,
         startPos,
       };
@@ -407,6 +505,41 @@ function findParentCounterKey(state: EditorState, lineNumber: number, depth: num
   return 'root';
 }
 
+/** 与 calculateOrderedListNumbers 中计数器 key 一致，用于判断「同级同组」有序列表 */
+export function orderedListCounterKey(state: EditorState, lineNumber: number): string | null {
+  const line = state.doc.line(lineNumber);
+  const item = parseListItem(line.text, lineNumber, line.from);
+  if (!item || item.type !== 'ordered') {
+    return null;
+  }
+  const itemDepth = getIndentColumnWidth(item.indent);
+  const quoteKey = item.quotePrefix ?? '';
+  const parentKey = findParentCounterKey(state, lineNumber, itemDepth, quoteKey);
+  return `${quoteKey}:${parentKey}:${itemDepth}`;
+}
+
+function dominantOrderedMarkerStyleInGroup(state: EditorState, lineNumber: number): OrderedListMarkerStyle {
+  const key = orderedListCounterKey(state, lineNumber);
+  if (!key) {
+    return 'decimal';
+  }
+  for (let j = 1; j <= state.doc.lines; j++) {
+    if (orderedListCounterKey(state, j) !== key) {
+      continue;
+    }
+    const raw = extractOrderedMarkerRawPartFromLineText(state.doc.line(j).text);
+    if (!raw) {
+      continue;
+    }
+    const st = inferOrderedMarkerStyleFromRawPart(raw);
+    if (st !== 'decimal') {
+      return st;
+    }
+  }
+  const selfRaw = extractOrderedMarkerRawPartFromLineText(state.doc.line(lineNumber).text);
+  return selfRaw ? inferOrderedMarkerStyleFromRawPart(selfRaw) : 'decimal';
+}
+
 /**
  * 获取严格模式下的标准化更改
  */
@@ -423,12 +556,22 @@ export function getStrictOrderedListNormalizationChanges(
     if (!item || item.type !== 'ordered') continue;
 
     const correctNumber = correctNumbers.get(i);
-    if (correctNumber === undefined || correctNumber === item.number) continue;
+    if (correctNumber === undefined) continue;
 
     const markerColumn = (item.quotePrefix?.length ?? 0) + item.indent.length;
-    const newText = `${line.text.slice(0, markerColumn)}${line.text
-      .slice(markerColumn)
-      .replace(/^(\d+|[a-z]|[ivxlcdm]+)([.)]) /i, `${correctNumber}$2 `)}`;
+    const slice = line.text.slice(markerColumn);
+    const headMatch = slice.match(/^((?:\d+|[a-z]|[ivxlcdm]+)([.)])) /i);
+    if (!headMatch) continue;
+
+    const style = dominantOrderedMarkerStyleInGroup(state, i);
+    const delim = item.delimiter ?? '.';
+    const desired = formatOrderedMarkerValue(correctNumber, style, delim);
+    if (headMatch[1] === desired) continue;
+
+    const newText = `${line.text.slice(0, markerColumn)}${slice.replace(
+      /^(\d+|[a-z]|[ivxlcdm]+)([.)]) /i,
+      `${desired} `,
+    )}`;
 
     if (newText !== line.text) {
       changes.push({
@@ -470,7 +613,9 @@ export function formatListItem(item: ListItemInfo): string {
   if (item.type === 'ordered') {
     const number = item.number ?? 1;
     const delimiter = item.delimiter ?? '.';
-    return `${quotePrefix}${indent}${number}${delimiter} ${content}`;
+    const markerStyle = item.markerStyle ?? 'decimal';
+    const markerSeg = formatOrderedMarkerValue(number, markerStyle, delimiter);
+    return `${quotePrefix}${indent}${markerSeg} ${content}`;
   }
 
   if (item.type === 'task') {

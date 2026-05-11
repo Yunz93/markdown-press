@@ -6,6 +6,7 @@
 import {
   parseListItem,
   formatListItem,
+  formatOrderedMarkerValue,
 } from '../nestedListBehavior';
 import type { ListInfo } from './core';
 
@@ -19,6 +20,7 @@ function convertToLegacyListInfo(item: ReturnType<typeof parseListItem>): ListIn
     content: item.content,
     number: item.number,
     delimiter: item.delimiter,
+    markerStyle: item.markerStyle,
     checkbox: item.checkbox,
   };
 }
@@ -43,7 +45,12 @@ export function formatListLine(
     : '';
 
   if (nextList.type === 'ordered') {
-    return `${quotePrefix}${nextList.indent}${nextList.number ?? 1}${nextList.delimiter ?? '.'} ${content}`;
+    const seg = formatOrderedMarkerValue(
+      nextList.number ?? 1,
+      nextList.markerStyle ?? 'decimal',
+      nextList.delimiter ?? '.',
+    );
+    return `${quotePrefix}${nextList.indent}${seg} ${content}`;
   }
 
   if (nextList.type === 'task') {
