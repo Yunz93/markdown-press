@@ -518,26 +518,49 @@ export function orderedListCounterKey(state: EditorState, lineNumber: number): s
   return `${quoteKey}:${parentKey}:${itemDepth}`;
 }
 
-function dominantOrderedMarkerStyleInGroup(state: EditorState, lineNumber: number): OrderedListMarkerStyle {
-  const key = orderedListCounterKey(state, lineNumber);
-  if (!key) {
-    return 'decimal';
-  }
-  for (let j = 1; j <= state.doc.lines; j++) {
-    if (orderedListCounterKey(state, j) !== key) {
+function previousSiblingMarkerStyleInGroup(
+  state: EditorState,
+  lineNumber: number,
+  currentItem: ListItemInfo,
+): OrderedListMarkerStyle | null {
+  const currentKey = orderedListCounterKey(state, lineNumber);
+  if (!currentKey) return null;
+
+  const currentDepth = getIndentColumnWidth(currentItem.indent);
+
+  for (let j = lineNumber - 1; j >= 1; j--) {
+    const line = state.doc.line(j);
+    const item = parseListItem(line.text, j, line.from);
+
+    if (!item) {
+      if (isBlankLine(line.text)) continue;
+      // 懒延续段不应打断同一 ListItem 的上下文
+      if (getOrderedListParentForContinuation(state, j)) continue;
+      break;
+    }
+
+    if ((item.quotePrefix ?? '') !== (currentItem.quotePrefix ?? '')) {
       continue;
     }
-    const raw = extractOrderedMarkerRawPartFromLineText(state.doc.line(j).text);
-    if (!raw) {
+
+    const depth = getIndentColumnWidth(item.indent);
+    if (depth < currentDepth) {
+      break; // 到达父级或更高级别，说明没有同级前项
+    }
+
+    if (item.type !== 'ordered') {
       continue;
     }
-    const st = inferOrderedMarkerStyleFromRawPart(raw);
-    if (st !== 'decimal') {
-      return st;
+
+    if (orderedListCounterKey(state, j) !== currentKey) {
+      continue;
     }
+
+    const raw = extractOrderedMarkerRawPartFromLineText(line.text);
+    return raw ? inferOrderedMarkerStyleFromRawPart(raw) : (item.markerStyle ?? 'decimal');
   }
-  const selfRaw = extractOrderedMarkerRawPartFromLineText(state.doc.line(lineNumber).text);
-  return selfRaw ? inferOrderedMarkerStyleFromRawPart(selfRaw) : 'decimal';
+
+  return null;
 }
 
 /**
@@ -563,7 +586,7 @@ export function getStrictOrderedListNormalizationChanges(
     const headMatch = slice.match(/^((?:\d+|[a-z]|[ivxlcdm]+)([.)])) /i);
     if (!headMatch) continue;
 
-    const style = dominantOrderedMarkerStyleInGroup(state, i);
+    const style = previousSiblingMarkerStyleInGroup(state, i, item) ?? item.markerStyle ?? 'decimal';
     const delim = item.delimiter ?? '.';
     const desired = formatOrderedMarkerValue(correctNumber, style, delim);
     if (headMatch[1] === desired) continue;

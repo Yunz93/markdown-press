@@ -29,4 +29,8 @@ describe('getStrictOrderedListNormalizationChanges', () => {
   it('rewrites a correct numeric index to letters when the list uses letters', () => {
     expect(normalize('A. one\nB. two\n3. three')).toBe('A. one\nB. two\nC. three');
   });
+
+  it('does not rewrite a new decimal list after a paragraph break', () => {
+    expect(normalize('A. one\nB. two\n\nParagraph\n\n1. three')).toBe('A. one\nB. two\n\nParagraph\n\n1. three');
+  });
 });
