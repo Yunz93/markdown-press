@@ -60,6 +60,14 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
+            ### 0.9.3
+
+            #### 修复与改进
+
+            - 有序列表：列表项下缩进延续段不再错误打断编号；在延续段末尾按 Enter 会正确插入下一序号。
+            - 宽松模式下预览保留源码中的序号显示；切换宽松/严格编号后编辑区与预览即时生效，无需重开文件。
+            - 精简有序列表标准化逻辑，移除易与延续段落冲突的旧 fallback。
+
             ### 0.9.2
 
             #### 改进
@@ -150,6 +158,14 @@ jobs:
           releaseName: Release ${{ github.ref_name }}
           releaseBody: |
             See the assets to download this version and install.
+
+            ### 0.9.3
+
+            #### 修复与改进
+
+            - 有序列表：列表项下缩进延续段不再错误打断编号；在延续段末尾按 Enter 会正确插入下一序号。
+            - 宽松模式下预览保留源码中的序号显示；切换宽松/严格编号后编辑区与预览即时生效，无需重开文件。
+            - 精简有序列表标准化逻辑，移除易与延续段落冲突的旧 fallback。
 
             ### 0.9.2
 
