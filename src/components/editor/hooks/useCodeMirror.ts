@@ -539,6 +539,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       const replacement = getDocumentReplacementRange(currentContent, safeContent);
       view.dispatch({
         changes: replacement,
+        scrollIntoView: false,
       });
     }
 
@@ -560,7 +561,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       restoreScrollFrameRef.current = null;
       restoreScrollPosition();
       if (shouldRestoreFocus && !view.hasFocus) {
-        view.focus();
+        view.contentDOM.focus({ preventScroll: true });
       }
     });
 

@@ -1,5 +1,5 @@
 import type { Frontmatter, MetadataField } from '../types';
-import { parseFrontmatter, updateFrontmatter } from './frontmatter';
+import { parseFrontmatter, replaceFrontmatterInner, updateFrontmatter } from './frontmatter';
 
 const LEGACY_DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'category', defaultValue: '' },
@@ -219,12 +219,37 @@ export function normalizeMetadataFields(input: unknown): MetadataField[] {
   return dedupedFields;
 }
 
-export function refreshDocumentUpdateTime(content: string): string {
-  const { frontmatter } = parseFrontmatter(content);
-  if (!frontmatter) {
-    return content;
+function stripYamlKeyQuotes(rawKey: string): string {
+  const t = rawKey.trim();
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    return t.slice(1, -1).trim();
+  }
+  return t;
+}
+
+/** Scalar timestamps only — block/flow structures need full YAML round-trip */
+function isInlineTimestampYamlValue(rawTail: string): boolean {
+  const t = rawTail.trim();
+  if (!t) {
+    return true;
   }
 
+  if (t === '|' || t === '>') {
+    return false;
+  }
+
+  if (t.startsWith('|') || t.startsWith('>')) {
+    return false;
+  }
+
+  if (t.startsWith('{') || t.startsWith('[') || t.startsWith('*') || t.startsWith('&')) {
+    return false;
+  }
+
+  return true;
+}
+
+function legacyRefreshDocumentUpdateTime(content: string, frontmatter: Frontmatter): string {
   const updates: Frontmatter = {};
   let hasUpdates = false;
 
@@ -242,4 +267,88 @@ export function refreshDocumentUpdateTime(content: string): string {
   }
 
   return updateFrontmatter(content, updates);
+}
+
+/**
+ * Refresh update-time frontmatter keys without rewriting the entire YAML block.
+ * Full round-trips reorder/reformat keys and cause large editor replacements that steal focus/caret.
+ */
+export function refreshDocumentUpdateTime(content: string): string {
+  const { frontmatter } = parseFrontmatter(content);
+  if (!frontmatter) {
+    return content;
+  }
+
+  const refreshKeysLower = new Set(
+    Object.keys(frontmatter).filter((key) => (
+      AUTO_REFRESH_UPDATE_TIME_KEYS.has(key.trim().toLowerCase())
+    )).map((key) => key.trim().toLowerCase()),
+  );
+
+  if (refreshKeysLower.size === 0) {
+    return content;
+  }
+
+  const touchedLowerKeys = new Set<string>();
+
+  const surgical = replaceFrontmatterInner(content, (inner, { lineEnding }) => {
+    const lines = inner.split(/\r?\n/);
+    let blockedByStructuredValue = false;
+
+    const nextLines = lines.map((line) => {
+      const trimmedStart = line.trimStart();
+      if (trimmedStart.startsWith('#')) {
+        return line;
+      }
+
+      const colonIdx = line.indexOf(':');
+      if (colonIdx <= 0) {
+        return line;
+      }
+
+      const keySegment = line.slice(0, colonIdx);
+      const logicalKey = stripYamlKeyQuotes(keySegment.trim());
+
+      if (!AUTO_REFRESH_UPDATE_TIME_KEYS.has(logicalKey.toLowerCase())) {
+        return line;
+      }
+
+      const afterColon = line.slice(colonIdx + 1);
+      const rawTail = afterColon.replace(/^\s*/, '');
+
+      if (!isInlineTimestampYamlValue(rawTail)) {
+        blockedByStructuredValue = true;
+        return line;
+      }
+
+      const nextStamp = normalizeTimestampValue(rawTail, logicalKey);
+      if (rawTail.trim() === nextStamp) {
+        touchedLowerKeys.add(logicalKey.toLowerCase());
+        return line;
+      }
+
+      touchedLowerKeys.add(logicalKey.toLowerCase());
+
+      const spacing = afterColon.match(/^\s*/)?.[0] ?? ' ';
+      return `${line.slice(0, colonIdx + 1)}${spacing}${nextStamp}`;
+    });
+
+    if (blockedByStructuredValue) {
+      return null;
+    }
+
+    for (const keyLower of refreshKeysLower) {
+      if (!touchedLowerKeys.has(keyLower)) {
+        return null;
+      }
+    }
+
+    return nextLines.join(lineEnding);
+  });
+
+  if (surgical !== null) {
+    return surgical;
+  }
+
+  return legacyRefreshDocumentUpdateTime(content, frontmatter);
 }

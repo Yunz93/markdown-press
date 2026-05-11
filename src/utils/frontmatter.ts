@@ -3,6 +3,36 @@ import type { Frontmatter, ParsedMarkdown } from '../types';
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
+/**
+ * Replace the inner YAML region between --- fences without re-serializing the whole block.
+ * Returning null from replacer aborts and leaves the original document unchanged.
+ */
+export function replaceFrontmatterInner(
+  content: string,
+  replacer: (inner: string, meta: { lineEnding: string }) => string | null,
+): string | null {
+  const match = content.match(FRONTMATTER_REGEX);
+  if (!match || match.index === undefined) {
+    return null;
+  }
+
+  const inner = match[1];
+  const lineEnding = /\r\n/.test(inner) ? '\r\n' : '\n';
+  const replacementInner = replacer(inner, { lineEnding });
+  if (replacementInner === null) {
+    return null;
+  }
+
+  const entireBlock = match[0];
+  const innerOffset = entireBlock.indexOf(inner);
+  if (innerOffset < 0) {
+    return null;
+  }
+
+  const newBlock = `${entireBlock.slice(0, innerOffset)}${replacementInner}${entireBlock.slice(innerOffset + inner.length)}`;
+  return `${content.slice(0, match.index)}${newBlock}${content.slice(match.index + entireBlock.length)}`;
+}
+
 function shouldQuoteYamlString(value: string): boolean {
   const trimmed = value.trim();
   return /^\s|\s$/.test(value)
