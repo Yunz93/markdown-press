@@ -16,6 +16,7 @@ import {
   isEmptyListItem,
   findPreviousSiblingItem,
   getStrictOrderedListNormalizationChanges,
+  getOrderedListParentForContinuation,
   LIST_INDENT_SIZE,
   LIST_INDENT_UNIT,
   getLevelFromIndent,
@@ -317,6 +318,33 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
   return true;
 };
 
+/** 在有序列表项的缩进延续段末尾按 Enter：插入下一项（避免落入默认 Markdown 续行并错误插入 `1.`） */
+export const handleOrderedListContinuationEnter: StateCommand = ({ state, dispatch }) => {
+  const main = state.selection.main;
+  if (!main.empty) return false;
+
+  const line = state.doc.lineAt(main.from);
+  if (main.from !== line.to) return false;
+
+  const parent = getOrderedListParentForContinuation(state, line.number);
+  if (!parent) return false;
+
+  const newItem: ListItemInfo = {
+    ...parent,
+    number: (parent.number ?? 1) + 1,
+    content: '',
+  };
+  const insert = '\n' + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+
+  dispatch(state.update({
+    changes: { from: main.from, insert },
+    selection: { anchor: main.from + insert.length },
+    scrollIntoView: true,
+    userEvent: 'input',
+  }));
+  return true;
+};
+
 // ==================== Backspace 处理 ====================
 
 export const handleListBackspace: StateCommand = ({ state, dispatch }): boolean => {
@@ -553,6 +581,7 @@ export const toggleTaskList: StateCommand = ({ state, dispatch }): boolean => {
 
 export const nestedListCommands = {
   handleListEnter,
+  handleOrderedListContinuationEnter,
   handleListBackspace,
   handleListTab,
   handleListShiftTab,

@@ -86,6 +86,15 @@ describe('handleListTab selection fallback', () => {
   });
 });
 
+describe('handleSmartEnter ordered list continuation', () => {
+  it('inserts the next sibling number after a tab-indented continuation line', () => {
+    const doc = '1. first\n\tcontinuation';
+    const cursorAtEnd = doc.length;
+    const next = applyCommand(handleSmartEnter, doc, cursorAtEnd, cursorAtEnd);
+    expect(next.doc.toString()).toBe('1. first\n\tcontinuation\n2. ');
+  });
+});
+
 describe('handleSmartEnter empty nested list items', () => {
   it('keeps the cursor after the marker when outdenting an empty ordered item', () => {
     const doc = '1. test\n   1. test\n   2. ';

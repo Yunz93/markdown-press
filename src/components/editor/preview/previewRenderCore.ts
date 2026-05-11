@@ -3,7 +3,7 @@ import { parseFrontmatter } from '../../../utils/frontmatter';
 import { renderMarkdown } from '../../../utils/markdown';
 import { hydrateCachedPreviewImageSources } from '../../../utils/previewImageCache';
 import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
-import type { MarkdownStylePreset } from '../../../types';
+import type { MarkdownStylePreset, OrderedListMode } from '../../../types';
 import { hasEmbeddableMediaLinksInHtml, hasWikiEmbedsInHtml } from './previewMedia';
 
 interface RenderMarkdownPreviewOptions {
@@ -13,10 +13,11 @@ interface RenderMarkdownPreviewOptions {
   isMarkdownPreview: boolean;
   themeMode: 'light' | 'dark';
   markdownStylePreset?: MarkdownStylePreset;
+  orderedListMode?: OrderedListMode;
 }
 
 export function renderMarkdownPreview(options: RenderMarkdownPreviewOptions) {
-  const { content, currentFilePath, highlighter, isMarkdownPreview, markdownStylePreset, themeMode } = options;
+  const { content, currentFilePath, highlighter, isMarkdownPreview, markdownStylePreset, themeMode, orderedListMode } = options;
 
   if (!isMarkdownPreview) {
     return { frontmatter: null, bodyHTML: '' };
@@ -29,7 +30,7 @@ export function renderMarkdownPreview(options: RenderMarkdownPreviewOptions) {
   const { frontmatter, body } = parseFrontmatter(content);
   try {
     const bodyHTML = hydrateCachedPreviewImageSources(
-      renderMarkdown(body, { highlighter, markdownStylePreset, themeMode }),
+      renderMarkdown(body, { highlighter, markdownStylePreset, themeMode, orderedListMode }),
       currentFilePath || undefined
     );
     return { frontmatter, bodyHTML };

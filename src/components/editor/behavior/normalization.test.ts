@@ -17,4 +17,8 @@ describe('getStrictOrderedListNormalizationChanges', () => {
   it('keeps blockquote and root ordered lists in separate numbering contexts', () => {
     expect(normalize('1. root\n> 1. quote\n2. next root')).toBe('1. root\n> 1. quote\n2. next root');
   });
+
+  it('does not restart numbering after an indented continuation paragraph under an ordered item', () => {
+    expect(normalize('1. one\n\tcontinuation\n2. two')).toBe('1. one\n\tcontinuation\n2. two');
+  });
 });

@@ -190,6 +190,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
     isHtmlPreview,
     highlighter,
     markdownStylePreset: settings.markdownStylePreset,
+    orderedListMode: settings.orderedListMode,
     themeMode: settings.themeMode as 'light' | 'dark',
     files,
     rootFolderPath,

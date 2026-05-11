@@ -13,7 +13,7 @@ import { resolvePreviewSource, warmPreviewImage } from '../../../utils/previewIm
 import { parseWikiLinkReference, extractWikiNoteFragment } from '../../../utils/wikiLinks';
 import { createAttachmentResolverContext, resolveAttachmentTarget } from '../../../utils/attachmentResolver';
 import type { FileNode } from '../../../types';
-import type { MarkdownStylePreset } from '../../../types';
+import type { MarkdownStylePreset, OrderedListMode } from '../../../types';
 import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 import {
   buildIframeEmbed,
@@ -49,6 +49,7 @@ export interface UsePreviewRendererOptions {
   highlighter?: ShikiHighlighter | null;
   themeMode?: 'light' | 'dark';
   markdownStylePreset?: MarkdownStylePreset;
+  orderedListMode?: OrderedListMode;
   files: FileNode[];
   rootFolderPath?: string | null;
   fileContents: Record<string, string>;
@@ -74,6 +75,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     highlighter,
     themeMode = 'light',
     markdownStylePreset = 'nord',
+    orderedListMode = 'strict',
     files,
     rootFolderPath,
     fileContents,
@@ -109,8 +111,9 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
       isMarkdownPreview,
       themeMode,
       markdownStylePreset,
+      orderedListMode,
     });
-  }, [content, currentFilePath, enabled, highlighter, isMarkdownPreview, markdownStylePreset, themeMode]);
+  }, [content, currentFilePath, enabled, highlighter, isMarkdownPreview, markdownStylePreset, orderedListMode, themeMode]);
 
   // Sanitize HTML for HTML preview
   const sanitizedHtmlPreview = useMemo(() => {
@@ -399,7 +402,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
             body.className = 'markdown-body preview-note-embed-body';
             try {
               const noteHtml = protectShikiPresInHtmlString(
-                renderMarkdown(fragment.markdown, { highlighter, themeMode, markdownStylePreset }),
+                renderMarkdown(fragment.markdown, { highlighter, themeMode, markdownStylePreset, orderedListMode }),
                 shikiSnapshots,
               );
               body.innerHTML = noteHtml;
@@ -536,6 +539,7 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
     requiresAsyncEnhancement,
     readFile,
     themeMode,
+    orderedListMode,
   ]);
 
   return {

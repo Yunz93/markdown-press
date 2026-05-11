@@ -214,6 +214,39 @@ function isBlankLine(lineText: string): boolean {
 }
 
 /**
+ * 当前行是否为「列表下的懒延续」：非列表行、有前导缩进，且向上能找到有序列表项，
+ * 中间未遇到顶格非列表正文（否则会打断列表）。
+ */
+export function getOrderedListParentForContinuation(
+  state: EditorState,
+  lineNumber: number,
+): ListItemInfo | null {
+  const line = state.doc.line(lineNumber);
+  if (isBlankLine(line.text)) return null;
+
+  const selfItem = parseListItem(line.text, lineNumber, line.from);
+  if (selfItem) return null;
+
+  const leading = line.text.match(/^[ \t]*/)?.[0] ?? '';
+  if (leading.length === 0) return null;
+
+  for (let i = lineNumber - 1; i >= 1; i--) {
+    const pl = state.doc.line(i);
+    if (isBlankLine(pl.text)) continue;
+
+    const item = parseListItem(pl.text, i, pl.from);
+    if (item) {
+      return item.type === 'ordered' ? item : null;
+    }
+
+    const plLeading = pl.text.match(/^[ \t]*/)?.[0] ?? '';
+    if (plLeading.length === 0) return null;
+  }
+
+  return null;
+}
+
+/**
  * 构建列表层级上下文
  * 分析文档中每个列表项的父级关系
  * 
@@ -292,6 +325,9 @@ export function calculateOrderedListNumbers(
         if (consecutiveBlankLines >= 2) {
           counters.clear();
         }
+      } else if (!item && getOrderedListParentForContinuation(state, i)) {
+        // 有序列表项下的缩进延续段，不应打断编号序列（与 CommonMark 懒延续一致）
+        consecutiveBlankLines = 0;
       } else {
         // 非列表行且非空行，清空计数器
         counters.clear();

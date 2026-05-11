@@ -9,7 +9,7 @@ import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensio
 import { normalizeShikiLanguage } from './shikiLanguages';
 import { getMarkdownPressShikiTheme } from './shikiTheme';
 import { parseWikiLinkReference } from './wikiLinks';
-import type { MarkdownStylePreset, ThemeMode } from '../types';
+import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from '../types';
 import { LRUCache, hashContent } from './performance';
 import { normalizeMarkdownTablesForRender } from './markdownTableNormalize';
 import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
@@ -18,10 +18,13 @@ interface MarkdownRenderOptions {
   highlighter?: ShikiHighlighter | null;
   markdownStylePreset?: MarkdownStylePreset;
   themeMode?: ThemeMode;
+  /** When `loose`, preview preserves author numeric markers via `<li value="…">`. */
+  orderedListMode?: OrderedListMode;
 }
 
 interface MarkdownRenderEnv {
   shikiBlocks?: string[];
+  orderedListMode?: OrderedListMode;
 }
 
 function wrapShikiBlockHtml(shikiPreHtml: string): string {
@@ -125,6 +128,17 @@ const createMarkdownIt = () => {
     return `<a class="markdown-link markdown-embed" href="#" data-wikilink="${escapedTarget}" data-wiki-embed="true" data-wiki-target="${escapedTarget}" data-wiki-label="${escapedLabel}"${sizeAttributes}>${escapedLabel}</a>`;
   };
 
+  md.renderer.rules.list_item_open = function listItemOpen(tokens, idx, options, env: MarkdownRenderEnv, self) {
+    const token = tokens[idx];
+    if (env?.orderedListMode === 'loose' && token.info) {
+      const digitMatch = String(token.info).trim().match(/^(\d+)/);
+      if (digitMatch) {
+        token.attrSet('value', digitMatch[1]);
+      }
+    }
+    return self.renderToken(tokens, idx, options);
+  };
+
   // Initialize extensions
   initKaTeX(md);
   initMermaid(md);
@@ -200,7 +214,7 @@ let currentTheme: ThemeMode = 'light';
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 2;
+const MARKDOWN_RENDERER_CACHE_VERSION = 3;
 
 function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string): boolean {
   if (!highlighter || !lang) return false;
@@ -318,7 +332,8 @@ function createCacheKey(markdown: string, options: MarkdownRenderOptions): strin
   const hlToken = hl
     ? `1_${typeof hl.__revision === 'number' ? hl.__revision : 0}`
     : '0';
-  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}_${options.markdownStylePreset ?? 'nord'}`;
+  const olMode = options.orderedListMode ?? 'strict';
+  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}_${options.markdownStylePreset ?? 'nord'}_${olMode}`;
 }
 
 /**
@@ -370,7 +385,9 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   // Configure fence renderer with the highlighter
   configureFenceRenderer(md, highlighter, themeMode, markdownStylePreset);
 
-  const env: MarkdownRenderEnv = {};
+  const env: MarkdownRenderEnv = {
+    orderedListMode: options.orderedListMode ?? 'strict',
+  };
   const normalizedMarkdown = normalizeMarkdownTablesForRender(
     angleBracketBareMarkdownHttpUrls(markdown),
   );
@@ -399,6 +416,7 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
       'data-wiki-height',
       'data-block-id',
       'data-shiki-block',
+      'value',
     ],
   });
 

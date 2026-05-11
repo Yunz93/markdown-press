@@ -76,6 +76,14 @@ describe('renderMarkdown', () => {
     expect(html).toContain('task-list-item');
   });
 
+  it('loose ordered list mode preserves author markers in preview HTML', () => {
+    const md = '1. first\n   indent\n3. third';
+    const loose = renderMarkdown(md, { orderedListMode: 'loose', themeMode: 'light' });
+    expect(loose).toMatch(/<li[^>]*value="3"/);
+    const strict = renderMarkdown(md, { orderedListMode: 'strict', themeMode: 'light' });
+    expect(strict).not.toMatch(/value="3"/);
+  });
+
   it('renders markdown images with lazy async defaults', () => {
     const html = renderMarkdown('![Poster](poster.png)');
     expect(html).toContain('decoding="async"');

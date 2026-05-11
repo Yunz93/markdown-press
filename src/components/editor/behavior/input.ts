@@ -26,6 +26,7 @@ import { buildQuotePrefix, buildQuoteRaw } from './quotes';
 import { parseListItem } from '../nestedListBehavior';
 import {
   handleListEnter,
+  handleOrderedListContinuationEnter,
   handleListBackspace,
   handleListTab,
   handleListShiftTab,
@@ -104,6 +105,10 @@ export const handleSmartEnter: StateCommand = ({ state, dispatch }): boolean => 
     if (item) {
       return handleListEnter({ state, dispatch } as Parameters<StateCommand>[0]) ?? false;
     }
+  }
+
+  if (handleOrderedListContinuationEnter({ state, dispatch })) {
+    return true;
   }
 
   // 引用块处理

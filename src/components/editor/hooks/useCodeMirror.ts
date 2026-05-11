@@ -153,6 +153,7 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
   const onContextMenuRef = useRef(onContextMenu);
   const loadedMarkdownLanguageKeysRef = useRef<Set<string>>(new Set());
   const pendingContentChangeIsLargeRef = useRef(false);
+  const orderedListModeRef = useRef(orderedListMode);
 
   // Compartments for dynamic reconfiguration
   const compartments = useMemo(() => ({
@@ -202,6 +203,14 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
       ),
     });
   }, [compartments.keymap, orderedListMode]);
+
+  useEffect(() => {
+    orderedListModeRef.current = orderedListMode;
+    if (orderedListMode !== 'strict' && normalizationTimeoutRef.current !== null) {
+      clearTimeout(normalizationTimeoutRef.current);
+      normalizationTimeoutRef.current = null;
+    }
+  }, [orderedListMode]);
 
   // Callback ref to track when editor element is mounted
   const setEditorElement = useCallback((element: HTMLDivElement | null) => {
@@ -410,7 +419,8 @@ export function useCodeMirror(options: UseCodeMirrorOptions): UseCodeMirrorRetur
               if (!update.docChanged) return;
 
               // Handle strict ordered list normalization - debounced for performance
-              if (orderedListMode === 'strict' && !isApplyingOrderedNormalizationRef.current) {
+              // Read mode from ref: updateListener is created once at editor init and must not close over a stale prop.
+              if (orderedListModeRef.current === 'strict' && !isApplyingOrderedNormalizationRef.current) {
                 // Only normalize on user input events, not on programmatic changes
                 const isUserInput = update.transactions.some(t => t.isUserEvent('input') || t.isUserEvent('delete'));
                 if (isUserInput) {
