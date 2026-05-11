@@ -23,7 +23,11 @@ import {
   removeIndentUnit,
 } from './core';
 import { buildQuotePrefix, buildQuoteRaw } from './quotes';
-import { parseListItem } from '../nestedListBehavior';
+import {
+  parseListItem,
+  getOrderedListParentForContinuation,
+  isLaterLineOfMarkdownListItem,
+} from '../nestedListBehavior';
 import {
   handleListEnter,
   handleOrderedListContinuationEnter,
@@ -140,6 +144,15 @@ export const handleSmartEnter: StateCommand = ({ state, dispatch }): boolean => 
       userEvent: 'input',
     }));
     return true;
+  }
+
+  // 无序列表等：同一 ListItem 多行正文时，lang-markdown 会把 marker 列偏移误用到当前行，
+  // 误判「空列表项」并删掉延续段文字；有序段已由 handleOrderedListContinuationEnter 处理。
+  if (
+    isLaterLineOfMarkdownListItem(state, line.number) &&
+    !getOrderedListParentForContinuation(state, line.number)
+  ) {
+    return insertNewlineAndIndent({ state, dispatch });
   }
 
   return insertNewlineContinueMarkupCommand({ nonTightLists: false })({ state, dispatch });

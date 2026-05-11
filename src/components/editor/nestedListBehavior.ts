@@ -15,6 +15,9 @@
  * ...以此类推
  */
 
+import { syntaxTree } from '@codemirror/language';
+import type { SyntaxNode } from '@lezer/common';
+import { markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorState, type ChangeSpec, type Transaction } from '@codemirror/state';
 import { type EditorView } from '@codemirror/view';
 import {
@@ -214,6 +217,30 @@ function isBlankLine(lineText: string): boolean {
 }
 
 /**
+ * 光标所在行是否为同一 Markdown ListItem 内「第一项之后的行」（懒延续 / 多段正文）。
+ * 用于在前导无空格时仍能拦截默认 insertNewlineContinueMarkup（其对延续行会误判空项并删内容）。
+ */
+export function isLaterLineOfMarkdownListItem(state: EditorState, lineNumber: number): boolean {
+  const line = state.doc.line(lineNumber);
+  const pos = line.to;
+  try {
+    if (!markdownLanguage.isActiveAt(state, pos, -1)) return false;
+  } catch {
+    return false;
+  }
+
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
+  while (node) {
+    if (node.name === 'ListItem') {
+      const itemFirstLine = state.doc.lineAt(node.from);
+      return line.number > itemFirstLine.number;
+    }
+    node = node.parent;
+  }
+  return false;
+}
+
+/**
  * 当前行是否为「列表下的懒延续」：非列表行、有前导缩进，且向上能找到有序列表项，
  * 中间未遇到顶格非列表正文（否则会打断列表）。
  */
@@ -227,8 +254,11 @@ export function getOrderedListParentForContinuation(
   const selfItem = parseListItem(line.text, lineNumber, line.from);
   if (selfItem) return null;
 
-  const leading = line.text.match(/^[ \t]*/)?.[0] ?? '';
-  if (leading.length === 0) return null;
+  const firstNonWs = line.text.search(/\S/);
+  const hasAsciiIndent = firstNonWs !== -1 && firstNonWs > 0;
+  const needsTreeContinuation = !hasAsciiIndent && isLaterLineOfMarkdownListItem(state, lineNumber);
+
+  if (!hasAsciiIndent && !needsTreeContinuation) return null;
 
   for (let i = lineNumber - 1; i >= 1; i--) {
     const pl = state.doc.line(i);
