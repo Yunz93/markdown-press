@@ -68,8 +68,9 @@ export function useExportActions(
     const publishPromise = invoke<T>(command, payload);
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = window.setTimeout(() => {
+        const lang = useAppStore.getState().settings.language;
         reject(new Error(
-          t(settings.language, timeoutTranslationKey)
+          t(lang, timeoutTranslationKey)
         ));
       }, PUBLISH_TIMEOUT_MS);
     });
@@ -345,7 +346,7 @@ export function useExportActions(
 
       const publishedUrl = buildSimpleBlogPostUrl(
         normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
-        contentToPublish,
+        prepared.markdownContent,
         prepared.postRelativePath
       );
 
