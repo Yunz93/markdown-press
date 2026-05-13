@@ -8,7 +8,7 @@ import {
   getBundledPresetDataUrlOverrides,
 } from '../fontSettings';
 import { getMarkdownStyleCssVariables, getMarkdownStyleTokens, normalizeMarkdownStylePreset } from '../markdownStyle';
-import type { MarkdownStylePreset } from '../../types';
+import type { ExportStrikethroughMode, MarkdownStylePreset } from '../../types';
 
 export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promise<string> {
   if (!fontSettings) {
@@ -50,6 +50,7 @@ export function buildExportStyles(
   codeFontFamily?: string,
   codeFontSize?: number,
   markdownStylePreset: MarkdownStylePreset = 'nord',
+  exportStrikethroughMode: ExportStrikethroughMode = 'preview-native',
 ): string {
   const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
   const resolvedFontSize = fontSize ?? 16;
@@ -60,6 +61,27 @@ export function buildExportStyles(
   const markdownStyleCssVariables = Object.entries(getMarkdownStyleCssVariables(normalizedStylePreset, theme))
     .map(([name, value]) => `      ${name}: ${value};`)
     .join('\n');
+
+  const exportDelStrikeBlock =
+    exportStrikethroughMode === 'preview-native'
+      ? `    .export-document .markdown-body del,
+    .export-document .markdown-body s {
+      color: var(--mp-doc-del);
+      text-decoration: line-through;
+    }
+`
+      : `    .export-document .markdown-body del,
+    .export-document .markdown-body s {
+      color: var(--mp-doc-del);
+      text-decoration: none;
+      background-image: linear-gradient(currentColor, currentColor);
+      background-repeat: no-repeat;
+      background-position: 0 66%;
+      background-size: 100% 0.07em;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
+`;
 
   return `
     ${fontFaceCss}
@@ -202,15 +224,111 @@ ${markdownStyleCssVariables}
     }
 
     .export-document .markdown-body h1 { color: var(--mp-doc-heading-1); }
-    .export-document .markdown-body h2 { color: var(--mp-doc-heading-2); }
+    .export-document .markdown-body h2 {
+      color: var(--mp-doc-heading-2);
+      border-bottom: none;
+      padding-bottom: 0;
+    }
     .export-document .markdown-body h3 { color: var(--mp-doc-heading-3); }
     .export-document .markdown-body h4 { color: var(--mp-doc-heading-4); }
     .export-document .markdown-body h5 { color: var(--mp-doc-heading-5); }
     .export-document .markdown-body h6 { color: var(--mp-doc-heading-6); }
 
-    .export-document .markdown-body h2 {
-      border-bottom: none;
-      padding-bottom: 0;
+    .export-document .markdown-body ul,
+    .export-document .markdown-body ol {
+      margin: 0.5rem 0;
+      padding-left: 2rem;
+    }
+
+    .export-document .markdown-body li > ul,
+    .export-document .markdown-body li > ol {
+      margin-top: 0.25rem;
+      margin-bottom: 0.25rem;
+      margin-left: 0.35rem;
+      padding-left: 1.35rem;
+      border-left: 1px solid var(--mp-doc-border);
+    }
+
+    .export-document .markdown-body ul {
+      list-style: disc;
+    }
+
+    .export-document .markdown-body ul ul,
+    .export-document .markdown-body ul ul ul {
+      list-style: disc;
+    }
+
+    .export-document .markdown-body ol {
+      list-style: decimal;
+    }
+
+    .export-document .markdown-body ol ol,
+    .export-document .markdown-body ol ol ol {
+      list-style: decimal;
+    }
+
+    /* Match preview.css: github-markdown uses ~16px margin-top on li>p, which pushes
+       the first line down; html2canvas paints list markers at the li top without that
+       offset, so bullets look vertically misaligned in PNG/PDF export. */
+    .export-document .markdown-body li > p {
+      margin-top: 0.15em;
+      margin-bottom: 0.15em;
+    }
+
+    .export-document .markdown-body .task-list-item {
+      position: relative;
+      list-style: none;
+      min-width: 0;
+      padding-left: 0.34rem;
+    }
+
+    .export-document .markdown-body .task-list-item::marker {
+      content: '';
+    }
+
+    .export-document .markdown-body .task-list-item + .task-list-item {
+      margin-top: 0.45rem;
+    }
+
+    .export-document .markdown-body .task-list-item > p {
+      margin: 0;
+    }
+
+    .export-document .markdown-body .task-list-item-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      position: absolute;
+      top: calc((1.95em - 1em) / 2);
+      left: -1.18rem;
+      width: 1em;
+      height: 1em;
+      margin: 0;
+      border: 1.5px solid var(--mp-doc-task-border, #94a3b8);
+      border-radius: 0.28rem;
+      background: #ffffff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .export-document .markdown-body .task-list-item-checkbox:checked {
+      border-color: var(--mp-doc-task-checked, var(--mp-doc-accent));
+      background-color: var(--mp-doc-task-checked, var(--mp-doc-accent));
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='white' d='M6.4 11.2 3.6 8.4l-1.1 1.1 3.9 3.9 7.1-7.1-1.1-1.1z'/%3E%3C/svg%3E");
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 0.82em 0.82em;
+    }
+
+    html.dark .export-document .markdown-body .task-list-item-checkbox,
+    html[data-theme="dark"] .export-document .markdown-body .task-list-item-checkbox {
+      border-color: var(--mp-doc-task-border, rgba(148, 163, 184, 0.68));
+      background: rgba(15, 23, 42, 0.88);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    html.dark .export-document .markdown-body .task-list-item-checkbox:checked,
+    html[data-theme="dark"] .export-document .markdown-body .task-list-item-checkbox:checked {
+      border-color: var(--mp-doc-task-checked, var(--mp-doc-accent));
+      background-color: var(--mp-doc-task-checked, var(--mp-doc-accent));
     }
 
     .export-document .markdown-body .footnotes {
@@ -254,8 +372,17 @@ ${markdownStyleCssVariables}
       color: var(--mp-doc-strong-em);
     }
 
-    .export-document .markdown-body del {
-      color: var(--mp-doc-del);
+${exportDelStrikeBlock}
+
+    .export-document .markdown-body ins,
+    .export-document .markdown-body u {
+      text-decoration: none;
+      background-image: linear-gradient(currentColor, currentColor);
+      background-repeat: no-repeat;
+      background-position: 0 88%;
+      background-size: 100% 0.06em;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
 
     .export-document .markdown-body mark {

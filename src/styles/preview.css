@@ -178,7 +178,8 @@
 
 .preview-pane-document.markdown-body p {
   margin-top: 0;
-  margin-bottom: 0.28em;
+  /* Normal block rhythm; previously 0.28em made preview look tighter than the editor blank lines. */
+  margin-bottom: 1em;
 }
 
 .preview-pane-document.markdown-body p:last-child {
@@ -368,6 +369,8 @@
 
 .preview-pane-document.markdown-body h2 {
   color: var(--mp-doc-heading-2, var(--mp-doc-accent, #7c3aed));
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .preview-pane-document.markdown-body h3 {
@@ -423,8 +426,15 @@
   color: var(--mp-doc-strong-em, inherit);
 }
 
-.preview-pane-document.markdown-body del {
+.preview-pane-document.markdown-body del,
+.preview-pane-document.markdown-body s {
   color: var(--mp-doc-del, inherit);
+  text-decoration: line-through;
+}
+
+.preview-pane-document.markdown-body ins,
+.preview-pane-document.markdown-body u {
+  text-decoration: underline;
 }
 
 .preview-pane-document.markdown-body mark {
@@ -754,6 +764,8 @@
 
 .dark .preview-pane-document.markdown-body h2 {
   color: var(--mp-doc-heading-2, var(--mp-doc-accent, #c084fc));
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .dark .preview-pane-document.markdown-body h3 {

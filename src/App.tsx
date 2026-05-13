@@ -23,6 +23,7 @@ import { TabBar } from './components/tabs/TabBar';
 import { PromptDialog } from './components/ui/Dialog';
 import { PublishTargetDialog } from './components/publish/PublishTargetDialog';
 import { WechatDraftDialog } from './components/publish/WechatDraftDialog';
+import { ShareLongImageDialog } from './components/share/ShareLongImageDialog';
 import { useExportActions } from './hooks/useExportActions';
 import { ViewMode } from './types';
 import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
@@ -198,6 +199,7 @@ const App: React.FC = () => {
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
   const {
     handleExportToPdf,
+    buildLongImageSharePayload,
     handlePublishSimpleBlog,
     handlePublishWechatDraft,
   } = useExportActions(forceSave, highlighter);
@@ -208,6 +210,7 @@ const App: React.FC = () => {
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
   const [isPublishTargetDialogOpen, setIsPublishTargetDialogOpen] = useState(false);
   const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
+  const [isShareLongImageDialogOpen, setIsShareLongImageDialogOpen] = useState(false);
   const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] = useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] = useState(false);
 
@@ -557,6 +560,7 @@ const App: React.FC = () => {
             themeMode={settings.themeMode}
             onPublish={handleOpenPublishDialog}
             onExportPdf={handleExportToPdf}
+            onShareLongImage={() => { setIsShareLongImageDialogOpen(true); }}
             isPreviewOnlyFile={isPreviewOnlyActiveFile}
           />
 
@@ -619,6 +623,13 @@ const App: React.FC = () => {
         defaults={wechatDraftDefaults}
         onClose={() => setIsWechatDraftDialogOpen(false)}
         onSubmit={(input) => { void handleSubmitWechatDraft(input); }}
+      />
+
+      <ShareLongImageDialog
+        isOpen={isShareLongImageDialogOpen}
+        onClose={() => setIsShareLongImageDialogOpen(false)}
+        buildPayload={buildLongImageSharePayload}
+        attachmentContext={{ files, rootFolderPath }}
       />
 
       {notification && (

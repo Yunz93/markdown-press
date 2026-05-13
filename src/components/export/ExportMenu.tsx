@@ -57,6 +57,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose, highlighter = n
           codeFontSize: Math.max(12, settings.fontSize - 2),
           highlighter,
           markdownStylePreset: settings.markdownStylePreset,
+          exportStrikethroughMode: settings.exportStrikethroughMode,
         });
         const savedPath = await exportToPdf(html, filename, activeFile?.path, {
           files,
@@ -86,7 +87,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ onClose, highlighter = n
       setFormat(null);
       onClose?.();
     }
-  }, [content, activeFile, files, rootFolderPath, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.fontSize, settings.markdownStylePreset, showNotification, highlighter, t]);
+  }, [content, activeFile, files, rootFolderPath, theme, includeTOC, onClose, previewFontFamily, codeFontFamily, settings.exportStrikethroughMode, settings.fontSize, settings.markdownStylePreset, showNotification, highlighter, t]);
 
   const fileName = activeFile?.name?.replace('.md', '') || 'document';
 

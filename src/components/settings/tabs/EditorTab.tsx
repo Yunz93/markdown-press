@@ -97,6 +97,19 @@ export const EditorTab: React.FC<EditorTabProps> = ({
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_markdownStyleDesc')}</p>
           </div>
 
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_exportStrikethroughMode')}</label>
+            <select
+              value={settings.exportStrikethroughMode}
+              onChange={(e) => onUpdateSettings({ exportStrikethroughMode: e.target.value as AppSettings['exportStrikethroughMode'] })}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+            >
+              <option value="preview-native">{t('settings_exportStrikethroughPreviewNative')}</option>
+              <option value="raster-safe">{t('settings_exportStrikethroughRasterSafe')}</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('settings_exportStrikethroughModeDesc')}</p>
+          </div>
+
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">{t('settings_editorFont')}</label>

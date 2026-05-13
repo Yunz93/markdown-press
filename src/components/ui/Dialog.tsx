@@ -82,7 +82,7 @@ export const Dialog: React.FC<DialogProps> = ({
       <div
         ref={dialogRef}
         className={`
-          relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl
+          relative flex w-full flex-col overflow-hidden rounded-2xl
           border border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl
           dark:border-white/10 dark:bg-gray-900/95
           max-h-[88vh]
@@ -162,7 +162,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   };
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} title={title}>
+    <Dialog isOpen={isOpen} onClose={onClose} title={title} className="max-w-md">
       <p className="text-gray-600 dark:text-gray-400 mb-6">{message}</p>
       <div className="flex justify-end gap-3">
         <button
@@ -243,7 +243,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   }, [handleSubmit]);
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} title={title}>
+    <Dialog isOpen={isOpen} onClose={onClose} title={title} className="max-w-md">
       {label && (
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           {label}

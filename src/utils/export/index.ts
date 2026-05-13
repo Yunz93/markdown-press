@@ -1,5 +1,6 @@
 // Export types
 export type { ExportOptions, SaveExportOptions } from './types';
+export { normalizeExportStrikethroughMode } from './types';
 export { PREVIEW_PANEL_WIDTH_PX } from './types';
 
 // Export core utilities
@@ -26,7 +27,10 @@ export {
 } from './htmlExport';
 
 // Export PDF export
-export { exportToPdf } from './pdfExport';
+export { exportToPdf, computeSafePdfRenderScale } from './pdfExport';
+
+// Long-image (PNG) export for sharing
+export { rasterizeExportHtmlToPngBlob, exportLongImagePng } from './longImageExport';
 
 // Export plain text export
 export {

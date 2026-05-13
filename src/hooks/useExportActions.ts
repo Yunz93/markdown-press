@@ -3,6 +3,7 @@ import { useAppStore, selectContent } from '../store/appStore';
 import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
 import { generateFrontmatter, parseFrontmatter, updateFrontmatter } from '../utils/frontmatter';
 import { exportToHtml, exportToPdf } from '../utils/export';
+import type { LongImageSharePayload } from '../components/share/longImageSharePayload';
 import { type Frontmatter } from '../types';
 import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../utils/fontSettings';
 import { buildSimpleBlogPostUrl, prepareSimpleBlogPublish } from '../utils/simpleBlogPublish';
@@ -146,6 +147,7 @@ export function useExportActions(
         includeProperties: false,
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
+        exportStrikethroughMode: settings.exportStrikethroughMode,
       });
       const savedPath = await exportToPdf(htmlContent, activeFile.name, activeFile.path, {
         files,
@@ -164,7 +166,54 @@ export function useExportActions(
       console.error('Failed to export PDF:', error);
       showNotification(t(settings.language, 'notifications_exportPdfFailed'), 'error');
     }
-  }, [activeTabId, content, files, rootFolderPath, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, rootFolderPath, previewFontFamily, codeFontFamily, highlighter, settings.exportStrikethroughMode, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
+
+  const buildLongImageSharePayload = useCallback(async (): Promise<LongImageSharePayload | null> => {
+    if (!activeTabId || !content) {
+      showNotification(t(settings.language, 'notifications_noFileToExport'), 'error');
+      return null;
+    }
+
+    const activeFile = findFileInTree(files, activeTabId);
+    if (!activeFile) {
+      showNotification(t(settings.language, 'notifications_noFileToExport'), 'error');
+      return null;
+    }
+
+    const htmlContent = await exportToHtml(content, {
+      title: activeFile.name.replace('.md', ''),
+      theme: settings.themeMode,
+      includeTOC: false,
+      fontFamily: previewFontFamily,
+      codeFontFamily,
+      fontSettings: settings,
+      fontSize: settings.fontSize,
+      codeFontSize: Math.max(12, settings.fontSize - 2),
+      includeProperties: false,
+      highlighter,
+      markdownStylePreset: settings.markdownStylePreset,
+      exportStrikethroughMode: settings.exportStrikethroughMode,
+    });
+
+    return {
+      html: htmlContent,
+      filenameBase: activeFile.name.replace(/\.md$/i, ''),
+      sourceFilePath: activeFile.path,
+    };
+  }, [
+    activeTabId,
+    codeFontFamily,
+    content,
+    files,
+    highlighter,
+    previewFontFamily,
+    settings.exportStrikethroughMode,
+    settings.fontSize,
+    settings.language,
+    settings.markdownStylePreset,
+    settings.themeMode,
+    showNotification,
+  ]);
 
   const handlePublishSimpleBlog = useCallback(async () => {
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
@@ -447,5 +496,5 @@ export function useExportActions(
     }
   }, [activeTabId, backfillFrontmatter, files, forceSave, invokePublishWithTimeout, setPublishing, showNotification]);
 
-  return { handleExportToPdf, handlePublishSimpleBlog, handlePublishWechatDraft };
+  return { handleExportToPdf, buildLongImageSharePayload, handlePublishSimpleBlog, handlePublishWechatDraft };
 }

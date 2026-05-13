@@ -20,6 +20,7 @@ interface ToolbarProps {
   themeMode: ThemeMode;
   onPublish?: () => void;
   onExportPdf?: () => void;
+  onShareLongImage?: () => void;
   isPreviewOnlyFile?: boolean;
 }
 
@@ -37,6 +38,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   themeMode,
   onPublish,
   onExportPdf,
+  onShareLongImage,
   isPreviewOnlyFile = false,
 }) => {
   const { t } = useI18n();
@@ -128,7 +130,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
           <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} previewOnly={isPreviewOnlyFile} />
         </div>
 
-        {(onPublish || onExportPdf) && (
+        {(onPublish || onExportPdf || onShareLongImage) && (
           <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
             {onPublish && (
               <button
@@ -162,6 +164,22 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+            )}
+
+            {onShareLongImage && (
+              <button
+                type="button"
+                onClick={onShareLongImage}
+                disabled={!fileName || isPreviewOnlyFile}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
+                title={t('toolbar_shareLongImage')}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
                 </svg>
               </button>
             )}

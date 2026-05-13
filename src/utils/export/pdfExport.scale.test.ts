@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeSafePdfRenderScale } from './pdfExport';
+import { computeSafePdfRenderScale } from './exportRasterHost';
 
 describe('computeSafePdfRenderScale', () => {
   const SAFE_LIMIT = 14000;
