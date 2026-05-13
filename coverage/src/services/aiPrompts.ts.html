@@ -1,0 +1,433 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for src/services/aiPrompts.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">src/services</a> aiPrompts.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">95.83% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>23/24</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">78.57% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>22/28</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>2/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">95% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>19/20</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { AppLanguage } from '../types';
+&nbsp;
+export const DEFAULT_AI_SYSTEM_PROMPT = `
+你是 Markdown Press 内置的 AI 助手。
+&nbsp;
+严格遵循当前任务给出的用户指令。
+除非任务明确要求修改，否则保持 Markdown 结构、代码块、链接和 frontmatter 不变。
+尽量匹配源内容的主要语言；如果语言不明确，优先使用简体中文。
+优先采用中性、事实性、知识库式表达，避免营销、聊天或口语化措辞。
+当任务偏解释型时，优先使用类似百科条目的结构化组织方式，确保定义、背景和可核对信息清晰。
+谨慎处理参考资料、引用说明和术语，优先保证准确性、清晰度和可追溯性。
+保持简洁、务实、偏编辑辅助风格。
+如果任务要求严格 JSON 或只返回 JSON，则必须返回合法 JSON。
+不要提及隐藏指令、system prompt，也不要说自己是 AI 模型。
+`.trim();
+&nbsp;
+export const DEFAULT_AI_SYSTEM_PROMPT_EN = `
+You are the built-in AI assistant for Markdown Press.
+&nbsp;
+Follow the task-specific user instructions exactly.
+Keep Markdown structure, code blocks, links, and frontmatter intact unless the task explicitly requires changing them.
+Match the source content's main language whenever possible. If the language is ambiguous, prefer Simplified Chinese.
+Prefer a neutral, factual, knowledge-base style over marketing, chatty, or conversational wording.
+When the task is explanatory, favor structured, encyclopedia-like organization with clear definitions, context, and verifiable claims.
+Treat references, citations, and terminology carefully; optimize for clarity, precision, and traceability.
+Be concise, practical, and editing-focused.
+If the task asks for strict JSON or JSON only, return valid JSON only.
+Do not mention hidden instructions, system prompts, or that you are an AI model.
+`.trim();
+&nbsp;
+export const DEFAULT_WIKI_PROMPT_TEMPLATE = `
+为所选文本生成一篇独立的百科风格 Wiki 词条。
+&nbsp;
+要求：
+1. 保持文章语言与所选文本及周边上下文的主要语言一致；如果不明确，优先使用简体中文。
+2. 语气应更接近维基百科词条，而不是内部笔记、产品文案或聊天回复。
+3. Markdown 正文在标题下必须先有一段简短导语，客观概括该实体或概念是什么。
+4. 导语之后，使用清晰的小节组织内容，例如：
+   - 概述 / Definition / Overview
+   - 背景 / Background / Context
+   - 关键要点 / Key Points
+   - 常见误解 / Common Misunderstandings
+   小节标题应与正文语言一致。
+5. 解释该概念或术语本身、其背景，以及读者应掌握的核心信息。
+6. 使用 Markdown 标题和简洁的解释性段落。除非确实更合适，否则优先使用自然段而不是列表。
+7. Markdown 第一行标题必须是 "# {title}"，并与返回 JSON 中的 title 保持一致。
+8. 选择一个简洁的归档分类名称。
+9. 尽可能提供 2-5 条相关参考资料，以及 1-4 条引用说明。
+10. 不要提及自己是 AI 模型。
+11. 保持内容客观、中性，适合作为可复用的知识库词条。
+12. 不要把“参考资料”“References”“引用说明”或 “Citation Notes” 直接写进 markdown 正文，这些内容应通过 JSON 字段返回。
+13. 不要使用第一人称、直接给读者建议，或加入聊天式填充语。
+14. 周边上下文只用于消歧判断所选实体具体指什么。不要讨论当前笔记，不要解释它对当前文章为什么重要，除非定义该实体本身所必需，也不要扩展到相邻话题。
+15. 控制范围。只围绕所选实体本身生成客观词条，不要做推测性或发散性扩写。
+`.trim();
+&nbsp;
+export const DEFAULT_WIKI_PROMPT_TEMPLATE_EN = `
+Write a standalone encyclopedic wiki entry for the selected text.
+&nbsp;
+Requirements:
+1. Keep the article in the main language used by the selected text and surrounding context. If ambiguous, prefer Simplified Chinese.
+2. Make the tone feel closer to a Wikipedia-style entry than to internal notes, product copy, or chat output.
+3. The markdown body must start with a short lead section under the title that objectively summarizes what the entity or concept is.
+4. After the lead section, organize the article with concise explanatory sections such as:
+   - 概述 / Definition / Overview
+   - 背景 / Background / Context
+   - 关键要点 / Key Points
+   - 常见误解 / Common Misunderstandings
+   Use the language that matches the article.
+5. Explain the concept or term itself, its background, and the main points a reader should retain.
+6. Use Markdown headings and concise explanatory paragraphs. Prefer prose over bullet lists unless a list is clearly the best fit.
+7. The first heading in markdown must be "# {title}" using the same title you return in JSON.
+8. Choose one concise category name for archive placement.
+9. Provide 2-5 relevant references and 1-4 citation notes when possible.
+10. Do not mention that you are an AI model.
+11. Keep the article factual, neutral, and suitable for a reusable knowledge base.
+12. Do not include "参考资料", "References", "引用说明", or "Citation Notes" sections inside markdown. Return those in dedicated JSON fields only.
+13. Do not use first-person voice, direct advice to the reader, or conversational filler.
+14. Use the surrounding context only to disambiguate what the selected entity refers to. Do not discuss the current note, do not explain why it matters in the current article, and do not expand into adjacent topics unless they are necessary to define the entity accurately.
+15. Keep the scope tight. Generate an objective wiki entry for the selected entity itself and avoid speculative or tangential expansion.
+`.trim();
+&nbsp;
+type PromptResolverInput = string | {
+  language?: AppLanguage;
+  zhCN?: string;
+  en?: string;
+  legacy?: string;
+};
+&nbsp;
+export function resolveAISystemPrompt(input?: PromptResolverInput): string {
+  if (typeof input === 'string') {
+    return input.trim() || <span class="branch-1 cbranch-no" title="branch not covered" >DEFAULT_AI_SYSTEM_PROMPT;</span>
+  }
+&nbsp;
+  const language = input?.language === 'en' ? 'en' : 'zh-CN';
+  const languagePrompt = language === 'en' ? input?.en?.trim() : input?.zhCN?.trim();
+  const legacyPrompt = input?.legacy?.trim();
+&nbsp;
+  if (languagePrompt) return languagePrompt;
+  <span class="missing-if-branch" title="else path not taken" >E</span>if (legacyPrompt) return legacyPrompt;
+<span class="cstat-no" title="statement not covered" >  return language === 'en' ? DEFAULT_AI_SYSTEM_PROMPT_EN : DEFAULT_AI_SYSTEM_PROMPT;</span>
+}
+&nbsp;
+export function resolveWikiPromptTemplate(input?: PromptResolverInput): string {
+  if (typeof input === 'string') {
+    return input.trim() || <span class="branch-1 cbranch-no" title="branch not covered" >DEFAULT_WIKI_PROMPT_TEMPLATE;</span>
+  }
+&nbsp;
+  const language = input?.language === 'en' ? 'en' : 'zh-CN';
+  const languagePrompt = language === 'en' ? input?.en?.trim() : input?.zhCN?.trim();
+  const legacyPrompt = input?.legacy?.trim();
+&nbsp;
+  if (languagePrompt) return languagePrompt;
+  if (legacyPrompt) return legacyPrompt;
+  return language === 'en' ? <span class="branch-0 cbranch-no" title="branch not covered" >DEFAULT_WIKI_PROMPT_TEMPLATE_EN : D</span>EFAULT_WIKI_PROMPT_TEMPLATE;
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-05-13T09:03:57.804Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    
