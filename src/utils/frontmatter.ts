@@ -50,12 +50,17 @@ function formatYamlKey(key: string): string {
   return shouldQuoteYamlString(key) ? JSON.stringify(key) : key;
 }
 
+/** String scalars as written after `key:` in YAML — matches generateFrontmatter / updateFrontmatter. */
+export function formatYamlStringScalar(value: string): string {
+  if (value === '') {
+    return '';
+  }
+  return shouldQuoteYamlString(value) ? JSON.stringify(value) : value;
+}
+
 function formatYamlScalar(value: unknown): string {
   if (typeof value === 'string') {
-    if (value === '') {
-      return '';
-    }
-    return shouldQuoteYamlString(value) ? JSON.stringify(value) : value;
+    return formatYamlStringScalar(value);
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {

@@ -1,5 +1,10 @@
 import type { Frontmatter, MetadataField } from '../types';
-import { parseFrontmatter, replaceFrontmatterInner, updateFrontmatter } from './frontmatter';
+import {
+  formatYamlStringScalar,
+  parseFrontmatter,
+  replaceFrontmatterInner,
+  updateFrontmatter,
+} from './frontmatter';
 
 const LEGACY_DEFAULT_METADATA_FIELDS: MetadataField[] = [
   { key: 'category', defaultValue: '' },
@@ -112,7 +117,7 @@ function normalizeTimestampValue(value: unknown, key: string): string {
   const trimmed = typeof value === 'string' ? value.trim() : '';
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return formatLocalDate(now);
+    return shouldUseDateTimePrecision(key) ? formatLocalDateTime(now, ' ') : formatLocalDate(now);
   }
 
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z$/.test(trimmed)) {
@@ -329,8 +334,10 @@ export function refreshDocumentUpdateTime(content: string): string {
 
       touchedLowerKeys.add(logicalKey.toLowerCase());
 
-      const spacing = afterColon.match(/^\s*/)?.[0] ?? ' ';
-      return `${line.slice(0, colonIdx + 1)}${spacing}${nextStamp}`;
+      const leadingWs = afterColon.match(/^\s*/)?.[0] ?? '';
+      const spacing = leadingWs.length > 0 ? leadingWs : ' ';
+      const formattedStamp = formatYamlStringScalar(nextStamp);
+      return `${line.slice(0, colonIdx + 1)}${spacing}${formattedStamp}`;
     });
 
     if (blockedByStructuredValue) {
