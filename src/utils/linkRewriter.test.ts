@@ -195,6 +195,77 @@ describe('linkRewriter', () => {
 
       expect(result.modifiedFiles).toHaveLength(0);
     });
+
+    it('does not rewrite links to non-existent unmoved files', async () => {
+      const files = [file('/vault/notes/a.md')];
+      const result = await runRewrite({
+        movedPathMap: { '/vault/old': '/vault/new' },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '[link](../missing/file.png)',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('handles markdown links with invalid percent-encoding', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/new/img.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {
+          '/vault/resources/img.png': '/vault/resources/new/img.png',
+        },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '![alt](../resources/%ZZ/img.png)',
+        },
+      });
+
+      // %ZZ is invalid percent-encoding; decodeTarget falls back to raw string
+      // The path won't match anything in pathMap, so no rewrite happens
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('resolves root-relative link when target exists in allFilePaths', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/sub/img.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {},
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '![photo](resources/sub/img.png)',
+        },
+      });
+
+      // File exists but was not moved, so no rewrite needed
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('handles moved paths outside vault root', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/new/img.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {
+          '/other/path/img.png': '/vault/resources/new/img.png',
+        },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '![alt](../../other/path/img.png)',
+        },
+      });
+
+      // The old path /other/path/img.png is not under /vault, so getPathRelativeToRoot
+      // falls back to returning normAbs. The link resolution should still work.
+      expect(result.modifiedFiles).toHaveLength(1);
+      expect(result.modifiedFiles[0].newContent).toBe('![alt](../resources/new/img.png)');
+    });
   });
 
   describe('wiki links', () => {
@@ -215,6 +286,27 @@ describe('linkRewriter', () => {
 
       expect(result.modifiedFiles).toHaveLength(1);
       expect(result.modifiedFiles[0].newContent).toBe('See [[new-name]] for details.');
+    });
+
+    it('rewrites path-based wiki link when basename changes via basename fallback', async () => {
+      // The wiki link uses a path that doesn't match any byRelativePath entry,
+      // but the basename matches a byBasename entry with basenameChanged=true.
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/notes/new-name.md'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {
+          '/vault/notes/old-name.md': '/vault/notes/new-name.md',
+        },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': 'See [[sub/old-name]] for reference.',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(1);
+      expect(result.modifiedFiles[0].newContent).toBe('See [[sub/new-name]] for reference.');
     });
 
     it('does not rewrite wiki link when file is only moved (basename unchanged)', async () => {

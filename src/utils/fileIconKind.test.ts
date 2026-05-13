@@ -25,4 +25,42 @@ describe('getFileIconKind', () => {
     expect(getFileIconKind('.env')).toBe('file');
     expect(getFileIconKind('readme')).toBe('file');
   });
+
+  it('classifies code files', () => {
+    expect(getFileIconKind('script.js')).toBe('code');
+    expect(getFileIconKind('app.py')).toBe('code');
+    expect(getFileIconKind('main.rs')).toBe('code');
+  });
+
+  it('returns file for trailing dot', () => {
+    expect(getFileIconKind('readme.')).toBe('file');
+  });
+
+  it('returns file for dot-only filenames like .gitignore', () => {
+    expect(getFileIconKind('.gitignore')).toBe('file');
+  });
+
+  it('returns file for empty extension after dot', () => {
+    expect(getFileIconKind('file.')).toBe('file');
+  });
+
+  it('returns file for filename starting with dot and having extension', () => {
+    expect(getFileIconKind('.env.local')).toBe('file');
+  });
+
+  it('returns file for unknown extension', () => {
+    expect(getFileIconKind('data.xyz')).toBe('file');
+    expect(getFileIconKind('archive.7zip')).toBe('file');
+  });
+
+  it('classifies text files', () => {
+    expect(getFileIconKind('log.txt')).toBe('text');
+    expect(getFileIconKind('data.csv')).toBe('text');
+    expect(getFileIconKind('notes.rtf')).toBe('text');
+  });
+
+  it('classifies spreadsheets and presentations', () => {
+    expect(getFileIconKind('budget.xlsx')).toBe('spreadsheet');
+    expect(getFileIconKind('slides.pptx')).toBe('presentation');
+  });
 });

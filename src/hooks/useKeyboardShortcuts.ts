@@ -132,6 +132,15 @@ function createShortcutMap(shortcuts: ShortcutConfig, handlers: Record<keyof Sho
   }));
 }
 
+function deferUntilAfterKeydownPropagation(handler: () => void): void {
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(handler);
+    return;
+  }
+
+  Promise.resolve().then(handler);
+}
+
 function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?: (() => void) | null) {
   const { settings, viewMode, lastNonSplitViewMode, setViewMode } = useAppStore();
 
@@ -174,7 +183,11 @@ function useShortcutListener(options: UseKeyboardShortcutsOptions, saveHandler?:
       }
 
       event.preventDefault();
-      entry.handler();
+      if (entry.action === 'save') {
+        deferUntilAfterKeydownPropagation(entry.handler);
+      } else {
+        entry.handler();
+      }
       return;
     }
   }, [

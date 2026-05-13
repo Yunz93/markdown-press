@@ -177,20 +177,20 @@ export function initMermaid(md: any) {
   };
 }
 
-function getMermaidDefinition(el: HTMLElement): string {
+export function getMermaidDefinition(el: HTMLElement): string {
   if (el.dataset.mermaidSource) {
     return el.dataset.mermaidSource;
   }
   return (el.textContent || '').trim();
 }
 
-function parseSvgLength(value: string | null): number | null {
+export function parseSvgLength(value: string | null): number | null {
   if (!value?.trim()) return null;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function parseSvgViewBoxSize(value: string | null): { width: number; height: number } | null {
+export function parseSvgViewBoxSize(value: string | null): { width: number; height: number } | null {
   if (!value?.trim()) return null;
 
   const parts = value.trim().split(/[\s,]+/).map((part) => Number.parseFloat(part));
@@ -203,7 +203,7 @@ function parseSvgViewBoxSize(value: string | null): { width: number; height: num
     : null;
 }
 
-function removeSvgLengthAttribute(svg: SVGSVGElement, name: 'width' | 'height'): void {
+export function removeSvgLengthAttribute(svg: SVGSVGElement, name: 'width' | 'height'): void {
   const value = svg.getAttribute(name);
   if (value === null) return;
 
@@ -213,7 +213,7 @@ function removeSvgLengthAttribute(svg: SVGSVGElement, name: 'width' | 'height'):
   svg.removeAttribute(name);
 }
 
-function getMermaidInlinePalette(themeMode: 'light' | 'dark') {
+export function getMermaidInlinePalette(themeMode: 'light' | 'dark') {
   if (themeMode === 'dark') {
     return {
       nodeFill: '#1f2937',
@@ -237,7 +237,7 @@ function getMermaidInlinePalette(themeMode: 'light' | 'dark') {
   };
 }
 
-function getMermaidDiagramKind(svg: SVGSVGElement): 'flowchart' | 'state' | 'pie' | 'sequence' | 'class' | 'other' {
+export function getMermaidDiagramKind(svg: SVGSVGElement): 'flowchart' | 'state' | 'pie' | 'sequence' | 'class' | 'other' {
   if (svg.classList.contains('flowchart')) return 'flowchart';
   if (svg.classList.contains('statediagram')) return 'state';
   if (svg.classList.contains('classDiagram')) return 'class';
@@ -246,7 +246,7 @@ function getMermaidDiagramKind(svg: SVGSVGElement): 'flowchart' | 'state' | 'pie
   return 'other';
 }
 
-function getRootMermaidSvg(el: HTMLElement): SVGSVGElement | null {
+export function getRootMermaidSvg(el: HTMLElement): SVGSVGElement | null {
   const firstChild = el.firstElementChild;
   const svg = firstChild?.tagName.toLowerCase() === 'svg'
     ? firstChild
@@ -256,7 +256,7 @@ function getRootMermaidSvg(el: HTMLElement): SVGSVGElement | null {
     : null;
 }
 
-function removeMermaidHoistedStyle(el: HTMLElement): void {
+export function removeMermaidHoistedStyle(el: HTMLElement): void {
   const styleId = el.dataset.mermaidStyleId;
   const doc = el.ownerDocument;
   if (!styleId || !doc) return;
@@ -264,7 +264,7 @@ function removeMermaidHoistedStyle(el: HTMLElement): void {
   delete el.dataset.mermaidStyleId;
 }
 
-function hoistMermaidSvgStyle(el: HTMLElement): void {
+export function hoistMermaidSvgStyle(el: HTMLElement): void {
   const doc = el.ownerDocument;
   if (!doc) return;
 
@@ -290,7 +290,7 @@ function hoistMermaidSvgStyle(el: HTMLElement): void {
   el.dataset.mermaidStyleId = styleId;
 }
 
-function inlineMermaidSvgTheme(el: HTMLElement, themeMode: 'light' | 'dark'): void {
+export function inlineMermaidSvgTheme(el: HTMLElement, themeMode: 'light' | 'dark'): void {
   const svg = getRootMermaidSvg(el);
   if (!svg) return;
 
@@ -439,7 +439,7 @@ function inlineMermaidSvgTheme(el: HTMLElement, themeMode: 'light' | 'dark'): vo
   }
 }
 
-function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'): void {
+export function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'): void {
   const svg = getRootMermaidSvg(el);
   if (!svg) return;
 

@@ -43,14 +43,15 @@ export function normalizeBlogSiteUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return '';
 
+  // Reject URLs with non-http(s) schemes (ftp://, file://, javascript:, etc.)
+  if (/^[a-z][a-z\d+\-.]*:/i.test(trimmed) && !/^https?:\/\//i.test(trimmed)) {
+    return '';
+  }
+
   const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 
   try {
     const url = new URL(candidate);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return '';
-    }
-
     const normalizedPath = url.pathname.replace(/\/+$/, '');
     return `${url.origin}${normalizedPath}`.replace(/\/+$/, '');
   } catch {

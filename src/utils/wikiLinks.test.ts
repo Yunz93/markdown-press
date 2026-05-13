@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseWikiLinkReference, extractWikiNoteFragment, resolveWikiLinkFile } from './wikiLinks';
+import { parseWikiLinkReference, extractWikiNoteFragment, resolveWikiLinkFile, buildWikiReferenceTarget } from './wikiLinks';
 import type { FileNode } from '../types';
 
 describe('parseWikiLinkReference', () => {
@@ -99,6 +99,38 @@ Final summary.`;
     const result = extractWikiNoteFragment(sampleContent, 'Test#Details');
     expect(result.title).toBe('Details');
   });
+
+  it('builds title from first heading when no path or subpath', () => {
+    const content = `---
+title: Test
+---
+
+# First Heading
+
+Some content.`;
+    const result = extractWikiNoteFragment(content, '#');
+    expect(result.title).toBe('First Heading');
+  });
+
+  it('builds title from path when no subpath', () => {
+    const content = `---
+title: Test
+---
+
+Some content without heading.`;
+    const result = extractWikiNoteFragment(content, 'My Note.md');
+    expect(result.title).toBe('My Note');
+  });
+
+  it('falls back to Embedded note when no heading, path, or subpath', () => {
+    const content = `---
+title: Test
+---
+
+Just some plain text.`;
+    const result = extractWikiNoteFragment(content, '#');
+    expect(result.title).toBe('Embedded note');
+  });
 });
 
 describe('resolveWikiLinkFile', () => {
@@ -131,6 +163,21 @@ describe('resolveWikiLinkFile', () => {
     expect(result?.name).toBe('deep.md');
   });
 
+  it('resolves by relative path from current file', () => {
+    const result = resolveWikiLinkFile(files, 'world', '/root', '/root/notes/hello.md');
+    expect(result?.name).toBe('world.md');
+  });
+
+  it('handles rootPath with trailing slash', () => {
+    const result = resolveWikiLinkFile(files, 'hello', '/root/');
+    expect(result?.name).toBe('hello.md');
+  });
+
+  it('handles path with backslashes', () => {
+    const result = resolveWikiLinkFile(files, 'hello', '\\root\\');
+    expect(result?.name).toBe('hello.md');
+  });
+
   it('returns null for non-existent file', () => {
     const result = resolveWikiLinkFile(files, 'nonexistent', '/root');
     expect(result).toBeNull();
@@ -144,5 +191,149 @@ describe('resolveWikiLinkFile', () => {
   it('handles heading subpath in target', () => {
     const result = resolveWikiLinkFile(files, 'hello#Section', '/root');
     expect(result?.name).toBe('hello.md');
+  });
+});
+
+describe('extractWikiNoteFragment - block section', () => {
+  const blockContent = `---
+title: Test
+---
+
+# Introduction
+
+This is the intro.
+
+Some block content here.
+^block-id-1
+
+## Details
+
+More details.
+^block-id-2
+
+Another paragraph.
+^block-id-3
+
+## Summary
+
+Final summary.`;
+
+  it('extracts block section by id', () => {
+    const result = extractWikiNoteFragment(blockContent, 'Test#^block-id-1');
+    expect(result.markdown).toBe('Some block content here.');
+    expect(result.title).toBe('block-id-1');
+  });
+
+  it('extracts block section when preceded by heading', () => {
+    const result = extractWikiNoteFragment(blockContent, 'Test#^block-id-2');
+    expect(result.markdown).toBe('More details.');
+    expect(result.title).toBe('block-id-2');
+  });
+
+  it('extracts block section with multiple lines', () => {
+    const result = extractWikiNoteFragment(blockContent, 'Test#^block-id-3');
+    expect(result.markdown).toBe('Another paragraph.');
+    expect(result.title).toBe('block-id-3');
+  });
+
+  it('returns null for non-existent block id', () => {
+    const result = extractWikiNoteFragment(blockContent, 'Test#^nonexistent');
+    expect(result.markdown).toBeNull();
+    expect(result.title).toBe('nonexistent');
+  });
+
+  it('extracts block at start of body (no preceding content)', () => {
+    const content = `---
+title: Test
+---
+^first-block
+
+Some other text.`;
+    const result = extractWikiNoteFragment(content, 'Test#^first-block');
+    expect(result.markdown).toBeNull();
+    expect(result.title).toBe('first-block');
+  });
+
+  it('stops at empty line when scanning backwards for block start', () => {
+    const content = `---
+title: Test
+---
+
+Line one.
+Line two.
+
+^block-id
+
+Next paragraph.`;
+    const result = extractWikiNoteFragment(content, 'Test#^block-id');
+    expect(result.markdown).toBeNull();
+    expect(result.title).toBe('block-id');
+  });
+
+  it('stops at heading when scanning backwards for block start', () => {
+    const content = `---
+title: Test
+---
+
+# Heading
+
+Text under heading.
+^block-id
+
+Next paragraph.`;
+    const result = extractWikiNoteFragment(content, 'Test#^block-id');
+    expect(result.markdown).toBe('Text under heading.');
+    expect(result.title).toBe('block-id');
+  });
+
+  it('handles block id with underscore and hyphen', () => {
+    const content = `---
+title: Test
+---
+
+Paragraph with id.
+^block_id-2
+
+Next paragraph.`;
+    const result = extractWikiNoteFragment(content, 'Test#^block_id-2');
+    expect(result.markdown).toBe('Paragraph with id.');
+    expect(result.title).toBe('block_id-2');
+  });
+});
+
+describe('buildWikiReferenceTarget', () => {
+  it('returns null for empty subpath', () => {
+    const result = buildWikiReferenceTarget({ subpath: '', subpathType: null });
+    expect(result).toBeNull();
+  });
+
+  it('returns null for whitespace-only subpath', () => {
+    const result = buildWikiReferenceTarget({ subpath: '   ', subpathType: 'heading' });
+    expect(result).toBeNull();
+  });
+
+  it('formats block subpath with caret prefix', () => {
+    const result = buildWikiReferenceTarget({ subpath: '^abc123', subpathType: 'block' });
+    expect(result).toBe('^abc123');
+  });
+
+  it('formats block subpath without caret prefix', () => {
+    const result = buildWikiReferenceTarget({ subpath: 'abc123', subpathType: 'block' });
+    expect(result).toBe('^abc123');
+  });
+
+  it('trims block subpath', () => {
+    const result = buildWikiReferenceTarget({ subpath: '  abc123  ', subpathType: 'block' });
+    expect(result).toBe('^abc123');
+  });
+
+  it('returns heading subpath as-is', () => {
+    const result = buildWikiReferenceTarget({ subpath: 'My Heading', subpathType: 'heading' });
+    expect(result).toBe('My Heading');
+  });
+
+  it('trims heading subpath', () => {
+    const result = buildWikiReferenceTarget({ subpath: '  My Heading  ', subpathType: 'heading' });
+    expect(result).toBe('My Heading');
   });
 });

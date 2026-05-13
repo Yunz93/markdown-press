@@ -24,6 +24,12 @@ describe('normalizeWikiFolder', () => {
     expect(normalizeWikiFolder('/tmp/wiki')).toBe('wiki');
     expect(normalizeWikiFolder('C:\\wiki')).toBe('wiki');
   });
+
+  it('falls back when normalized result is empty', () => {
+    expect(normalizeWikiFolder('///')).toBe('wiki');
+    expect(normalizeWikiFolder('\\\\')).toBe('wiki');
+    expect(normalizeWikiFolder('   ')).toBe('wiki');
+  });
 });
 
 describe('sanitizeWikiArchiveSegment', () => {

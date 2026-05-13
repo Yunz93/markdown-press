@@ -22,9 +22,6 @@ export function normalizeGitHubImageUrl(value: string): string {
     }
 
     const [branch, ...pathSegments] = rest;
-    if (!branch || pathSegments.length === 0) {
-      return value;
-    }
 
     const encodedBranch = encodeUrlPathSegment(branch);
     const encodedPath = pathSegments.map(encodeUrlPathSegment).join('/');

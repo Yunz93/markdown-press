@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseFrontmatter, generateFrontmatter, updateFrontmatter, removeFrontmatter, getFrontmatterValue, setFrontmatterValue } from './frontmatter';
+import { describe, it, expect, vi } from 'vitest';
+import { parseFrontmatter, generateFrontmatter, updateFrontmatter, removeFrontmatter, getFrontmatterValue, setFrontmatterValue, replaceFrontmatterInner } from './frontmatter';
 
 describe('parseFrontmatter', () => {
   it('returns null frontmatter for empty content', () => {
@@ -81,6 +81,74 @@ describe('generateFrontmatter', () => {
     const result = generateFrontmatter({ date: '2026-01-01' });
     expect(result).toContain('"2026-01-01"');
   });
+
+  it('handles empty arrays', () => {
+    const result = generateFrontmatter({ tags: [] });
+    expect(result).toContain('tags:');
+    expect(result).toContain('- ');
+  });
+
+  it('returns empty string when generation throws', () => {
+    // Create a circular reference that will cause JSON.stringify to throw
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const result = generateFrontmatter({ bad: circular });
+    expect(result).toBe('');
+  });
+
+  it('handles empty object values', () => {
+    const result = generateFrontmatter({ meta: {} });
+    expect(result).toContain('meta:');
+  });
+
+  it('handles nested objects with multi-line values', () => {
+    const result = generateFrontmatter({ meta: { tags: ['a', 'b'] } });
+    expect(result).toContain('meta:');
+    expect(result).toContain('  tags:');
+    expect(result).toContain('    - a');
+    expect(result).toContain('    - b');
+  });
+
+  it('handles arrays containing nested objects', () => {
+    const result = generateFrontmatter({ items: [{ name: 'a' }] });
+    expect(result).toContain('items:');
+    expect(result).toContain('  - name: a');
+  });
+
+  it('handles arrays containing nested arrays', () => {
+    const result = generateFrontmatter({ matrix: [['a', 'b']] });
+    expect(result).toContain('matrix:');
+    expect(result).toContain('  - - a');
+    expect(result).toContain('    - b');
+  });
+
+  it('handles various scalar types', () => {
+    const result = generateFrontmatter({
+      count: 42,
+      active: true,
+      empty: '',
+      nil: null,
+      missing: undefined,
+    });
+    expect(result).toContain('count: 42');
+    expect(result).toContain('active: true');
+    expect(result).toContain('empty:');
+    expect(result).toContain('nil:');
+    expect(result).not.toContain('missing');
+  });
+
+  it('handles undefined inside arrays', () => {
+    const result = generateFrontmatter({ items: [undefined, 'a'] });
+    expect(result).toContain('items:');
+    expect(result).toContain('- ');
+    expect(result).toContain('- a');
+  });
+
+  it('falls back to JSON.stringify for exotic values', () => {
+    const result = generateFrontmatter({ sym: Symbol('test') as unknown as string });
+    // Symbol serializes to undefined in JSON.stringify, so output should be 'sym:'
+    expect(result).toContain('sym:');
+  });
 });
 
 describe('updateFrontmatter', () => {
@@ -103,6 +171,12 @@ describe('updateFrontmatter', () => {
     const result = updateFrontmatter(content, { title: 'New' });
     const parsed = parseFrontmatter(result);
     expect(parsed.frontmatter?.title).toBe('New');
+  });
+
+  it('returns original content when new frontmatter is empty', () => {
+    const content = '# Hello';
+    const result = updateFrontmatter(content, {});
+    expect(result).toBe(content);
   });
 });
 
@@ -146,5 +220,64 @@ describe('setFrontmatterValue', () => {
     const result = setFrontmatterValue('# Body', 'title', 'New');
     const parsed = parseFrontmatter(result);
     expect(parsed.frontmatter?.title).toBe('New');
+  });
+});
+
+describe('replaceFrontmatterInner', () => {
+  it('returns null when content has no frontmatter', () => {
+    const result = replaceFrontmatterInner('# Hello', (inner) => inner);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when replacer returns null', () => {
+    const content = '---\ntitle: Test\n---\n\nBody';
+    const result = replaceFrontmatterInner(content, () => null);
+    expect(result).toBeNull();
+  });
+
+  it('replaces inner content while preserving fences', () => {
+    const content = '---\ntitle: Old\n---\n\nBody';
+    const result = replaceFrontmatterInner(content, (inner) => inner.replace('Old', 'New'));
+    expect(result).toBe('---\ntitle: New\n---\n\nBody');
+  });
+
+  it('handles CRLF line endings', () => {
+    const content = '---\r\ntitle: Test\r\nstatus: draft\r\n---\r\n\r\nBody';
+    const result = replaceFrontmatterInner(content, (inner, { lineEnding }) => {
+      expect(lineEnding).toBe('\r\n');
+      return inner.replace('Test', 'Replaced');
+    });
+    expect(result).toBe('---\r\ntitle: Replaced\r\nstatus: draft\r\n---\r\n\r\nBody');
+  });
+
+  it('handles LF line endings', () => {
+    const content = '---\ntitle: Test\nstatus: draft\n---\n\nBody';
+    const result = replaceFrontmatterInner(content, (inner, { lineEnding }) => {
+      expect(lineEnding).toBe('\n');
+      return inner.replace('Test', 'Replaced');
+    });
+    expect(result).toBe('---\ntitle: Replaced\nstatus: draft\n---\n\nBody');
+  });
+
+  it('returns null when frontmatter is not at start', () => {
+    const content = 'Some text\n---\ntitle: Test\n---\n\nBody';
+    const result = replaceFrontmatterInner(content, (inner) => inner.replace('Test', 'Replaced'));
+    expect(result).toBeNull();
+  });
+
+  it('returns null when inner offset is negative (defensive)', () => {
+    // This tests the defensive innerOffset < 0 branch.
+    // We mock indexOf to return -1 to force that path.
+    const content = '---\ntitle: Test\n---\n\nBody';
+    const originalIndexOf = String.prototype.indexOf;
+    const spy = vi.spyOn(String.prototype, 'indexOf').mockImplementation(function (this: string, searchString: string, position?: number) {
+      if (searchString === 'title: Test') {
+        return -1;
+      }
+      return originalIndexOf.call(this, searchString, position);
+    });
+    const result = replaceFrontmatterInner(content, (inner) => inner.replace('Test', 'Replaced'));
+    expect(result).toBeNull();
+    spy.mockRestore();
   });
 });

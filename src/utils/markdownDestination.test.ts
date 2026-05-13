@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { buildMarkdownDestination, parseMarkdownDestination, stripMarkdownDestination } from './markdownDestination';
 
 describe('markdownDestination', () => {
+  it('returns empty result for empty string', () => {
+    expect(parseMarkdownDestination('')).toEqual({
+      path: '',
+      angleBrackets: false,
+      title: '',
+    });
+  });
+
+  it('returns empty result for whitespace-only string', () => {
+    expect(parseMarkdownDestination('   \t\n  ')).toEqual({
+      path: '',
+      angleBrackets: false,
+      title: '',
+    });
+  });
+
   it('parses angle-bracket paths with titles', () => {
     expect(parseMarkdownDestination('<../resources/my file.png> "cover title"')).toEqual({
       path: '../resources/my file.png',
