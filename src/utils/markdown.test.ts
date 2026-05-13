@@ -16,6 +16,12 @@ describe('renderMarkdown', () => {
     expect(html).toMatch(/My Note/i);
   });
 
+  it('collapses extra blank lines in source to one block boundary (CommonMark)', () => {
+    const html = renderMarkdown(['第一段', '', '', '', '第二段'].join('\n'));
+    expect(html.match(/<\/p>\s*<p>/g)?.length).toBe(1);
+    expect(html).not.toMatch(/<p>\s*<\/p>/);
+  });
+
   it('renders wiki embed size attributes from pipe syntax', () => {
     const html = renderMarkdown('![[resources/test.pg|300]]');
     expect(html).toContain('data-wiki-embed="true"');
