@@ -227,17 +227,8 @@ describe('refreshDocumentUpdateTime', () => {
   });
 
   it('falls back to legacy when a refresh key is missing from surgical replacement', () => {
-    const doc = [
-      '---',
-      'date modified: 2020-01-01 00:00:00',
-      '---',
-      '',
-      'Body',
-    ].join('\n');
-
-    // Mock replaceFrontmatterInner to simulate missing key scenario
-    // This is hard to trigger naturally, so we test the fallback path
-    // through the blockedByStructuredValue path instead
+    // 模拟局部替换缺少刷新字段的场景；这个分支很难自然触发，
+    // 所以通过 blockedByStructuredValue 路径覆盖旧逻辑回退。
     const docWithBlock = [
       '---',
       'update_time: >',

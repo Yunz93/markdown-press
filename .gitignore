@@ -28,6 +28,7 @@ src-tauri/target
 *.sln
 *.sw?
 .claude
+AGENTS.md
 .omx/
 secure-settings.json
 secure-settings.key
