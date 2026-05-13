@@ -183,6 +183,16 @@ describe('resolveWikiLinkFile', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null for heading-only target with empty path', () => {
+    const result = resolveWikiLinkFile(files, '#Section', '/root');
+    expect(result).toBeNull();
+  });
+
+  it('handles currentFilePath outside rootFolderPath', () => {
+    const result = resolveWikiLinkFile(files, 'notes/hello', '/root', '/other/path/file.md');
+    expect(result?.name).toBe('hello.md');
+  });
+
   it('strips .md extension from target', () => {
     const result = resolveWikiLinkFile(files, 'hello.md', '/root');
     expect(result?.name).toBe('hello.md');
@@ -277,6 +287,21 @@ title: Test
 
 # Heading
 
+Text under heading.
+^block-id
+
+Next paragraph.`;
+    const result = extractWikiNoteFragment(content, 'Test#^block-id');
+    expect(result.markdown).toBe('Text under heading.');
+    expect(result.title).toBe('block-id');
+  });
+
+  it('stops at heading when text is directly under heading with no blank line', () => {
+    const content = `---
+title: Test
+---
+
+# Heading
 Text under heading.
 ^block-id
 

@@ -212,6 +212,7 @@ describe('refreshDocumentUpdateTime', () => {
     expect(next).toMatch(/date modified:/);
   });
 
+
   it('falls back to legacy when refresh key uses anchor', () => {
     const doc = [
       '---',
@@ -758,5 +759,17 @@ describe('normalizeMetadataFields', () => {
     const input = [{}];
     const result = normalizeMetadataFields(input);
     expect(result).toEqual(DEFAULT_METADATA_FIELDS);
+  });
+
+  it('returns defaults when renameLegacyMetadataKey returns empty', () => {
+    // Field with key that maps to empty after legacy rename
+    const input = [
+      { key: 'title', defaultValue: 'draft' },
+      { key: '', defaultValue: 'empty' },
+    ];
+    const result = normalizeMetadataFields(input);
+    expect(result).toEqual([
+      { key: 'title', defaultValue: 'draft' },
+    ]);
   });
 });

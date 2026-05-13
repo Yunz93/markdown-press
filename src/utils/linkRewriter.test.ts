@@ -145,6 +145,39 @@ describe('linkRewriter', () => {
       expect(result.modifiedFiles[0].newContent).toBe('[see here](../docs/guide.md#installation)');
     });
 
+    it('does not rewrite hash-only links', async () => {
+      const files = [file('/vault/notes/a.md')];
+      const result = await runRewrite({
+        movedPathMap: { '/vault/old': '/vault/new' },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '[back to top](#introduction)',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('handles absolute paths in links', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/new/img.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {
+          '/vault/resources/img.png': '/vault/resources/new/img.png',
+        },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '![photo](/vault/resources/img.png)',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(1);
+      // Absolute path is rewritten to relative for portability
+      expect(result.modifiedFiles[0].newContent).toBe('![photo](../resources/new/img.png)');
+    });
+
     it('rewrites root-relative links preserving style', async () => {
       const files = [
         file('/vault/notes/a.md'),
@@ -421,6 +454,32 @@ describe('linkRewriter', () => {
       expect(result.modifiedFiles).toHaveLength(1);
       expect(result.modifiedFiles[0].newContent).toBe('![[new-photo.png]]');
     });
+
+    it('does not rewrite wiki link with empty path', async () => {
+      const files = [file('/vault/notes/a.md')];
+      const result = await runRewrite({
+        movedPathMap: { '/vault/old': '/vault/new' },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': 'See [[#heading]] for details.',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('does not rewrite wiki link that normalizes to empty', async () => {
+      const files = [file('/vault/notes/a.md')];
+      const result = await runRewrite({
+        movedPathMap: { '/vault/old': '/vault/new' },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': 'See [[/]] for details.',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
   });
 
   describe('HTML references', () => {
@@ -464,6 +523,54 @@ describe('linkRewriter', () => {
       expect(result.modifiedFiles[0].newContent).toBe(
         '<a href="../archive/doc.pdf">download</a>',
       );
+    });
+
+    it('does not rewrite empty HTML src/href', async () => {
+      const files = [file('/vault/notes/a.md')];
+      const result = await runRewrite({
+        movedPathMap: { '/vault/old': '/vault/new' },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '<img src="" alt="photo">',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('does not rewrite HTML reference to unmoved file', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/other.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: { '/vault/old': '/vault/new' },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '<img src="../resources/other.png" alt="photo">',
+        },
+      });
+
+      expect(result.modifiedFiles).toHaveLength(0);
+    });
+
+    it('does not rewrite HTML reference when resolved path equals decoded path', async () => {
+      const files = [
+        file('/vault/notes/a.md'),
+        file('/vault/resources/img.png'),
+      ];
+      const result = await runRewrite({
+        movedPathMap: {
+          '/vault/resources/img.png': '/vault/resources/img.png',
+        },
+        files,
+        fileContents: {
+          '/vault/notes/a.md': '<img src="../resources/img.png" alt="photo">',
+        },
+      });
+
+      // Target exists but path didn't actually change
+      expect(result.modifiedFiles).toHaveLength(0);
     });
   });
 

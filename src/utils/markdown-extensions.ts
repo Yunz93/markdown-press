@@ -101,8 +101,8 @@ export function initKaTeX(md: any) {
 
     // Find the closing $$
     if (contentEnd === -1) {
-      // Search across multiple lines
-      let currentLine = start;
+      // Search across multiple lines (start from the line after the opening $$)
+      let currentLine = start + 1;
 
       while (currentLine < state.lineMax) {
         const lineStart = state.bMarks[currentLine];
@@ -271,7 +271,7 @@ export function hoistMermaidSvgStyle(el: HTMLElement): void {
   const svg = getRootMermaidSvg(el);
   if (!svg) return;
 
-  const styleNodes = Array.from(svg.querySelectorAll(':scope > style'));
+  const styleNodes = Array.from(svg.children).filter((c) => c.tagName.toLowerCase() === 'style');
   if (styleNodes.length === 0) return;
 
   const cssText = styleNodes
