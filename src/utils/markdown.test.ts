@@ -3,7 +3,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import MarkdownIt from 'markdown-it';
 import { shouldUseAsyncPreviewEnhancement } from '../components/editor/preview/previewRenderCore';
+import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
 import { clearMarkdownCache, renderMarkdown, configureMarkdownClasses } from './markdown';
+
+function createMockHighlighter() {
+  const codeToHtml = vi.fn((code: string) => `<pre class="shiki"><code>${code}</code></pre>`);
+  const highlighter: ShikiHighlighter = {
+    codeToHtml,
+    getLoadedLanguages: () => ['js'],
+    supportsLanguage: () => true,
+  };
+  return { codeToHtml, highlighter };
+}
 
 describe('renderMarkdown', () => {
   beforeEach(() => {
@@ -129,35 +140,43 @@ describe('renderMarkdown', () => {
   });
 
   it('returns cached result on second render of identical markdown', () => {
-    const md = 'Hello **world**.';
-    const first = renderMarkdown(md);
-    const second = renderMarkdown(md);
+    const { codeToHtml, highlighter } = createMockHighlighter();
+    const md = '```js\nconsole.log(1);\n```';
+
+    const first = renderMarkdown(md, { highlighter });
+    const second = renderMarkdown(md, { highlighter });
+
     expect(second).toBe(first);
+    expect(codeToHtml).toHaveBeenCalledTimes(1);
   });
 
   it('does not cache documents larger than MAX_CACHEABLE_LENGTH', () => {
-    const largeMd = 'x'.repeat(100_001);
-    const first = renderMarkdown(largeMd);
-    const second = renderMarkdown(largeMd);
-    // Both should produce the same HTML, but cache should not be used
+    const { codeToHtml, highlighter } = createMockHighlighter();
+    const largeMd = `${'x'.repeat(100_001)}\n\n\`\`\`js\nconsole.log(1);\n\`\`\``;
+
+    const first = renderMarkdown(largeMd, { highlighter });
+    const second = renderMarkdown(largeMd, { highlighter });
+
     expect(second).toBe(first);
-    // If we spy on cache, we could verify, but the behavior is the same;
-    // the key point is that it doesn't throw and returns valid HTML.
     expect(second).toContain('<p>');
+    expect(codeToHtml).toHaveBeenCalledTimes(2);
   });
 
   it('clearMarkdownCache clears the cache so re-render produces fresh result', () => {
-    const md = 'Cache test.';
-    const first = renderMarkdown(md);
+    const { codeToHtml, highlighter } = createMockHighlighter();
+    const md = '```js\nconsole.log(1);\n```';
+
+    const first = renderMarkdown(md, { highlighter });
     clearMarkdownCache();
-    const second = renderMarkdown(md);
+    const second = renderMarkdown(md, { highlighter });
+
     expect(second).toBe(first);
+    expect(codeToHtml).toHaveBeenCalledTimes(2);
   });
 
   it('configureMarkdownClasses adds heading and link classes', () => {
     const md = new MarkdownIt();
     configureMarkdownClasses(md, {});
-    const tokens = md.parse('# Title\n\n[link](https://example.com)', {});
     // The renderer rules are modified; verify by rendering
     const html = md.render('# Title\n\n[link](https://example.com)');
     expect(html).toContain('class="heading-1"');

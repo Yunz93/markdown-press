@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { Frontmatter } from '../types';
 import { parseFrontmatter, generateFrontmatter, updateFrontmatter, removeFrontmatter, getFrontmatterValue, setFrontmatterValue, replaceFrontmatterInner } from './frontmatter';
+
+function runtimeFrontmatter(value: Record<string, unknown>): Frontmatter {
+  return value as unknown as Frontmatter;
+}
 
 describe('parseFrontmatter', () => {
   it('returns null frontmatter for empty content', () => {
@@ -92,17 +97,17 @@ describe('generateFrontmatter', () => {
     // Create a circular reference that will cause JSON.stringify to throw
     const circular: Record<string, unknown> = {};
     circular.self = circular;
-    const result = generateFrontmatter({ bad: circular });
+    const result = generateFrontmatter(runtimeFrontmatter({ bad: circular }));
     expect(result).toBe('');
   });
 
   it('handles empty object values', () => {
-    const result = generateFrontmatter({ meta: {} });
+    const result = generateFrontmatter(runtimeFrontmatter({ meta: {} }));
     expect(result).toContain('meta:');
   });
 
   it('handles nested objects with multi-line values', () => {
-    const result = generateFrontmatter({ meta: { tags: ['a', 'b'] } });
+    const result = generateFrontmatter(runtimeFrontmatter({ meta: { tags: ['a', 'b'] } }));
     expect(result).toContain('meta:');
     expect(result).toContain('  tags:');
     expect(result).toContain('    - a');
@@ -110,13 +115,13 @@ describe('generateFrontmatter', () => {
   });
 
   it('handles arrays containing nested objects', () => {
-    const result = generateFrontmatter({ items: [{ name: 'a' }] });
+    const result = generateFrontmatter(runtimeFrontmatter({ items: [{ name: 'a' }] }));
     expect(result).toContain('items:');
     expect(result).toContain('  - name: a');
   });
 
   it('handles arrays containing nested arrays', () => {
-    const result = generateFrontmatter({ matrix: [['a', 'b']] });
+    const result = generateFrontmatter(runtimeFrontmatter({ matrix: [['a', 'b']] }));
     expect(result).toContain('matrix:');
     expect(result).toContain('  - - a');
     expect(result).toContain('    - b');
@@ -138,7 +143,7 @@ describe('generateFrontmatter', () => {
   });
 
   it('handles undefined inside arrays', () => {
-    const result = generateFrontmatter({ items: [undefined, 'a'] });
+    const result = generateFrontmatter(runtimeFrontmatter({ items: [undefined, 'a'] }));
     expect(result).toContain('items:');
     expect(result).toContain('- ');
     expect(result).toContain('- a');

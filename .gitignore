@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage/
+coverage-test/
+coverage-test2/
 *.local
 src-tauri/dist
 src-tauri/target

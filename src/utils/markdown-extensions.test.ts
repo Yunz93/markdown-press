@@ -21,7 +21,7 @@ vi.mock('katex', async () => {
   return {
     default: {
       ...actual,
-      renderToString: vi.fn((...args: any[]) => actual.renderToString(...args)),
+      renderToString: vi.fn((...args: Parameters<typeof actual.renderToString>) => actual.renderToString(...args)),
     },
   };
 });
