@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { FileTypeIcon } from '../FileTypeIcon';
 import type { FileNode } from '../../types';
 
 const AUTO_EXPAND_ON_DRAG_MS = 420;
@@ -175,10 +176,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
               </svg>
             )
           ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-              <polyline points="13 2 13 9 20 9" />
-            </svg>
+            <FileTypeIcon fileName={node.name} className="w-4 h-4" size={16} />
           )}
         </span>
         <span className="truncate flex-1">{node.name.replace('.md', '')}</span>

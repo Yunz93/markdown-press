@@ -1,4 +1,5 @@
 import React from 'react';
+import { FileTypeIcon } from '../FileTypeIcon';
 import type { FileNode } from '../../types';
 import { useI18n } from '../../hooks/useI18n';
 
@@ -51,10 +52,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
               ) : (
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                  <polyline points="13 2 13 9 20 9" />
-                </svg>
+                <FileTypeIcon fileName={node.name} className="h-3.5 w-3.5" size={14} />
               )}
             </span>
             <span className="truncate flex-1">{node.name}</span>
