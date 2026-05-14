@@ -53,6 +53,13 @@ describe('parseFrontmatter', () => {
     expect(result.frontmatter?.title).toBe('Hello');
     expect(result.body).toBe('Body');
   });
+
+  it('returns null frontmatter for empty YAML block', () => {
+    const content = '---\n\n---\n\nBody';
+    const result = parseFrontmatter(content);
+    expect(result.frontmatter).toBeNull();
+    expect(result.body).toBe('Body');
+  });
 });
 
 describe('generateFrontmatter', () => {

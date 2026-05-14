@@ -70,11 +70,18 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
 
         try {
           const latestContent = await readFile(node);
-          const currentCached = useAppStore.getState().fileContents[activeTabId];
+          const stateAfterRead = useAppStore.getState();
+
+          if (stateAfterRead.hasUnsavedChanges(activeTabId)) {
+            showNotification(t('notifications_fileChangedOnDisk'), 'error');
+            return;
+          }
+
+          const currentCached = stateAfterRead.fileContents[activeTabId];
           if (currentCached === latestContent) return;
 
-          useAppStore.getState().updateTabContent(activeTabId, latestContent);
-          useAppStore.getState().markAsSaved(activeTabId);
+          stateAfterRead.updateTabContent(activeTabId, latestContent);
+          stateAfterRead.markAsSaved(activeTabId);
           showNotification(t('notifications_fileReloaded'), 'success');
         } catch (error) {
           console.error('Failed to reload file from disk:', error);

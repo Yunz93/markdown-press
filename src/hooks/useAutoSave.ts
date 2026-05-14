@@ -114,11 +114,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       return false;
     }
 
-    if (contentToSave !== currentContent) {
-      contentRef.current = contentToSave;
-      updateTabContent(activeTabId, contentToSave);
-    }
-
     isSavingRef.current = true;
     setSaving(true);
     saveStateRef.current.status = 'saving';
@@ -131,6 +126,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         },
         'Auto-save failed'
       );
+
+      if (contentToSave !== currentContent) {
+        contentRef.current = contentToSave;
+        updateTabContent(activeTabId, contentToSave);
+      }
 
       updateFileContent(activeTabId, contentToSave);
       markAsSaved(activeTabId);
@@ -174,7 +174,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       // Save to local storage as backup
       try {
-        localStorage.setItem(`draft_${activeTabId}`, currentContent);
+        localStorage.setItem(`draft_${activeTabId}`, contentToSave);
         showNotification(t(settings.language, 'notifications_saveBackupCreated'), 'error');
       } catch (backupError) {
         showNotification(t(settings.language, 'notifications_saveFailed', { message: saveStateRef.current.error || '' }), 'error');

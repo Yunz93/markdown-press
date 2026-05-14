@@ -149,7 +149,8 @@ export function parseFrontmatter(content: string): ParsedMarkdown {
   }
 
   try {
-    const frontmatter = normalizeFrontmatterValue(yaml.load(match[1])) as Frontmatter;
+    const parsed = normalizeFrontmatterValue(yaml.load(match[1]));
+    const frontmatter = (parsed ?? null) as Frontmatter | null;
     const body = content.substring(match[0].length).trim();
     return { frontmatter, body };
   } catch (error) {

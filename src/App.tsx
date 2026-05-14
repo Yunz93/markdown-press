@@ -276,11 +276,13 @@ const App: React.FC = () => {
   useGlobalKeyboardShortcuts(
     async () => {
       if (currentFilePath) {
-        await forceSave(undefined, {
+        const saved = await forceSave(undefined, {
           formatBeforeSave: settings.formatMarkdownOnManualSave,
           trigger: 'manual',
         });
-        showNotification(t('app_saved'), 'success');
+        if (saved) {
+          showNotification(t('app_saved'), 'success');
+        }
       }
     },
     handleAIAnalyze,
