@@ -1,6 +1,5 @@
 // Export types
 export type { ExportOptions, SaveExportOptions } from './types';
-export { normalizeExportStrikethroughMode } from './types';
 export { PREVIEW_PANEL_WIDTH_PX } from './types';
 
 // Export core utilities

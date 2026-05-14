@@ -101,6 +101,7 @@ export function useFileOperations() {
     addTab,
     closeTab,
     updateTabContent,
+    markAsSaved,
     setCurrentFilePath,
     setViewMode,
     showNotification,
@@ -135,8 +136,10 @@ export function useFileOperations() {
         if (isHtmlFile(file.name)) {
           const text = await readFile(file);
           updateTabContent(file.id, text);
+          markAsSaved(file.id);
         } else {
           updateTabContent(file.id, '');
+          markAsSaved(file.id);
         }
         setViewMode(ViewMode.PREVIEW);
         return;
@@ -147,12 +150,13 @@ export function useFileOperations() {
       if (cachedContent === undefined) {
         const text = await readFile(file);
         updateTabContent(file.id, text);
+        markAsSaved(file.id);
       }
     } catch (e) {
       console.error('Failed to read file:', file.path, e);
       showNotification(t(settings.language, 'notifications_failedToReadFile', { name: file.name }), 'error');
     }
-  }, [readFile, addTab, setCurrentFilePath, setViewMode, updateTabContent, showNotification, fileContents]);
+  }, [readFile, addTab, setCurrentFilePath, setViewMode, updateTabContent, markAsSaved, showNotification, fileContents]);
 
   const handleCreateFile = useCallback(async (parentFolder?: FileNode, fileName?: string) => {
     const timestamp = Date.now();

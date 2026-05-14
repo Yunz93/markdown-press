@@ -2,7 +2,7 @@ import { renderMarkdown } from '../markdown';
 import { parseFrontmatter } from '../frontmatter';
 import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../fontSettings';
 import { getKatexRenderMode } from '../markdown-extensions';
-import { normalizeExportStrikethroughMode, type ExportOptions } from './types';
+import type { ExportOptions } from './types';
 import {
   buildExportStyles,
   buildExportDocument,
@@ -29,10 +29,7 @@ export async function exportToHtml(
     includeProperties = true,
     highlighter,
     markdownStylePreset = 'nord',
-    exportStrikethroughMode: exportStrikethroughModeOpt,
   } = options;
-
-  const exportStrikethroughMode = normalizeExportStrikethroughMode(exportStrikethroughModeOpt);
 
   const { frontmatter, body } = parseFrontmatter(content);
   const htmlContent = renderMarkdown(body, { highlighter, markdownStylePreset, themeMode: theme });
@@ -51,7 +48,6 @@ export async function exportToHtml(
     resolvedCodeFontFamily,
     codeFontSize,
     markdownStylePreset,
-    exportStrikethroughMode,
   );
   const propertiesHtml = includeProperties ? renderProperties(frontmatter) : '';
   const documentMarkup = buildExportDocument(

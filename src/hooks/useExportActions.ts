@@ -148,7 +148,6 @@ export function useExportActions(
         includeProperties: false,
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
-        exportStrikethroughMode: settings.exportStrikethroughMode,
       });
       const savedPath = await exportToPdf(htmlContent, activeFile.name, activeFile.path, {
         files,
@@ -167,7 +166,7 @@ export function useExportActions(
       console.error('Failed to export PDF:', error);
       showNotification(t(settings.language, 'notifications_exportPdfFailed'), 'error');
     }
-  }, [activeTabId, content, files, rootFolderPath, previewFontFamily, codeFontFamily, highlighter, settings.exportStrikethroughMode, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
+  }, [activeTabId, content, files, rootFolderPath, previewFontFamily, codeFontFamily, highlighter, settings.fontSize, settings.markdownStylePreset, settings.themeMode, showNotification]);
 
   const buildLongImageSharePayload = useCallback(async (): Promise<LongImageSharePayload | null> => {
     if (!activeTabId || !content) {
@@ -193,7 +192,6 @@ export function useExportActions(
       includeProperties: false,
       highlighter,
       markdownStylePreset: settings.markdownStylePreset,
-      exportStrikethroughMode: settings.exportStrikethroughMode,
     });
 
     return {
@@ -208,7 +206,6 @@ export function useExportActions(
     files,
     highlighter,
     previewFontFamily,
-    settings.exportStrikethroughMode,
     settings.fontSize,
     settings.language,
     settings.markdownStylePreset,

@@ -13,7 +13,6 @@ import {
   DEFAULT_UI_FONT_FAMILY,
 } from '../utils/fontSettings';
 import { DEFAULT_MARKDOWN_STYLE_PRESET, normalizeMarkdownStylePreset } from '../utils/markdownStyle';
-import { normalizeExportStrikethroughMode } from '../utils/export/types';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
 import { normalizeWikiFolder } from '../utils/wikiGeneration';
 import { normalizeTrashFolder } from '../utils/trashFolder';
@@ -96,7 +95,6 @@ export const defaultSettings: AppSettings = {
   attachmentPasteFormat: 'obsidian',
   orderedListMode: 'strict',
   markdownStylePreset: DEFAULT_MARKDOWN_STYLE_PRESET,
-  exportStrikethroughMode: 'preview-native',
   blogRepoUrl: '',
   blogSiteUrl: '',
   blogGithubToken: '',
@@ -186,7 +184,6 @@ export function createUISlice(
         language: normalizeLanguage(settings.language),
         themeMode: normalizeThemeMode(settings.themeMode),
         markdownStylePreset: normalizeMarkdownStylePreset(settings.markdownStylePreset),
-        exportStrikethroughMode: normalizeExportStrikethroughMode(settings.exportStrikethroughMode),
         wikiFolder: normalizeWikiFolder(settings.wikiFolder),
         trashFolder: normalizeTrashFolder(settings.trashFolder),
       }
@@ -201,9 +198,6 @@ export function createUISlice(
           language: normalizeLanguage(updates.language ?? state.settings.language),
           themeMode: normalizeThemeMode(updates.themeMode ?? state.settings.themeMode),
           markdownStylePreset: normalizeMarkdownStylePreset(updates.markdownStylePreset ?? state.settings.markdownStylePreset),
-          exportStrikethroughMode: normalizeExportStrikethroughMode(
-            updates.exportStrikethroughMode ?? state.settings.exportStrikethroughMode,
-          ),
           wikiFolder: normalizeWikiFolder(updates.wikiFolder ?? state.settings.wikiFolder),
           trashFolder: normalizeTrashFolder(updates.trashFolder ?? state.settings.trashFolder),
         }

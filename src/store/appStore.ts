@@ -21,7 +21,6 @@ import { normalizeMetadataFields } from '../utils/metadataFields';
 import { normalizeTrashFolder } from '../utils/trashFolder';
 import { normalizeWikiFolder } from '../utils/wikiGeneration';
 import { normalizeMarkdownStylePreset } from '../utils/markdownStyle';
-import { normalizeExportStrikethroughMode } from '../utils/export/types';
 import { normalizeShortcutConfigForPlatform } from '../utils/shortcuts';
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
@@ -47,6 +46,7 @@ export interface AppState extends
   UIActions {}
 
 const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey'] as const;
+const REMOVED_SETTING_KEYS = ['exportStrikethroughMode'] as const;
 
 function clampPersistedNumber(value: unknown, min: number, max: number, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
@@ -72,20 +72,16 @@ function resolveFirstValidString(settings: Record<string, unknown>, keys: string
   return '';
 }
 
-function stripSensitiveSettings(settings: Record<string, unknown>): Record<string, unknown> {
+export function stripNonRuntimeSettings(settings: Record<string, unknown>): Record<string, unknown> {
   const sanitized = { ...settings };
-  SENSITIVE_SETTING_KEYS.forEach((key) => {
+  [...SENSITIVE_SETTING_KEYS, ...REMOVED_SETTING_KEYS].forEach((key) => {
     delete sanitized[key];
   });
   return sanitized;
 }
 
 function sanitizeSettingsForPersistence(settings: AppSettings): AppSettings {
-  const sanitized = { ...settings };
-  SENSITIVE_SETTING_KEYS.forEach((key) => {
-    delete sanitized[key];
-  });
-  return sanitized;
+  return stripNonRuntimeSettings(settings as unknown as Record<string, unknown>) as unknown as AppSettings;
 }
 
 function resolvePersistedBlogRepoUrl(persistedSettings: Record<string, unknown>): string {
@@ -276,7 +272,7 @@ export const useAppStore = create<AppState>()(
       name: 'markdown-press-settings',
       partialize: (state) => ({ settings: sanitizeSettingsForPersistence((state as any).settings) }),
       merge: (persistedState, currentState) => {
-        const persistedSettings = stripSensitiveSettings((persistedState as any)?.settings ?? {});
+        const persistedSettings = stripNonRuntimeSettings((persistedState as any)?.settings ?? {});
         const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
         const resolvedLocalizedPrompts = resolveLocalizedPrompts(persistedSettings);
         const legacyContentFontFamily = resolveFirstValidString(
@@ -314,7 +310,6 @@ export const useAppStore = create<AppState>()(
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
           themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
           markdownStylePreset: normalizeMarkdownStylePreset(persistedSettings.markdownStylePreset),
-          exportStrikethroughMode: normalizeExportStrikethroughMode(persistedSettings.exportStrikethroughMode),
           wikiFolder: normalizeWikiFolder(
             typeof persistedSettings.wikiFolder === 'string'
               ? persistedSettings.wikiFolder

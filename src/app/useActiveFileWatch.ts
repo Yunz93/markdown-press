@@ -74,6 +74,7 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
           if (currentCached === latestContent) return;
 
           useAppStore.getState().updateTabContent(activeTabId, latestContent);
+          useAppStore.getState().markAsSaved(activeTabId);
           showNotification(t('notifications_fileReloaded'), 'success');
         } catch (error) {
           console.error('Failed to reload file from disk:', error);

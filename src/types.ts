@@ -152,9 +152,6 @@ export interface ImageHostingConfig {
   custom: ImageHostingCustomConfig;
 }
 
-/** Strikethrough in exported HTML / PDF / long-image PNG (html2canvas rasterization). */
-export type ExportStrikethroughMode = 'raster-safe' | 'preview-native';
-
 export interface AppSettings {
   language: AppLanguage;
   aiProvider: AIProvider;
@@ -172,8 +169,6 @@ export interface AppSettings {
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
   markdownStylePreset: MarkdownStylePreset;
-  /** `raster-safe`: background-line workaround for flaky html2canvas line-through. `preview-native`: matches preview `text-decoration: line-through`. */
-  exportStrikethroughMode: ExportStrikethroughMode;
   blogRepoUrl: string;
   blogSiteUrl: string;
   blogGithubToken?: string;

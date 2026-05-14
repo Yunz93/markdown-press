@@ -8,7 +8,7 @@ import {
   getBundledPresetDataUrlOverrides,
 } from '../fontSettings';
 import { getMarkdownStyleCssVariables, getMarkdownStyleTokens, normalizeMarkdownStylePreset } from '../markdownStyle';
-import type { ExportStrikethroughMode, MarkdownStylePreset } from '../../types';
+import type { MarkdownStylePreset } from '../../types';
 
 export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promise<string> {
   if (!fontSettings) {
@@ -50,7 +50,6 @@ export function buildExportStyles(
   codeFontFamily?: string,
   codeFontSize?: number,
   markdownStylePreset: MarkdownStylePreset = 'nord',
-  exportStrikethroughMode: ExportStrikethroughMode = 'preview-native',
 ): string {
   const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
   const resolvedFontSize = fontSize ?? 16;
@@ -62,24 +61,10 @@ export function buildExportStyles(
     .map(([name, value]) => `      ${name}: ${value};`)
     .join('\n');
 
-  const exportDelStrikeBlock =
-    exportStrikethroughMode === 'preview-native'
-      ? `    .export-document .markdown-body del,
+  const exportDelStrikeBlock = `    .export-document .markdown-body del,
     .export-document .markdown-body s {
       color: var(--mp-doc-del);
       text-decoration: line-through;
-    }
-`
-      : `    .export-document .markdown-body del,
-    .export-document .markdown-body s {
-      color: var(--mp-doc-del);
-      text-decoration: none;
-      background-image: linear-gradient(currentColor, currentColor);
-      background-repeat: no-repeat;
-      background-position: 0 66%;
-      background-size: 100% 0.07em;
-      -webkit-box-decoration-break: clone;
-      box-decoration-break: clone;
     }
 `;
 

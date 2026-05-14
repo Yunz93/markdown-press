@@ -1,10 +1,6 @@
 import type { FontSettings } from '../fontSettings';
 import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
-import type { ExportStrikethroughMode, MarkdownStylePreset } from '../../types';
-
-export function normalizeExportStrikethroughMode(mode: unknown): ExportStrikethroughMode {
-  return mode === 'raster-safe' ? 'raster-safe' : 'preview-native';
-}
+import type { MarkdownStylePreset } from '../../types';
 
 export interface ExportOptions {
   title?: string;
@@ -18,8 +14,6 @@ export interface ExportOptions {
   includeProperties?: boolean;
   highlighter?: ShikiHighlighter | null;
   markdownStylePreset?: MarkdownStylePreset;
-  /** Defaults to `preview-native` when omitted (see `exportToHtml`). */
-  exportStrikethroughMode?: ExportStrikethroughMode;
 }
 
 export interface SaveExportOptions {

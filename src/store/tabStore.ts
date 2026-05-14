@@ -57,6 +57,9 @@ export function createTabSlice(
         fileContents: content !== undefined
           ? { ...state.fileContents, [fileId]: content }
           : state.fileContents,
+        lastSavedContent: content !== undefined
+          ? { ...state.lastSavedContent, [fileId]: content }
+          : state.lastSavedContent,
       };
     }),
 

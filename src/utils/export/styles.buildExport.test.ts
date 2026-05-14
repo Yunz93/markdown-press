@@ -19,14 +19,7 @@ describe('buildExportStyles', () => {
     expect(css).toMatch(/\.export-document \.markdown-body li > p\s*\{[^}]*margin-top:\s*0\.15em/m);
   });
 
-  it('draws del and s with a background line in raster-safe export mode', () => {
-    const css = buildExportStyles('light', undefined, undefined, '', undefined, undefined, 'nord', 'raster-safe');
-    expect(css).toMatch(/\.export-document \.markdown-body del\s*,\s*\.export-document \.markdown-body s\s*\{[^}]*text-decoration:\s*none/m);
-    expect(css).toMatch(/\.export-document \.markdown-body del\s*,\s*\.export-document \.markdown-body s\s*\{[^}]*background-image:\s*linear-gradient\(currentColor,\s*currentColor\)/m);
-    expect(css).toMatch(/\.export-document \.markdown-body del\s*,\s*\.export-document \.markdown-body s\s*\{[^}]*background-position:\s*0 66%/m);
-  });
-
-  it('draws del and s with native line-through in preview-native export mode (default)', () => {
+  it('draws del and s with native line-through like preview', () => {
     const css = buildExportStyles('light');
     expect(css).toMatch(/\.export-document \.markdown-body del\s*,\s*\.export-document \.markdown-body s\s*\{[^}]*text-decoration:\s*line-through/m);
     const delBlock = css.match(/\.export-document \.markdown-body del\s*,\s*\.export-document \.markdown-body s\s*\{[^}]*\}/);
