@@ -58,10 +58,32 @@ describe('createHandleSmartTab selection', () => {
     expect(threeDigitParent.doc.toString()).toBe('100. parent\n     1. child');
   });
 
+  it('uses the decimal parent marker style when indenting a stale alphabetic empty item', () => {
+    const doc = '1. 服务化\na. \n3. 可靠性';
+    const cursorAfterMarker = '1. 服务化\na. '.length;
+    const next = applyCommand(tab, doc, cursorAfterMarker, cursorAfterMarker);
+
+    expect(next.doc.toString()).toBe('1. 服务化\n    1. \n2. 可靠性');
+  });
+
   it('renumbers ordered siblings in the same tab command', () => {
     const next = applyCommand(tab, '1. one\n2. two\n3. three', 7, 7);
 
     expect(next.doc.toString()).toBe('1. one\n    1. two\n2. three');
+  });
+
+  it('indents mixed selections line by line instead of nesting later list items', () => {
+    const next = applyCommand(tab, '- A\nB\n- C', 0, 9);
+    expect(next.doc.toString()).toBe('    - A\n    B\n    - C');
+  });
+
+  it('after a nested ordered item, Tab nests a top-level sibling under the nearest shallower item', () => {
+    const doc = '1. 基础：算力付费；\n2. 进阶：可靠性保障 SLA 付费；\n   1. 测试\n3. ';
+    const pos = doc.length;
+    const next = applyCommand(tab, doc, pos, pos);
+    expect(next.doc.toString().split('\n').pop()).toBe('    1. ');
+    // 误把「上一行」子列表当父级时会出现 7 格缩进
+    expect(next.doc.toString()).not.toMatch(/\n {7}1\. /);
   });
 });
 
@@ -76,6 +98,27 @@ describe('createHandleSmartShiftTab selection', () => {
     expect(afterMarker.doc.toString()).toBe('1. item');
     expect(beforeMarker.selection.main.from).toBe(3);
     expect(afterMarker.selection.main.from).toBe(3);
+  });
+
+  it('removes the marker from level-0 list items', () => {
+    expect(applyCommand(shiftTab, '- item', 2, 2).doc.toString()).toBe('item');
+    expect(applyCommand(shiftTab, '1. item', 3, 3).doc.toString()).toBe('item');
+    expect(applyCommand(shiftTab, '- [ ] item', 6, 6).doc.toString()).toBe('item');
+  });
+
+  it('outdents mixed selections line by line and unlists level-0 items', () => {
+    const next = applyCommand(shiftTab, '- A\nB\n- C', 0, 9);
+    expect(next.doc.toString()).toBe('A\nB\nC');
+  });
+
+  it('keeps loose Shift-Tab numbering aligned with Enter when outdenting an empty ordered child', () => {
+    const looseShiftTab = createHandleSmartShiftTab('loose');
+    const doc = '1. 前项\n2. 数据的安全性；\n    1. 专属算力模式；\n    2. ';
+    const next = applyCommand(looseShiftTab, doc, doc.length, doc.length);
+    const enterNext = applyCommand(handleSmartEnter, doc, doc.length, doc.length);
+
+    expect(next.doc.toString()).toBe('1. 前项\n2. 数据的安全性；\n    1. 专属算力模式；\n3. ');
+    expect(next.doc.toString()).toBe(enterNext.doc.toString());
   });
 });
 

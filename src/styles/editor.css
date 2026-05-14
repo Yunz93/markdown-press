@@ -1,4 +1,6 @@
 .editor-pane-layout {
+  /* 列表软换行悬挂：前缀按字符数 × 本系数 × 1em（中文字体下 1ch 常过宽，故不用 ch） */
+  --mp-editor-list-hang-em-per-char: 0.47;
   --pane-backdrop-px: 28px;
   --pane-backdrop-py: 30px;
   --pane-frame-max-width: 1240px;
@@ -108,7 +110,10 @@
 .editor-pane-layout .cm-line {
   display: block;
   position: relative;
-  padding: 0 !important;
+  /* 勿对 padding-left 使用 !important，否则列表悬挂缩进（内联 padding-left）无法生效 */
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-right: 0 !important;
   color: inherit;
 }
 

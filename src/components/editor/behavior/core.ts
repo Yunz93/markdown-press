@@ -21,6 +21,29 @@ export const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
 export const HEADING_REGEX = /^([ \t]*)(#{1,6})( +)(.*)$/;
 export const EMPTY_LINE_REGEX = /^[ \t]*$/;
 
+/**
+ * 列表行正文起点之前的字符数（用于软换行悬挂缩进，配合 padding-left + 负 text-indent）。
+ * 非列表、或无法解析时返回 null。Tab 计为 1 字符；悬挂缩进在编辑器侧按字符数 × em 系数换算。
+ */
+export function getMarkdownListHangPrefixCharCount(lineText: string): number | null {
+  const task = lineText.match(TASK_LIST_REGEX);
+  if (task) {
+    const rest = task[4] ?? '';
+    return Math.max(0, lineText.length - rest.length);
+  }
+  const ordered = lineText.match(ORDERED_LIST_REGEX);
+  if (ordered) {
+    const rest = ordered[4] ?? '';
+    return Math.max(0, lineText.length - rest.length);
+  }
+  const unordered = lineText.match(UNORDERED_LIST_REGEX);
+  if (unordered) {
+    const rest = unordered[3] ?? '';
+    return Math.max(0, lineText.length - rest.length);
+  }
+  return null;
+}
+
 // ==================== 缩进单位工具 ====================
 
 /**

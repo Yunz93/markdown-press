@@ -81,25 +81,40 @@ function getChildIndentForParent(parent: ListItemInfo): string {
   return getIndentByColumn(parentWidth + Math.max(LIST_INDENT_UNIT.length, markerContentOffset));
 }
 
-function withIndent(item: ListItemInfo, indent: string): ListItemInfo {
+function withIndent(
+  item: ListItemInfo,
+  indent: string,
+  options?: { markerStyle?: ListItemInfo['markerStyle'] },
+): ListItemInfo {
   return {
     ...item,
     level: getLevelFromIndent(indent),
     indent,
     number: item.type === 'ordered' ? 1 : item.number,
+    markerStyle: item.type === 'ordered' ? options?.markerStyle ?? item.markerStyle : item.markerStyle,
   };
 }
 
+/**
+ * 查找用于 Tab 缩进嵌套的「上一项」父级。
+ * 必须跳过比当前行更深的列表行（否则顶格续行会误挂到上一项的子列表下）。
+ */
 function findPreviousListItem(
   state: EditorState,
   lineNumber: number,
   quotePrefix: string,
-  overrides?: Map<number, ListItemInfo>,
+  overrides: Map<number, ListItemInfo> | undefined,
+  currentIndentColumnWidth: number,
 ): ListItemInfo | null {
   for (let current = lineNumber - 1; current >= 1; current -= 1) {
     const overridden = overrides?.get(current);
     if (overridden) {
-      if ((overridden.quotePrefix ?? '') === quotePrefix) return overridden;
+      if ((overridden.quotePrefix ?? '') === quotePrefix) {
+        if (getIndentColumnWidth(overridden.indent) > currentIndentColumnWidth) {
+          continue;
+        }
+        return overridden;
+      }
       continue;
     }
 
@@ -108,6 +123,9 @@ function findPreviousListItem(
 
     const item = parseListItem(line.text, current, line.from);
     if (item && (item.quotePrefix ?? '') === quotePrefix) {
+      if (getIndentColumnWidth(item.indent) > currentIndentColumnWidth) {
+        continue;
+      }
       return item;
     }
   }
@@ -131,6 +149,36 @@ function findOutdentIndent(state: EditorState, item: ListItemInfo): string {
   }
 
   return '';
+}
+
+function getOutdentedOrderedItem(state: EditorState, item: ListItemInfo, indent: string): ListItemInfo {
+  if (item.type !== 'ordered') {
+    return withIndent(item, indent);
+  }
+
+  const targetWidth = getIndentColumnWidth(indent);
+  for (let current = item.lineNumber - 1; current >= 1; current -= 1) {
+    const line = state.doc.line(current);
+    if (isBlankLine(line.text)) break;
+
+    const candidate = parseListItem(line.text, current, line.from);
+    if (!candidate || (candidate.quotePrefix ?? '') !== (item.quotePrefix ?? '')) continue;
+
+    const candidateWidth = getIndentColumnWidth(candidate.indent);
+    if (candidateWidth < targetWidth) {
+      break;
+    }
+
+    if (candidate.type === 'ordered' && candidateWidth === targetWidth) {
+      return {
+        ...withIndent(item, indent, { markerStyle: candidate.markerStyle ?? 'decimal' }),
+        number: (candidate.number ?? 0) + 1,
+        delimiter: candidate.delimiter ?? item.delimiter,
+      };
+    }
+  }
+
+  return withIndent(item, indent);
 }
 
 function mapListCursorColumn(
@@ -215,6 +263,32 @@ function dispatchListItemLevelChanges(
   return true;
 }
 
+function indentSelectedLine(lineText: string): string {
+  return `${LIST_INDENT_UNIT}${lineText}`;
+}
+
+function outdentSelectedLine(state: EditorState, lineText: string, lineNumber: number): string {
+  const item = parseListItem(lineText, lineNumber, 0);
+  if (item) {
+    if (getIndentColumnWidth(item.indent) === 0) {
+      return `${item.quotePrefix ?? ''}${item.content}`;
+    }
+
+    const newItem = getOutdentedOrderedItem(state, item, findOutdentIndent(state, item));
+    return formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+  }
+
+  const indent = getLeadingIndent(lineText);
+  if (indent.length === 0) return lineText;
+
+  // 删除最多一个缩进单位或一个 tab
+  if (indent.startsWith('\t')) {
+    return lineText.slice(1);
+  }
+  const toRemove = Math.min(LIST_INDENT_SIZE, indent.match(/^ */)?.[0].length ?? 0);
+  return lineText.slice(toRemove);
+}
+
 // ==================== Enter 处理 ====================
 
 export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
@@ -228,7 +302,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
   if (isEmptyListItem(item) && main.from === line.to) {
     // 移除 marker，回退一级或转为普通行
     if (getIndentColumnWidth(item.indent) > 0) {
-      const newItem = withIndent(item, findOutdentIndent(state, item));
+      const newItem = getOutdentedOrderedItem(state, item, findOutdentIndent(state, item));
       newItem.content = '';
       const next = formatListItem(newItem);
       const selectionColumn = getListContentStartColumn(newItem);
@@ -389,6 +463,10 @@ export const handleListBackspace: StateCommand = ({ state, dispatch }): boolean 
 export const handleListTab = (options?: { strictMode?: boolean }): StateCommand => {
   return ({ state, dispatch }): boolean => {
     const hasSelection = state.selection.ranges.some(r => !r.empty);
+    if (hasSelection) {
+      return updateSelectedLinesWithSelectionMap(state, dispatch, indentSelectedLine);
+    }
+
     const items = getSelectedListItems(state);
 
     // 有列表项被选中
@@ -397,11 +475,19 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
       const plannedItems = new Map<number, ListItemInfo>();
 
       for (const item of items) {
-        const parent = findPreviousListItem(state, item.lineNumber, item.quotePrefix ?? '', plannedItems);
+        const parent = findPreviousListItem(
+          state,
+          item.lineNumber,
+          item.quotePrefix ?? '',
+          plannedItems,
+          getIndentColumnWidth(item.indent),
+        );
         const nextIndent = parent
           ? getChildIndentForParent(parent)
           : `${item.indent}${LIST_INDENT_UNIT}`;
-        const newItem = withIndent(item, nextIndent);
+        const newItem = withIndent(item, nextIndent, {
+          markerStyle: parent?.type === 'ordered' ? parent.markerStyle ?? 'decimal' : undefined,
+        });
         // Ensure output uses spaces only, replace any tabs with the editor indent unit.
         const formatted = formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
         updates.push({ item, newItem, newText: formatted });
@@ -409,11 +495,6 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
       }
 
       return dispatchListItemLevelChanges(state, dispatch, updates, { strictMode: options?.strictMode });
-    }
-
-    // 普通文本：有选区时按行首缩进，避免整段替换为一段空格
-    if (hasSelection) {
-      return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText) => `${LIST_INDENT_UNIT}${lineText}`);
     }
 
     const changes = state.changeByRange(range => ({
@@ -428,6 +509,16 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
 
 export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCommand => {
   return ({ state, dispatch }): boolean => {
+    const hasSelection = state.selection.ranges.some(r => !r.empty);
+    if (hasSelection) {
+      return updateSelectedLinesWithSelectionMap(
+        state,
+        dispatch,
+        (lineText, { lineNumber }) => outdentSelectedLine(state, lineText, lineNumber),
+        options?.strictMode ? { normalizeOrderedNumbers: 'document' } : undefined,
+      );
+    }
+
     const items = getSelectedListItems(state);
 
     // 有列表项被选中
@@ -435,9 +526,16 @@ export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCom
       const updates: Array<{ item: ListItemInfo; newItem: ListItemInfo; newText: string }> = [];
 
       for (const item of items) {
-        if (getIndentColumnWidth(item.indent) === 0) continue; // 无法继续减少缩进
+        if (getIndentColumnWidth(item.indent) === 0) {
+          return replaceCurrentLine(
+            state,
+            dispatch,
+            `${item.quotePrefix ?? ''}${item.content}`,
+            item.quotePrefix?.length ?? 0,
+          );
+        }
 
-        const newItem = withIndent(item, findOutdentIndent(state, item));
+        const newItem = getOutdentedOrderedItem(state, item, findOutdentIndent(state, item));
         updates.push({
           item,
           newItem,
@@ -449,17 +547,11 @@ export const handleListShiftTab = (options?: { strictMode?: boolean }): StateCom
     }
 
     // 普通文本：删除缩进
-    return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText) => {
-      const indent = getLeadingIndent(lineText);
-      if (indent.length === 0) return lineText;
-
-      // 删除最多一个缩进单位或一个 tab
-      if (indent.startsWith('\t')) {
-        return lineText.slice(1);
-      }
-      const toRemove = Math.min(LIST_INDENT_SIZE, indent.match(/^ */)?.[0].length ?? 0);
-      return lineText.slice(toRemove);
-    });
+    return updateSelectedLinesWithSelectionMap(
+      state,
+      dispatch,
+      (lineText, { lineNumber }) => outdentSelectedLine(state, lineText, lineNumber),
+    );
   };
 };
 

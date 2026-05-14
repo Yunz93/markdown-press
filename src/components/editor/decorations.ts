@@ -17,6 +17,7 @@ import {
   UNORDERED_LIST_REGEX,
   ORDERED_LIST_REGEX,
 } from './behavior';
+import { isInsideFencedCode, isInsideFrontmatter, getMarkdownListHangPrefixCharCount } from './behavior/core';
 
 // ==================== 语法高亮样式 ====================
 
@@ -194,9 +195,28 @@ export const fencedCodeDecorations = ViewPlugin.fromClass(class {
 function buildMarkdownListDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const { doc } = view.state;
+  const state = view.state;
 
   for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber += 1) {
     const line = doc.line(lineNumber);
+    if (isInsideFencedCode(state, line.from) || isInsideFrontmatter(state, line.from)) {
+      continue;
+    }
+
+    const hangChars = getMarkdownListHangPrefixCharCount(line.text);
+    if (hangChars !== null && hangChars > 0) {
+      builder.add(
+        line.from,
+        line.from,
+        Decoration.line({
+          class: 'cm-markdown-list-line-hang',
+          attributes: {
+            style: `padding-left: calc(var(--mp-editor-list-hang-em-per-char, 0.47) * ${hangChars} * 1em); text-indent: calc(-1 * var(--mp-editor-list-hang-em-per-char, 0.47) * ${hangChars} * 1em)`,
+          },
+        }),
+      );
+    }
+
     const unorderedMatch = line.text.match(UNORDERED_LIST_REGEX);
     const orderedMatch = line.text.match(ORDERED_LIST_REGEX);
     const match = unorderedMatch ?? orderedMatch;
@@ -225,7 +245,7 @@ export const markdownListDecorations = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
-    if (update.docChanged) {
+    if (update.docChanged || syntaxTree(update.startState) !== syntaxTree(update.state)) {
       this.decorations = buildMarkdownListDecorations(update.view);
     }
   }

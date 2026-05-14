@@ -21,6 +21,7 @@ export {
   addIndentUnit,
   removeIndentUnit,
   isInsideFencedCode,
+  getMarkdownListHangPrefixCharCount,
   mapColumnAfterLineUpdate,
   getSelectedLineNumbers,
   updateSelectedLines,
