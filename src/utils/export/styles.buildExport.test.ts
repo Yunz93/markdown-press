@@ -14,6 +14,13 @@ describe('buildExportStyles', () => {
     expect(css).toMatch(/\.export-document \.markdown-body ol\s*\{[^}]*list-style:\s*decimal/m);
   });
 
+  it('gives nested lists enough padding-left so guide border does not overlap ol markers', () => {
+    const css = buildExportStyles('light');
+    expect(css).toMatch(
+      /\.export-document \.markdown-body li > ul\s*,\s*\.export-document \.markdown-body li > ol\s*\{[^}]*padding-left:\s*2rem/m,
+    );
+  });
+
   it('tightens li > p margins like preview (avoids misaligned html2canvas list markers)', () => {
     const css = buildExportStyles('light');
     expect(css).toMatch(/\.export-document \.markdown-body li > p\s*\{[^}]*margin-top:\s*0\.15em/m);

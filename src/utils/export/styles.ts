@@ -230,7 +230,8 @@ ${markdownStyleCssVariables}
       margin-top: 0.25rem;
       margin-bottom: 0.25rem;
       margin-left: 0.35rem;
-      padding-left: 1.35rem;
+      /* 与 preview.css 一致，避免 border-left 与有序列表序号重叠 */
+      padding-left: 2rem;
       border-left: 1px solid var(--mp-doc-border);
     }
 
