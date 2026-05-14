@@ -61,7 +61,7 @@ export interface AIWikiGenerationResult {
   citations: string[];
 }
 
-export type AIProvider = 'gemini' | 'codex';
+export type AIProvider = 'gemini' | 'codex' | 'deepseek';
 
 export interface ShortcutConfig {
   save: string;
@@ -179,6 +179,9 @@ export interface AppSettings {
   codexApiBaseUrl?: string;
   codexApiKey?: string;
   codexModel?: string;
+  deepseekApiBaseUrl?: string;
+  deepseekApiKey?: string;
+  deepseekModel?: string;
   aiSystemPrompt?: string;
   aiSystemPromptZh?: string;
   aiSystemPromptEn?: string;

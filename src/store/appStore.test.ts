@@ -5,7 +5,7 @@ import {
   DEFAULT_WIKI_PROMPT_TEMPLATE,
   DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
 } from '../services/aiPrompts';
-import { resolveLocalizedPrompts, stripNonRuntimeSettings, useAppStore } from './appStore';
+import { defaultSettings, resolveLocalizedPrompts, stripNonRuntimeSettings, useAppStore } from './appStore';
 
 afterEach(() => {
   useAppStore.setState({
@@ -17,6 +17,17 @@ afterEach(() => {
 });
 
 describe('stripNonRuntimeSettings', () => {
+  it('removes AI API keys from persisted settings', () => {
+    const settings = stripNonRuntimeSettings({
+      geminiApiKey: 'gemini-secret',
+      codexApiKey: 'openai-secret',
+      deepseekApiKey: 'deepseek-secret',
+      language: 'zh-CN',
+    });
+
+    expect(settings).toEqual({ language: 'zh-CN' });
+  });
+
   it('removes deleted export strikethrough setting from persisted settings', () => {
     const settings = stripNonRuntimeSettings({
       language: 'zh-CN',
@@ -24,6 +35,14 @@ describe('stripNonRuntimeSettings', () => {
     });
 
     expect(settings).toEqual({ language: 'zh-CN' });
+  });
+});
+
+describe('defaultSettings', () => {
+  it('uses DeepSeek as the default AI provider', () => {
+    expect(defaultSettings.aiProvider).toBe('deepseek');
+    expect(defaultSettings.deepseekApiBaseUrl).toBe('https://api.deepseek.com');
+    expect(defaultSettings.deepseekModel).toBe('deepseek-v4-flash');
   });
 });
 

@@ -45,7 +45,7 @@ export interface AppState extends
   EditorActions,
   UIActions {}
 
-const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey'] as const;
+const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey', 'deepseekApiKey'] as const;
 const REMOVED_SETTING_KEYS = ['exportStrikethroughMode'] as const;
 
 function clampPersistedNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -184,6 +184,10 @@ function looksLikeOpenAIModel(value: unknown): boolean {
   return typeof value === 'string' && /^(gpt-|o[1-9]\b|o[1-9]-|codex\b)/i.test(value.trim());
 }
 
+function looksLikeDeepSeekModel(value: unknown): boolean {
+  return typeof value === 'string' && /^deepseek(?:-|$)/i.test(value.trim());
+}
+
 function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) {
   const persistedProvider = typeof persistedSettings.aiProvider === 'string'
     ? persistedSettings.aiProvider
@@ -194,14 +198,29 @@ function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) 
   const persistedCodexModel = typeof persistedSettings.codexModel === 'string'
     ? persistedSettings.codexModel.trim()
     : '';
+  const persistedDeepSeekModel = typeof persistedSettings.deepseekModel === 'string'
+    ? persistedSettings.deepseekModel.trim()
+    : '';
 
-  if (persistedProvider === 'codex' || persistedProvider === 'gemini') {
+  if (persistedProvider === 'codex' || persistedProvider === 'gemini' || persistedProvider === 'deepseek') {
     return {
       aiProvider: persistedProvider,
       codexModel: persistedCodexModel || (persistedProvider === 'codex' && looksLikeOpenAIModel(persistedGeminiModel)
         ? persistedGeminiModel
         : defaultSettings.codexModel),
       geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
+      deepseekModel: persistedDeepSeekModel || (persistedProvider === 'deepseek' && looksLikeDeepSeekModel(persistedGeminiModel)
+        ? persistedGeminiModel
+        : defaultSettings.deepseekModel),
+    };
+  }
+
+  if (!persistedDeepSeekModel && looksLikeDeepSeekModel(persistedGeminiModel)) {
+    return {
+      aiProvider: 'deepseek',
+      codexModel: persistedCodexModel || defaultSettings.codexModel,
+      geminiModel: defaultSettings.geminiModel,
+      deepseekModel: persistedGeminiModel || defaultSettings.deepseekModel,
     };
   }
 
@@ -210,13 +229,15 @@ function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) 
       aiProvider: 'codex',
       codexModel: persistedCodexModel || persistedGeminiModel || defaultSettings.codexModel,
       geminiModel: looksLikeGeminiModel(persistedGeminiModel) ? persistedGeminiModel : defaultSettings.geminiModel,
+      deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
     };
   }
 
   return {
-    aiProvider: 'gemini',
+    aiProvider: 'deepseek',
     codexModel: persistedCodexModel || defaultSettings.codexModel,
     geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
+    deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
   };
 }
 

@@ -14,6 +14,7 @@ const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
 const SECRET_KEY_WECHAT_APP_SECRET: &str = "wechatAppSecret";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
 const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
+const SECRET_KEY_DEEPSEEK_API_KEY: &str = "deepseekApiKey";
 const SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN: &str = "imageHostingGithubToken";
 const SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY: &str = "imageHostingS3SecretAccessKey";
 const SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET: &str = "imageHostingOssAccessKeySecret";
@@ -26,6 +27,7 @@ pub(crate) struct SecureSettingsResult {
     wechat_app_secret: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
+    deepseek_api_key: Option<String>,
     image_hosting_github_token: Option<String>,
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
@@ -39,6 +41,7 @@ struct SecureSettingsFile {
     wechat_app_secret: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
+    deepseek_api_key: Option<String>,
     image_hosting_github_token: Option<String>,
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
@@ -258,6 +261,7 @@ fn write_secure_settings_file(
         || settings.wechat_app_secret.is_some()
         || settings.gemini_api_key.is_some()
         || settings.codex_api_key.is_some()
+        || settings.deepseek_api_key.is_some()
         || settings.image_hosting_github_token.is_some()
         || settings.image_hosting_s3_secret_access_key.is_some()
         || settings.image_hosting_oss_access_key_secret.is_some()
@@ -308,6 +312,7 @@ fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String
         SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
+        SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key,
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token,
         SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
             settings.image_hosting_s3_secret_access_key
@@ -333,6 +338,7 @@ fn write_secure_secret(
         SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret = normalized,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
+        SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key = normalized,
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token = normalized,
         SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
             settings.image_hosting_s3_secret_access_key = normalized
@@ -355,6 +361,7 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
         SECRET_KEY_WECHAT_APP_SECRET => Some(SECRET_KEY_WECHAT_APP_SECRET),
         SECRET_KEY_GEMINI_API_KEY => Some(SECRET_KEY_GEMINI_API_KEY),
         SECRET_KEY_CODEX_API_KEY => Some(SECRET_KEY_CODEX_API_KEY),
+        SECRET_KEY_DEEPSEEK_API_KEY => Some(SECRET_KEY_DEEPSEEK_API_KEY),
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => Some(SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN),
         SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
             Some(SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY)
@@ -376,6 +383,7 @@ pub(crate) fn get_secure_settings(app: tauri::AppHandle) -> Result<SecureSetting
         wechat_app_secret: read_secure_secret(&app, SECRET_KEY_WECHAT_APP_SECRET)?,
         gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
         codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
+        deepseek_api_key: read_secure_secret(&app, SECRET_KEY_DEEPSEEK_API_KEY)?,
         image_hosting_github_token: read_secure_secret(
             &app,
             SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN,

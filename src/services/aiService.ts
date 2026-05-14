@@ -1,6 +1,7 @@
 import type { AIAnalysisResult, AIWikiGenerationResult, AppSettings } from '../types';
 import { analyzeContent, generateGeminiWikiArticle } from './geminiService';
 import { analyzeContentWithCodex, generateCodexWikiArticle } from './codexService';
+import { analyzeContentWithDeepSeek, generateDeepSeekWikiArticle } from './deepseekService';
 import { resolveAISystemPrompt, resolveWikiPromptTemplate } from './aiPrompts';
 
 function looksLikeGeminiModel(modelName: string): boolean {
@@ -9,6 +10,10 @@ function looksLikeGeminiModel(modelName: string): boolean {
 
 function looksLikeCodexModel(modelName: string): boolean {
   return /^(gpt-|o[1-9]\b|o[1-9]-|codex\b|computer-use\b)/i.test(modelName.trim());
+}
+
+function looksLikeDeepSeekModel(modelName: string): boolean {
+  return /^deepseek(?:-|$)/i.test(modelName.trim());
 }
 
 export function buildWikiPrompt(
@@ -75,6 +80,16 @@ export function ensureAIConfiguration(settings: AppSettings): { ok: true } {
     return { ok: true };
   }
 
+  if (settings.aiProvider === 'deepseek') {
+    if (!settings.deepseekApiKey?.trim()) {
+      throw new Error('Please configure DeepSeek API Key in settings.');
+    }
+    if (settings.deepseekModel?.trim() && !looksLikeDeepSeekModel(settings.deepseekModel)) {
+      throw new Error('当前选择的是 DeepSeek provider，但模型名看起来不是 DeepSeek 模型。请从列表重新选择。');
+    }
+    return { ok: true };
+  }
+
   if (!settings.geminiApiKey?.trim()) {
     throw new Error('Please configure Gemini API Key in settings.');
   }
@@ -91,6 +106,10 @@ export async function analyzeMarkdownWithProvider(
 ): Promise<AIAnalysisResult> {
   if (settings.aiProvider === 'codex') {
     return analyzeContentWithCodex(content, settings);
+  }
+
+  if (settings.aiProvider === 'deepseek') {
+    return analyzeContentWithDeepSeek(content, settings);
   }
 
   return analyzeContent(
@@ -126,6 +145,10 @@ export async function generateWikiFromSelectionWithProvider(
 
   if (settings.aiProvider === 'codex') {
     return generateCodexWikiArticle(prompt, settings);
+  }
+
+  if (settings.aiProvider === 'deepseek') {
+    return generateDeepSeekWikiArticle(prompt, settings);
   }
 
   return generateGeminiWikiArticle(

@@ -38,6 +38,10 @@ function looksLikeUsefulOpenAIModel(modelId: string): boolean {
   return /^(gpt-|o[1-9]\b|o[1-9]-|codex\b|computer-use\b)/i.test(modelId);
 }
 
+function looksLikeUsefulDeepSeekModel(modelId: string): boolean {
+  return /^deepseek(?:-|$)/i.test(modelId);
+}
+
 function stripGeminiModelPrefix(name: string): string {
   return name.replace(/^models\//i, '').trim();
 }
@@ -99,11 +103,46 @@ async function fetchGeminiModels(settings: AppSettings): Promise<ModelOption[]> 
   );
 }
 
+async function fetchDeepSeekModels(settings: AppSettings): Promise<ModelOption[]> {
+  const apiKey = settings.deepseekApiKey?.trim();
+  if (!apiKey) {
+    throw new Error('请先配置 DeepSeek API Key，再加载模型列表。');
+  }
+
+  const baseUrl = (settings.deepseekApiBaseUrl?.trim() || 'https://api.deepseek.com').replace(/\/+$/, '');
+  const response = await fetch(`${baseUrl}/models`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  const payload = await response.json() as OpenAIModelListResponse & {
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || `加载 DeepSeek 模型列表失败（${response.status}）。`);
+  }
+
+  return dedupeAndSortModels(
+    (payload.data || [])
+      .map((model) => model.id?.trim() || '')
+      .filter(looksLikeUsefulDeepSeekModel)
+      .map((id) => ({ id, label: id }))
+  );
+}
+
 export async function fetchAvailableModels(
   provider: AIProvider,
   settings: AppSettings
 ): Promise<ModelOption[]> {
-  return provider === 'codex'
-    ? fetchOpenAIModels(settings)
-    : fetchGeminiModels(settings);
+  if (provider === 'codex') {
+    return fetchOpenAIModels(settings);
+  }
+
+  if (provider === 'deepseek') {
+    return fetchDeepSeekModels(settings);
+  }
+
+  return fetchGeminiModels(settings);
 }

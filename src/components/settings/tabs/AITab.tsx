@@ -29,17 +29,26 @@ export const AITab: React.FC<SettingsTabProps> = ({
   const { handleSecureSettingChange, renderSecureSaveState } = useSecureSettings(onUpdateSettings);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
-  const [availableModels, setAvailableModels] = useState<Record<'gemini' | 'codex', ModelOption[]>>({
+  const [showDeepSeekApiKey, setShowDeepSeekApiKey] = useState(false);
+  const [availableModels, setAvailableModels] = useState<Record<AppSettings['aiProvider'], ModelOption[]>>({
     gemini: [],
     codex: [],
+    deepseek: [],
   });
-  const [isLoadingModels, setIsLoadingModels] = useState<Record<'gemini' | 'codex', boolean>>({
+  const [isLoadingModels, setIsLoadingModels] = useState<Record<AppSettings['aiProvider'], boolean>>({
     gemini: false,
     codex: false,
+    deepseek: false,
   });
   const [modelLoadMessage, setModelLoadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const loadModels = async (provider: 'gemini' | 'codex') => {
+  const getProviderLabel = (provider: AppSettings['aiProvider']) => {
+    if (provider === 'gemini') return 'Gemini ';
+    if (provider === 'codex') return 'OpenAI ';
+    return 'DeepSeek ';
+  };
+
+  const loadModels = async (provider: AppSettings['aiProvider']) => {
     try {
       setModelLoadMessage(null);
       setIsLoadingModels((prev) => ({ ...prev, [provider]: true }));
@@ -50,7 +59,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
       setModelLoadMessage({
         type: 'success',
         text: models.length > 0
-          ? t('settings_modelsLoaded', { count: models.length, provider: provider === 'gemini' ? 'Gemini ' : 'OpenAI ' })
+          ? t('settings_modelsLoaded', { count: models.length, provider: getProviderLabel(provider) })
           : t('settings_noAvailableModels'),
       });
     } catch (error) {
@@ -90,6 +99,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
               className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
             >
               <option value="gemini">Gemini</option>
+              <option value="deepseek">DeepSeek</option>
               <option value="codex">OpenAI</option>
             </select>
           </div>
@@ -155,6 +165,68 @@ export const AITab: React.FC<SettingsTabProps> = ({
                     })}
                 </select>
                 <p className="text-[10px] text-gray-400">{t('settings_pickGeminiModel')}</p>
+              </div>
+            </>
+          )}
+
+          {settings.aiProvider === 'deepseek' && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_deepseekBaseUrl')}</label>
+                <input
+                  type="text"
+                  value={settings.deepseekApiBaseUrl || 'https://api.deepseek.com'}
+                  onChange={(e) => onUpdateSettings({ deepseekApiBaseUrl: e.target.value })}
+                  placeholder={t('settings_deepseekBaseUrlExample')}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_deepseekModel')}</label>
+                  <button
+                    type="button"
+                    onClick={() => { void loadModels('deepseek'); }}
+                    disabled={isLoadingModels.deepseek}
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 disabled:opacity-60"
+                  >
+                    {isLoadingModels.deepseek ? t('settings_loadingModels') : t('settings_loadModelList')}
+                  </button>
+                </div>
+                <select
+                  value={settings.deepseekModel || 'deepseek-v4-flash'}
+                  onChange={(e) => onUpdateSettings({ deepseekModel: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                >
+                  {[settings.deepseekModel || 'deepseek-v4-flash', ...availableModels.deepseek.map((model) => model.id)]
+                    .filter((value, index, array) => value && array.indexOf(value) === index)
+                    .map((modelId) => {
+                      const option = availableModels.deepseek.find((item) => item.id === modelId);
+                      return <option key={modelId} value={modelId}>{option?.label || modelId}</option>;
+                    })}
+                </select>
+                <p className="text-[10px] text-gray-400">{t('settings_pickDeepSeekModel')}</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings_deepseekApiKey')}</label>
+                <div className="relative">
+                  <input
+                    type={showDeepSeekApiKey ? 'text' : 'password'}
+                    value={settings.deepseekApiKey || ''}
+                    onChange={(e) => handleSecureSettingChange('deepseekApiKey', e.target.value)}
+                    placeholder={t('settings_deepseekApiKeyPaste')}
+                    className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all font-mono"
+                  />
+                  <button
+                    onClick={() => setShowDeepSeekApiKey(!showDeepSeekApiKey)}
+                    className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    aria-label={showDeepSeekApiKey ? 'Hide API key' : 'Show API key'}
+                  >
+                    <EyeIcon visible={showDeepSeekApiKey} />
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400">{t('settings_deepseekApiKeyLocalOnly')}</p>
+                {renderSecureSaveState('deepseekApiKey')}
               </div>
             </>
           )}

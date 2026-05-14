@@ -20,6 +20,7 @@ export function useSecureSettings(
     wechatAppSecret: 0,
     geminiApiKey: 0,
     codexApiKey: 0,
+    deepseekApiKey: 0,
     imageHostingGithubToken: 0,
     imageHostingS3SecretAccessKey: 0,
     imageHostingOssAccessKeySecret: 0,

@@ -7,7 +7,8 @@ import {
   resolveAISystemPrompt,
   resolveWikiPromptTemplate,
 } from './aiPrompts';
-import { buildWikiPrompt } from './aiService';
+import { buildWikiPrompt, ensureAIConfiguration } from './aiService';
+import { defaultSettings } from '../store/appStore';
 
 describe('DEFAULT_AI_SYSTEM_PROMPT', () => {
   it('includes Chinese knowledge-base guidance by default', () => {
@@ -93,5 +94,24 @@ describe('buildWikiPrompt', () => {
 
     expect(prompt).toContain('English wiki template.');
     expect(prompt).not.toContain('中文模板');
+  });
+});
+
+describe('ensureAIConfiguration', () => {
+  it('requires a DeepSeek API key when DeepSeek is selected', () => {
+    expect(() => ensureAIConfiguration({
+      ...defaultSettings,
+      aiProvider: 'deepseek',
+      deepseekApiKey: '',
+    })).toThrow('Please configure DeepSeek API Key in settings.');
+  });
+
+  it('accepts DeepSeek settings with a DeepSeek model name', () => {
+    expect(ensureAIConfiguration({
+      ...defaultSettings,
+      aiProvider: 'deepseek',
+      deepseekApiKey: 'sk-test',
+      deepseekModel: 'deepseek-v4-flash',
+    })).toEqual({ ok: true });
   });
 });

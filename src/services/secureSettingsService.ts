@@ -7,7 +7,7 @@ const SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 const SECURE_SETTINGS_WAIT_MS = 5000;
 
 export const SENSITIVE_SETTING_KEYS = [
-  'blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey',
+  'blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey', 'deepseekApiKey',
   'imageHostingGithubToken', 'imageHostingS3SecretAccessKey',
   'imageHostingOssAccessKeySecret', 'imageHostingQiniuSecretKey',
 ] as const;
@@ -20,6 +20,7 @@ interface SecureSettingsPayload {
   wechatAppSecret?: string | null;
   geminiApiKey?: string | null;
   codexApiKey?: string | null;
+  deepseekApiKey?: string | null;
   imageHostingGithubToken?: string | null;
   imageHostingS3SecretAccessKey?: string | null;
   imageHostingOssAccessKeySecret?: string | null;
@@ -122,6 +123,7 @@ export async function loadSecureSettings(): Promise<Partial<SensitiveSettings>> 
       wechatAppSecret: normalizeSecretValue(payload.wechatAppSecret),
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
+      deepseekApiKey: normalizeSecretValue(payload.deepseekApiKey),
       imageHostingGithubToken: normalizeSecretValue(payload.imageHostingGithubToken),
       imageHostingS3SecretAccessKey: normalizeSecretValue(payload.imageHostingS3SecretAccessKey),
       imageHostingOssAccessKeySecret: normalizeSecretValue(payload.imageHostingOssAccessKeySecret),

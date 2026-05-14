@@ -253,6 +253,13 @@ const translations = {
     settings_loadModelList: '加载模型列表',
     settings_loadingModels: '加载中…',
     settings_pickGeminiModel: '请选择列表中的 Gemini 模型。',
+    settings_deepseekBaseUrl: 'DeepSeek API Endpoint',
+    settings_deepseekBaseUrlExample: '例如：https://api.deepseek.com',
+    settings_deepseekModel: 'DeepSeek 模型',
+    settings_pickDeepSeekModel: '请选择列表中的 DeepSeek 模型。',
+    settings_deepseekApiKey: 'DeepSeek API 密钥',
+    settings_deepseekApiKeyPaste: '在此粘贴 DeepSeek API 密钥...',
+    settings_deepseekApiKeyLocalOnly: '仅在本地存储。使用 DeepSeek Platform API 密钥。',
     settings_openaiBaseUrl: 'openAI API Endpoint',
     settings_openaiBaseUrlExample: '例如：https://api.openai.com/v1',
     settings_openaiModel: 'OpenAI 模型',
@@ -461,6 +468,10 @@ const translations = {
     notifications_aiOpenAIForbidden: '当前 OpenAI API key 没有权限访问这个资源或模型。请检查项目权限、组织归属或模型可用性。',
     notifications_aiOpenAIRateLimited: 'OpenAI API 请求过于频繁，或当前项目已触发速率限制。请稍后重试。',
     notifications_aiOpenAIModelUnavailable: '当前 OpenAI 模型不可用。请在设置里重新选择一个可用模型。',
+    notifications_aiDeepSeekUnauthorized: 'DeepSeek API 认证失败。请检查 API Key 是否正确、是否仍有效。',
+    notifications_aiDeepSeekForbidden: '当前 DeepSeek API key 没有权限访问这个资源或模型。请检查账号权限或模型可用性。',
+    notifications_aiDeepSeekRateLimited: 'DeepSeek API 请求过于频繁，或当前账号已触发速率限制。请稍后重试。',
+    notifications_aiDeepSeekModelUnavailable: '当前 DeepSeek 模型不可用。请在设置里重新选择一个可用模型。',
     notifications_noKnowledgeBaseForWiki: '当前没有可用于创建 Wiki 文件的知识库目录。',
     notifications_wikiCreated: 'Wiki 已创建：{name}',
     notifications_wikiCreateFailed: '生成 Wiki 失败，请检查 AI 设置后再试。',
@@ -772,6 +783,13 @@ const translations = {
     settings_loadModelList: 'Load models',
     settings_loadingModels: 'Loading…',
     settings_pickGeminiModel: 'Choose a Gemini model from the list.',
+    settings_deepseekBaseUrl: 'DeepSeek API Endpoint',
+    settings_deepseekBaseUrlExample: 'Example: https://api.deepseek.com',
+    settings_deepseekModel: 'DeepSeek model',
+    settings_pickDeepSeekModel: 'Choose a DeepSeek model from the list.',
+    settings_deepseekApiKey: 'DeepSeek API key',
+    settings_deepseekApiKeyPaste: 'Paste DeepSeek API key here...',
+    settings_deepseekApiKeyLocalOnly: 'Stored locally only. Uses a DeepSeek Platform API key.',
     settings_openaiBaseUrl: 'openAI API Endpoint',
     settings_openaiBaseUrlExample: 'Example: https://api.openai.com/v1',
     settings_openaiModel: 'OpenAI model',
@@ -980,6 +998,10 @@ const translations = {
     notifications_aiOpenAIForbidden: 'This OpenAI API key does not have access to the requested resource or model. Check project permissions, org ownership, or model availability.',
     notifications_aiOpenAIRateLimited: 'The OpenAI API request was rate limited, or the current project hit a throughput limit. Please try again later.',
     notifications_aiOpenAIModelUnavailable: 'The selected OpenAI model is unavailable. Pick another model in settings.',
+    notifications_aiDeepSeekUnauthorized: 'DeepSeek API authentication failed. Check whether the API key is correct and still active.',
+    notifications_aiDeepSeekForbidden: 'This DeepSeek API key does not have access to the requested resource or model. Check account permissions or model availability.',
+    notifications_aiDeepSeekRateLimited: 'The DeepSeek API request was rate limited, or the current account hit a throughput limit. Please try again later.',
+    notifications_aiDeepSeekModelUnavailable: 'The selected DeepSeek model is unavailable. Pick another model in settings.',
     notifications_noKnowledgeBaseForWiki: 'No knowledge base folder is available for creating the wiki file.',
     notifications_wikiCreated: 'Wiki created: {name}',
     notifications_wikiCreateFailed: 'Failed to generate the wiki article. Check your AI settings and try again.',
@@ -1059,6 +1081,7 @@ export function t(language: AppLanguage, key: TranslationKey, params?: Params): 
 const knownErrorMessages: Record<string, TranslationKey> = {
   'Please configure OpenAI API Key in settings.': 'notifications_aiConfigFirst',
   'Please configure Gemini API Key in settings.': 'notifications_aiConfigFirst',
+  'Please configure DeepSeek API Key in settings.': 'notifications_aiConfigFirst',
   'Please configure AI settings first.': 'notifications_aiConfigFirst',
   'Failed to create the wiki file.': 'notifications_wikiCreateFailed',
   'Gemini API key is required': 'notifications_aiConfigFirst',
@@ -1068,6 +1091,39 @@ export function localizeKnownError(language: AppLanguage, message: string): stri
   const normalizedMessage = message.trim();
   const exactKey = knownErrorMessages[normalizedMessage];
   if (exactKey) return t(language, exactKey);
+
+  const isDeepSeekMessage = /deepseek/i.test(normalizedMessage);
+  if (isDeepSeekMessage) {
+    if (
+      /model .*not found/i.test(normalizedMessage)
+      || /does not exist/i.test(normalizedMessage)
+      || /unsupported model/i.test(normalizedMessage)
+      || /model unavailable/i.test(normalizedMessage)
+    ) {
+      return t(language, 'notifications_aiDeepSeekModelUnavailable');
+    }
+
+    if (
+      /\b429\b/.test(normalizedMessage)
+      || /rate limit/i.test(normalizedMessage)
+      || /too many requests/i.test(normalizedMessage)
+    ) {
+      return t(language, 'notifications_aiDeepSeekRateLimited');
+    }
+
+    if (/\b403\b/.test(normalizedMessage) || /forbidden/i.test(normalizedMessage)) {
+      return t(language, 'notifications_aiDeepSeekForbidden');
+    }
+
+    if (
+      /incorrect api key/i.test(normalizedMessage)
+      || /invalid_api_key/i.test(normalizedMessage)
+      || /\b401\b/.test(normalizedMessage)
+      || /unauthorized/i.test(normalizedMessage)
+    ) {
+      return t(language, 'notifications_aiDeepSeekUnauthorized');
+    }
+  }
 
   if (
     /exceeded your current quota/i.test(normalizedMessage)

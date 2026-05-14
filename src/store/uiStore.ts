@@ -80,7 +80,7 @@ export const defaultImageHostingConfig: ImageHostingConfig = {
 
 export const defaultSettings: AppSettings = {
   language: 'zh-CN',
-  aiProvider: 'gemini',
+  aiProvider: 'deepseek',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
   uiFontSize: 18,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
@@ -105,6 +105,9 @@ export const defaultSettings: AppSettings = {
   codexApiBaseUrl: 'https://api.openai.com/v1',
   codexApiKey: '',
   codexModel: 'gpt-5.2-codex',
+  deepseekApiBaseUrl: 'https://api.deepseek.com',
+  deepseekApiKey: '',
+  deepseekModel: 'deepseek-v4-flash',
   aiSystemPrompt: '',
   aiSystemPromptZh: DEFAULT_AI_SYSTEM_PROMPT,
   aiSystemPromptEn: DEFAULT_AI_SYSTEM_PROMPT_EN,
