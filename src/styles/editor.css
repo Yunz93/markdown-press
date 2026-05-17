@@ -1,6 +1,8 @@
 .editor-pane-layout {
-  /* 列表软换行悬挂：前缀按字符数 × 本系数 × 1em（中文字体下 1ch 常过宽，故不用 ch） */
-  --mp-editor-list-hang-em-per-char: 0.47;
+  /* 列表软换行悬挂：前缀按字符数 × 本系数 × 1em；数值过大续行会偏右，可在主题里覆盖该变量微调 */
+  --mp-editor-list-hang-em-per-char: 0.34;
+  /* 负 text-indent 会把 marker 左移，用少量外边距避免顶边裁切/溢出观感 */
+  --mp-editor-list-hang-edge-buffer: 0.32em;
   --pane-backdrop-px: 28px;
   --pane-backdrop-py: 30px;
   --pane-frame-max-width: 1240px;
@@ -129,6 +131,10 @@
 
 .editor-pane-layout .cm-markdown-list-marker {
   color: var(--mp-doc-list-marker, #94a3b8);
+}
+
+.editor-pane-layout .cm-markdown-list-line-hang {
+  margin-inline-start: var(--mp-editor-list-hang-edge-buffer, 0.32em);
 }
 
 .editor-pane-layout[data-markdown-style="typewriter"] .cm-formatting,

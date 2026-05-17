@@ -49,9 +49,7 @@ function collapseBlankLinesBetweenTableRows(lines: string[]): string[] {
         i = j;
         continue;
       }
-      if (result.length > 0 && result[result.length - 1] !== '') {
-        result.push('');
-      }
+      result.push(...lines.slice(i, j));
       i = j;
       continue;
     }

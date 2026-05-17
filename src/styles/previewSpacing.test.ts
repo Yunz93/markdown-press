@@ -1,0 +1,33 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+describe('preview spacing CSS', () => {
+  it('uses source blank lines as one editor-height line without adjacent margin stacking', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/preview.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body\s*\{[^}]*--preview-line-height:\s*1\.95;[^}]*line-height:\s*var\(--preview-line-height\);/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.preview-source-blank-line\s*\{[^}]*height:\s*calc\(var\(--preview-line-height\) \* 1em\);/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body > :has\(\+ \.preview-source-blank-line\)\s*\{[^}]*margin-bottom:\s*0;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.preview-source-blank-line \+ \*\s*\{[^}]*margin-top:\s*0;/m,
+    );
+  });
+
+  it('does not add paragraph-to-list spacing when the source has no blank line', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/preview.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body p:has\(\+ :is\(ul,\s*ol\)\)\s*\{[^}]*margin-bottom:\s*0;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body p \+ :is\(ul,\s*ol\)\s*\{[^}]*margin-top:\s*0;/m,
+    );
+  });
+});

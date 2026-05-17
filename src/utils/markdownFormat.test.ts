@@ -37,6 +37,33 @@ describe('formatMarkdownForSave', () => {
     expect(out.trimEnd()).toBe('- UI\n    - child one\n    - child two');
   });
 
+  it('keeps an empty ordered list item attached to the previous list during format-on-save', () => {
+    const input = [
+      '1. 基础：算力付费；',
+      '2. 进阶：可靠性保障 SLA 付费；',
+      '3. ',
+      '',
+    ].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe('1. 基础：算力付费；\n2. 进阶：可靠性保障 SLA 付费；\n3.');
+  });
+
+  it('removes the blank line between a colon introduction and its list', () => {
+    const input = [
+      '商业模式：',
+      '',
+      '- 软件订阅：按节点、GPU、模型数量或并发规模。',
+      '- 部署服务：PoC、上线、迁移、性能调优。',
+      '',
+    ].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe([
+      '商业模式：',
+      '- 软件订阅：按节点、GPU、模型数量或并发规模。',
+      '- 部署服务：PoC、上线、迁移、性能调优。',
+    ].join('\n'));
+  });
+
   it('renumbers indented ordered list items during format-on-save', () => {
     const input = ['10. parent', '    3. child one', '    9. child two', '11. next', ''].join('\n');
     const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });

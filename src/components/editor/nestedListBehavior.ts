@@ -24,6 +24,9 @@ import {
   getIndentColumnWidth as getIndentColumnWidthFromCore,
   getLevelFromIndent as getLevelFromIndentFromCore,
   getIndentFromLevel as getIndentFromLevelFromCore,
+  ORDERED_LIST_REGEX,
+  UNORDERED_LIST_REGEX,
+  TASK_LIST_REGEX,
 } from './behavior/core';
 
 export const LIST_INDENT_UNIT = '    ';
@@ -215,7 +218,7 @@ function extractOrderedMarkerRawPartFromLineText(lineText: string): string | nul
   if (quoteMatch) {
     text = quoteMatch[3];
   }
-  const ORDERED_HEAD = /^([ \t]*)(\d+|[a-z]|[ivxlcdm]+)([.)]) /i;
+  const ORDERED_HEAD = ORDERED_LIST_REGEX;
   const m = text.match(ORDERED_HEAD);
   return m ? m[2] : null;
 }
@@ -239,12 +242,7 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
   }
   quotePrefix = quotePrefix || '';
 
-  // 导入 core.ts 的正则以确保一致性
-  const TASK_LIST_REGEX = /^([ \t]*)([-+*]) (\[[ xX]\])(?: (.*)|$)$/;
-  // 扩展有序列表正则：支持 1., a., i., I. 等格式
-  const ORDERED_LIST_REGEX = /^([ \t]*)(\d+|[a-z]|[ivxlcdm]+)([.)]) (.*)$/i;
-  const UNORDERED_LIST_REGEX = /^([ \t]*)([-+*]) (.*)$/;
-  
+  // 与 behavior/core.ts 中导出的正则一致，避免两处漂移
   // 任务列表: - [ ] content 或 * [x] content
   const taskMatch = text.match(TASK_LIST_REGEX);
   if (taskMatch) {
@@ -265,7 +263,8 @@ export function parseListItem(lineText: string, lineNumber: number, startPos: nu
   // 有序列表: 支持 1., a., i., I. 等格式；数值统一为序号的整数值，样式单独保留
   const orderedMatch = text.match(ORDERED_LIST_REGEX);
   if (orderedMatch) {
-    const [, indent, markerPart, delimiter, content] = orderedMatch;
+    const [, indent, markerPart, delimiter] = orderedMatch;
+    const content = (orderedMatch[4] ?? orderedMatch[5] ?? orderedMatch[6] ?? '').trimStart();
     const markerInfo = parseOrderedListMarker(`${markerPart}${delimiter}`);
     if (markerInfo) {
       const markerStyle = inferOrderedMarkerStyleFromRawPart(markerPart);

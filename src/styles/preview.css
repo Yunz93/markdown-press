@@ -81,13 +81,14 @@
 }
 
 .preview-pane-document.markdown-body {
+  --preview-line-height: 1.95;
   width: 100%;
   min-width: 0;
   max-width: none;
   margin: 0;
   padding: var(--pane-content-top) var(--pane-content-px) var(--preview-content-bottom, var(--pane-content-bottom));
   color: var(--mp-doc-text, #312e81);
-  line-height: 1.95;
+  line-height: var(--preview-line-height);
   overflow-wrap: anywhere;
   word-break: break-word;
   font-family: var(--preview-font-family) !important;
@@ -95,7 +96,7 @@
 }
 
 .preview-pane-document-compact.markdown-body {
-  line-height: 1.85;
+  --preview-line-height: 1.85;
 }
 
 .preview-pane-document.markdown-body > * {
@@ -184,6 +185,29 @@
 
 .preview-pane-document.markdown-body p:last-child {
   margin-bottom: 0;
+}
+
+.preview-pane-document.markdown-body p:has(+ :is(ul, ol)) {
+  margin-bottom: 0;
+}
+
+.preview-pane-document.markdown-body p + :is(ul, ol) {
+  margin-top: 0;
+}
+
+.preview-pane-document.markdown-body .preview-source-blank-line {
+  display: block;
+  height: calc(var(--preview-line-height) * 1em);
+  margin: 0;
+  pointer-events: none;
+}
+
+.preview-pane-document.markdown-body > :has(+ .preview-source-blank-line) {
+  margin-bottom: 0;
+}
+
+.preview-pane-document.markdown-body .preview-source-blank-line + * {
+  margin-top: 0;
 }
 
 .preview-pane-document.markdown-body li > p {
@@ -914,7 +938,7 @@
 
 @media (max-width: 960px) {
   .preview-pane-document.markdown-body {
-    line-height: 1.85;
+    --preview-line-height: 1.85;
   }
 }
 

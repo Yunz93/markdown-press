@@ -149,7 +149,7 @@ function isThematicBreak(line: string): boolean {
 }
 
 function isListItem(line: string, previousNonBlankKind: MarkdownLineKind | null = null): boolean {
-  const match = line.match(/^(\s*)(?:[-+*]|\d+[.)])\s+\S/);
+  const match = line.match(/^(\s*)(?:[-+*]|\d+[.)])(?:\s+\S|\s*$)/);
   if (!match) return false;
 
   const indent = match[1];
@@ -160,6 +160,10 @@ function isListItem(line: string, previousNonBlankKind: MarkdownLineKind | null 
 
 function isBlockquote(line: string): boolean {
   return /^\s{0,3}>\s?/.test(line);
+}
+
+function isListIntroductionLine(line: string): boolean {
+  return /[:：]\s*$/.test(line.trimEnd());
 }
 
 function isIndentedCode(line: string): boolean {
@@ -247,11 +251,11 @@ function normalizeAtxHeading(line: string): string {
 }
 
 function normalizeUnorderedList(line: string): string {
-  return line.replace(/^(\s{0,3})[*+]\s+/, '$1- ');
+  return line.replace(/^(\s{0,3})[-+*](?:\s+|$)/, '$1- ');
 }
 
 function normalizeOrderedList(line: string): string {
-  return line.replace(/^(\s*)(\d+)[\.)]\s+/, '$1$2. ');
+  return line.replace(/^(\s*)(\d+)[\.)](?:\s+|$)/, '$1$2. ');
 }
 
 function normalizeTaskList(line: string): string {
@@ -284,7 +288,7 @@ function normalizeFootnoteDefinition(line: string): string {
 }
 
 function getOrderedListInfo(line: string): { indentLength: number; number: number } | null {
-  const match = line.match(/^(\s*)(\d+)[\.)]\s+/);
+  const match = line.match(/^(\s*)(\d+)[\.)](?:\s+|$)/);
   if (!match) return null;
   return {
     indentLength: match[1].length,
@@ -297,7 +301,7 @@ function getBlockquoteOrderedListInfo(line: string): {
   indentLength: number;
   number: number;
 } | null {
-  const match = line.match(/^(\s{0,3}>+\s?)(\s*)(\d+)[\.)]\s+/);
+  const match = line.match(/^(\s{0,3}>+\s?)(\s*)(\d+)[\.)](?:\s+|$)/);
   if (!match) return null;
   return {
     prefix: match[1],
@@ -384,6 +388,15 @@ function shouldInsertBlankLineBetween(
 
   if (previousKind === 'list' && currentKind !== 'list') {
     return true;
+  }
+
+  if (
+    previousKind === 'paragraph' &&
+    currentKind === 'list' &&
+    previousNonBlankLine &&
+    isListIntroductionLine(previousNonBlankLine)
+  ) {
+    return false;
   }
 
   if (currentKind === 'list' && previousKind !== 'list') {
@@ -529,6 +542,28 @@ function normalizeMarkdownLine(
   }
 }
 
+function isBlankBeforeIntroducedList(
+  lines: string[],
+  index: number,
+  previousKind: MarkdownLineKind,
+  previousNonBlankLine: string | null,
+): boolean {
+  if (
+    previousKind !== 'paragraph' ||
+    !previousNonBlankLine ||
+    !isListIntroductionLine(previousNonBlankLine)
+  ) {
+    return false;
+  }
+
+  for (let nextIndex = index + 1; nextIndex < lines.length; nextIndex += 1) {
+    if (lines[nextIndex].trim() === '') continue;
+    return classifyMarkdownLine(lines[nextIndex], previousNonBlankLine, previousKind) === 'list';
+  }
+
+  return false;
+}
+
 function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions): string[] {
   const output: string[] = [];
   let previousNonBlankLine: string | null = null;
@@ -536,10 +571,15 @@ function normalizeBlockSpacing(lines: string[], options: MarkdownFormatOptions):
   const orderedListCounters = new Map<string, number>();
   let deferredBlankAfterTable = false;
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const currentKind = classifyMarkdownLine(line, previousNonBlankLine, previousKind);
 
     if (currentKind === 'blank') {
+      if (isBlankBeforeIntroducedList(lines, index, previousKind, previousNonBlankLine)) {
+        orderedListCounters.clear();
+        continue;
+      }
       if (previousKind === 'table') {
         deferredBlankAfterTable = true;
         orderedListCounters.clear();

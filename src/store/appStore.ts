@@ -188,7 +188,7 @@ function looksLikeDeepSeekModel(value: unknown): boolean {
   return typeof value === 'string' && /^deepseek(?:-|$)/i.test(value.trim());
 }
 
-function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) {
+export function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) {
   const persistedProvider = typeof persistedSettings.aiProvider === 'string'
     ? persistedSettings.aiProvider
     : '';
@@ -229,6 +229,15 @@ function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) 
       aiProvider: 'codex',
       codexModel: persistedCodexModel || persistedGeminiModel || defaultSettings.codexModel,
       geminiModel: looksLikeGeminiModel(persistedGeminiModel) ? persistedGeminiModel : defaultSettings.geminiModel,
+      deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
+    };
+  }
+
+  if (looksLikeGeminiModel(persistedGeminiModel)) {
+    return {
+      aiProvider: 'gemini',
+      codexModel: persistedCodexModel || defaultSettings.codexModel,
+      geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
       deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
     };
   }

@@ -28,9 +28,10 @@ describe('renderMarkdown', () => {
     expect(html).toMatch(/My Note/i);
   });
 
-  it('collapses extra blank lines in source to one block boundary (CommonMark)', () => {
+  it('preserves source blank lines between preview blocks', () => {
     const html = renderMarkdown(['第一段', '', '', '', '第二段'].join('\n'));
-    expect(html.match(/<\/p>\s*<p>/g)?.length).toBe(1);
+    expect(html.match(/preview-source-blank-line/g)?.length).toBe(3);
+    expect(html).toMatch(/<p>第一段<\/p>\s*(?:<div class="preview-source-blank-line"><\/div>\s*){3}<p>第二段<\/p>/);
     expect(html).not.toMatch(/<p>\s*<\/p>/);
   });
 

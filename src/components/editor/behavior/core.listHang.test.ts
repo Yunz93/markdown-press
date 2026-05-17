@@ -7,6 +7,10 @@ describe('getMarkdownListHangPrefixCharCount', () => {
     expect(getMarkdownListHangPrefixCharCount('10. 正文')).toBe(4);
   });
 
+  it('covers tight ordered marker without space before body', () => {
+    expect(getMarkdownListHangPrefixCharCount('2.AIGC')).toBe(2);
+  });
+
   it('covers task list checkbox prefix', () => {
     expect(getMarkdownListHangPrefixCharCount('- [ ] 待办')).toBe(6);
     expect(getMarkdownListHangPrefixCharCount('- [x] 完成')).toBe(6);

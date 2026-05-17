@@ -5,7 +5,13 @@ import {
   DEFAULT_WIKI_PROMPT_TEMPLATE,
   DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
 } from '../services/aiPrompts';
-import { defaultSettings, resolveLocalizedPrompts, stripNonRuntimeSettings, useAppStore } from './appStore';
+import {
+  defaultSettings,
+  resolveLocalizedPrompts,
+  resolvePersistedAISettings,
+  stripNonRuntimeSettings,
+  useAppStore,
+} from './appStore';
 
 afterEach(() => {
   useAppStore.setState({
@@ -43,6 +49,17 @@ describe('defaultSettings', () => {
     expect(defaultSettings.aiProvider).toBe('deepseek');
     expect(defaultSettings.deepseekApiBaseUrl).toBe('https://api.deepseek.com');
     expect(defaultSettings.deepseekModel).toBe('deepseek-v4-flash');
+  });
+});
+
+describe('persisted AI settings migration', () => {
+  it('keeps legacy Gemini-only settings on the Gemini provider', () => {
+    const settings = resolvePersistedAISettings({
+      geminiModel: 'gemini-2.0-flash-exp',
+    });
+
+    expect(settings.aiProvider).toBe('gemini');
+    expect(settings.geminiModel).toBe('gemini-2.0-flash-exp');
   });
 });
 

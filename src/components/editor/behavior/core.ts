@@ -14,8 +14,8 @@ export const LIST_INDENT_SIZE = 4;
 
 // 保持向后兼容的正则导出
 export const UNORDERED_LIST_REGEX = /^([ \t]*)([-+*]) (.*)$/;
-// 扩展有序列表正则：支持 1., a., i., I. 等格式
-export const ORDERED_LIST_REGEX = /^([ \t]*)(\d+|[a-z]|[ivxlcdm]+)([.)]) (.*)$/i;
+// 有序：标准 `1. 正文`；另支持 `2.AIGC`（点号后无空格）；`1.2` 等数字开头仍视为非列表，避免版本号误判
+export const ORDERED_LIST_REGEX = /^([ \t]*)(\d+|[a-z]|[ivxlcdm]+)([.)])(?:\s+(.*)|([A-Za-z\u4e00-\u9fff].*)|())$/i;
 export const TASK_LIST_REGEX = /^([ \t]*)([-+*]) (\[[ xX]\])(?: (.*)|$)$/;
 export const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
 export const HEADING_REGEX = /^([ \t]*)(#{1,6})( +)(.*)$/;
@@ -33,7 +33,7 @@ export function getMarkdownListHangPrefixCharCount(lineText: string): number | n
   }
   const ordered = lineText.match(ORDERED_LIST_REGEX);
   if (ordered) {
-    const rest = ordered[4] ?? '';
+    const rest = ordered[4] ?? ordered[5] ?? ordered[6] ?? '';
     return Math.max(0, lineText.length - rest.length);
   }
   const unordered = lineText.match(UNORDERED_LIST_REGEX);

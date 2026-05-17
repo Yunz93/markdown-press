@@ -211,7 +211,7 @@ function buildMarkdownListDecorations(view: EditorView): DecorationSet {
         Decoration.line({
           class: 'cm-markdown-list-line-hang',
           attributes: {
-            style: `padding-left: calc(var(--mp-editor-list-hang-em-per-char, 0.47) * ${hangChars} * 1em); text-indent: calc(-1 * var(--mp-editor-list-hang-em-per-char, 0.47) * ${hangChars} * 1em)`,
+            style: `padding-left: calc(var(--mp-editor-list-hang-em-per-char, 0.34) * ${hangChars} * 1em); text-indent: calc(-1 * var(--mp-editor-list-hang-em-per-char, 0.34) * ${hangChars} * 1em)`,
           },
         }),
       );

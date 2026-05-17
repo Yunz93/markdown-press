@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify';
 import { useEffect } from 'react';
 import MarkdownIt from 'markdown-it';
-import type Token from 'markdown-it/lib/token.mjs';
+import Token from 'markdown-it/lib/token.mjs';
 import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import taskLists from 'markdown-it-task-lists';
 import footnote from 'markdown-it-footnote';
@@ -214,7 +214,8 @@ let currentTheme: ThemeMode = 'light';
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 3;
+const MARKDOWN_RENDERER_CACHE_VERSION = 4;
+const PREVIEW_BLANK_LINE_HTML = '<div class="preview-source-blank-line"></div>\n';
 
 function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string): boolean {
   if (!highlighter || !lang) return false;
@@ -362,6 +363,46 @@ function angleBracketBareMarkdownHttpUrls(markdown: string): string {
   return out;
 }
 
+function countBlankSourceLines(lines: string[], startLine: number, endLine: number): number {
+  let count = 0;
+  for (let lineIndex = startLine; lineIndex < endLine; lineIndex += 1) {
+    if ((lines[lineIndex] ?? '').trim() === '') {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function createPreviewBlankLineToken(count: number): Token {
+  const token = new Token('html_block', '', 0);
+  token.block = true;
+  token.content = PREVIEW_BLANK_LINE_HTML.repeat(count);
+  return token;
+}
+
+function preservePreviewSourceBlankLines(tokens: Token[], markdown: string): Token[] {
+  const lines = markdown.split('\n');
+  const nextTokens: Token[] = [];
+  let previousTopLevelEndLine: number | null = null;
+
+  for (const token of tokens) {
+    if (token.level === 0 && token.map && token.nesting !== -1) {
+      const [startLine, endLine] = token.map;
+      if (previousTopLevelEndLine !== null && startLine > previousTopLevelEndLine) {
+        const blankLineCount = countBlankSourceLines(lines, previousTopLevelEndLine, startLine);
+        if (blankLineCount > 0) {
+          nextTokens.push(createPreviewBlankLineToken(blankLineCount));
+        }
+      }
+      previousTopLevelEndLine = endLine;
+    }
+
+    nextTokens.push(token);
+  }
+
+  return nextTokens;
+}
+
 /**
  * Render markdown to HTML with sanitization and caching
  */
@@ -391,7 +432,8 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   const normalizedMarkdown = normalizeMarkdownTablesForRender(
     angleBracketBareMarkdownHttpUrls(markdown),
   );
-  const renderedHtml = md.render(normalizedMarkdown, env);
+  const tokens = preservePreviewSourceBlankLines(md.parse(normalizedMarkdown, env), normalizedMarkdown);
+  const renderedHtml = md.renderer.render(tokens, md.options, env);
 
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
