@@ -8,6 +8,23 @@ export function hasUriScheme(value: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(value.trim());
 }
 
+export function isLocalPreviewLinkHref(href: string): boolean {
+  const trimmed = href.trim();
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) {
+    return false;
+  }
+
+  return !hasUriScheme(trimmed);
+}
+
+export function getLocalPreviewLinkTarget(href: string): string {
+  const trimmed = href.trim();
+  const hashIndex = trimmed.indexOf('#');
+  const withoutHash = hashIndex >= 0 ? trimmed.slice(0, hashIndex) : trimmed;
+  const queryIndex = withoutHash.indexOf('?');
+  return (queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash).trim();
+}
+
 export function isImageAttachment(fileName: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
 }

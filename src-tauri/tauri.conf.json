@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "",
+        "title": "M記",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "theme": "Dark",

@@ -70,6 +70,18 @@ describe('formatMarkdownForSave', () => {
     expect(out.trimEnd()).toBe('1. parent\n    1. child one\n    2. child two\n2. next');
   });
 
+  it('renumbers tight ordered markers during format-on-save', () => {
+    const input = ['4.AI', '9.AIGC', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe('1. AI\n2. AIGC');
+  });
+
+  it('renumbers tight ordered markers inside blockquotes during format-on-save', () => {
+    const input = ['> 4.AI', '> 9.AIGC', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });
+    expect(out.trimEnd()).toBe('> 1. AI\n> 2. AIGC');
+  });
+
   it('preserves indented code lines that look like ordered lists', () => {
     const input = ['before', '', '    1. not a list', '    2. still code', '', 'after', ''].join('\n');
     const out = formatMarkdownForSave(input, { orderedListMode: 'strict' });

@@ -149,7 +149,7 @@ function isThematicBreak(line: string): boolean {
 }
 
 function isListItem(line: string, previousNonBlankKind: MarkdownLineKind | null = null): boolean {
-  const match = line.match(/^(\s*)(?:[-+*]|\d+[.)])(?:\s+\S|\s*$)/);
+  const match = line.match(/^(\s*)(?:[-+*](?:\s+\S|\s*$)|\d+[.)](?:\s+\S|[A-Za-z\u4e00-\u9fff].*|\s*$))/);
   if (!match) return false;
 
   const indent = match[1];
@@ -255,7 +255,12 @@ function normalizeUnorderedList(line: string): string {
 }
 
 function normalizeOrderedList(line: string): string {
-  return line.replace(/^(\s*)(\d+)[\.)](?:\s+|$)/, '$1$2. ');
+  const match = line.match(/^(\s*)(\d+)[\.)](?:\s+(.*)|([A-Za-z\u4e00-\u9fff].*))?$/);
+  if (!match) return line;
+
+  const [, indent, number, spacedContent = '', tightContent = ''] = match;
+  const content = (spacedContent || tightContent).trimStart();
+  return content ? `${indent}${number}. ${content}` : `${indent}${number}.`;
 }
 
 function normalizeTaskList(line: string): string {
@@ -288,7 +293,7 @@ function normalizeFootnoteDefinition(line: string): string {
 }
 
 function getOrderedListInfo(line: string): { indentLength: number; number: number } | null {
-  const match = line.match(/^(\s*)(\d+)[\.)](?:\s+|$)/);
+  const match = line.match(/^(\s*)(\d+)[\.)](?:\s+.*|[A-Za-z\u4e00-\u9fff].*|$)/);
   if (!match) return null;
   return {
     indentLength: match[1].length,
@@ -301,7 +306,7 @@ function getBlockquoteOrderedListInfo(line: string): {
   indentLength: number;
   number: number;
 } | null {
-  const match = line.match(/^(\s{0,3}>+\s?)(\s*)(\d+)[\.)](?:\s+|$)/);
+  const match = line.match(/^(\s{0,3}>+\s?)(\s*)(\d+)[\.)](?:\s+.*|[A-Za-z\u4e00-\u9fff].*|$)/);
   if (!match) return null;
   return {
     prefix: match[1],
@@ -480,6 +485,25 @@ function nextOrderedNumber(
   return nextNumber;
 }
 
+function renumberOrderedListLine(line: string, nextNumber: number): string {
+  const normalized = normalizeOrderedList(line);
+  const match = normalized.match(/^(\s*)\d+\.\s*(.*)$/);
+  if (!match) return normalized;
+
+  const [, indent, content] = match;
+  return content ? `${indent}${nextNumber}. ${content}` : `${indent}${nextNumber}.`;
+}
+
+function renumberBlockquoteOrderedListLine(line: string, nextNumber: number): string {
+  const normalized = normalizeBlockquote(line);
+  const match = normalized.match(/^(\s{0,3}>+\s?\s*)\d+[.)](?:\s+(.*)|([A-Za-z\u4e00-\u9fff].*))?$/);
+  if (!match) return normalized;
+
+  const [, prefix, spacedContent = '', tightContent = ''] = match;
+  const content = (spacedContent || tightContent).trimStart();
+  return content ? `${prefix}${nextNumber}. ${content}` : `${prefix}${nextNumber}.`;
+}
+
 function normalizeMarkdownLine(
   line: string,
   kind: MarkdownLineKind,
@@ -502,7 +526,7 @@ function normalizeMarkdownLine(
 
         pruneDeeperOrderedCounters(orderedListCounters, 'root', orderedInfo.indentLength);
         const nextNumber = nextOrderedNumber(orderedListCounters, 'root', orderedInfo.indentLength);
-        return normalized.replace(/^(\s*)\d+\.\s+/, `$1${nextNumber}. `);
+        return renumberOrderedListLine(normalized, nextNumber);
       }
 
       orderedListCounters.clear();
@@ -522,10 +546,7 @@ function normalizeMarkdownLine(
           counterPrefix,
           blockquoteOrderedInfo.indentLength,
         );
-        return normalizeBlockquote(line).replace(
-          /^(\s{0,3}>+\s?\s*)\d+\.\s+/,
-          `$1${nextNumber}. `,
-        );
+        return renumberBlockquoteOrderedListLine(line, nextNumber);
       }
     case 'linkDefinition':
       orderedListCounters.clear();

@@ -14,6 +14,7 @@ import { useFileOperations } from '../../hooks/useFileOperations';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { getResolvedCodeFontFamily, getResolvedPreviewFontFamily } from '../../utils/fontSettings';
 import { usePreviewRenderer, usePreviewScroll, useWikiLinkNavigation } from './hooks';
+import { getLocalPreviewLinkTarget, isLocalPreviewLinkHref } from './preview/previewMedia';
 import { mountPdfPreview } from '../../utils/pdfPreview';
 import { debounce, throttle } from '../../utils/throttle';
 import { useThrottledResize } from '../../utils/performance';
@@ -583,6 +584,28 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
       return;
     }
 
+    if (externalLink && isLocalPreviewLinkHref(href)) {
+      const localTarget = getLocalPreviewLinkTarget(href);
+      if (!localTarget) return;
+
+      event.preventDefault();
+      const attachmentContext = createAttachmentResolverContext(files, rootFolderPath, currentFilePath);
+      const resolvedAttachment = await resolveAttachmentTarget(attachmentContext, localTarget);
+      if (!resolvedAttachment) {
+        showNotification(t('notifications_linkedFileNotFound', { target: href }), 'error');
+        return;
+      }
+
+      await handleFileSelect({
+        id: resolvedAttachment.path,
+        name: resolvedAttachment.name,
+        type: 'file',
+        path: resolvedAttachment.path,
+        isTrash: false,
+      });
+      return;
+    }
+
     // Anchor link click
     const anchorLink = target?.closest('a[href^="#"]') as HTMLAnchorElement | null;
     if (!anchorLink) return;
@@ -595,7 +618,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(({
 
     event.preventDefault();
     navigation.navigateToHashLink(normalizedHash);
-  }, [navigation, showNotification]);
+  }, [currentFilePath, files, handleFileSelect, navigation, rootFolderPath, showNotification, t]);
 
   // Handle double click events
   const handlePreviewDoubleClick = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
