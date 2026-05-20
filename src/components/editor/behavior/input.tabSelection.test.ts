@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EditorState, EditorSelection } from '@codemirror/state';
 import type { StateCommand } from '@codemirror/state';
-import { createHandleSmartShiftTab, createHandleSmartTab, handleSmartEnter } from './input';
+import { createHandleSmartShiftTab, createHandleSmartTab, createHandleSmartBackspace, handleSmartEnter } from './input';
 import { handleListTab } from '../nestedListCommands';
 
 function applyCommand(cmd: StateCommand, doc: string, anchor: number, head: number): EditorState {
@@ -77,11 +77,34 @@ describe('createHandleSmartTab selection', () => {
     expect(next.doc.toString()).toBe('    - A\n    B\n    - C');
   });
 
+  // 回归 #9：Tab 不应当强制把非空子项的 markerStyle 改成父级风格
+  it('preserves explicit child markerStyle when content is non-empty', () => {
+    const tabStrict = createHandleSmartTab('strict');
+    const doc = 'A. parent\n1. child';
+    const next = applyCommand(tabStrict, doc, doc.length, doc.length);
+    // child 是非空显式数字项，应当保留 1. 数字样式，仅缩进改变
+    expect(next.doc.toString()).toBe('A. parent\n    1. child');
+  });
+
+  // 回归 #6：连续 Tab 应当持续缩进，不应卡在 marker-aware 父级缩进
+  it('keeps indenting on consecutive tabs even when child indent equals marker-aware proposal', () => {
+    const tabStrict = createHandleSmartTab('strict');
+    const doc = '- [ ] parent\n- [x] child';
+    const after1 = applyCommand(tabStrict, doc, doc.length, doc.length);
+    expect(after1.doc.toString()).toBe('- [ ] parent\n      - [x] child');
+
+    const doc2 = after1.doc.toString();
+    const after2 = applyCommand(tabStrict, doc2, doc2.length, doc2.length);
+    expect(after2.doc.toString()).toBe('- [ ] parent\n          - [x] child');
+  });
+
   it('after a nested ordered item, Tab nests a top-level sibling under the nearest shallower item', () => {
     const doc = '1. 基础：算力付费；\n2. 进阶：可靠性保障 SLA 付费；\n   1. 测试\n3. ';
     const pos = doc.length;
     const next = applyCommand(tab, doc, pos, pos);
-    expect(next.doc.toString().split('\n').pop()).toBe('    1. ');
+    // 与同父级（2. 进阶）下已存在的子项 `   1. 测试` 对齐，使用 3 空格缩进；
+    // strict 模式 normalize 接续编号 → `   2. `
+    expect(next.doc.toString().split('\n').pop()).toBe('   2. ');
     // 误把「上一行」子列表当父级时会出现 7 格缩进
     expect(next.doc.toString()).not.toMatch(/\n {7}1\. /);
   });
@@ -145,5 +168,24 @@ describe('handleSmartEnter empty nested list items', () => {
 
     expect(next.doc.toString()).toBe('1. test\n   1. test\n2. ');
     expect(next.selection.main.from).toBe('1. test\n   1. test\n2. '.length);
+  });
+});
+
+describe('createHandleSmartBackspace strict normalization', () => {
+  // 回归 #4：Backspace 拉平嵌套有序项时不应出现瞬时的重复编号
+  it('normalizes duplicate marker number in the same transaction', () => {
+    const cmd = createHandleSmartBackspace('strict');
+    const doc = '1. parent\n    1. child';
+    const cursorAtChildMarker = '1. parent\n    1. '.length;
+    const next = applyCommand(cmd, doc, cursorAtChildMarker, cursorAtChildMarker);
+    expect(next.doc.toString()).toBe('1. parent\n2. child');
+  });
+
+  it('leaves loose mode untouched after backspace outdent', () => {
+    const cmd = createHandleSmartBackspace('loose');
+    const doc = '1. parent\n    1. child';
+    const cursorAtChildMarker = '1. parent\n    1. '.length;
+    const next = applyCommand(cmd, doc, cursorAtChildMarker, cursorAtChildMarker);
+    expect(next.doc.toString()).toBe('1. parent\n1. child');
   });
 });

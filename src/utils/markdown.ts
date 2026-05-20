@@ -12,6 +12,7 @@ import { parseWikiLinkReference } from './wikiLinks';
 import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from '../types';
 import { LRUCache, hashContent } from './performance';
 import { normalizeMarkdownTablesForRender } from './markdownTableNormalize';
+import { preprocessAlphaRomanLists, applyAlphaRomanListAttrs } from './markdownAlphaRomanList';
 import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
 
 interface MarkdownRenderOptions {
@@ -44,6 +45,12 @@ const createMarkdownIt = () => {
     .use(taskLists)
     // GFM/Obsidian-style [^id] refs and [^id]: definitions (otherwise parsed as reference links).
     .use(footnote);
+
+  // 关闭 setext 标题(下划线式 `foo\n---` / `foo\n===`)。
+  // 它与列表编辑中间态强冲突:在 `- test` 下一行只敲了一个孤立 `-`、还没写空格和内容时,
+  // markdown-it 会按 CommonMark 把上一项渲染成 <h2>,导致预览突然跳成大字标题。
+  // 项目只保留 ATX 风格(`# foo`)的标题,符合现代 markdown 风格指南。
+  md.disable('lheading');
 
   md.core.ruler.after('inline', 'obsidian_block_references', (state) => {
     const nextTokens: Token[] = [];
@@ -432,7 +439,11 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   const normalizedMarkdown = normalizeMarkdownTablesForRender(
     angleBracketBareMarkdownHttpUrls(markdown),
   );
-  const tokens = preservePreviewSourceBlankLines(md.parse(normalizedMarkdown, env), normalizedMarkdown);
+  // 把 alpha/roman marker 改写成阿拉伯数字,让 markdown-it 正常识别为有序列表;
+  // 后续通过 token.map[0] 把原始风格(A./a./I./i.)以 type/start 属性回填到 ordered_list_open。
+  const { src: alphaPreparedSrc, meta: alphaRomanMeta } = preprocessAlphaRomanLists(normalizedMarkdown);
+  const tokens = preservePreviewSourceBlankLines(md.parse(alphaPreparedSrc, env), alphaPreparedSrc);
+  applyAlphaRomanListAttrs(tokens, alphaRomanMeta);
   const renderedHtml = md.renderer.render(tokens, md.options, env);
 
   // Sanitize HTML to prevent XSS attacks
@@ -459,6 +470,9 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
       'data-block-id',
       'data-shiki-block',
       'value',
+      // 用于 alpha/roman 有序列表: <ol type="A" start="3"> 等
+      'type',
+      'start',
     ],
   });
 

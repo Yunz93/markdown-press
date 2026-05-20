@@ -33,6 +33,7 @@ import {
   handleListEnter,
   handleOrderedListContinuationEnter,
   handleListBackspace,
+  createHandleListBackspace,
   handleListTab,
   handleListShiftTab,
 } from '../nestedListCommands';
@@ -162,40 +163,45 @@ export const handleSmartEnter: StateCommand = ({ state, dispatch }): boolean => 
 // ==================== 智能 Backspace 处理 ====================
 
 export const handleSmartBackspace: StateCommand = ({ state, dispatch }): boolean => {
-  const main = state.selection.main;
-  if (!main.empty || isInsideFencedCode(state, main.from)) {
-    return false;
-  }
-
-  if (isInsideFrontmatter(state, main.from)) {
-    return false;
-  }
-
-  const line = state.doc.lineAt(main.from);
-  const structured = parseStructuredLine(line.text);
-
-  // 使用新的列表处理逻辑
-  if (structured.list) {
-    const item = parseListItem(line.text, line.number, line.from);
-    if (item) {
-      return handleListBackspace({ state, dispatch } as Parameters<StateCommand>[0]) ?? false;
-    }
-  }
-
-  // 引用块处理
-  if (structured.quote) {
-    let markerBoundary = line.from + buildQuotePrefix(structured.quote).length;
-
-    if (main.from === markerBoundary) {
-      const nextText = structured.quote.depth > 1
-        ? `${structured.quote.indent}${buildQuoteRaw(structured.quote.depth - 1, structured.quote.spacedStyle)}${structured.quote.content}`
-        : `${structured.quote.indent}${structured.quote.content}`;
-      return replaceCurrentLine(state, dispatch, nextText, nextText.length);
-    }
-  }
-
-  return false;
+  return createHandleSmartBackspace('strict')({ state, dispatch });
 };
+
+export function createHandleSmartBackspace(orderedListMode: OrderedListMode): StateCommand {
+  return ({ state, dispatch }): boolean => {
+    const main = state.selection.main;
+    if (!main.empty || isInsideFencedCode(state, main.from)) {
+      return false;
+    }
+
+    if (isInsideFrontmatter(state, main.from)) {
+      return false;
+    }
+
+    const line = state.doc.lineAt(main.from);
+    const structured = parseStructuredLine(line.text);
+
+    if (structured.list) {
+      const item = parseListItem(line.text, line.number, line.from);
+      if (item) {
+        const cmd = createHandleListBackspace({ strictMode: orderedListMode === 'strict' });
+        return cmd({ state, dispatch }) ?? false;
+      }
+    }
+
+    if (structured.quote) {
+      let markerBoundary = line.from + buildQuotePrefix(structured.quote).length;
+
+      if (main.from === markerBoundary) {
+        const nextText = structured.quote.depth > 1
+          ? `${structured.quote.indent}${buildQuoteRaw(structured.quote.depth - 1, structured.quote.spacedStyle)}${structured.quote.content}`
+          : `${structured.quote.indent}${structured.quote.content}`;
+        return replaceCurrentLine(state, dispatch, nextText, nextText.length);
+      }
+    }
+
+    return false;
+  };
+}
 
 // ==================== Tab / Shift-Tab 处理 ====================
 

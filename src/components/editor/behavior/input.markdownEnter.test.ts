@@ -39,4 +39,18 @@ describe('handleSmartEnter ordered list continuation with markdown syntax tree',
     const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
     expect(next.doc.toString()).toMatch(/\nB\.[ )]/);
   });
+
+  // 回归 #2：缩进不足 CommonMark 续行宽度时不应当作续行段
+  it('does not insert next ordered marker when continuation indent is below marker width', () => {
+    const doc = '1. one\n two';
+    const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
+    // 续行段判定失败 → 落到默认 markdown 续行（不会插入下一个有序 marker）
+    expect(next.doc.toString()).not.toMatch(/\n2\.[ )]/);
+  });
+
+  it('does not insert next ordered marker when continuation indent is 2 spaces under 1.', () => {
+    const doc = '1. one\n  two';
+    const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
+    expect(next.doc.toString()).not.toMatch(/\n2\.[ )]/);
+  });
 });

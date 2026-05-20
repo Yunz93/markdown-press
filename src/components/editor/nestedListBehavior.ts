@@ -338,8 +338,35 @@ export function isLaterLineOfMarkdownListItem(state: EditorState, lineNumber: nu
 }
 
 /**
+ * 计算父项续行段所需的最小缩进列宽（与 CommonMark 一致）。
+ * = quotePrefix 长 + indent 列宽 + marker 文本宽 + 1（marker 后的空格）
+ */
+function getContinuationMinIndent(item: ListItemInfo): number {
+  const quoteWidth = item.quotePrefix?.length ?? 0;
+  const indentWidth = getIndentColumnWidth(item.indent);
+  let markerWidth: number;
+  if (item.type === 'ordered') {
+    const seg = formatOrderedMarkerValue(
+      item.number ?? 1,
+      item.markerStyle ?? 'decimal',
+      item.delimiter ?? '.',
+    );
+    markerWidth = seg.length;
+  } else if (item.type === 'task') {
+    markerWidth = item.marker.length + 1 + (item.checkbox?.length ?? 3);
+  } else {
+    markerWidth = item.marker.length;
+  }
+  return quoteWidth + indentWidth + markerWidth + 1;
+}
+
+/**
  * 当前行是否为「列表下的懒延续」：非列表行、有前导缩进，且向上能找到有序列表项，
  * 中间未遇到顶格非列表正文（否则会打断列表）。
+ *
+ * 收紧：当当前行使用 ASCII 缩进续行时，缩进列宽必须 ≥ 父项的内容起列
+ * （quotePrefix + indent + marker + 1），否则视为段落不再当作续行段。
+ * 这样能让编辑器对 Enter 的续写行为与 CommonMark 渲染一致。
  */
 export function getOrderedListParentForContinuation(
   state: EditorState,
@@ -357,13 +384,23 @@ export function getOrderedListParentForContinuation(
 
   if (!hasAsciiIndent && !needsTreeContinuation) return null;
 
+  const currentLeading = line.text.match(/^[ \t]*/)?.[0] ?? '';
+  const currentIndentWidth = getIndentColumnWidth(currentLeading);
+
   for (let i = lineNumber - 1; i >= 1; i--) {
     const pl = state.doc.line(i);
     if (isBlankLine(pl.text)) continue;
 
     const item = parseListItem(pl.text, i, pl.from);
     if (item) {
-      return item.type === 'ordered' ? item : null;
+      if (item.type !== 'ordered') return null;
+      // 仅 ASCII 缩进路径校验最小缩进；needsTreeContinuation 路径已由 lang-markdown 语法树确认归属
+      if (hasAsciiIndent && !needsTreeContinuation) {
+        if (currentIndentWidth < getContinuationMinIndent(item)) {
+          return null;
+        }
+      }
+      return item;
     }
 
     const plLeading = pl.text.match(/^[ \t]*/)?.[0] ?? '';
@@ -376,13 +413,16 @@ export function getOrderedListParentForContinuation(
 /**
  * 构建列表层级上下文
  * 分析文档中每个列表项的父级关系
- * 
+ *
  * 注意：根据 CommonMark 规范，列表中的空行不应该中断列表
  * 只有当空行后的内容缩进不足以构成列表延续时才中断
+ *
+ * 实现说明：层级判定统一使用「缩进列宽（含 marker 内容起列约束）」，
+ * 而不是按 4 空格量化的 item.level，避免 5/6 空格等非倍数缩进出现层级漂移。
  */
 export function buildListHierarchy(doc: EditorState['doc']): Map<number, ListContext> {
   const hierarchy = new Map<number, ListContext>();
-  const stack: Array<{ level: number; type: ListType; lineNumber: number }> = [];
+  const stack: Array<{ depth: number; type: ListType; lineNumber: number }> = [];
   let lastNonBlankLine = 0;
   let consecutiveBlankLines = 0;
 
@@ -409,19 +449,21 @@ export function buildListHierarchy(doc: EditorState['doc']): Map<number, ListCon
     consecutiveBlankLines = 0;
     lastNonBlankLine = i;
 
-    // 找到当前项的父级
-    while (stack.length > 0 && stack[stack.length - 1].level >= item.level) {
+    const itemDepth = getIndentColumnWidth(item.indent);
+
+    // 弹出所有「等深或更深」的项，剩下的栈顶才是真正的父级
+    while (stack.length > 0 && stack[stack.length - 1].depth >= itemDepth) {
       stack.pop();
     }
 
     const parent = stack[stack.length - 1];
     hierarchy.set(i, {
-      parentLevel: parent?.level ?? -1,
+      parentLevel: parent ? Math.floor(parent.depth / LIST_INDENT_SIZE) : -1,
       listType: item.type,
       startNumber: 1,
     });
 
-    stack.push({ level: item.level, type: item.type, lineNumber: i });
+    stack.push({ depth: itemDepth, type: item.type, lineNumber: i });
   }
 
   return hierarchy;
@@ -430,16 +472,36 @@ export function buildListHierarchy(doc: EditorState['doc']): Map<number, ListCon
 /**
  * 计算有序列表的标准化编号
  * 严格模式：每个层级独立计数
- * 
- * 注意：根据 CommonMark 规范，列表中的空行不应该中断列表编号
+ *
+ * 行为约定：
+ * - 两个连续空行：清空所有计数器（段落级断开）
+ * - 单个空行 + 后续是「显式起始 marker」（number === 1）：仅重置该 key 的计数器，允许新分组
+ * - 单个空行 + 后续 number !== 1：视为同组延续（兼容 CommonMark 的 lazy 续行）
+ * - 缩进延续段（` continuation`）：不打断
  */
 export function calculateOrderedListNumbers(
   state: EditorState,
   changes?: ChangeSpec[]
 ): Map<number, number> {
   const numbers = new Map<number, number>();
-  const counters = new Map<string, number>(); // key: "parentLine:type:level"
+  const counters = new Map<string, number>(); // key: "quoteKey:parentKey:itemDepth"
+  const counterDepths = new Map<string, number>(); // 与 counters 同 key，记录其 itemDepth
   let consecutiveBlankLines = 0;
+  let pendingBlankReset = false;
+
+  const clearCountersAtOrBelow = (minDepth: number) => {
+    for (const [k, d] of [...counterDepths.entries()]) {
+      if (d >= minDepth) {
+        counters.delete(k);
+        counterDepths.delete(k);
+      }
+    }
+  };
+
+  const clearAllCounters = () => {
+    counters.clear();
+    counterDepths.clear();
+  };
 
   for (let i = 1; i <= state.doc.lines; i++) {
     const line = state.doc.line(i);
@@ -448,17 +510,26 @@ export function calculateOrderedListNumbers(
     if (!item || item.type !== 'ordered') {
       if (isBlankLine(line.text)) {
         consecutiveBlankLines++;
-        // 两个连续空行才清空计数器
+        pendingBlankReset = true;
+        // 两个连续空行清空所有计数器（段落级断开）
         if (consecutiveBlankLines >= 2) {
-          counters.clear();
+          clearAllCounters();
+          pendingBlankReset = false;
         }
       } else if (!item && getOrderedListParentForContinuation(state, i)) {
         // 有序列表项下的缩进延续段，不应打断编号序列（与 CommonMark 懒延续一致）
         consecutiveBlankLines = 0;
-      } else {
-        // 非列表行且非空行，清空计数器
-        counters.clear();
+        pendingBlankReset = false;
+      } else if (item && (item.type === 'unordered' || item.type === 'task')) {
+        // 无序/任务列表项：仅清空同级或更深的有序计数（更深嵌套的兄弟不影响顶层计数继承）
+        clearCountersAtOrBelow(getIndentColumnWidth(item.indent));
         consecutiveBlankLines = 0;
+        pendingBlankReset = false;
+      } else {
+        // 真正的非列表非空非续行（段落、代码块等）：清空所有计数
+        clearAllCounters();
+        consecutiveBlankLines = 0;
+        pendingBlankReset = false;
       }
       continue;
     }
@@ -472,8 +543,25 @@ export function calculateOrderedListNumbers(
     const parentKey = findParentCounterKey(state, i, itemDepth, quoteKey);
     const key = `${quoteKey}:${parentKey}:${itemDepth}`;
 
-    const current = (counters.get(key) ?? 0) + 1;
+    // 单空行后若用户显式写了起始编号 1，认为是新分组，重置同 key 的计数
+    if (pendingBlankReset && item.number === 1) {
+      counters.delete(key);
+      counterDepths.delete(key);
+    }
+    pendingBlankReset = false;
+
+    let current: number;
+    const stored = counters.get(key);
+    if (stored === undefined) {
+      // 首次出现：顶层组保留用户的起始编号；嵌套层级强制从 1 开始
+      const isTopLevel = parentKey === 'root';
+      const seed = isTopLevel ? Math.max(1, item.number ?? 1) : 1;
+      current = seed;
+    } else {
+      current = stored + 1;
+    }
     counters.set(key, current);
+    counterDepths.set(key, itemDepth);
     numbers.set(i, current);
   }
 
@@ -482,6 +570,9 @@ export function calculateOrderedListNumbers(
 
 /**
  * 查找父级计数器 key
+ *
+ * 仅当前一项的内容起列 ≤ 当前缩进列宽时，前一项才是有效父级（与 CommonMark 嵌套规则一致）。
+ * 缩进虽然更浅但内容起列不够的项不能作为父级，会继续向上寻找。
  */
 function findParentCounterKey(state: EditorState, lineNumber: number, depth: number, quotePrefix: string): string {
   for (let i = lineNumber - 1; i >= 1; i--) {
@@ -497,9 +588,16 @@ function findParentCounterKey(state: EditorState, lineNumber: number, depth: num
       continue;
     }
 
-    if (getIndentColumnWidth(item.indent) < depth) {
+    const itemIndentWidth = getIndentColumnWidth(item.indent);
+    if (itemIndentWidth >= depth) {
+      // 同级或更深，不是当前项的父级，继续向上寻找
+      continue;
+    }
+
+    if (getContinuationMinIndent(item) <= depth) {
       return `${i}:${item.type}`;
     }
+    // 更浅但内容起列不够：当前项不能算它的子项，继续向上找更外层潜在父级
   }
   return 'root';
 }
@@ -548,6 +646,10 @@ function previousSiblingMarkerStyleInGroup(
     }
 
     if (item.type !== 'ordered') {
+      // 同级或更浅的无序项视为兄弟打断；更深嵌套的无序项是其他列表的子内容，可跨越
+      if (depth <= currentDepth) {
+        break;
+      }
       continue;
     }
 
@@ -693,11 +795,13 @@ export function getSelectedListItems(state: EditorState): ListItemInfo[] {
 
 /**
  * 查找同级上一个列表项
+ * 参数 depth 为缩进列宽（getIndentColumnWidth 的返回值），同列宽视为同级，
+ * 不再按 4 空格量化层级，避免 5/6 空格等非倍数缩进出现误判。
  */
 export function findPreviousSiblingItem(
   state: EditorState,
   lineNumber: number,
-  level: number
+  depth: number
 ): ListItemInfo | null {
   for (let i = lineNumber - 1; i >= 1; i--) {
     const line = state.doc.line(i);
@@ -706,10 +810,11 @@ export function findPreviousSiblingItem(
     const item = parseListItem(line.text, i, line.from);
     if (!item) continue;
 
-    if (item.level === level) {
+    const itemDepth = getIndentColumnWidth(item.indent);
+    if (itemDepth === depth) {
       return item;
     }
-    if (item.level < level) {
+    if (itemDepth < depth) {
       break; // 到达父级或更高级别
     }
   }
@@ -718,11 +823,12 @@ export function findPreviousSiblingItem(
 
 /**
  * 查找同级下一个列表项
+ * 参数 depth 同上，为缩进列宽。
  */
 export function findNextSiblingItem(
   state: EditorState,
   lineNumber: number,
-  level: number
+  depth: number
 ): ListItemInfo | null {
   for (let i = lineNumber + 1; i <= state.doc.lines; i++) {
     const line = state.doc.line(i);
@@ -731,10 +837,11 @@ export function findNextSiblingItem(
     const item = parseListItem(line.text, i, line.from);
     if (!item) continue;
 
-    if (item.level === level) {
+    const itemDepth = getIndentColumnWidth(item.indent);
+    if (itemDepth === depth) {
       return item;
     }
-    if (item.level < level) {
+    if (itemDepth < depth) {
       break; // 到达父级或更高级别
     }
   }
@@ -748,6 +855,6 @@ export function isLastListItem(state: EditorState, lineNumber: number): boolean 
   const item = getListInfoAtLine(state, lineNumber);
   if (!item) return false;
 
-  const nextItem = findNextSiblingItem(state, lineNumber, item.level);
+  const nextItem = findNextSiblingItem(state, lineNumber, getIndentColumnWidth(item.indent));
   return nextItem === null;
 }

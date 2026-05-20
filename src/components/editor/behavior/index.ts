@@ -86,6 +86,7 @@ export {
   handleStructuredPaste,
   createHandleSmartTab,
   createHandleSmartShiftTab,
+  createHandleSmartBackspace,
 } from './input';
 
 // Re-export normalization
@@ -97,7 +98,7 @@ export {
 import { toggleBold, toggleItalic, toggleInlineCode, insertLink, insertCodeBlock } from './commands/inline';
 import { toggleBlockquote, cycleHeading } from './commands/block';
 import { toggleUnorderedList, toggleOrderedList, createToggleOrderedList } from './commands/list';
-import { handleSmartEnter, handleSmartBackspace, handleSmartTab, handleSmartShiftTab, handleStructuredPaste, createHandleSmartTab, createHandleSmartShiftTab } from './input';
+import { handleSmartEnter, handleSmartBackspace, handleSmartTab, handleSmartShiftTab, handleStructuredPaste, createHandleSmartTab, createHandleSmartShiftTab, createHandleSmartBackspace } from './input';
 
 // ==================== 命令导出 ====================
 
@@ -123,7 +124,7 @@ export const markdownCommands = {
 export function createMarkdownKeyBindings(orderedListMode: OrderedListMode): KeyBinding[] {
   return [
     { key: 'Enter', run: handleSmartEnter },
-    { key: 'Backspace', run: handleSmartBackspace },
+    { key: 'Backspace', run: createHandleSmartBackspace(orderedListMode) },
     { key: 'Shift-Tab', run: createHandleSmartShiftTab(orderedListMode) },
     { key: 'Tab', run: createHandleSmartTab(orderedListMode) },
     { key: 'Mod-b', run: toggleBold },

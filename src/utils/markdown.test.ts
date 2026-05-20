@@ -95,6 +95,82 @@ describe('renderMarkdown', () => {
     expect(html).toContain('task-list-item');
   });
 
+  // 修复:让预览端也认 alpha/roman 风格的有序列表(A./B./i./a./b. 等),与编辑器侧对齐;
+  // 否则 markdown-it 会把这些行当成普通段落 + soft break,丢失列表与嵌套结构。
+  describe('alpha / roman ordered list markers render as <ol type=...> with nesting', () => {
+    it('uppercase alpha `A./B.` renders as <ol type="A">', () => {
+      const html = renderMarkdown('A. first\nB. second');
+      expect(html).toMatch(/<ol[^>]*type="A"/);
+      expect(html).toMatch(/<li>first<\/li>/);
+      expect(html).toMatch(/<li>second<\/li>/);
+    });
+
+    it('lowercase alpha `a./b.` renders as <ol type="a">', () => {
+      const html = renderMarkdown('a. first\nb. second');
+      expect(html).toMatch(/<ol[^>]*type="a"/);
+    });
+
+    it('multi-letter roman `ii./iii.` renders as <ol type="i" start="2">', () => {
+      const html = renderMarkdown('ii. two\niii. three');
+      expect(html).toMatch(/<ol[^>]*type="i"/);
+      expect(html).toMatch(/start="2"/);
+    });
+
+    it('reproduces the user screenshot: nested alpha/roman lists preserve their structure', () => {
+      const md = [
+        'A. test',
+        'B. test',
+        '    A. test',
+        '    B. test',
+      ].join('\n');
+      const html = renderMarkdown(md);
+      // 顶层应是 <ol type="A">,嵌套子列表也是 <ol type="A">,而不是被退化成 <p>...<br>...</p>。
+      expect(html).not.toMatch(/<p>A\. test<br/);
+      const olMatches = html.match(/<ol[^>]*type="A"/g);
+      expect(olMatches?.length ?? 0).toBeGreaterThanOrEqual(2);
+    });
+
+    it('does not affect numeric ordered lists', () => {
+      const html = renderMarkdown('1. one\n2. two');
+      expect(html).not.toMatch(/type="[Aa]"/);
+      expect(html).toMatch(/<ol>\s*<li>one<\/li>/);
+    });
+
+    it('alpha marker inside fenced code block is not rewritten', () => {
+      const html = renderMarkdown('```\nA. inside code\n```');
+      expect(html).toContain('A. inside code');
+      expect(html).not.toMatch(/<ol[^>]*type="A"/);
+    });
+  });
+
+  // 修复:防止编辑中间态(列表下一行只有孤立 `-`)被解析成 setext h2,导致预览突然跳成大字标题。
+  // 见 issue:"这个编辑中间态的渲染有问题"。
+  describe('setext heading is disabled to avoid mid-edit list rendering jumps', () => {
+    it('does not render `foo\\n---` as <h2>', () => {
+      const html = renderMarkdown('foo\n---');
+      expect(html).not.toMatch(/<h2\b/);
+    });
+
+    it('does not render `foo\\n===` as <h1>', () => {
+      const html = renderMarkdown('foo\n===');
+      expect(html).not.toMatch(/<h1\b/);
+    });
+
+    it('still renders ATX-style headings (`# foo` / `## bar`) normally', () => {
+      const html = renderMarkdown('# heading1\n\n## heading2');
+      expect(html).toMatch(/<h1[^>]*>heading1<\/h1>/);
+      expect(html).toMatch(/<h2[^>]*>heading2<\/h2>/);
+    });
+
+    it('mid-edit list intermediate state with trailing `-` does not promote previous item to a heading', () => {
+      // 复现截图场景:`- test` 嵌套结构,末行只敲了一个 `-`(4 空格缩进、未输入空格和内容)。
+      const html = renderMarkdown('- test\n  - test\n  - tet\n  - test\n    -');
+      expect(html).not.toMatch(/<h1\b/);
+      expect(html).not.toMatch(/<h2\b/);
+      expect(html).toMatch(/<ul>[\s\S]*<li>[\s\S]*test[\s\S]*<\/ul>/);
+    });
+  });
+
   it('loose ordered list mode preserves author markers in preview HTML', () => {
     const md = '1. first\n   indent\n3. third';
     const loose = renderMarkdown(md, { orderedListMode: 'loose', themeMode: 'light' });

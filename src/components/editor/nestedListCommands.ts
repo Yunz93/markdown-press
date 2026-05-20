@@ -96,6 +96,31 @@ function withIndent(
 }
 
 /**
+ * 在 parent 之下、当前行之上查找已存在的「parent 直接子项」缩进，
+ * 用于多个兄弟项之间保持一致缩进（避免 3 空格子项与 4 空格 marker-aware 缩进混用）。
+ */
+function findExistingChildIndentUnderParent(
+  state: EditorState,
+  parent: ListItemInfo,
+  currentLineNumber: number,
+): string | null {
+  const parentWidth = getIndentColumnWidth(parent.indent);
+  for (let i = parent.lineNumber + 1; i < currentLineNumber; i += 1) {
+    const line = state.doc.line(i);
+    if (isBlankLine(line.text)) continue;
+
+    const it = parseListItem(line.text, i, line.from);
+    if (!it) continue;
+    if ((it.quotePrefix ?? '') !== (parent.quotePrefix ?? '')) continue;
+
+    const w = getIndentColumnWidth(it.indent);
+    if (w <= parentWidth) break; // 回到 parent 同级或更浅，停止
+    return it.indent; // 第一个比 parent 更深的项就是 parent 的直接子级
+  }
+  return null;
+}
+
+/**
  * 查找用于 Tab 缩进嵌套的「上一项」父级。
  * 必须跳过比当前行更深的列表行（否则顶格续行会误挂到上一项的子列表下）。
  */
@@ -422,41 +447,108 @@ export const handleOrderedListContinuationEnter: StateCommand = ({ state, dispat
 
 // ==================== Backspace 处理 ====================
 
-export const handleListBackspace: StateCommand = ({ state, dispatch }): boolean => {
-  const main = state.selection.main;
-  if (!main.empty) return false;
-
-  const line = state.doc.lineAt(main.from);
-  const item = parseListItem(line.text, line.number, line.from);
-
-  if (!item) return false;
-
-  // 计算 marker 后的边界位置
-  const quoteLen = item.quotePrefix?.length ?? 0;
-  let markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1; // +1 for space
-
-  if (item.type === 'ordered') {
-    const seg = formatOrderedMarkerValue(item.number ?? 1, item.markerStyle ?? 'decimal', item.delimiter ?? '.');
-    markerEnd = line.from + quoteLen + item.indent.length + seg.length + 1;
-  } else if (item.type === 'task') {
-    markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1 + (item.checkbox?.length ?? 3) + 1;
+/** 在同一事务内将「行替换 + strict normalize」合并 dispatch，避免出现瞬时的重复编号 */
+function dispatchLineReplacementWithNormalize(
+  state: EditorState,
+  dispatch: (tr: Transaction) => void,
+  line: { from: number; to: number },
+  newText: string,
+  cursorAnchor: number,
+  options?: { strictMode?: boolean },
+): boolean {
+  const baseChanges = { from: line.from, to: line.to, insert: newText };
+  if (!options?.strictMode) {
+    dispatch(state.update({
+      changes: baseChanges,
+      selection: { anchor: cursorAnchor },
+      scrollIntoView: true,
+      userEvent: 'input',
+    }));
+    return true;
   }
 
-  // 光标不在 marker 边界处，不处理
-  if (main.from !== markerEnd) return false;
-
-  // 有缩进时，先减少缩进
-  if (getIndentColumnWidth(item.indent) > 0) {
-    const newItem = withIndent(item, findOutdentIndent(state, item));
-    const removedColumns = getIndentColumnWidth(item.indent) - getIndentColumnWidth(newItem.indent);
-    const next = formatListItem(newItem);
-    return replaceCurrentLine(state, dispatch, next, markerEnd - line.from - removedColumns);
+  const baseChangeSet = state.changes(baseChanges);
+  const intermediate = state.update({ changes: baseChanges });
+  const normalizationChanges = getStrictOrderedListNormalizationChanges(intermediate.state);
+  if (!normalizationChanges) {
+    dispatch(state.update({
+      changes: baseChanges,
+      selection: { anchor: cursorAnchor },
+      scrollIntoView: true,
+      userEvent: 'input',
+    }));
+    return true;
   }
 
-  // 无缩进时，移除列表 marker
-  const plainText = `${item.quotePrefix ?? ''}${item.content}`;
-  return replaceCurrentLine(state, dispatch, plainText, (item.quotePrefix?.length ?? 0));
+  const normalizationChangeSet = intermediate.state.changes(normalizationChanges);
+  const composedChanges = baseChangeSet.compose(normalizationChangeSet);
+  const mappedAnchor = normalizationChangeSet.mapPos(cursorAnchor, 1);
+  dispatch(state.update({
+    changes: composedChanges,
+    selection: { anchor: mappedAnchor },
+    scrollIntoView: true,
+    userEvent: 'input',
+  }));
+  return true;
+}
+
+export const createHandleListBackspace = (options?: { strictMode?: boolean }): StateCommand => {
+  return ({ state, dispatch }): boolean => {
+    const main = state.selection.main;
+    if (!main.empty) return false;
+
+    const line = state.doc.lineAt(main.from);
+    const item = parseListItem(line.text, line.number, line.from);
+
+    if (!item) return false;
+
+    // 计算 marker 后的边界位置
+    const quoteLen = item.quotePrefix?.length ?? 0;
+    let markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1;
+
+    if (item.type === 'ordered') {
+      const seg = formatOrderedMarkerValue(item.number ?? 1, item.markerStyle ?? 'decimal', item.delimiter ?? '.');
+      markerEnd = line.from + quoteLen + item.indent.length + seg.length + 1;
+    } else if (item.type === 'task') {
+      markerEnd = line.from + quoteLen + item.indent.length + item.marker.length + 1 + (item.checkbox?.length ?? 3) + 1;
+    }
+
+    // 光标不在 marker 边界处，不处理
+    if (main.from !== markerEnd) return false;
+
+    // 有缩进时，先减少缩进
+    if (getIndentColumnWidth(item.indent) > 0) {
+      const newItem = withIndent(item, findOutdentIndent(state, item));
+      const removedColumns = getIndentColumnWidth(item.indent) - getIndentColumnWidth(newItem.indent);
+      const next = formatListItem(newItem);
+      const cursorAnchor = line.from + (markerEnd - line.from - removedColumns);
+      return dispatchLineReplacementWithNormalize(
+        state,
+        dispatch,
+        { from: line.from, to: line.to },
+        next,
+        cursorAnchor,
+        options,
+      );
+    }
+
+    // 无缩进时，移除列表 marker
+    const plainText = `${item.quotePrefix ?? ''}${item.content}`;
+    const cursorAnchor = line.from + (item.quotePrefix?.length ?? 0);
+    return dispatchLineReplacementWithNormalize(
+      state,
+      dispatch,
+      { from: line.from, to: line.to },
+      plainText,
+      cursorAnchor,
+      options,
+    );
+  };
 };
+
+/** 默认 strict 模式以匹配主键绑定；调用方可通过 createHandleListBackspace 自定义 */
+export const handleListBackspace: StateCommand = (cmdArg) =>
+  createHandleListBackspace({ strictMode: true })(cmdArg);
 
 // ==================== Tab / Shift-Tab 处理 ====================
 
@@ -475,18 +567,43 @@ export const handleListTab = (options?: { strictMode?: boolean }): StateCommand 
       const plannedItems = new Map<number, ListItemInfo>();
 
       for (const item of items) {
+        const currentWidth = getIndentColumnWidth(item.indent);
         const parent = findPreviousListItem(
           state,
           item.lineNumber,
           item.quotePrefix ?? '',
           plannedItems,
-          getIndentColumnWidth(item.indent),
+          currentWidth,
         );
-        const nextIndent = parent
-          ? getChildIndentForParent(parent)
-          : `${item.indent}${LIST_INDENT_UNIT}`;
+
+        let nextIndent: string;
+        if (parent) {
+          // 优先复用 parent 下已有子项的缩进，让兄弟项视觉对齐
+          const existingChildIndent = findExistingChildIndentUnderParent(state, parent, item.lineNumber);
+          const proposed = getChildIndentForParent(parent);
+
+          if (
+            existingChildIndent !== null &&
+            getIndentColumnWidth(existingChildIndent) > currentWidth
+          ) {
+            nextIndent = existingChildIndent;
+          } else if (getIndentColumnWidth(proposed) > currentWidth) {
+            nextIndent = proposed;
+          } else {
+            // 已经处于该父级子列范围内（多次 Tab），在当前缩进上再加深一级
+            nextIndent = `${item.indent}${LIST_INDENT_UNIT}`;
+          }
+        } else {
+          nextIndent = `${item.indent}${LIST_INDENT_UNIT}`;
+        }
+
+        // markerStyle 继承策略：仅当 (父级是 ordered) 且 (当前子项内容为空)
+        // 才把子项 marker 对齐父级。这样既能修正 `1. \na. ` 这类陈旧字母标记，
+        // 也能尊重用户在非空项里显式选择的 markerStyle。
+        const inheritParentStyle =
+          parent?.type === 'ordered' && item.type === 'ordered' && item.content.trim() === '';
         const newItem = withIndent(item, nextIndent, {
-          markerStyle: parent?.type === 'ordered' ? parent.markerStyle ?? 'decimal' : undefined,
+          markerStyle: inheritParentStyle ? parent!.markerStyle ?? 'decimal' : undefined,
         });
         // Ensure output uses spaces only, replace any tabs with the editor indent unit.
         const formatted = formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
