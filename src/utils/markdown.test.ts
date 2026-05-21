@@ -141,6 +141,13 @@ describe('renderMarkdown', () => {
       expect(html).toContain('A. inside code');
       expect(html).not.toMatch(/<ol[^>]*type="A"/);
     });
+
+    it('alpha marker inside indented code block is not rewritten', () => {
+      const html = renderMarkdown('    A. inside code\n    B. still code');
+      expect(html).toContain('<pre><code>A. inside code');
+      expect(html).toContain('B. still code');
+      expect(html).not.toMatch(/<ol[^>]*type="A"/);
+    });
   });
 
   // 修复:防止编辑中间态(列表下一行只有孤立 `-`)被解析成 setext h2,导致预览突然跳成大字标题。

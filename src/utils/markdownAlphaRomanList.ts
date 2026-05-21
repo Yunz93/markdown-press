@@ -14,13 +14,12 @@
  *   - 多字母 [IVXLCDM]{2,} / [ivxlcdm]{2,} (且能解析为正整数罗马数字) → 罗马
  *   - 单字母 [A-Z] / [a-z] → alpha
  *
- * 已知限制:
- *   - fenced code block (``` 或 ~~~) 内容被跳过,不会改写。
- *   - indented code block 不做检测;在 4 空格缩进的"代码块"里写 `A. text` 这种少见用法,会被
- *     当作列表项改写。考虑到该写法非主流,暂不针对处理。
+ * 额外约束:
+ *   - fenced code block (``` 或 ~~~) 内容会被跳过,不会改写。
+ *   - indented code block 也会被跳过,避免把 4 空格缩进代码里的 `A. text` 污染成列表。
  */
 
-import type Token from 'markdown-it/lib/token';
+import type Token from 'markdown-it/lib/token.mjs';
 
 export type AlphaRomanListType = 'A' | 'a' | 'I' | 'i';
 
@@ -34,6 +33,8 @@ export type AlphaRomanListMeta = Map<number, AlphaRomanListMetaEntry>;
 // 匹配 alpha/roman 列表行。多字母 roman 优先,避免 `ii.` 被当成单字母 alpha。
 // 后跟空白或行尾,保证 `A.text` 这种无空格紧贴的不会误判为列表。
 const ALPHA_ROMAN_LIST_RE = /^([ \t]*)([IVXLCDM]{2,}|[ivxlcdm]{2,}|[A-Z]|[a-z])([.)])(?=\s|$)(.*)$/;
+const DECIMAL_LIST_RE = /^([ \t]*)\d+[.)](?=\s|$)/;
+const BULLET_LIST_RE = /^([ \t]*)[-+*](?=\s|$)/;
 
 // fenced code 起止行(允许 0~3 空格缩进,与 CommonMark 一致)。
 const FENCE_RE = /^([ ]{0,3})(`{3,}|~{3,})/;
@@ -47,6 +48,28 @@ const ROMAN_VALUES: Record<string, number> = {
   d: 500,
   m: 1000,
 };
+
+function getIndentColumns(line: string): number {
+  let columns = 0;
+  for (const char of line) {
+    if (char === ' ') {
+      columns += 1;
+      continue;
+    }
+    if (char === '\t') {
+      columns += 4;
+      continue;
+    }
+    break;
+  }
+  return columns;
+}
+
+function isListLikeLine(line: string): boolean {
+  return ALPHA_ROMAN_LIST_RE.test(line)
+    || DECIMAL_LIST_RE.test(line)
+    || BULLET_LIST_RE.test(line);
+}
 
 /** 解析罗马数字字符串为正整数;无效返回 0。 */
 function parseRoman(input: string): number {
@@ -97,9 +120,14 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
   const meta: AlphaRomanListMeta = new Map();
   let inFence = false;
   let fenceChar = '';
+  let inIndentedCode = false;
+  let activeListIndents: number[] = [];
+  let previousNonBlankIndent: number | null = null;
+  let previousNonBlankWasList = false;
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
+    const trimmed = line.trim();
 
     const fenceMatch = line.match(FENCE_RE);
     if (fenceMatch) {
@@ -114,16 +142,57 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
       continue;
     }
     if (inFence) continue;
+    if (trimmed === '') {
+      activeListIndents = [];
+      previousNonBlankIndent = null;
+      previousNonBlankWasList = false;
+      continue;
+    }
+
+    const indentColumns = getIndentColumns(line);
+    activeListIndents = activeListIndents.filter((indent) => indent <= indentColumns);
+    const hasIndentedListContext = activeListIndents.includes(indentColumns)
+      || (previousNonBlankWasList && previousNonBlankIndent !== null && previousNonBlankIndent <= indentColumns);
+
+    if (inIndentedCode) {
+      if (indentColumns >= 4 && !hasIndentedListContext) {
+        previousNonBlankWasList = false;
+        previousNonBlankIndent = indentColumns;
+        continue;
+      }
+      inIndentedCode = false;
+    }
+
+    if (indentColumns >= 4 && !hasIndentedListContext) {
+      // 4 空格缩进且前面没有明确列表上下文时,按 CommonMark 视为 indented code block。
+      // 后续整段代码块都应跳过 alpha/roman 预处理,避免把代码内容改写成列表。
+      inIndentedCode = true;
+      previousNonBlankWasList = false;
+      previousNonBlankIndent = indentColumns;
+      continue;
+    }
 
     const m = line.match(ALPHA_ROMAN_LIST_RE);
-    if (!m) continue;
+    if (m) {
+      const [, indent, markerPart, delimiter, rest] = m;
+      const cls = classifyMarker(markerPart);
+      if (cls) {
+        lines[i] = `${indent}${cls.value}${delimiter}${rest}`;
+        meta.set(i, { type: cls.type, start: cls.value });
+      }
+    }
 
-    const [, indent, markerPart, delimiter, rest] = m;
-    const cls = classifyMarker(markerPart);
-    if (!cls) continue;
+    if (isListLikeLine(lines[i])) {
+      if (!activeListIndents.includes(indentColumns)) {
+        activeListIndents.push(indentColumns);
+      }
+      previousNonBlankWasList = true;
+      previousNonBlankIndent = indentColumns;
+      continue;
+    }
 
-    lines[i] = `${indent}${cls.value}${delimiter}${rest}`;
-    meta.set(i, { type: cls.type, start: cls.value });
+    previousNonBlankWasList = false;
+    previousNonBlankIndent = indentColumns;
   }
 
   return { src: lines.join('\n'), meta };
