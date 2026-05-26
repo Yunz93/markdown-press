@@ -74,4 +74,28 @@ xattr -cr /Applications/M記.app
 
 ## 致谢
 
-[Tauri](https://tauri.app/) · [React](https://react.dev/) · [markdown-it](https://github.com/markdown-it/markdown-it) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)
+M記 建立在以下开源项目与服务之上（排名不分先后）：
+
+**桌面与界面**
+
+- [Tauri](https://tauri.app/) · [React](https://react.dev/) · [Zustand](https://github.com/pmndrs/zustand) · [Vite](https://vitejs.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [Lucide](https://lucide.dev/)
+
+**编辑器**
+
+- [CodeMirror](https://codemirror.net/)
+
+**Markdown 与预览**
+
+- [markdown-it](https://github.com/markdown-it/markdown-it) · [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) · [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) · [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [DOMPurify](https://github.com/cure53/DOMPurify)
+
+**导出与 PDF**
+
+- [PDF.js](https://mozilla.github.io/pdf.js/) · [html2canvas](https://html2canvas.hertzen.com/) · [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/) · [jsPDF](https://github.com/parallax/jsPDF)
+
+**其他**
+
+- [js-yaml](https://github.com/nodeca/js-yaml)
+
+**AI 服务（可选）**
+
+- [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)

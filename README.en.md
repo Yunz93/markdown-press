@@ -74,4 +74,28 @@ Same settings tab: **App ID** and **App Secret** (App Secret stays in secure loc
 
 ## Acknowledgements
 
-[Tauri](https://tauri.app/) · [React](https://react.dev/) · [markdown-it](https://github.com/markdown-it/markdown-it) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)
+M記 is built on the following open-source projects and services (in no particular order):
+
+**Desktop & UI**
+
+- [Tauri](https://tauri.app/) · [React](https://react.dev/) · [Zustand](https://github.com/pmndrs/zustand) · [Vite](https://vitejs.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [Lucide](https://lucide.dev/)
+
+**Editor**
+
+- [CodeMirror](https://codemirror.net/)
+
+**Markdown & preview**
+
+- [markdown-it](https://github.com/markdown-it/markdown-it) · [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) · [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) · [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [DOMPurify](https://github.com/cure53/DOMPurify)
+
+**Export & PDF**
+
+- [PDF.js](https://mozilla.github.io/pdf.js/) · [html2canvas](https://html2canvas.hertzen.com/) · [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/) · [jsPDF](https://github.com/parallax/jsPDF)
+
+**Other**
+
+- [js-yaml](https://github.com/nodeca/js-yaml)
+
+**AI services (optional)**
+
+- [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)
