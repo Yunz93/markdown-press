@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, act, waitFor } from '@testing-library/react';
 import { useCodeMirror } from './useCodeMirror';
 import type { EditorView } from '@codemirror/view';
+import { LARGE_FILE_THRESHOLDS } from '../../../utils/performance';
 
 function Harness(props: {
   content: string;
@@ -59,7 +60,7 @@ describe('useCodeMirror', () => {
   });
 
   it('flushes pending large-file edits before switching to a new document', async () => {
-    const largeContent = `${Array.from({ length: 5001 }, () => 'line').join('\n')}\n`;
+    const largeContent = 'x'.repeat(LARGE_FILE_THRESHOLDS.CHAR_COUNT + 1);
     const nextContent = 'next document';
     const firstOnChange = vi.fn();
     const secondOnChange = vi.fn();
