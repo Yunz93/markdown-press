@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildExportStyles } from './styles';
+import { buildExportDocument, buildExportStyles } from './styles';
 
 describe('buildExportStyles', () => {
   it('removes github-markdown h2 bottom border in export body', () => {
@@ -39,5 +39,19 @@ describe('buildExportStyles', () => {
     expect(css).toMatch(/\.export-document \.markdown-body ins\s*,\s*\.export-document \.markdown-body u\s*\{[^}]*text-decoration:\s*none/m);
     expect(css).toMatch(/\.export-document \.markdown-body ins\s*,\s*\.export-document \.markdown-body u\s*\{[^}]*background-image:\s*linear-gradient\(currentColor,\s*currentColor\)/m);
     expect(css).toMatch(/\.export-document \.markdown-body ins\s*,\s*\.export-document \.markdown-body u\s*\{[^}]*background-position:\s*0 88%/m);
+  });
+
+  it('scopes export theme colors to .export-document[data-theme] for off-screen rasterization', () => {
+    const css = buildExportStyles('light');
+    expect(css).toMatch(/\.export-document\[data-theme="light"\] \.markdown-body\s*\{[^}]*--color-fg-default:\s*var\(--mp-doc-text\)/m);
+    expect(css).toMatch(/\.export-document\[data-theme="dark"\] \.markdown-body\s*\{[^}]*--color-fg-default:\s*var\(--mp-doc-text\)/m);
+    expect(css).toMatch(/\.export-document \{\s*[^}]*--mp-doc-text:/m);
+    expect(css).not.toMatch(/html\.dark \.export-document/);
+    expect(css).not.toMatch(/html:not\(\.dark\) \.export-document/);
+  });
+
+  it('embeds export theme on .export-document for raster selectors', () => {
+    const markup = buildExportDocument('<p>Hi</p>', '', 'nord', 'dark');
+    expect(markup).toContain('data-theme="dark"');
   });
 });

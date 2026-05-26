@@ -1,0 +1,116 @@
+/** @vitest-environment happy-dom */
+
+import React, { useEffect, useState } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, waitFor } from '@testing-library/react';
+import { clearMarkdownCache } from '../../../utils/markdown';
+import { usePreviewRenderer } from './usePreviewRenderer';
+
+(globalThis as typeof globalThis & { __PROD__?: boolean }).__PROD__ ??= false;
+
+const mockedResolvePreviewSource = vi.fn(async (src: string) => `resolved:${src}`);
+const mockedWarmPreviewImage = vi.fn(async (src: string) => `warmed:${src}`);
+
+vi.mock('../../../utils/previewImageCache', () => ({
+  resolvePreviewSource: (...args: unknown[]) => mockedResolvePreviewSource(...args),
+  warmPreviewImage: (...args: unknown[]) => mockedWarmPreviewImage(...args),
+  hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
+}));
+
+vi.mock('../../../utils/attachmentResolver', () => ({
+  createAttachmentResolverContext: vi.fn(() => ({})),
+  resolveAttachmentTarget: vi.fn(),
+}));
+
+import { resolveAttachmentTarget } from '../../../utils/attachmentResolver';
+
+const mockedResolveAttachmentTarget = vi.mocked(resolveAttachmentTarget);
+
+function RendererHarness(props: {
+  content: string;
+  enabled?: boolean;
+  highlighter?: { id: string } | null;
+}) {
+  const renderer = usePreviewRenderer({
+    content: props.content,
+    currentFilePath: '/vault/notes/a.md',
+    isMarkdownPreview: true,
+    isHtmlPreview: false,
+    highlighter: props.highlighter ?? null,
+    themeMode: 'light',
+    files: [],
+    rootFolderPath: '/vault',
+    fileContents: {},
+    activeTabId: 'tab-a',
+    readFile: async () => '',
+    enabled: props.enabled ?? true,
+  });
+
+  const [html, setHtml] = useState(() => renderer.enhancedBodyHtml);
+
+  useEffect(() => {
+    setHtml(renderer.enhancedBodyHtml);
+  }, [renderer.enhancedBodyHtml]);
+
+  return (
+    <div
+      data-testid="out"
+      data-body={renderer.parsedContent.bodyHTML}
+      data-requires-async={String(renderer.requiresAsyncEnhancement)}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+describe('usePreviewRenderer additional coverage', () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMarkdownCache();
+    mockedResolvePreviewSource.mockImplementation(async (src: string) => `resolved:${src}`);
+    mockedWarmPreviewImage.mockImplementation(async (src: string) => `warmed:${src}`);
+  });
+
+  it('skips parsing and async enhancement when disabled', async () => {
+    render(<RendererHarness content="# Title" enabled={false} />);
+
+    await waitFor(() => {
+      const out = document.querySelector('[data-testid="out"]') as HTMLElement;
+      expect(out.dataset.body).toBe('');
+      expect(out.dataset.requiresAsync).toBe('false');
+      expect(out.innerHTML).toBe('');
+    });
+  });
+
+  it('replaces inline markdown images that resolve to video attachments', async () => {
+    mockedResolveAttachmentTarget.mockResolvedValue({
+      path: '/vault/media/clip.mp4',
+      name: 'clip.mp4',
+    });
+
+    render(<RendererHarness content="![clip](media/clip.mp4)" />);
+
+    await waitFor(() => {
+      const out = document.querySelector('[data-testid="out"]') as HTMLElement;
+      const video = out.querySelector('video.preview-attachment-video') as HTMLVideoElement | null;
+      expect(video).toBeTruthy();
+      expect(video?.getAttribute('src')).toBe('resolved:/vault/media/clip.mp4');
+      expect(out.querySelector('img')).toBeNull();
+    });
+  });
+
+  it('clears markdown cache when the highlighter becomes available', async () => {
+    const clearSpy = vi.spyOn(await import('../../../utils/markdown'), 'clearMarkdownCache');
+
+    const { rerender } = render(<RendererHarness content="# One" highlighter={null} />);
+    rerender(<RendererHarness content="# One" highlighter={{ id: 'shiki' }} />);
+
+    await waitFor(() => {
+      expect(clearSpy).toHaveBeenCalled();
+    });
+  });
+});

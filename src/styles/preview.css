@@ -233,8 +233,8 @@
 }
 
 /* Wiki `![[note|100]]` embeds: `data-wiki-embed-w` / `h` are set on <img> after async enhancement.
-   Some WKWebView release paths drop inline `style` when HTML is re-serialized for React; `attr()`
-   keeps the requested size in author CSS. Values are like "100px" on the data attribute. */
+   Some WKWebView release paths drop inline `style` when HTML is re-serialized for React; typed
+   `attr(... px)` keeps the requested size in author CSS. Values are bare numbers like "100". */
 .preview-pane-document.markdown-body img.preview-attachment-image[data-wiki-embed-w] {
   width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
   max-width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;

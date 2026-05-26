@@ -39,4 +39,17 @@ describe('enhanceExportAttachmentEmbeds', () => {
     expect(img?.getAttribute('data-original-src')).toBe('/vault/resources/poster.jpg');
     expect(img?.getAttribute('src')).toBe('/vault/resources/poster.jpg');
   });
+
+  it('applies wiki embed width from data-wiki-width', async () => {
+    const host = document.createElement('div');
+    host.innerHTML = `<article class="markdown-body"><a class="markdown-embed" href="#" data-wiki-embed="true" data-wiki-target="poster.jpg" data-wikilink="poster.jpg" data-wiki-label="poster.jpg" data-wiki-width="200"></a></article>`;
+
+    await enhanceExportAttachmentEmbeds(host, '/vault/notes/a.md', {
+      files: [],
+      rootFolderPath: '/vault',
+    });
+
+    const img = host.querySelector('img.preview-attachment-image') as HTMLImageElement | null;
+    expect(img?.style.width).toBe('200px');
+  });
 });

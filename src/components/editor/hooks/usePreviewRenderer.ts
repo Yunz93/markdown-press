@@ -427,13 +427,14 @@ export function usePreviewRenderer(options: UsePreviewRendererOptions): UsePrevi
               image.style.setProperty('max-width', `${embedWidth}px`, 'important');
               // Survives innerHTML → dangerouslySetInnerHTML round-trips better than style alone
               // in some WKWebView release builds; sized via preview.css `attr(...)`.
-              image.setAttribute('data-wiki-embed-w', `${embedWidth}px`);
+              // Typed CSS attr(... px) expects a bare number, not "200px".
+              image.setAttribute('data-wiki-embed-w', String(embedWidth));
             }
             if (embedHeight) {
               image.style.setProperty('height', `${embedHeight}px`, 'important');
               image.style.setProperty('max-height', `${embedHeight}px`, 'important');
               image.style.objectFit = 'contain';
-              image.setAttribute('data-wiki-embed-h', `${embedHeight}px`);
+              image.setAttribute('data-wiki-embed-h', String(embedHeight));
             }
 
             try {

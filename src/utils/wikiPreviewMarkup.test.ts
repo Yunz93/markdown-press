@@ -20,5 +20,15 @@ describe('wikiPreviewMarkup', () => {
     expect(el.innerHTML).toContain('<h1>Heading</h1>');
     expect(el.innerHTML).toContain('<p>Para</p>');
   });
+
+  it('builds wiki hover preview without subtitle', () => {
+    const el = buildWikiPreviewMarkup({
+      title: 'Only Title',
+      html: '<p>Snippet</p>',
+    });
+
+    expect(el.querySelector('.wiki-link-hover-preview-subtitle')).toBeNull();
+    expect(el.querySelector('.wiki-link-hover-preview-title')?.textContent).toBe('Only Title');
+  });
 });
 

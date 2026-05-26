@@ -111,6 +111,7 @@ ${markdownStyleCssVariables}
       padding: 30px 28px 72px;
       max-width: ${PREVIEW_PANEL_WIDTH_PX}px;
       margin: 0 auto;
+${markdownStyleCssVariables}
     }
 
     .export-document .markdown-body {
@@ -126,17 +127,17 @@ ${markdownStyleCssVariables}
       line-height: inherit;
     }
 
-    html:not(.dark) .export-document .markdown-body,
-    html[data-theme="light"] .export-document .markdown-body {
+    .export-document[data-theme="light"] .markdown-body {
       color: var(--mp-doc-text) !important;
       --color-fg-default: var(--mp-doc-text) !important;
       --color-fg-muted: var(--mp-doc-muted) !important;
       --color-canvas-default: transparent !important;
     }
 
-    html.dark .export-document .markdown-body,
-    html[data-theme="dark"] .export-document .markdown-body {
+    .export-document[data-theme="dark"] .markdown-body {
       color: var(--mp-doc-text);
+      --color-fg-default: var(--mp-doc-text);
+      --color-fg-muted: var(--mp-doc-muted);
       --color-canvas-default: transparent;
     }
 
@@ -304,15 +305,13 @@ ${markdownStyleCssVariables}
       background-size: 0.82em 0.82em;
     }
 
-    html.dark .export-document .markdown-body .task-list-item-checkbox,
-    html[data-theme="dark"] .export-document .markdown-body .task-list-item-checkbox {
+    .export-document[data-theme="dark"] .markdown-body .task-list-item-checkbox {
       border-color: var(--mp-doc-task-border, rgba(148, 163, 184, 0.68));
       background: rgba(15, 23, 42, 0.88);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
 
-    html.dark .export-document .markdown-body .task-list-item-checkbox:checked,
-    html[data-theme="dark"] .export-document .markdown-body .task-list-item-checkbox:checked {
+    .export-document[data-theme="dark"] .markdown-body .task-list-item-checkbox:checked {
       border-color: var(--mp-doc-task-checked, var(--mp-doc-accent));
       background-color: var(--mp-doc-task-checked, var(--mp-doc-accent));
     }
@@ -602,10 +601,11 @@ export function buildExportDocument(
   contentHtml: string,
   toc: string,
   markdownStylePreset: MarkdownStylePreset = 'nord',
+  theme: 'light' | 'dark' = 'light',
 ): string {
   return `
     <div class="export-stage">
-      <div class="export-document" data-markdown-style="${normalizeMarkdownStylePreset(markdownStylePreset)}">
+      <div class="export-document" data-markdown-style="${normalizeMarkdownStylePreset(markdownStylePreset)}" data-theme="${theme}">
         ${toc}
         ${contentHtml}
       </div>

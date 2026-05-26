@@ -2,10 +2,21 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  buildIframeEmbed,
   configurePreviewImageElement,
+  createPreviewPdfContainer,
   getLocalPreviewLinkTarget,
+  hasEmbeddableMediaLinksInHtml,
+  hasUriScheme,
   hasWikiEmbedsInHtml,
+  isHtmlDocument,
+  isImageAttachment,
   isLocalPreviewLinkHref,
+  isMarkdownNote,
+  isPdfAttachment,
+  isVideoAttachment,
+  normalizeExistingIframe,
+  resolveExternalVideoEmbed,
 } from './previewMedia';
 
 describe('hasWikiEmbedsInHtml', () => {
@@ -48,6 +59,13 @@ describe('local preview links', () => {
     expect(isLocalPreviewLinkHref('papers/saycan.pdf#page=2')).toBe(true);
   });
 
+  it('uses hasUriScheme to reject external and protocol-prefixed hrefs', () => {
+    expect(hasUriScheme('https://example.com')).toBe(true);
+    expect(hasUriScheme('mailto:hi@example.com')).toBe(true);
+    expect(hasUriScheme('../local/file.pdf')).toBe(false);
+    expect(isLocalPreviewLinkHref('https://example.com/paper.pdf')).toBe(false);
+  });
+
   it('does not treat external URLs or hash anchors as local files', () => {
     expect(isLocalPreviewLinkHref('https://example.com/paper.pdf')).toBe(false);
     expect(isLocalPreviewLinkHref('#references')).toBe(false);
@@ -57,5 +75,113 @@ describe('local preview links', () => {
   it('strips PDF viewer hash and query suffixes before resolving the file', () => {
     expect(getLocalPreviewLinkTarget('../papers/saycan.pdf#page=2')).toBe('../papers/saycan.pdf');
     expect(getLocalPreviewLinkTarget('../papers/saycan.pdf?download=1')).toBe('../papers/saycan.pdf');
+  });
+});
+
+describe('hasEmbeddableMediaLinksInHtml', () => {
+  it('detects YouTube and Bilibili watch links in rendered html', () => {
+    expect(hasEmbeddableMediaLinksInHtml('<a href="https://www.youtube.com/watch?v=abc">x</a>')).toBe(true);
+    expect(hasEmbeddableMediaLinksInHtml('<a href="https://youtu.be/abc">x</a>')).toBe(true);
+    expect(hasEmbeddableMediaLinksInHtml('<a href="https://www.bilibili.com/video/BV1xx411c7mD">x</a>')).toBe(true);
+    expect(hasEmbeddableMediaLinksInHtml('<a href="https://player.bilibili.com/player.html?bvid=BV1xx411c7mD">x</a>')).toBe(true);
+  });
+
+  it('is false for unrelated links', () => {
+    expect(hasEmbeddableMediaLinksInHtml('<a href="https://example.com/watch?v=abc">x</a>')).toBe(false);
+    expect(hasEmbeddableMediaLinksInHtml('<p>no links</p>')).toBe(false);
+  });
+});
+
+describe('resolveExternalVideoEmbed', () => {
+  it('resolves YouTube watch, shorts, and youtu.be links', () => {
+    expect(resolveExternalVideoEmbed('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toEqual({
+      provider: 'youtube',
+      src: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+      title: 'YouTube video',
+    });
+
+    expect(resolveExternalVideoEmbed('https://youtu.be/abc123?t=30s')).toEqual({
+      provider: 'youtube',
+      src: 'https://www.youtube-nocookie.com/embed/abc123?start=30',
+      title: 'YouTube video',
+    });
+
+    expect(resolveExternalVideoEmbed('https://www.youtube.com/shorts/short123')).toEqual({
+      provider: 'youtube',
+      src: 'https://www.youtube-nocookie.com/embed/short123',
+      title: 'YouTube video',
+    });
+  });
+
+  it('resolves Bilibili BV and av links', () => {
+    expect(resolveExternalVideoEmbed('https://www.bilibili.com/video/BV1xx411c7mD?p=2')).toEqual({
+      provider: 'bilibili',
+      src: 'https://player.bilibili.com/player.html?bvid=BV1xx411c7mD&page=2',
+      title: 'Bilibili video',
+    });
+
+    expect(resolveExternalVideoEmbed('https://www.bilibili.com/video/av12345')).toEqual({
+      provider: 'bilibili',
+      src: 'https://player.bilibili.com/player.html?aid=12345',
+      title: 'Bilibili video',
+    });
+  });
+
+  it('returns null for unsupported urls', () => {
+    expect(resolveExternalVideoEmbed('https://example.com/video/1')).toBeNull();
+    expect(resolveExternalVideoEmbed('not-a-url')).toBeNull();
+  });
+});
+
+describe('buildIframeEmbed', () => {
+  it('builds a provider-scoped iframe wrapper', () => {
+    const embed = resolveExternalVideoEmbed('https://youtu.be/abc123');
+    expect(embed).not.toBeNull();
+
+    const wrapper = buildIframeEmbed(document, embed!);
+    expect(wrapper.className).toBe('preview-external-video-embed is-youtube');
+
+    const frame = wrapper.querySelector('iframe') as HTMLIFrameElement | null;
+    expect(frame?.className).toBe('preview-external-video-frame');
+    expect(frame?.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/abc123');
+    expect(frame?.loading).toBe('lazy');
+    expect(frame?.allowFullscreen).toBe(true);
+  });
+});
+
+describe('normalizeExistingIframe', () => {
+  it('fills in preview iframe defaults without overwriting existing attrs', () => {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('loading', 'eager');
+
+    normalizeExistingIframe(frame);
+
+    expect(frame.classList.contains('preview-external-video-frame')).toBe(true);
+    expect(frame.getAttribute('loading')).toBe('eager');
+    expect(frame.getAttribute('referrerpolicy')).toBe('strict-origin-when-cross-origin');
+    expect(frame.getAttribute('allow')).toContain('picture-in-picture');
+  });
+});
+
+describe('attachment type helpers', () => {
+  it('classifies common preview attachment extensions', () => {
+    expect(isImageAttachment('photo.JPG')).toBe(true);
+    expect(isVideoAttachment('clip.webm')).toBe(true);
+    expect(isPdfAttachment('paper.pdf')).toBe(true);
+    expect(isMarkdownNote('note.markdown')).toBe(true);
+    expect(isHtmlDocument('page.HTM')).toBe(true);
+    expect(isImageAttachment('readme.txt')).toBe(false);
+  });
+});
+
+describe('createPreviewPdfContainer', () => {
+  it('creates a pending pdf.js mount container with metadata', () => {
+    const container = createPreviewPdfContainer(document, 'blob:pdf', 'Paper', '/vault/paper.pdf');
+
+    expect(container.className).toContain('preview-pdfjs');
+    expect(container.dataset.pdfSrc).toBe('blob:pdf');
+    expect(container.dataset.pdfTitle).toBe('Paper');
+    expect(container.dataset.pdfPath).toBe('/vault/paper.pdf');
+    expect(container.dataset.pdfjsState).toBe('pending');
   });
 });

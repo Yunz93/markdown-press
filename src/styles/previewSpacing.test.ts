@@ -30,4 +30,28 @@ describe('preview spacing CSS', () => {
       /\.preview-pane-document\.markdown-body p \+ :is\(ul,\s*ol\)\s*\{[^}]*margin-top:\s*0;/m,
     );
   });
+
+  it('sizes wiki embed images via typed attr(... px) on bare numeric data attributes', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/preview.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body img\.preview-attachment-image\[data-wiki-embed-w\]\s*\{[^}]*attr\(data-wiki-embed-w px,\s*100%\)/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body img\.preview-attachment-image\[data-wiki-embed-h\]\s*\{[^}]*attr\(data-wiki-embed-h px,\s*auto\)/m,
+    );
+    expect(css).toMatch(/Values are bare numbers like "100"/);
+  });
+
+  it('defines preview attachment, pdf, video, note embed, and properties blocks', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/preview.css'), 'utf8');
+
+    expect(css).toMatch(/\.preview-pane-properties\b/);
+    expect(css).toMatch(/\.preview-attachment-pdf\b/);
+    expect(css).toMatch(/\.preview-attachment-video\b/);
+    expect(css).toMatch(/\.preview-note-embed\b/);
+    expect(css).toMatch(/\.preview-external-video-embed\b/);
+    expect(css).toMatch(/\.preview-html-document\b/);
+    expect(css).toMatch(/\.preview-pane-document-compact\b/);
+  });
 });

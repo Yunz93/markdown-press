@@ -81,4 +81,29 @@ describe('shikiHtmlSnapshots', () => {
     expect(restored).not.toContain('data-mp-shiki-slot=');
     expect(restored).not.toContain('color:green');
   });
+
+  it('returns html unchanged when there are no shiki blocks', () => {
+    const html = '<p>plain text</p><code>inline</code>';
+    const snapshots: string[] = [];
+    expect(protectShikiPresInHtmlString(html, snapshots)).toBe(html);
+    expect(snapshots).toHaveLength(0);
+    expect(restoreShikiPresFromSnapshots(html, snapshots)).toBe(html);
+  });
+
+  it('skips restore when placeholder hash does not match the snapshot', () => {
+    const pre =
+      '<pre class="shiki"><code><span style="color:purple">secret</span></code></pre>';
+    const snapshots: string[] = [];
+    const protectedHtml = protectShikiPresInHtmlString(pre, snapshots);
+    const tampered = protectedHtml.replace(/data-mp-shiki-h="[^"]+"/, 'data-mp-shiki-h="00000000"');
+    const restored = restoreShikiPresFromSnapshots(tampered, snapshots);
+    expect(restored).toContain('data-mp-shiki-slot="0"');
+    expect(restored).not.toContain('color:purple');
+  });
+
+  it('protects empty html without creating snapshots', () => {
+    const snapshots: string[] = [];
+    expect(protectShikiPresInHtmlString('', snapshots)).toBe('');
+    expect(snapshots).toHaveLength(0);
+  });
 });

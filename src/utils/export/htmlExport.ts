@@ -54,6 +54,7 @@ export async function exportToHtml(
     `${propertiesHtml}<article class="markdown-body" data-markdown-style="${markdownStylePreset}">${htmlContent}</article>`,
     toc,
     markdownStylePreset,
+    theme,
   );
 
   const html = `<!DOCTYPE html>
