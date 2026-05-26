@@ -108,7 +108,7 @@ See [RELEASE_SMOKE_TEST.md](./RELEASE_SMOKE_TEST.md) for the manual checklist.
 - `.trash` is an internal application directory and should not be edited manually
 - The preview pipeline supports wiki links, heading jumps, block references, and attachment resolution
 - Settings allow separate UI, editor, preview, and code font configuration
-- The bundled default Chinese font is Tsanger JinKai 02
+- The default font is the system font, with 仓耳今楷 available as a bundled Chinese font option
 - External file change watch: if a file is modified outside the app with no unsaved edits, it reloads automatically
 
 ## Contributing

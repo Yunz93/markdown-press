@@ -11,6 +11,7 @@ import {
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
+  FONT_DEFAULTS_VERSION,
 } from '../utils/fontSettings';
 import { DEFAULT_MARKDOWN_STYLE_PRESET, normalizeMarkdownStylePreset } from '../utils/markdownStyle';
 import { DEFAULT_METADATA_FIELDS } from '../utils/metadataFields';
@@ -81,6 +82,7 @@ export const defaultImageHostingConfig: ImageHostingConfig = {
 export const defaultSettings: AppSettings = {
   language: 'zh-CN',
   aiProvider: 'deepseek',
+  fontDefaultsVersion: FONT_DEFAULTS_VERSION,
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
   uiFontSize: 18,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,

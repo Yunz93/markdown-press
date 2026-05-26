@@ -11,6 +11,9 @@ import {
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
+  FONT_DEFAULTS_VERSION,
+  LEGACY_DEFAULT_BUNDLED_FONT_FAMILY,
+  LEGACY_DEFAULT_CODE_FONT_FAMILY,
   normalizeStoredCodeFontFamily,
   normalizeStoredEditorFontFamily,
   normalizeStoredPreviewFontFamily,
@@ -70,6 +73,87 @@ function resolveFirstValidString(settings: Record<string, unknown>, keys: string
     if (typeof v === 'string' && v.trim()) return v;
   }
   return '';
+}
+
+type FontSettingNormalizer = (value: string | undefined) => string;
+
+function shouldMigrateLegacyDefaultFonts(persistedSettings: Record<string, unknown>): boolean {
+  const version = persistedSettings.fontDefaultsVersion;
+  return typeof version !== 'number' || version < FONT_DEFAULTS_VERSION;
+}
+
+function resolvePersistedFontFamily(
+  value: unknown,
+  normalize: FontSettingNormalizer,
+  fallback: string,
+  migrateLegacyDefaults: boolean,
+): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return fallback;
+  }
+
+  const normalized = normalize(value);
+  if (
+    migrateLegacyDefaults
+    && (
+      normalized === LEGACY_DEFAULT_BUNDLED_FONT_FAMILY
+      || normalized === LEGACY_DEFAULT_CODE_FONT_FAMILY
+    )
+  ) {
+    return fallback;
+  }
+
+  return normalized;
+}
+
+export function resolvePersistedFontSettings(
+  persistedSettings: Record<string, unknown>,
+): Pick<AppSettings, 'fontDefaultsVersion' | 'uiFontFamily' | 'uiFontSize' | 'editorFontFamily' | 'previewFontFamily' | 'codeFontFamily' | 'fontSize'> {
+  const migrateLegacyDefaults = shouldMigrateLegacyDefaultFonts(persistedSettings);
+  const legacyContentFontFamily = resolvePersistedFontFamily(
+    resolveFirstValidString(persistedSettings, ['chineseFontFamily', 'englishFontFamily', 'fontFamily']),
+    normalizeStoredEditorFontFamily,
+    DEFAULT_EDITOR_FONT_FAMILY,
+    migrateLegacyDefaults,
+  );
+  const legacyContentFontSize = clampPersistedNumber(persistedSettings.fontSize, 12, 32, 16);
+  const resolvedSharedFontSize = resolveFirstValidNumber(
+    persistedSettings,
+    ['fontSize', 'editorFontSize', 'previewFontSize', 'codeFontSize', 'editorCodeFontSize', 'previewCodeFontSize'],
+    11, 32, legacyContentFontSize,
+  );
+
+  return {
+    fontDefaultsVersion: FONT_DEFAULTS_VERSION,
+    uiFontFamily: resolvePersistedFontFamily(
+      persistedSettings.uiFontFamily,
+      normalizeStoredUiFontFamily,
+      DEFAULT_UI_FONT_FAMILY,
+      migrateLegacyDefaults,
+    ),
+    uiFontSize: typeof persistedSettings.uiFontSize === 'number' && Number.isFinite(persistedSettings.uiFontSize)
+      ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
+      : defaultSettings.uiFontSize,
+    editorFontFamily: resolvePersistedFontFamily(
+      persistedSettings.editorFontFamily,
+      normalizeStoredEditorFontFamily,
+      legacyContentFontFamily,
+      migrateLegacyDefaults,
+    ),
+    previewFontFamily: resolvePersistedFontFamily(
+      persistedSettings.previewFontFamily,
+      normalizeStoredPreviewFontFamily,
+      legacyContentFontFamily || DEFAULT_PREVIEW_FONT_FAMILY,
+      migrateLegacyDefaults,
+    ),
+    codeFontFamily: resolvePersistedFontFamily(
+      persistedSettings.codeFontFamily,
+      normalizeStoredCodeFontFamily,
+      DEFAULT_CODE_FONT_FAMILY,
+      migrateLegacyDefaults,
+    ),
+    fontSize: resolvedSharedFontSize,
+  };
 }
 
 export function stripNonRuntimeSettings(settings: Record<string, unknown>): Record<string, unknown> {
@@ -305,36 +389,13 @@ export const useAppStore = create<AppState>()(
         const persistedSettings = stripNonRuntimeSettings((persistedState as any)?.settings ?? {});
         const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
         const resolvedLocalizedPrompts = resolveLocalizedPrompts(persistedSettings);
-        const legacyContentFontFamily = resolveFirstValidString(
-          persistedSettings, ['chineseFontFamily', 'englishFontFamily', 'fontFamily'],
-        ) || DEFAULT_EDITOR_FONT_FAMILY;
-        const legacyContentFontSize = clampPersistedNumber(persistedSettings.fontSize, 12, 32, 16);
-        const resolvedSharedFontSize = resolveFirstValidNumber(
-          persistedSettings,
-          ['fontSize', 'editorFontSize', 'previewFontSize', 'codeFontSize', 'editorCodeFontSize', 'previewCodeFontSize'],
-          11, 32, legacyContentFontSize,
-        );
+        const resolvedFontSettings = resolvePersistedFontSettings(persistedSettings);
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
           blogRepoUrl: resolvePersistedBlogRepoUrl(persistedSettings),
           blogSiteUrl: resolvePersistedBlogSiteUrl(persistedSettings),
-          uiFontFamily: typeof persistedSettings.uiFontFamily === 'string' && persistedSettings.uiFontFamily.trim()
-            ? normalizeStoredUiFontFamily(persistedSettings.uiFontFamily)
-            : DEFAULT_UI_FONT_FAMILY,
-          uiFontSize: typeof persistedSettings.uiFontSize === 'number' && Number.isFinite(persistedSettings.uiFontSize)
-            ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
-            : defaultSettings.uiFontSize,
-          editorFontFamily: typeof persistedSettings.editorFontFamily === 'string' && persistedSettings.editorFontFamily.trim()
-            ? normalizeStoredEditorFontFamily(persistedSettings.editorFontFamily)
-            : normalizeStoredEditorFontFamily(legacyContentFontFamily),
-          previewFontFamily: typeof persistedSettings.previewFontFamily === 'string' && persistedSettings.previewFontFamily.trim()
-            ? normalizeStoredPreviewFontFamily(persistedSettings.previewFontFamily)
-            : normalizeStoredPreviewFontFamily(legacyContentFontFamily || DEFAULT_PREVIEW_FONT_FAMILY),
-          codeFontFamily: typeof persistedSettings.codeFontFamily === 'string' && persistedSettings.codeFontFamily.trim()
-            ? normalizeStoredCodeFontFamily(persistedSettings.codeFontFamily)
-            : DEFAULT_CODE_FONT_FAMILY,
-          fontSize: resolvedSharedFontSize,
+          ...resolvedFontSettings,
           ...resolvedAISettings,
           ...resolvedLocalizedPrompts,
           language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),

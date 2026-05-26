@@ -8,10 +8,15 @@ import {
 import {
   defaultSettings,
   resolveLocalizedPrompts,
+  resolvePersistedFontSettings,
   resolvePersistedAISettings,
   stripNonRuntimeSettings,
   useAppStore,
 } from './appStore';
+import {
+  FONT_DEFAULTS_VERSION,
+  SYSTEM_DEFAULT_FONT_FAMILY,
+} from '../utils/fontSettings';
 
 afterEach(() => {
   useAppStore.setState({
@@ -60,6 +65,32 @@ describe('persisted AI settings migration', () => {
 
     expect(settings.aiProvider).toBe('gemini');
     expect(settings.geminiModel).toBe('gemini-2.0-flash-exp');
+  });
+});
+
+describe('persisted font settings migration', () => {
+  it('migrates old bundled default font settings to the system default', () => {
+    const settings = resolvePersistedFontSettings({
+      uiFontFamily: 'preset:tsanger-jinkai',
+      editorFontFamily: 'preset:tsanger-jinkai',
+      previewFontFamily: 'Tsanger JinKai 02',
+      codeFontFamily: '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace',
+    });
+
+    expect(settings.fontDefaultsVersion).toBe(FONT_DEFAULTS_VERSION);
+    expect(settings.uiFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
+    expect(settings.editorFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
+    expect(settings.previewFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
+    expect(settings.codeFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
+  });
+
+  it('preserves an explicit bundled font after the default-font migration has run', () => {
+    const settings = resolvePersistedFontSettings({
+      fontDefaultsVersion: FONT_DEFAULTS_VERSION,
+      editorFontFamily: 'preset:tsanger-jinkai',
+    });
+
+    expect(settings.editorFontFamily).toBe('preset:tsanger-jinkai');
   });
 });
 

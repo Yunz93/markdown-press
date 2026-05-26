@@ -6,7 +6,10 @@ import {
 } from '../../services/systemFontService';
 import {
   BUNDLED_FONT_PRESETS,
+  SYSTEM_DEFAULT_FONT_FAMILY,
   buildSystemFontFamily,
+  getBundledPresetDisplayLabel,
+  getBundledPresetLabelForFontFamily,
 } from '../../utils/fontSettings';
 import { useI18n } from '../../hooks/useI18n';
 
@@ -16,7 +19,7 @@ export interface FontOption {
 }
 
 export function useFontOptions(isOpen: boolean) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [availableSystemFonts, setAvailableSystemFonts] = useState<string[]>(
     () => getCachedSystemFontFamilies() ?? []
   );
@@ -57,17 +60,22 @@ export function useFontOptions(isOpen: boolean) {
   }, [isOpen]);
 
   const bundledFontOptions = BUNDLED_FONT_PRESETS.map((preset) => ({
-    label: preset.label,
+    label: getBundledPresetDisplayLabel(preset, language),
     value: preset.id,
   }));
 
   const systemFontOptions = availableSystemFonts.map((fontFamily) => ({
-    label: fontFamily,
+    label: getBundledPresetLabelForFontFamily(fontFamily, language) ?? fontFamily,
     value: buildSystemFontFamily(fontFamily),
   }));
 
+  const defaultFontOption = {
+    label: t('settings_systemDefaultFontOption'),
+    value: SYSTEM_DEFAULT_FONT_FAMILY,
+  };
+
   const buildFontOptions = (currentValue: string): FontOption[] => {
-    const options = [...bundledFontOptions, ...systemFontOptions]
+    const options = [defaultFontOption, ...bundledFontOptions, ...systemFontOptions]
       .filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index);
 
     if (!options.some((option) => option.value === currentValue)) {

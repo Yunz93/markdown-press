@@ -155,6 +155,7 @@ export interface ImageHostingConfig {
 export interface AppSettings {
   language: AppLanguage;
   aiProvider: AIProvider;
+  fontDefaultsVersion: number;
   uiFontFamily: string;
   uiFontSize: number;
   editorFontFamily: string;

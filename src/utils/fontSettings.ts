@@ -1,4 +1,4 @@
-import type { AppSettings } from '../types';
+import type { AppLanguage, AppSettings } from '../types';
 import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
 import { getKatexRenderMode } from './markdown-extensions';
 
@@ -16,7 +16,8 @@ export type FontSettings = Pick<
 
 export interface BundledFontPreset {
   id: string;
-  label: string;
+  labelZh: string;
+  labelEn: string;
   assetUrl: string;
   fontFaceFamily: string;
   familyNames: string[];
@@ -32,13 +33,16 @@ interface FontFaceApiSpec {
 export const BUNDLED_FONT_PRESETS: BundledFontPreset[] = [
   {
     id: `${PRESET_PREFIX}tsanger-jinkai`,
-    label: 'Tsanger JinKai 02',
+    labelZh: '仓耳今楷',
+    labelEn: 'Tsanger JinKai',
     assetUrl: tsangerJinKaiAssetUrl,
     fontFaceFamily: 'MarkdownPressPresetTsangerJinKai02',
     familyNames: [
+      'Tsanger JinKai 02',
       'TsangerJinKai02 W04',
       'TsangerJinKai02-W04',
       'TsangerJinKai02',
+      '仓耳今楷',
       '仓耳今楷02 W04',
       '仓耳今楷02',
     ],
@@ -175,10 +179,14 @@ const UI_FONT_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
 const CONTENT_FONT_FALLBACK = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
 const CODE_FONT_FALLBACK = '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace';
 
-export const DEFAULT_UI_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
-export const DEFAULT_EDITOR_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
-export const DEFAULT_PREVIEW_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
-export const DEFAULT_CODE_FONT_FAMILY = CODE_FONT_FALLBACK;
+export const SYSTEM_DEFAULT_FONT_FAMILY = SYSTEM_PREFIX;
+export const FONT_DEFAULTS_VERSION = 2;
+export const LEGACY_DEFAULT_BUNDLED_FONT_FAMILY = `${PRESET_PREFIX}tsanger-jinkai`;
+export const LEGACY_DEFAULT_CODE_FONT_FAMILY = CODE_FONT_FALLBACK;
+export const DEFAULT_UI_FONT_FAMILY = SYSTEM_DEFAULT_FONT_FAMILY;
+export const DEFAULT_EDITOR_FONT_FAMILY = SYSTEM_DEFAULT_FONT_FAMILY;
+export const DEFAULT_PREVIEW_FONT_FAMILY = SYSTEM_DEFAULT_FONT_FAMILY;
+export const DEFAULT_CODE_FONT_FAMILY = SYSTEM_DEFAULT_FONT_FAMILY;
 export const FONT_SETTINGS_STORAGE_KEY = 'markdown-press-settings';
 
 function getZoneFallback(zone: FontZone): string {
@@ -414,6 +422,28 @@ export function getInitialFontSettingsFromLocalStorage(): FontSettings {
 
 export function buildSystemFontFamily(fontName: string): string {
   return `${SYSTEM_PREFIX}${fontName.trim()}`;
+}
+
+export function getBundledPresetDisplayLabel(
+  preset: BundledFontPreset,
+  language: AppLanguage,
+): string {
+  return language === 'en' ? preset.labelEn : preset.labelZh;
+}
+
+export function getBundledPresetLabelForFontFamily(
+  fontName: string,
+  language: AppLanguage = 'zh-CN',
+): string | null {
+  const normalized = fontName.trim().toLowerCase();
+  const preset = BUNDLED_FONT_PRESETS.find((item) => (
+    item.labelZh.toLowerCase() === normalized
+    || item.labelEn.toLowerCase() === normalized
+    || item.fontFaceFamily.toLowerCase() === normalized
+    || item.familyNames.some((name) => name.toLowerCase() === normalized)
+  ));
+
+  return preset ? getBundledPresetDisplayLabel(preset, language) : null;
 }
 
 export function getResolvedUiFontFamily(settings: Pick<AppSettings, 'uiFontFamily'>): string {
