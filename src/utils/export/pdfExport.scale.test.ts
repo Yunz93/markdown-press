@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeSafePdfRenderScale } from './exportRasterHost';
+import {
+  computeSafeLongImageRenderScale,
+  computeSafePdfRenderScale,
+  LONG_IMAGE_MAX_CANVAS_DIMENSION,
+} from './exportRasterHost';
 
 describe('computeSafePdfRenderScale', () => {
   const SAFE_LIMIT = 14000;
@@ -51,5 +55,24 @@ describe('computeSafePdfRenderScale', () => {
   it('respects an explicit max-canvas-dimension override', () => {
     const scale = computeSafePdfRenderScale(832, 8000, 2.5, 8000);
     expect(scale * 8000).toBeLessThanOrEqual(8000 + 1e-6);
+  });
+});
+
+describe('computeSafeLongImageRenderScale', () => {
+  it('keeps long image exports crisp on non-Windows platforms', () => {
+    const scale = computeSafeLongImageRenderScale(832, 8000, 2.5, 'mac');
+    expect(scale).toBeCloseTo(2.5, 5);
+  });
+
+  it('uses the lower WebView2-safe cap on Windows', () => {
+    const scale = computeSafeLongImageRenderScale(832, 8000, 2.5, 'windows');
+    expect(scale).toBeLessThan(2.5);
+    expect(scale * 8000).toBeLessThanOrEqual(14000 + 1e-6);
+  });
+
+  it('still caps very long non-Windows images before exceeding the long-image limit', () => {
+    const scale = computeSafeLongImageRenderScale(832, 24000, 2.5, 'mac');
+    expect(scale * 24000).toBeLessThanOrEqual(LONG_IMAGE_MAX_CANVAS_DIMENSION + 1e-6);
+    expect(scale).toBeGreaterThan(1);
   });
 });

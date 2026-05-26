@@ -1,7 +1,7 @@
 import { saveExportFile } from './core';
 import type { ExportAttachmentContext } from './attachments';
 import {
-  computeSafePdfRenderScale,
+  computeSafeLongImageRenderScale,
   disposeExportRasterHost,
   mountExportHtmlForRasterization,
   prepareExportRenderTargetForRasterization,
@@ -18,7 +18,7 @@ export async function rasterizeExportHtmlToPngBlob(
   try {
     await prepareExportRenderTargetForRasterization(renderTarget, theme, sourceFilePath, attachmentContext);
 
-    const safeScale = computeSafePdfRenderScale(
+    const safeScale = computeSafeLongImageRenderScale(
       renderTarget.scrollWidth,
       renderTarget.scrollHeight,
     );

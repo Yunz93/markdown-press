@@ -1,4 +1,5 @@
 import { renderMermaidDiagrams } from '../markdown-extensions';
+import { getPlatformIdentifier } from '../platform';
 import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import { enhanceExportAttachmentEmbeds, type ExportAttachmentContext } from './attachments';
 import { prepareExportImages, waitForImages, waitForNextPaint } from './images';
@@ -15,6 +16,9 @@ export const EXPORT_MAX_CANVAS_DIMENSION = 14000;
 
 /** Default rasterization scale; chosen for crisp PDF / long-image output on short documents. */
 export const EXPORT_REQUESTED_RENDER_SCALE = 2.5;
+
+/** 非 Windows 长图导出可保留更多纵向像素，避免过早降采样。 */
+export const LONG_IMAGE_MAX_CANVAS_DIMENSION = 30000;
 
 /**
  * Absolute floor on the render scale. We allow sub-1.0 scales for very long
@@ -40,6 +44,23 @@ export function computeSafePdfRenderScale(
   const safeHeight = containerHeightPx > 0 ? maxCanvasDimension / containerHeightPx : requestedScale;
   const bounded = Math.min(requestedScale, safeWidth, safeHeight);
   return Math.max(EXPORT_MIN_RENDER_SCALE, bounded);
+}
+
+export function computeSafeLongImageRenderScale(
+  containerWidthPx: number,
+  containerHeightPx: number,
+  requestedScale: number = EXPORT_REQUESTED_RENDER_SCALE,
+  platformIdentifier: string = getPlatformIdentifier(),
+): number {
+  const maxCanvasDimension = platformIdentifier.includes('win')
+    ? EXPORT_MAX_CANVAS_DIMENSION
+    : LONG_IMAGE_MAX_CANVAS_DIMENSION;
+  return computeSafePdfRenderScale(
+    containerWidthPx,
+    containerHeightPx,
+    requestedScale,
+    maxCanvasDimension,
+  );
 }
 
 export interface MountedExportRasterHost {
