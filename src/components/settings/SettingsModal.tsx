@@ -104,7 +104,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('settings_title')}</h2>
           </div>
 
-          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-0.5">
+          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-0.5 scrollbar-hide">
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -123,7 +123,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="flex-1 flex flex-col min-w-0 bg-transparent">
-          <div className="settings-panel flex-1 overflow-y-auto p-8">
+          <div className="settings-panel flex-1 overflow-y-auto p-8 scrollbar-hide">
             {renderActiveTab()}
           </div>
 
