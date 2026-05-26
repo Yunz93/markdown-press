@@ -94,6 +94,12 @@ describe('formatMarkdownForSave', () => {
     expect(out.trimEnd()).toBe('> 1. quote one\n> 2. quote two\n\n1. root');
   });
 
+  it('preserves author markers in loose mode during format-on-save', () => {
+    const input = ['1. first', '3. third', ''].join('\n');
+    const out = formatMarkdownForSave(input, { orderedListMode: 'loose' });
+    expect(out.trimEnd()).toBe('1. first\n3. third');
+  });
+
   it('joins pipe table rows and normalizes Unicode dashes in separator rows', () => {
     const input = [
       '| 左对齐 | 居中 | 右对齐 |',

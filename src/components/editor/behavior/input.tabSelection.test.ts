@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { EditorState, EditorSelection } from '@codemirror/state';
 import type { StateCommand } from '@codemirror/state';
 import { createHandleSmartShiftTab, createHandleSmartTab, createHandleSmartBackspace, handleSmartEnter } from './input';
-import { handleListTab } from '../nestedListCommands';
+import { createHandleListBackspace, handleListEnter, handleListTab } from '../nestedListCommands';
 
 function applyCommand(cmd: StateCommand, doc: string, anchor: number, head: number): EditorState {
   const state = EditorState.create({
@@ -168,6 +168,89 @@ describe('handleSmartEnter empty nested list items', () => {
 
     expect(next.doc.toString()).toBe('1. test\n   1. test\n2. ');
     expect(next.selection.main.from).toBe('1. test\n   1. test\n2. '.length);
+  });
+});
+
+describe('unordered and task nested list editing', () => {
+  const tab = createHandleSmartTab('strict');
+
+  it('Tab nests an unordered sibling under its parent', () => {
+    const doc = '- parent\n- child';
+    const childPos = doc.indexOf('- child') + 2;
+    const next = applyCommand(tab, doc, childPos, childPos);
+    expect(next.doc.toString()).toBe('- parent\n    - child');
+  });
+
+  it('Enter continues an unordered list at the same indent', () => {
+    const doc = '- first item';
+    const next = applyCommand(handleListEnter, doc, doc.length, doc.length);
+    expect(next.doc.toString()).toBe('- first item\n- ');
+  });
+
+  it('Enter continues a task list and keeps the checkbox unchecked', () => {
+    const doc = '- [ ] todo';
+    const next = applyCommand(handleListEnter, doc, doc.length, doc.length);
+    expect(next.doc.toString()).toBe('- [ ] todo\n- [ ] ');
+  });
+
+  it('Shift-Tab outdents a nested unordered item', () => {
+    const shiftTab = createHandleSmartShiftTab('strict');
+    const doc = '- parent\n    - child';
+    const childPos = doc.indexOf('- child') + 2;
+    const next = applyCommand(shiftTab, doc, childPos, childPos);
+    expect(next.doc.toString()).toBe('- parent\n- child');
+  });
+
+  it('Backspace outdents a nested unordered item at marker boundary', () => {
+    const doc = '- parent\n    - child';
+    const markerEnd = doc.indexOf('child');
+    const next = applyCommand(createHandleListBackspace(), doc, markerEnd, markerEnd);
+    expect(next.doc.toString()).toBe('- parent\n- child');
+  });
+});
+
+describe('multi-level Shift-Tab outdent', () => {
+  const shiftTab = createHandleSmartShiftTab('strict');
+
+  it('outdents a deeply nested ordered item one parent indent at a time', () => {
+    const doc = ['1. top', '    1. mid', '        1. inner', '            1. leaf'].join('\n');
+    const leafMarkerEnd = doc.indexOf('leaf');
+
+    const once = applyCommand(shiftTab, doc, leafMarkerEnd, leafMarkerEnd);
+    expect(once.doc.toString()).toBe(
+      ['1. top', '    1. mid', '        1. inner', '        2. leaf'].join('\n'),
+    );
+
+    const twicePos = once.doc.toString().lastIndexOf('leaf');
+    const twice = applyCommand(shiftTab, once.doc.toString(), twicePos, twicePos);
+    expect(twice.doc.toString()).toBe(
+      ['1. top', '    1. mid', '        1. inner', '    2. leaf'].join('\n'),
+    );
+
+    const thirdPos = twice.doc.toString().lastIndexOf('leaf');
+    const thrice = applyCommand(shiftTab, twice.doc.toString(), thirdPos, thirdPos);
+    expect(thrice.doc.toString()).toBe(
+      ['1. top', '    1. mid', '        1. inner', '2. leaf'].join('\n'),
+    );
+  });
+});
+
+describe('blockquote nested list editing', () => {
+  const tab = createHandleSmartTab('strict');
+
+  it('Tab nests a blockquote ordered sibling under its parent', () => {
+    const doc = ['> 1. parent', '> 2. child'].join('\n');
+    const childPos = doc.indexOf('2. child') + 2;
+    const next = applyCommand(tab, doc, childPos, childPos);
+    expect(next.doc.toString()).toBe(['> 1. parent', '>     1. child'].join('\n'));
+  });
+
+  it('Shift-Tab on Tab-nested blockquote item removes marker but keeps quote spacing', () => {
+    const shiftTab = createHandleSmartShiftTab('strict');
+    const doc = ['> 1. parent', '>     1. child'].join('\n');
+    const cursorAtChildMarker = doc.indexOf('1. child') + '1. '.length;
+    const next = applyCommand(shiftTab, doc, cursorAtChildMarker, cursorAtChildMarker);
+    expect(next.doc.toString()).toBe(['> 1. parent', '>     child'].join('\n'));
   });
 });
 

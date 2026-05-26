@@ -90,6 +90,25 @@ describe('renderMarkdown', () => {
     expect(html).toMatch(/A--(&gt;|>)B/);
   });
 
+  it('renders nested unordered lists', () => {
+    const html = renderMarkdown('- parent\n    - child\n        - leaf');
+    expect(html.match(/<ul\b/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(html).toMatch(/<li>leaf<\/li>/);
+  });
+
+  it('renders nested task lists', () => {
+    const html = renderMarkdown('- [ ] parent\n    - [x] child');
+    expect(html).toContain('task-list-item');
+    expect(html).toContain('contains-task-list');
+    expect(html).toMatch(/<li class="task-list-item"[\s\S]*<ul class="contains-task-list"/);
+  });
+
+  it('renders nested lists inside blockquotes', () => {
+    const html = renderMarkdown(['> - parent', '>     - child'].join('\n'));
+    expect(html).toMatch(/<blockquote/);
+    expect(html.match(/<ul\b/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
   it('renders task list markup', () => {
     const html = renderMarkdown('- [ ] open\n- [x] closed');
     expect(html).toContain('task-list-item');

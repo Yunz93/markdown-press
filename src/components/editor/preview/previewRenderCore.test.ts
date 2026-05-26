@@ -157,4 +157,53 @@ describe('renderMarkdownPreview', () => {
 
     fetchSpy.mockRestore();
   });
+
+  it('renders nested unordered lists into queryable preview DOM', () => {
+    const { bodyHTML } = renderMarkdownPreview({
+      content: '- parent\n    - child\n        - leaf',
+      isMarkdownPreview: true,
+      themeMode: 'light',
+    });
+
+    const root = document.createElement('div');
+    root.className = 'preview-pane-document markdown-body';
+    root.innerHTML = bodyHTML;
+
+    const nestedItems = root.querySelectorAll('ul ul li');
+    expect(nestedItems.length).toBeGreaterThanOrEqual(2);
+    expect(root.querySelector('ul ul ul li')?.textContent).toContain('leaf');
+  });
+
+  it('renders nested alpha ordered lists with ol type attributes in preview DOM', () => {
+    const { bodyHTML } = renderMarkdownPreview({
+      content: ['A. parent', '    A. child'].join('\n'),
+      isMarkdownPreview: true,
+      themeMode: 'light',
+      orderedListMode: 'strict',
+    });
+
+    const root = document.createElement('div');
+    root.className = 'preview-pane-document markdown-body';
+    root.innerHTML = bodyHTML;
+
+    expect(root.querySelectorAll('ol[type="A"]').length).toBeGreaterThanOrEqual(2);
+    expect(root.textContent).toContain('child');
+  });
+
+  it('renders blockquote nested lists with nested ul inside blockquote', () => {
+    const { bodyHTML } = renderMarkdownPreview({
+      content: ['> - parent', '>     - child'].join('\n'),
+      isMarkdownPreview: true,
+      themeMode: 'light',
+    });
+
+    const root = document.createElement('div');
+    root.className = 'preview-pane-document markdown-body';
+    root.innerHTML = bodyHTML;
+
+    const blockquote = root.querySelector('blockquote');
+    expect(blockquote).toBeTruthy();
+    expect(blockquote?.querySelectorAll('ul').length).toBeGreaterThanOrEqual(2);
+    expect(blockquote?.textContent).toContain('child');
+  });
 });

@@ -53,4 +53,16 @@ describe('handleSmartEnter ordered list continuation with markdown syntax tree',
     const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
     expect(next.doc.toString()).not.toMatch(/\n2\.[ )]/);
   });
+
+  it('continues lower-case roman ordered lists with the next numeral', () => {
+    const doc = 'ii. second item';
+    const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
+    expect(next.doc.toString()).toMatch(/\niii\.[ )]/);
+  });
+
+  it('continues upper-case roman ordered lists with the next numeral', () => {
+    const doc = 'IV. fourth item';
+    const next = applyWithMarkdown(handleSmartEnter, doc, doc.length, doc.length);
+    expect(next.doc.toString()).toMatch(/\nV\.[ )]/);
+  });
 });

@@ -76,4 +76,8 @@ describe('getStrictOrderedListNormalizationChanges', () => {
     // 嵌套的无序子项不应打断顶层 ordered 的样式推断
     expect(normalize('A. a\n  - x\n  - y\n1. c')).toBe('A. a\n  - x\n  - y\nB. c');
   });
+
+  it('renumbers lower-case roman siblings to stay contiguous', () => {
+    expect(normalize('ii. two\niv. four')).toBe('ii. two\niii. four');
+  });
 });
