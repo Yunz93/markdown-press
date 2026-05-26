@@ -122,6 +122,7 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
   let fenceChar = '';
   let inIndentedCode = false;
   let activeListIndents: number[] = [];
+  let pendingBlankListIndents: number[] = [];
   let previousNonBlankIndent: number | null = null;
   let previousNonBlankWasList = false;
 
@@ -143,6 +144,10 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
     }
     if (inFence) continue;
     if (trimmed === '') {
+      // 连续空行时 activeListIndents 已清空，勿用 [] 覆盖仍有效的 pending 上下文。
+      if (activeListIndents.length > 0) {
+        pendingBlankListIndents = [...activeListIndents];
+      }
       activeListIndents = [];
       previousNonBlankIndent = null;
       previousNonBlankWasList = false;
@@ -150,8 +155,13 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
     }
 
     const indentColumns = getIndentColumns(line);
+    const lineIsListLike = isListLikeLine(line);
+    const hasBlankLineNestedListContext = lineIsListLike
+      && pendingBlankListIndents.some((indent) => indent + 4 === indentColumns);
+    pendingBlankListIndents = [];
     activeListIndents = activeListIndents.filter((indent) => indent <= indentColumns);
     const hasIndentedListContext = activeListIndents.includes(indentColumns)
+      || hasBlankLineNestedListContext
       || (previousNonBlankWasList && previousNonBlankIndent !== null && previousNonBlankIndent <= indentColumns);
 
     if (inIndentedCode) {

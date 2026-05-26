@@ -123,4 +123,44 @@ describe('preprocessAlphaRomanLists', () => {
     expect(meta.get(6)).toEqual({ type: 'a', start: 1 });
     expect(meta.get(8)).toEqual({ type: 'a', start: 1 });
   });
+
+  it('keeps nested alpha lists after a blank line inside the parent item', () => {
+    const input = [
+      'A. parent',
+      '',
+      '    A. child',
+      '    B. child2',
+    ].join('\n');
+    const { src, meta } = preprocessAlphaRomanLists(input);
+    expect(src).toBe([
+      '1. parent',
+      '',
+      '    1. child',
+      '    2. child2',
+    ].join('\n'));
+    expect(meta.get(0)).toEqual({ type: 'A', start: 1 });
+    expect(meta.get(2)).toEqual({ type: 'A', start: 1 });
+    expect(meta.get(3)).toEqual({ type: 'A', start: 2 });
+  });
+
+  it('keeps nested alpha lists after multiple blank lines inside the parent item', () => {
+    const input = [
+      'A. parent',
+      '',
+      '',
+      '    A. child',
+      '    B. child2',
+    ].join('\n');
+    const { src, meta } = preprocessAlphaRomanLists(input);
+    expect(src).toBe([
+      '1. parent',
+      '',
+      '',
+      '    1. child',
+      '    2. child2',
+    ].join('\n'));
+    expect(meta.get(0)).toEqual({ type: 'A', start: 1 });
+    expect(meta.get(3)).toEqual({ type: 'A', start: 1 });
+    expect(meta.get(4)).toEqual({ type: 'A', start: 2 });
+  });
 });

@@ -148,6 +148,35 @@ describe('renderMarkdown', () => {
       expect(html).toContain('B. still code');
       expect(html).not.toMatch(/<ol[^>]*type="A"/);
     });
+
+    it('nested alpha list after a blank line still renders as a nested list', () => {
+      const md = [
+        'A. parent',
+        '',
+        '    A. child',
+        '    B. child2',
+      ].join('\n');
+      const html = renderMarkdown(md);
+      const olMatches = html.match(/<ol[^>]*type="A"/g);
+      expect(olMatches?.length ?? 0).toBeGreaterThanOrEqual(2);
+      expect(html).toMatch(/<li>child<\/li>/);
+      expect(html).not.toContain('<pre><code>A. child');
+    });
+
+    it('nested alpha list after multiple blank lines still renders as a nested list', () => {
+      const md = [
+        'A. parent',
+        '',
+        '',
+        '    A. child',
+        '    B. child2',
+      ].join('\n');
+      const html = renderMarkdown(md);
+      const olMatches = html.match(/<ol[^>]*type="A"/g);
+      expect(olMatches?.length ?? 0).toBeGreaterThanOrEqual(2);
+      expect(html).toMatch(/<li>child<\/li>/);
+      expect(html).not.toContain('<pre><code>A. child');
+    });
   });
 
   // 修复:防止编辑中间态(列表下一行只有孤立 `-`)被解析成 setext h2,导致预览突然跳成大字标题。

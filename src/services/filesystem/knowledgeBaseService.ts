@@ -9,7 +9,7 @@ interface OpenKnowledgeBaseOptions {
 }
 
 interface OpenKnowledgeBaseParams {
-  addTab: (tabId: string, content: string) => void;
+  addTab: (tabId: string, content?: string) => void;
   clearAllCache: () => void;
   findPreferredFile: (fileNodes: FileNode[], filePath: string) => FileNode | undefined;
   findInitialOpenableFile: (fileNodes: FileNode[]) => FileNode | null;
@@ -54,6 +54,10 @@ function isMarkdownFile(name: string): boolean {
 
 function isPreviewOnlyFile(name: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp|pdf|html?)$/i.test(name);
+}
+
+function shouldReadInitialFileContent(name: string): boolean {
+  return isMarkdownFile(name) || /\.html?$/i.test(name);
 }
 
 export async function openKnowledgeBaseWorkspace(
@@ -141,12 +145,17 @@ export async function openKnowledgeBaseWorkspace(
   let openedPreviewOnly = false;
   if (initialFile) {
     try {
-      const initialContent = await withErrorHandling(
-        () => fs.readFile(initialFile.path),
-        `Failed to read file: ${initialFile.name}`
-      );
+      if (shouldReadInitialFileContent(initialFile.name)) {
+        const initialContent = await withErrorHandling(
+          () => fs.readFile(initialFile.path),
+          `Failed to read file: ${initialFile.name}`
+        );
 
-      addTab(initialFile.id, initialContent);
+        addTab(initialFile.id, initialContent);
+      } else {
+        addTab(initialFile.id);
+      }
+
       setCurrentFilePath(initialFile.path);
       openedPreviewOnly = isPreviewOnlyFile(initialFile.name) && !isMarkdownFile(initialFile.name);
     } catch (error) {
