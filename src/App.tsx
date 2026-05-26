@@ -1,48 +1,57 @@
-import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useAppStore, selectContent, defaultSettings } from './store/appStore';
-import { useFileSystem } from './hooks/useFileSystem';
-import { useViewMode } from './hooks/useViewMode';
-import { useSettings } from './hooks/useSettings';
-import { useGlobalKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { useAutoSave } from './hooks/useAutoSave';
-import { useOutline } from './hooks/useOutline';
-import { useUndoRedo } from './hooks/useUndoRedo';
-import { useStoreHydration } from './hooks/useStoreHydration';
-import { useShikiHighlighter } from './hooks/useShikiHighlighter';
-import { useThemeSync } from './hooks/useThemeSync';
-import { useAIAnalyze } from './hooks/useAIAnalyze';
-import { useFileOperations } from './hooks/useFileOperations';
-import { Sidebar } from './components/sidebar/Sidebar';
-import { Toolbar } from './components/toolbar/Toolbar';
-import { SettingsModal } from './components/settings/SettingsModal';
-import { SplitView } from './components/editor/SplitView';
-import type { CodeMirrorContentChangeMeta } from './components/editor/hooks/useCodeMirror';
-import { OutlinePanel } from './components/outline/OutlinePanel';
-import { ContentSearch } from './components/search/ContentSearch';
-import { TabBar } from './components/tabs/TabBar';
-import { PromptDialog } from './components/ui/Dialog';
-import { PublishTargetDialog } from './components/publish/PublishTargetDialog';
-import { WechatDraftDialog } from './components/publish/WechatDraftDialog';
-import { ShareLongImageDialog } from './components/share/ShareLongImageDialog';
-import { useExportActions } from './hooks/useExportActions';
-import { ViewMode } from './types';
-import { focusEditorRangeByOffset } from './utils/editorSelectionBridge';
-import { requestPreviewHeadingScroll } from './utils/previewNavigationBridge';
-import { getResolvedUiFontFamily } from './utils/fontSettings';
-import { logEnvironment } from './utils/environment';
-import { useI18n } from './hooks/useI18n';
-import { getPathBasename, findFileInTree } from './app/appShellUtils';
-import { getResolvedEditorFontFamily } from './utils/fontSettings';
-import { useAppBootstrap } from './app/useAppBootstrap';
-import { useActiveFileWatch } from './app/useActiveFileWatch';
-import { useAppUpdater } from './app/useAppUpdater';
-import { useWorkspaceLayout } from './app/useWorkspaceLayout';
-import { useAttachmentCleanup } from './app/useAttachmentCleanup';
-import { useExternalFileOpen } from './app/useExternalFileOpen';
-import { getStartupKnowledgeBaseGate } from './app/startupKnowledgeBaseGate';
-import { extractWechatDraftDefaults, type WechatDraftPublishInput } from './utils/wechatPublish';
-import { isTauriEnvironment } from './types/filesystem';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { useAppStore, selectContent, defaultSettings } from "./store/appStore";
+import { useFileSystem } from "./hooks/useFileSystem";
+import { useViewMode } from "./hooks/useViewMode";
+import { useSettings } from "./hooks/useSettings";
+import { useGlobalKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useAutoSave } from "./hooks/useAutoSave";
+import { useOutline } from "./hooks/useOutline";
+import { useUndoRedo } from "./hooks/useUndoRedo";
+import { useStoreHydration } from "./hooks/useStoreHydration";
+import { useShikiHighlighter } from "./hooks/useShikiHighlighter";
+import { useThemeSync } from "./hooks/useThemeSync";
+import { useAIAnalyze } from "./hooks/useAIAnalyze";
+import { useFileOperations } from "./hooks/useFileOperations";
+import { Sidebar } from "./components/sidebar/Sidebar";
+import { Toolbar } from "./components/toolbar/Toolbar";
+import { SplitView } from "./components/editor/SplitView";
+import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useCodeMirror";
+import { OutlinePanel } from "./components/outline/OutlinePanel";
+import { ContentSearch } from "./components/search/ContentSearch";
+import { TabBar } from "./components/tabs/TabBar";
+import { useExportActions } from "./hooks/useExportActions";
+import { ViewMode } from "./types";
+import { focusEditorRangeByOffset } from "./utils/editorSelectionBridge";
+import { requestPreviewHeadingScroll } from "./utils/previewNavigationBridge";
+import { getResolvedUiFontFamily } from "./utils/fontSettings";
+import { logEnvironment } from "./utils/environment";
+import { useI18n } from "./hooks/useI18n";
+import { getPathBasename, findFileInTree } from "./app/appShellUtils";
+import { getResolvedEditorFontFamily } from "./utils/fontSettings";
+import { useAppBootstrap } from "./app/useAppBootstrap";
+import { useActiveFileWatch } from "./app/useActiveFileWatch";
+import { useAppUpdater } from "./app/useAppUpdater";
+import { useWorkspaceLayout } from "./app/useWorkspaceLayout";
+import { useAttachmentCleanup } from "./app/useAttachmentCleanup";
+import { useExternalFileOpen } from "./app/useExternalFileOpen";
+import { getStartupKnowledgeBaseGate } from "./app/startupKnowledgeBaseGate";
+import {
+  extractWechatDraftDefaults,
+  type WechatDraftPublishInput,
+} from "./utils/wechatPublish";
+import { isTauriEnvironment } from "./types/filesystem";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { KnowledgeBaseOnboarding } from "./components/KnowledgeBaseOnboarding";
+import { KnowledgeBaseLoadingScreen } from "./components/KnowledgeBaseLoadingScreen";
+import { AppDialogs } from "./components/AppDialogs";
 
 function isImageFile(name: string): boolean {
   return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
@@ -64,74 +73,9 @@ function isPreviewOnlyFile(name: string): boolean {
 // Using centralized configuration for better maintainability
 
 // Log environment info on app initialization for debugging
-if (typeof window !== 'undefined' && import.meta.env.DEV) {
+if (typeof window !== "undefined" && import.meta.env.DEV) {
   logEnvironment();
 }
-
-const KnowledgeBaseOnboarding: React.FC<{
-  uiScaleStyle: React.CSSProperties;
-  uiFontFamily: string;
-  onOpen: () => void;
-}> = ({ uiScaleStyle, uiFontFamily, onOpen }) => {
-  const { t } = useI18n();
-  return (
-    <div
-      className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
-      style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
-    >
-      <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
-            M
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">{t('app_chooseKnowledgeBase')}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('app_chooseKnowledgeBaseDesc')}</p>
-          </div>
-        </div>
-        <button
-          onClick={onOpen}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium hover:opacity-90 transition-opacity"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-          {t('app_openKnowledgeBase')}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const KnowledgeBaseLoadingScreen: React.FC<{
-  uiScaleStyle: React.CSSProperties;
-  uiFontFamily: string;
-}> = ({ uiScaleStyle, uiFontFamily }) => {
-  const { t } = useI18n();
-
-  return (
-    <div
-      className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
-      style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
-    >
-      <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
-            M
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">{t('app_restoringWorkspace')}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('app_restoringWorkspaceDesc')}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/80 dark:bg-black/30 px-4 py-3">
-          <div className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-black dark:border-gray-700 dark:border-t-white animate-spin" />
-          <span className="text-sm text-gray-600 dark:text-gray-300">{t('app_openingKnowledgeBase')}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const App: React.FC = () => {
   const { t } = useI18n();
@@ -164,7 +108,15 @@ const App: React.FC = () => {
 
   const content = useAppStore(selectContent);
 
-  const { openDirectory, openKnowledgeBase, openFilePath, readFile, moveToTrash, refreshFileTree, watchFile } = useFileSystem();
+  const {
+    openDirectory,
+    openKnowledgeBase,
+    openFilePath,
+    readFile,
+    moveToTrash,
+    refreshFileTree,
+    watchFile,
+  } = useFileSystem();
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
@@ -177,8 +129,14 @@ const App: React.FC = () => {
 
   useThemeSync(settings.themeMode);
   useLayoutEffect(() => {
-    document.documentElement.style.setProperty('--editor-font-size', `${settings.fontSize}px`);
-    document.documentElement.style.setProperty('--editor-font-family', getResolvedEditorFontFamily(settings));
+    document.documentElement.style.setProperty(
+      "--editor-font-size",
+      `${settings.fontSize}px`,
+    );
+    document.documentElement.style.setProperty(
+      "--editor-font-family",
+      getResolvedEditorFontFamily(settings),
+    );
   }, [settings.fontSize, settings.editorFontFamily]);
   useAppBootstrap({
     settings,
@@ -208,22 +166,32 @@ const App: React.FC = () => {
 
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
-  const [isPublishTargetDialogOpen, setIsPublishTargetDialogOpen] = useState(false);
+  const [isPublishTargetDialogOpen, setIsPublishTargetDialogOpen] =
+    useState(false);
   const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
-  const [isShareLongImageDialogOpen, setIsShareLongImageDialogOpen] = useState(false);
-  const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] = useState(false);
-  const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] = useState(false);
+  const [isShareLongImageDialogOpen, setIsShareLongImageDialogOpen] =
+    useState(false);
+  const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] =
+    useState(false);
+  const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
+    useState(false);
 
-  const openFilePathForExternalOpen = useCallback(async (path: string, options?: { silentSuccess?: boolean; suppressErrors?: boolean }) => {
-    // If a knowledge base is already open, open external files in a new window
-    // (matches macOS "double click file" expectations for library-style apps).
-    if (isTauriEnvironment() && rootFolderPath) {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('open_file_in_new_window', { path });
-      return path;
-    }
-    return openFilePath(path, options);
-  }, [openFilePath, rootFolderPath]);
+  const openFilePathForExternalOpen = useCallback(
+    async (
+      path: string,
+      options?: { silentSuccess?: boolean; suppressErrors?: boolean },
+    ) => {
+      // If a knowledge base is already open, open external files in a new window
+      // (matches macOS "double click file" expectations for library-style apps).
+      if (isTauriEnvironment() && rootFolderPath) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("open_file_in_new_window", { path });
+        return path;
+      }
+      return openFilePath(path, options);
+    },
+    [openFilePath, rootFolderPath],
+  );
 
   const externalFileOpen = useExternalFileOpen({
     settingsHydrated,
@@ -269,8 +237,12 @@ const App: React.FC = () => {
     t,
   });
 
-  const activeFile = activeTabId ? findFileInTree(files, activeTabId) : undefined;
-  const isPreviewOnlyActiveFile = activeFile ? isPreviewOnlyFile(activeFile.name) : false;
+  const activeFile = activeTabId
+    ? findFileInTree(files, activeTabId)
+    : undefined;
+  const isPreviewOnlyActiveFile = activeFile
+    ? isPreviewOnlyFile(activeFile.name)
+    : false;
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts(
@@ -278,10 +250,10 @@ const App: React.FC = () => {
       if (currentFilePath) {
         const saved = await forceSave(undefined, {
           formatBeforeSave: settings.formatMarkdownOnManualSave,
-          trigger: 'manual',
+          trigger: "manual",
         });
         if (saved) {
-          showNotification(t('app_saved'), 'success');
+          showNotification(t("app_saved"), "success");
         }
       }
     },
@@ -302,65 +274,88 @@ const App: React.FC = () => {
       onToggleSidebar: () => setSidebarOpen(!isSidebarOpen),
       onToggleTheme: toggleTheme,
       onNewNote: () => setIsNewNoteDialogOpen(true),
-      onNewFolder: () => { void fileOps.handleNewFolder(undefined, t('app_untitledFolder')); },
+      onNewFolder: () => {
+        void fileOps.handleNewFolder(undefined, t("app_untitledFolder"));
+      },
       onCloseTab: () => {
         if (activeTabId) {
           closeTab(activeTabId);
         }
       },
-      onOpenKnowledgeBase: () => { void handleSwitchKnowledgeBase(); },
-      onExportPdf: () => { void handleExportToPdf(); },
+      onOpenKnowledgeBase: () => {
+        void handleSwitchKnowledgeBase();
+      },
+      onExportPdf: () => {
+        void handleExportToPdf();
+      },
       onToggleView: isPreviewOnlyActiveFile ? () => {} : undefined,
-    }
+    },
   );
 
   useEffect(() => {
     if (isPreviewOnlyActiveFile && viewMode !== ViewMode.PREVIEW) {
-      setViewMode(ViewMode.PREVIEW, 'direct');
+      setViewMode(ViewMode.PREVIEW, "direct");
     }
   }, [isPreviewOnlyActiveFile, viewMode, setViewMode]);
 
-  const handleHeadingClick = useCallback((id: string, line: number) => {
-    setActiveHeadingId(id);
+  const handleHeadingClick = useCallback(
+    (id: string, line: number) => {
+      setActiveHeadingId(id);
 
-    const lineIndex = Math.max(0, line - 1);
-    const lines = content.split('\n');
-    const cursorPos = lines.slice(0, lineIndex).reduce((sum, l) => sum + l.length + 1, 0);
+      const lineIndex = Math.max(0, line - 1);
+      const lines = content.split("\n");
+      const cursorPos = lines
+        .slice(0, lineIndex)
+        .reduce((sum, l) => sum + l.length + 1, 0);
 
-    if (viewMode !== ViewMode.PREVIEW) {
-      focusEditorRangeByOffset(cursorPos, cursorPos, { alignTopRatio: 0.3 });
-    }
+      if (viewMode !== ViewMode.PREVIEW) {
+        focusEditorRangeByOffset(cursorPos, cursorPos, { alignTopRatio: 0.3 });
+      }
 
-    if (viewMode !== ViewMode.EDITOR) {
-      const scrollOptions = { alignMode: 'center' as const, behavior: 'smooth' as const };
-      requestPreviewHeadingScroll(activeTabId, id, scrollOptions);
-    }
-  }, [activeTabId, content, setActiveHeadingId, viewMode]);
+      if (viewMode !== ViewMode.EDITOR) {
+        const scrollOptions = {
+          alignMode: "center" as const,
+          behavior: "smooth" as const,
+        };
+        requestPreviewHeadingScroll(activeTabId, id, scrollOptions);
+      }
+    },
+    [activeTabId, content, setActiveHeadingId, viewMode],
+  );
 
-  const handleContentChange = useCallback((newContent: string, meta?: CodeMirrorContentChangeMeta) => {
-    if (!activeTabId) {
-      setContent(newContent, meta?.skipHistory);
-      return;
-    }
+  const handleContentChange = useCallback(
+    (newContent: string, meta?: CodeMirrorContentChangeMeta) => {
+      if (!activeTabId) {
+        setContent(newContent, meta?.skipHistory);
+        return;
+      }
 
-    setContentForFile(activeTabId, newContent, meta?.skipHistory);
-  }, [activeTabId, setContent, setContentForFile]);
+      setContentForFile(activeTabId, newContent, meta?.skipHistory);
+    },
+    [activeTabId, setContent, setContentForFile],
+  );
 
-  const handleToolbarViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode, 'direct');
-  }, [setViewMode]);
+  const handleToolbarViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode, "direct");
+    },
+    [setViewMode],
+  );
 
   const handleSidebarWidthChange = useCallback((nextWidth: number) => {
     setSidebarWidth(nextWidth);
   }, []);
 
-  const handleSubmitNewNote = useCallback((value: string) => {
-    const fileName = value.trim();
-    if (!fileName) return;
+  const handleSubmitNewNote = useCallback(
+    (value: string) => {
+      const fileName = value.trim();
+      if (!fileName) return;
 
-    void fileOps.handleCreateFile(undefined, fileName);
-    setIsNewNoteDialogOpen(false);
-  }, [fileOps]);
+      void fileOps.handleCreateFile(undefined, fileName);
+      setIsNewNoteDialogOpen(false);
+    },
+    [fileOps],
+  );
 
   const handleOutlineWidthChange = useCallback((nextWidth: number) => {
     setOutlineWidth(nextWidth);
@@ -384,12 +379,15 @@ const App: React.FC = () => {
     setIsWechatDraftDialogOpen(true);
   }, []);
 
-  const handleSubmitWechatDraft = useCallback(async (input: WechatDraftPublishInput) => {
-    const published = await handlePublishWechatDraft(input);
-    if (published) {
-      setIsWechatDraftDialogOpen(false);
-    }
-  }, [handlePublishWechatDraft]);
+  const handleSubmitWechatDraft = useCallback(
+    async (input: WechatDraftPublishInput) => {
+      const published = await handlePublishWechatDraft(input);
+      if (published) {
+        setIsWechatDraftDialogOpen(false);
+      }
+    },
+    [handlePublishWechatDraft],
+  );
 
   const wechatDraftDefaults = useMemo(() => {
     if (!activeFile || !content) {
@@ -398,13 +396,23 @@ const App: React.FC = () => {
 
     return extractWechatDraftDefaults(content, activeFile.path);
   }, [activeFile, content]);
-  const notification = useAppStore(state => state.notification);
-  const currentKnowledgeBaseName = useMemo(() => getPathBasename(rootFolderPath), [rootFolderPath]);
-  const uiFontFamily = useMemo(() => getResolvedUiFontFamily(settings), [settings.uiFontFamily]);
-  const uiScaleStyle = useMemo(() => ({
-    '--ui-font-size': `${settings.uiFontSize}px`,
-    '--ui-font-scale': `${settings.uiFontSize / defaultSettings.uiFontSize}`,
-  }) as React.CSSProperties, [settings.uiFontSize]);
+  const notification = useAppStore((state) => state.notification);
+  const currentKnowledgeBaseName = useMemo(
+    () => getPathBasename(rootFolderPath),
+    [rootFolderPath],
+  );
+  const uiFontFamily = useMemo(
+    () => getResolvedUiFontFamily(settings),
+    [settings.uiFontFamily],
+  );
+  const uiScaleStyle = useMemo(
+    () =>
+      ({
+        "--ui-font-size": `${settings.uiFontSize}px`,
+        "--ui-font-scale": `${settings.uiFontSize / defaultSettings.uiFontSize}`,
+      }) as React.CSSProperties,
+    [settings.uiFontSize],
+  );
 
   useEffect(() => {
     if (!settingsHydrated) return;
@@ -442,8 +450,8 @@ const App: React.FC = () => {
 
       if (!restoredPath) {
         updateSettings({
-          lastKnowledgeBasePath: '',
-          lastOpenedFilePath: '',
+          lastKnowledgeBasePath: "",
+          lastOpenedFilePath: "",
         });
       }
 
@@ -465,17 +473,18 @@ const App: React.FC = () => {
     updateSettings,
   ]);
 
-  const { shouldShowKnowledgeBaseLoading, shouldShowKnowledgeBaseOnboarding } = getStartupKnowledgeBaseGate({
-    settingsHydrated,
-    rootFolderPath,
-    filesLen: files.length,
-    isTauri: isTauriEnvironment(),
-    lastKnowledgeBasePath: settings.lastKnowledgeBasePath ?? '',
-    externalChecked: externalFileOpen.hasCheckedExternalFiles,
-    externalHandled: externalFileOpen.hasHandledExternalFile,
-    isRestoringStartupKnowledgeBase,
-    hasResolvedStartupKnowledgeBase,
-  });
+  const { shouldShowKnowledgeBaseLoading, shouldShowKnowledgeBaseOnboarding } =
+    getStartupKnowledgeBaseGate({
+      settingsHydrated,
+      rootFolderPath,
+      filesLen: files.length,
+      isTauri: isTauriEnvironment(),
+      lastKnowledgeBasePath: settings.lastKnowledgeBasePath ?? "",
+      externalChecked: externalFileOpen.hasCheckedExternalFiles,
+      externalHandled: externalFileOpen.hasHandledExternalFile,
+      isRestoringStartupKnowledgeBase,
+      hasResolvedStartupKnowledgeBase,
+    });
 
   if (shouldShowKnowledgeBaseLoading) {
     return (
@@ -497,158 +506,143 @@ const App: React.FC = () => {
   }
 
   return (
-    <div
-      className="flex h-screen flex-col overflow-hidden text-sm"
-      style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
-    >
-      {(() => {
-        const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform ?? '');
-        const shouldInsetForMacOverlayTitlebar = isMac && isTauriEnvironment();
-        if (!shouldInsetForMacOverlayTitlebar) return null;
-        return (
-          <div
-            className="h-[28px] w-full shrink-0 bg-gray-50 dark:bg-black"
-            data-tauri-drag-region
-            onMouseDown={(event) => {
-              if (event.button !== 0) return;
-              void getCurrentWindow().startDragging();
-            }}
-          />
-        );
-      })()}
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <Sidebar
-          files={files}
-          activeFileId={activeTabId}
-          onFileSelect={fileOps.handleFileSelect}
-          onCreateFile={(folder, fileName) => fileOps.handleCreateFile(folder, fileName)}
-          onNewFolder={(folder, name) => fileOps.handleNewFolder(folder, name)}
-          onRename={fileOps.handleRename}
-          onDelete={fileOps.handleDelete}
-          onReveal={fileOps.handleRevealInExplorer}
-          onMoveToTrash={fileOps.handleMoveToTrash}
-          onRestoreFromTrash={fileOps.handleRestoreFromTrash}
-          onDeleteForever={fileOps.handleDeleteForever}
-          onEmptyTrash={fileOps.handleEmptyTrash}
-          onMoveNode={fileOps.handleMoveNode}
-          onMoveToRoot={fileOps.handleMoveToRoot}
-          currentKnowledgeBaseName={currentKnowledgeBaseName}
-          currentKnowledgeBasePath={rootFolderPath ?? undefined}
-          onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
-          isOpen={isSidebarOpen}
-          searchFocusRequestKey={sidebarSearchRequestKey}
-          locateCurrentFileRequestKey={sidebarLocateRequestKey}
-          width={responsiveSidebarWidth}
-          onWidthChange={handleSidebarWidthChange}
-          onClose={() => setSidebarOpen(false)}
-        />
-
-        <main
-          ref={mainContentRef}
-          className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black"
-        >
-          <Toolbar
-            fileName={activeFile?.name || ''}
-            viewMode={viewMode}
-            onViewModeChange={handleToolbarViewModeChange}
-            onAIAnalyze={handleAIAnalyze}
-            isAnalyzing={isAnalyzing}
-            isSaving={isSaving}
-            isPublishing={isPublishing}
-            isSidebarOpen={isSidebarOpen}
-            onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
-            onToggleTheme={toggleTheme}
-            themeMode={settings.themeMode}
-            onPublish={handleOpenPublishDialog}
-            onExportPdf={handleExportToPdf}
-            onShareLongImage={() => { setIsShareLongImageDialogOpen(true); }}
-            isPreviewOnlyFile={isPreviewOnlyActiveFile}
-          />
-
-          <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
-
-          <div className="flex-1 min-w-0 flex overflow-hidden relative">
-            <SplitView
-              highlighter={highlighter}
-              onContentChange={handleContentChange}
-              onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
-              isOutlineOpen={isOutlineOpen}
-              canShowOutline={canShowOutlinePanel}
-              canShowOutlineToggle={canShowOutlineToggle}
-              contentDensity={contentDensity}
-              onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
+    <ErrorBoundary>
+      <div
+        className="flex h-screen flex-col overflow-hidden text-sm"
+        style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
+      >
+        {(() => {
+          const isMac =
+            typeof navigator !== "undefined" &&
+            /Mac/.test(navigator.platform ?? "");
+          const shouldInsetForMacOverlayTitlebar =
+            isMac && isTauriEnvironment();
+          if (!shouldInsetForMacOverlayTitlebar) return null;
+          return (
+            <div
+              className="h-[28px] w-full shrink-0 bg-gray-50 dark:bg-black"
+              data-tauri-drag-region
+              onMouseDown={(event) => {
+                if (event.button !== 0) return;
+                void getCurrentWindow().startDragging();
+              }}
             />
-            {isOutlineVisible && (
-              <OutlinePanel
-                headings={outlineHeadings}
-                activeHeadingId={activeHeadingId}
-                onHeadingClick={handleHeadingClick}
-                width={responsiveOutlineWidth}
-                onWidthChange={handleOutlineWidthChange}
+          );
+        })()}
+
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <Sidebar
+            files={files}
+            activeFileId={activeTabId}
+            onFileSelect={fileOps.handleFileSelect}
+            onCreateFile={(folder, fileName) =>
+              fileOps.handleCreateFile(folder, fileName)
+            }
+            onNewFolder={(folder, name) =>
+              fileOps.handleNewFolder(folder, name)
+            }
+            onRename={fileOps.handleRename}
+            onDelete={fileOps.handleDelete}
+            onReveal={fileOps.handleRevealInExplorer}
+            onMoveToTrash={fileOps.handleMoveToTrash}
+            onRestoreFromTrash={fileOps.handleRestoreFromTrash}
+            onDeleteForever={fileOps.handleDeleteForever}
+            onEmptyTrash={fileOps.handleEmptyTrash}
+            onMoveNode={fileOps.handleMoveNode}
+            onMoveToRoot={fileOps.handleMoveToRoot}
+            currentKnowledgeBaseName={currentKnowledgeBaseName}
+            currentKnowledgeBasePath={rootFolderPath ?? undefined}
+            onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
+            isOpen={isSidebarOpen}
+            searchFocusRequestKey={sidebarSearchRequestKey}
+            locateCurrentFileRequestKey={sidebarLocateRequestKey}
+            width={responsiveSidebarWidth}
+            onWidthChange={handleSidebarWidthChange}
+            onClose={() => setSidebarOpen(false)}
+          />
+
+          <main
+            ref={mainContentRef}
+            className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black"
+          >
+            <Toolbar
+              fileName={activeFile?.name || ""}
+              viewMode={viewMode}
+              onViewModeChange={handleToolbarViewModeChange}
+              onAIAnalyze={handleAIAnalyze}
+              isAnalyzing={isAnalyzing}
+              isSaving={isSaving}
+              isPublishing={isPublishing}
+              isSidebarOpen={isSidebarOpen}
+              onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
+              onToggleTheme={toggleTheme}
+              themeMode={settings.themeMode}
+              onPublish={handleOpenPublishDialog}
+              onExportPdf={handleExportToPdf}
+              onShareLongImage={() => {
+                setIsShareLongImageDialogOpen(true);
+              }}
+              isPreviewOnlyFile={isPreviewOnlyActiveFile}
+            />
+
+            <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
+
+            <div className="flex-1 min-w-0 flex overflow-hidden relative">
+              <SplitView
+                highlighter={highlighter}
+                onContentChange={handleContentChange}
+                onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
+                isOutlineOpen={isOutlineOpen}
+                canShowOutline={canShowOutlinePanel}
+                canShowOutlineToggle={canShowOutlineToggle}
+                contentDensity={contentDensity}
+                onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
               />
-            )}
-            {isSearchBarOpen && (
-              <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
-            )}
-          </div>
-        </main>
-      </div>
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        onUpdateSettings={updateSettings}
-        uiScaleStyle={uiScaleStyle}
-      />
-
-      <PromptDialog
-        isOpen={isNewNoteDialogOpen}
-        onClose={() => setIsNewNoteDialogOpen(false)}
-        onSubmit={handleSubmitNewNote}
-        title={t('app_newFile')}
-        label={t('app_fileName')}
-        defaultValue={t('app_untitled')}
-        submitText={t('common_create')}
-      />
-
-      <PublishTargetDialog
-        isOpen={isPublishTargetDialogOpen}
-        onClose={() => setIsPublishTargetDialogOpen(false)}
-        onSelectSimpleBlog={handleSelectSimpleBlogPublish}
-        onSelectWechatDraft={handleSelectWechatDraftPublish}
-      />
-
-      <WechatDraftDialog
-        isOpen={isWechatDraftDialogOpen}
-        isSubmitting={isPublishing}
-        defaults={wechatDraftDefaults}
-        onClose={() => setIsWechatDraftDialogOpen(false)}
-        onSubmit={(input) => { void handleSubmitWechatDraft(input); }}
-      />
-
-      <ShareLongImageDialog
-        isOpen={isShareLongImageDialogOpen}
-        onClose={() => setIsShareLongImageDialogOpen(false)}
-        buildPayload={buildLongImageSharePayload}
-        attachmentContext={{ files, rootFolderPath }}
-      />
-
-      {notification && (
-        <div
-          className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-50 animate-fade-in border glass ${
-            notification.type === 'success'
-              ? 'text-green-600 border-green-100 dark:border-green-900'
-              : 'text-red-500 border-red-100 dark:border-red-900'
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          {notification.msg}
+              {isOutlineVisible && (
+                <OutlinePanel
+                  headings={outlineHeadings}
+                  activeHeadingId={activeHeadingId}
+                  onHeadingClick={handleHeadingClick}
+                  width={responsiveOutlineWidth}
+                  onWidthChange={handleOutlineWidthChange}
+                />
+              )}
+              {isSearchBarOpen && (
+                <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
+              )}
+            </div>
+          </main>
         </div>
-      )}
-    </div>
+
+        <AppDialogs
+          isSettingsOpen={isSettingsOpen}
+          isNewNoteDialogOpen={isNewNoteDialogOpen}
+          isPublishTargetDialogOpen={isPublishTargetDialogOpen}
+          isWechatDraftDialogOpen={isWechatDraftDialogOpen}
+          isShareLongImageDialogOpen={isShareLongImageDialogOpen}
+          isPublishing={isPublishing}
+          settings={settings}
+          wechatDraftDefaults={wechatDraftDefaults}
+          notification={notification}
+          attachmentContext={{ files, rootFolderPath }}
+          t={t as unknown as (key: string) => string}
+          uiScaleStyle={uiScaleStyle}
+          buildPayload={buildLongImageSharePayload}
+          onCloseSettings={() => setSettingsOpen(false)}
+          onUpdateSettings={updateSettings}
+          onCloseNewNote={() => setIsNewNoteDialogOpen(false)}
+          onSubmitNewNote={handleSubmitNewNote}
+          onClosePublishTarget={() => setIsPublishTargetDialogOpen(false)}
+          onSelectSimpleBlog={handleSelectSimpleBlogPublish}
+          onSelectWechatDraft={handleSelectWechatDraftPublish}
+          onCloseWechatDraft={() => setIsWechatDraftDialogOpen(false)}
+          onSubmitWechatDraft={(input) => {
+            void handleSubmitWechatDraft(input);
+          }}
+          onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
+        />
+      </div>
+    </ErrorBoundary>
   );
 };
 
