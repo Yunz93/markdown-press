@@ -23,6 +23,7 @@ import { resolveAttachmentTarget } from '../../utils/attachmentResolver';
 const mockedResolveAttachmentTarget = vi.mocked(resolveAttachmentTarget);
 
 const attachmentContext = {
+  cacheNamespace: 'test-vault',
   files: [],
   rootFolderPath: '/vault',
   currentFilePath: '/vault/notes/a.md',

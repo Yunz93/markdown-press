@@ -6,16 +6,33 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useAppStore } from '../../store/appStore';
 import type { PreviewPaneHandle } from './PreviewPane';
 
-const mockNavigateToWikilink = vi.fn(async () => true);
-const mockNavigateToHashLink = vi.fn(() => true);
-const mockHandleFileSelect = vi.fn(async () => {});
-const mockHandleRevealInExplorer = vi.fn(async () => {});
-const mockMountPdfPreview = vi.fn(() => () => {});
-const mockResolveAttachmentTarget = vi.fn();
-const mockSyncScrollTo = vi.fn();
-const mockCancelScrollSync = vi.fn();
-const mockRenderMermaidDiagrams = vi.fn(async () => {});
-const mockResetMermaidPlaceholders = vi.fn();
+const {
+  mockNavigateToWikilink,
+  mockNavigateToHashLink,
+  mockHandleFileSelect,
+  mockHandleRevealInExplorer,
+  mockMountPdfPreview,
+  mockResolveAttachmentTarget,
+  mockSyncScrollTo,
+  mockCancelScrollSync,
+  mockRenderMermaidDiagrams,
+  mockResetMermaidPlaceholders,
+} = vi.hoisted(() => ({
+  mockNavigateToWikilink: vi.fn(async () => true),
+  mockNavigateToHashLink: vi.fn(() => true),
+  mockHandleFileSelect: vi.fn(async () => {}),
+  mockHandleRevealInExplorer: vi.fn(async () => {}),
+  mockMountPdfPreview: vi.fn<
+    (container: HTMLElement, src: string, title: string, pdfPath?: string) => () => void
+  >(() => () => {}),
+  mockResolveAttachmentTarget: vi.fn(),
+  mockSyncScrollTo: vi.fn(),
+  mockCancelScrollSync: vi.fn(),
+  mockRenderMermaidDiagrams: vi.fn<
+    (container: HTMLElement, options?: { themeMode?: 'light' | 'dark' }) => Promise<void>
+  >(async () => {}),
+  mockResetMermaidPlaceholders: vi.fn<(container: HTMLElement) => void>(() => {}),
+}));
 
 vi.mock('../../hooks/useFileOperations', () => ({
   useFileOperations: () => ({
@@ -32,11 +49,11 @@ vi.mock('../../hooks/useFileSystem', () => ({
 
 vi.mock('../../utils/attachmentResolver', () => ({
   createAttachmentResolverContext: vi.fn(() => ({})),
-  resolveAttachmentTarget: (...args: unknown[]) => mockResolveAttachmentTarget(...args),
+  resolveAttachmentTarget: mockResolveAttachmentTarget,
 }));
 
 vi.mock('../../utils/pdfPreview', () => ({
-  mountPdfPreview: (...args: unknown[]) => mockMountPdfPreview(...args),
+  mountPdfPreview: mockMountPdfPreview,
 }));
 
 vi.mock('../../utils/previewImageCache', () => ({
@@ -45,8 +62,8 @@ vi.mock('../../utils/previewImageCache', () => ({
 }));
 
 vi.mock('../../utils/markdown-extensions', () => ({
-  renderMermaidDiagrams: (...args: unknown[]) => mockRenderMermaidDiagrams(...args),
-  resetMermaidPlaceholders: (...args: unknown[]) => mockResetMermaidPlaceholders(...args),
+  renderMermaidDiagrams: mockRenderMermaidDiagrams,
+  resetMermaidPlaceholders: mockResetMermaidPlaceholders,
 }));
 
 vi.mock('../../utils/performance', async (importOriginal) => {

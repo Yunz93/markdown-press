@@ -3,7 +3,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { FileNode } from '../../../types';
-import { useWikiLinkNavigation } from './useWikiLinkNavigation';
+import type { PreviewScrollOptions } from '../../../utils/previewNavigationBridge';
+
+const { mockRequestPreviewHeadingScroll } = vi.hoisted(() => ({
+  mockRequestPreviewHeadingScroll: vi.fn<
+    (tabId: string | null | undefined, id: string, options?: PreviewScrollOptions) => boolean
+  >(() => false),
+}));
 
 vi.mock('../../../store/appStore', () => ({
   useAppStore: {
@@ -11,15 +17,15 @@ vi.mock('../../../store/appStore', () => ({
   },
 }));
 
-const mockRequestPreviewHeadingScroll = vi.fn(() => false);
-
 vi.mock('../../../utils/previewNavigationBridge', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../utils/previewNavigationBridge')>();
   return {
     ...actual,
-    requestPreviewHeadingScroll: (...args: unknown[]) => mockRequestPreviewHeadingScroll(...args),
+    requestPreviewHeadingScroll: mockRequestPreviewHeadingScroll,
   };
 });
+
+import { useWikiLinkNavigation } from './useWikiLinkNavigation';
 
 const files: FileNode[] = [
   { id: 'note-a', name: 'a.md', type: 'file', path: '/vault/notes/a.md' },

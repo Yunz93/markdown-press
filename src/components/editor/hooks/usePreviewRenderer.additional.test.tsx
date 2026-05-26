@@ -4,16 +4,21 @@ import React, { useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { clearMarkdownCache } from '../../../utils/markdown';
+import type { ShikiHighlighter } from '../../../hooks/useShikiHighlighter';
 import { usePreviewRenderer } from './usePreviewRenderer';
 
 (globalThis as typeof globalThis & { __PROD__?: boolean }).__PROD__ ??= false;
 
-const mockedResolvePreviewSource = vi.fn(async (src: string) => `resolved:${src}`);
-const mockedWarmPreviewImage = vi.fn(async (src: string) => `warmed:${src}`);
+const mockedResolvePreviewSource = vi.fn<(src: string, sourceFilePath?: string) => Promise<string>>(
+  async (src) => `resolved:${src}`,
+);
+const mockedWarmPreviewImage = vi.fn<(src: string, sourceFilePath?: string) => Promise<string>>(
+  async (src) => `warmed:${src}`,
+);
 
 vi.mock('../../../utils/previewImageCache', () => ({
-  resolvePreviewSource: (...args: unknown[]) => mockedResolvePreviewSource(...args),
-  warmPreviewImage: (...args: unknown[]) => mockedWarmPreviewImage(...args),
+  resolvePreviewSource: (src: string, sourceFilePath?: string) => mockedResolvePreviewSource(src, sourceFilePath),
+  warmPreviewImage: (src: string, sourceFilePath?: string) => mockedWarmPreviewImage(src, sourceFilePath),
   hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
 }));
 
@@ -29,7 +34,7 @@ const mockedResolveAttachmentTarget = vi.mocked(resolveAttachmentTarget);
 function RendererHarness(props: {
   content: string;
   enabled?: boolean;
-  highlighter?: { id: string } | null;
+  highlighter?: ShikiHighlighter | null;
 }) {
   const renderer = usePreviewRenderer({
     content: props.content,
@@ -106,8 +111,12 @@ describe('usePreviewRenderer additional coverage', () => {
   it('clears markdown cache when the highlighter becomes available', async () => {
     const clearSpy = vi.spyOn(await import('../../../utils/markdown'), 'clearMarkdownCache');
 
+    const mockHighlighter: ShikiHighlighter = {
+      codeToHtml: () => '',
+    };
+
     const { rerender } = render(<RendererHarness content="# One" highlighter={null} />);
-    rerender(<RendererHarness content="# One" highlighter={{ id: 'shiki' }} />);
+    rerender(<RendererHarness content="# One" highlighter={mockHighlighter} />);
 
     await waitFor(() => {
       expect(clearSpy).toHaveBeenCalled();

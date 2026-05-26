@@ -8,12 +8,16 @@ import { usePreviewRenderer } from './usePreviewRenderer';
 
 (globalThis as typeof globalThis & { __PROD__?: boolean }).__PROD__ ??= false;
 
-const mockedResolvePreviewSource = vi.fn(async (src: string) => `resolved:${src}`);
-const mockedWarmPreviewImage = vi.fn(async (src: string) => `warmed:${src}`);
+const mockedResolvePreviewSource = vi.fn<(src: string, sourceFilePath?: string) => Promise<string>>(
+  async (src) => `resolved:${src}`,
+);
+const mockedWarmPreviewImage = vi.fn<(src: string, sourceFilePath?: string) => Promise<string>>(
+  async (src) => `warmed:${src}`,
+);
 
 vi.mock('../../../utils/previewImageCache', () => ({
-  resolvePreviewSource: (...args: unknown[]) => mockedResolvePreviewSource(...args),
-  warmPreviewImage: (...args: unknown[]) => mockedWarmPreviewImage(...args),
+  resolvePreviewSource: (src: string, sourceFilePath?: string) => mockedResolvePreviewSource(src, sourceFilePath),
+  warmPreviewImage: (src: string, sourceFilePath?: string) => mockedWarmPreviewImage(src, sourceFilePath),
   hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
 }));
 
