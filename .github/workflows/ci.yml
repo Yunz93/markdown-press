@@ -33,6 +33,10 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Test with coverage
+        run: npx vitest run --coverage
+        continue-on-error: true
+
       - name: Build
         run: npm run build
 
