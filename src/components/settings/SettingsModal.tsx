@@ -16,6 +16,7 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: AppSettings;
   onUpdateSettings: (updates: Partial<AppSettings>) => void;
+  uiScaleStyle?: React.CSSProperties;
 }
 
 type SettingsTab = 'general' | 'editor' | 'metadata' | 'shortcuts' | 'ai' | 'interface' | 'imageHosting' | 'about';
@@ -42,7 +43,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   settings,
-  onUpdateSettings
+  onUpdateSettings,
+  uiScaleStyle,
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>('editor');
@@ -86,7 +88,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="ui-scaled fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-fade-in-02s">
+    <div
+      className="ui-scaled fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-fade-in-02s"
+      style={uiScaleStyle}
+    >
       <div
         className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-scale-in flex h-[600px] max-h-[90vh] border border-gray-200/50 dark:border-white/10"
         role="dialog"
@@ -118,7 +123,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="flex-1 flex flex-col min-w-0 bg-transparent">
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="settings-panel flex-1 overflow-y-auto p-8">
             {renderActiveTab()}
           </div>
 

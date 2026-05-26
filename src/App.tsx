@@ -600,6 +600,7 @@ const App: React.FC = () => {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={updateSettings}
+        uiScaleStyle={uiScaleStyle}
       />
 
       <PromptDialog

@@ -97,6 +97,21 @@ body {
   font-size: calc(11px * var(--ui-font-scale));
 }
 
+/* 设置面板表单控件：统一系统 UI 字体与较小字号，避免继承界面字体导致输入框偏大 */
+.settings-panel select,
+.settings-panel input:not([type='range']):not([type='checkbox']):not([type='radio']),
+.settings-panel textarea {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif !important;
+  font-size: calc(var(--ui-font-size) * 0.75) !important;
+  line-height: 1.125rem;
+}
+
+.settings-panel input.font-mono,
+.settings-panel textarea.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace !important;
+}
+
 html[data-app-booting="true"] *,
 html[data-app-booting="true"] *::before,
 html[data-app-booting="true"] *::after {
