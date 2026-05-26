@@ -31,6 +31,17 @@ describe('preview spacing CSS', () => {
     );
   });
 
+  it('keeps inline code pills vertically centered inside prose lines', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/preview.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body code\s*\{[^}]*line-height:\s*1\.35;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body pre(?:,\s*\n\.preview-pane-document\.markdown-body pre:not\(\.shiki\) code)+[^}]*line-height:\s*1\.75;/m,
+    );
+  });
+
   it('sizes wiki embed images via typed attr(... px) on bare numeric data attributes', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/styles/preview.css'), 'utf8');
 

@@ -493,6 +493,8 @@
   color: var(--mp-doc-code-text, inherit);
   border-radius: 0.45rem;
   padding: 0.15rem 0.35rem;
+  /* 行内代码不能继承正文 1.95 行高，否则胶囊背景会偏高，文字看起来不居中 */
+  line-height: 1.35;
   font-family: var(--preview-code-font-family);
   font-size: var(--preview-code-font-size);
 }
