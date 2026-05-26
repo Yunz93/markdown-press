@@ -7,11 +7,13 @@ import {
   parseListItem,
   formatListItem,
   formatOrderedMarkerValue,
-} from '../nestedListBehavior';
-import type { ListInfo } from './core';
+} from "./nestedListBehavior";
+import type { ListInfo } from "./core";
 
 // 将新的 ListItemInfo 转换为旧的 ListInfo 格式
-function convertToLegacyListInfo(item: ReturnType<typeof parseListItem>): ListInfo | null {
+function convertToLegacyListInfo(
+  item: ReturnType<typeof parseListItem>,
+): ListInfo | null {
   if (!item) return null;
   return {
     type: item.type,
@@ -35,26 +37,26 @@ export function parseListLine(lineText: string): ListInfo | null {
 export function formatListLine(
   quote: { indent: string; depth: number; spacedStyle: boolean } | null,
   list: ListInfo,
-  overrides: Partial<ListInfo> = {}
+  overrides: Partial<ListInfo> = {},
 ): string {
   const nextList = { ...list, ...overrides };
   // 确保内容没有前导空格，避免格式化后出现多余空格
   const content = nextList.content.trimStart();
   const quotePrefix = quote
-    ? `${quote.indent}${quote.spacedStyle ? '> '.repeat(quote.depth) : '>'.repeat(quote.depth) + ' '}`
-    : '';
+    ? `${quote.indent}${quote.spacedStyle ? "> ".repeat(quote.depth) : ">".repeat(quote.depth) + " "}`
+    : "";
 
-  if (nextList.type === 'ordered') {
+  if (nextList.type === "ordered") {
     const seg = formatOrderedMarkerValue(
       nextList.number ?? 1,
-      nextList.markerStyle ?? 'decimal',
-      nextList.delimiter ?? '.',
+      nextList.markerStyle ?? "decimal",
+      nextList.delimiter ?? ".",
     );
     return `${quotePrefix}${nextList.indent}${seg} ${content}`;
   }
 
-  if (nextList.type === 'task') {
-    const checkbox = nextList.checkbox ?? '[ ]';
+  if (nextList.type === "task") {
+    const checkbox = nextList.checkbox ?? "[ ]";
     return `${quotePrefix}${nextList.indent}${nextList.marker} ${checkbox} ${content}`;
   }
 

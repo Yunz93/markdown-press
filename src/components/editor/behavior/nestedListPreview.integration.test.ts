@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { EditorState, EditorSelection } from "@codemirror/state";
 import type { StateCommand } from "@codemirror/state";
-import { clearMarkdownCache, renderMarkdown } from "../../utils/markdown";
+import { clearMarkdownCache, renderMarkdown } from "../../../utils/markdown";
 import {
   createHandleListBackspace,
   handleListEnter,
