@@ -74,4 +74,4 @@ xattr -cr /Applications/M記.app
 
 ## 致谢
 
-[Tauri](https://tauri.app/) · [React](https://react.dev/) · [markdown-it](https://github.com/markdown-it/markdown-it) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [Mermaid](https://mermaid.js.org/) · [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)
+[Tauri](https://tauri.app/) · [React](https://react.dev/) · [markdown-it](https://github.com/markdown-it/markdown-it) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)

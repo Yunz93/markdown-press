@@ -11,7 +11,7 @@
 - Markdown rendering: [markdown-it](https://github.com/markdown-it/markdown-it)
 - Syntax highlighting: [Shiki](https://shiki.style/)
 - Math rendering: [KaTeX](https://katex.org/)
-- Diagrams: [Mermaid](https://mermaid.js.org/)
+- Diagrams: [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) (common Mermaid syntax) + [Mermaid](https://mermaid.js.org/) (fallback for other types)
 - AI: [Google Gemini API](https://ai.google.dev/) / [OpenAI API](https://platform.openai.com/)
 
 ## Requirements
@@ -107,6 +107,7 @@ See [RELEASE_SMOKE_TEST.md](./RELEASE_SMOKE_TEST.md) for the manual checklist.
 - Dark mode is the default theme
 - `.trash` is an internal application directory and should not be edited manually
 - The preview pipeline supports wiki links, heading jumps, block references, and attachment resolution
+- Mermaid diagrams prefer beautiful-mermaid (flowchart, state, sequence, class, ER, xychart-beta); pie, gantt, and other types fall back to official Mermaid
 - Settings allow separate UI, editor, preview, and code font configuration
 - The default font is the system font, with 仓耳今楷 available as a bundled Chinese font option
 - External file change watch: if a file is modified outside the app with no unsaved edits, it reloads automatically

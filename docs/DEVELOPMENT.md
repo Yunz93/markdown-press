@@ -11,7 +11,7 @@
 - Markdown 渲染: [markdown-it](https://github.com/markdown-it/markdown-it)
 - 代码高亮: [Shiki](https://shiki.style/)
 - 数学公式: [KaTeX](https://katex.org/)
-- 图表: [Mermaid](https://mermaid.js.org/)
+- 图表: [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)（Mermaid 语法，常见类型）+ [Mermaid](https://mermaid.js.org/)（其余类型回退）
 - AI: [Google Gemini API](https://ai.google.dev/) / [OpenAI API](https://platform.openai.com/)
 
 ## 环境要求
@@ -107,6 +107,7 @@ npm run smoke:release
 - 默认主题为暗色模式
 - `.trash` 为应用内部回收站目录，不应手动编辑
 - 预览层支持 wiki link、heading link、block ref 与附件解析
+- Mermaid 图表优先由 beautiful-mermaid 渲染（flowchart、state、sequence、class、ER、xychart-beta）；pie、gantt 等其余类型回退到官方 Mermaid
 - 设置页支持分别配置界面字体、编辑字体、预览字体和代码字体
 - 默认字体为系统字体，内置中文字体提供仓耳今楷选项
 - 支持外部文件变更监听，如果文件在外部被修改且无未保存编辑，会自动重新加载

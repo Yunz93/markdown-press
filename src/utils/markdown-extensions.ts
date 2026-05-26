@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { renderMermaidSVG, THEMES, type RenderOptions } from 'beautiful-mermaid';
 import { isTauriEnvironment } from '../types/filesystem';
 
 // KaTeX options
@@ -10,27 +11,64 @@ const katexOptions: katex.KatexOptions = {
   trust: false,
 };
 
-let mermaidModulePromise: Promise<typeof import('mermaid')> | null = null;
-let mermaidStyleCounter = 0;
+let beautifulMermaidModulePromise: Promise<typeof import('beautiful-mermaid')> | null = null;
+let officialMermaidModulePromise: Promise<typeof import('mermaid')> | null = null;
+let officialMermaidStyleCounter = 0;
+let lastOfficialMermaidThemeMode: 'light' | 'dark' | null = null;
 
-export type KatexRenderMode = 'mathml';
+const MERMAID_THEME_BY_MODE = {
+  light: 'nord-light',
+  dark: 'nord',
+} as const;
 
-async function loadMermaidModule() {
-  if (!mermaidModulePromise) {
-    mermaidModulePromise = import('mermaid');
+export type MermaidRendererKind = 'beautiful' | 'official';
+
+export function getMermaidFirstDirective(definition: string): string {
+  for (const rawLine of definition.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('%%')) continue;
+    return line.toLowerCase();
   }
-  const module = await mermaidModulePromise;
-  return module.default;
+  return '';
 }
 
-/** Last `themeMode` passed to `mermaid.initialize` (re-run when it changes). */
-let lastMermaidThemeMode: 'light' | 'dark' | null = null;
+/** Route supported diagram types to beautiful-mermaid; everything else uses official Mermaid. */
+export function getMermaidRendererKind(definition: string): MermaidRendererKind {
+  const firstDirective = getMermaidFirstDirective(definition);
+  if (!firstDirective) {
+    return 'beautiful';
+  }
 
-async function ensureMermaidConfigured(themeMode: 'light' | 'dark' = 'light') {
-  const mermaid = await loadMermaidModule();
-  if (lastMermaidThemeMode === themeMode) {
+  if (/^(graph|flowchart)\b/.test(firstDirective)) return 'beautiful';
+  if (/^statediagram(-v2)?\b/.test(firstDirective)) return 'beautiful';
+  if (/^sequencediagram\b/.test(firstDirective)) return 'beautiful';
+  if (/^classdiagram\b/.test(firstDirective)) return 'beautiful';
+  if (/^erdiagram\b/.test(firstDirective)) return 'beautiful';
+  if (/^xychart(-beta)?\b/.test(firstDirective)) return 'beautiful';
+
+  return 'official';
+}
+
+async function loadBeautifulMermaidModule() {
+  if (!beautifulMermaidModulePromise) {
+    beautifulMermaidModulePromise = import('beautiful-mermaid');
+  }
+  return beautifulMermaidModulePromise;
+}
+
+async function loadOfficialMermaidModule() {
+  if (!officialMermaidModulePromise) {
+    officialMermaidModulePromise = import('mermaid');
+  }
+  return (await officialMermaidModulePromise).default;
+}
+
+async function ensureOfficialMermaidConfigured(themeMode: 'light' | 'dark') {
+  const mermaid = await loadOfficialMermaidModule();
+  if (lastOfficialMermaidThemeMode === themeMode) {
     return mermaid;
   }
+
   mermaid.initialize({
     startOnLoad: false,
     theme: themeMode === 'dark' ? 'dark' : 'default',
@@ -40,13 +78,27 @@ async function ensureMermaidConfigured(themeMode: 'light' | 'dark' = 'light') {
       useMaxWidth: true,
     },
   });
-  lastMermaidThemeMode = themeMode;
+  lastOfficialMermaidThemeMode = themeMode;
   return mermaid;
+}
+
+function getBeautifulMermaidRenderOptions(themeMode: 'light' | 'dark'): RenderOptions {
+  const themeName = MERMAID_THEME_BY_MODE[themeMode];
+  return {
+    ...THEMES[themeName],
+    transparent: true,
+  };
+}
+
+function renderBeautifulMermaidSvg(definition: string, themeMode: 'light' | 'dark'): string {
+  return renderMermaidSVG(definition, getBeautifulMermaidRenderOptions(themeMode));
 }
 
 export type RenderMermaidDiagramsOptions = {
   themeMode?: 'light' | 'dark';
 };
+
+export type KatexRenderMode = 'mathml';
 
 /**
  * Initialize KaTeX for inline and display math
@@ -213,39 +265,6 @@ export function removeSvgLengthAttribute(svg: SVGSVGElement, name: 'width' | 'he
   svg.removeAttribute(name);
 }
 
-export function getMermaidInlinePalette(themeMode: 'light' | 'dark') {
-  if (themeMode === 'dark') {
-    return {
-      nodeFill: '#1f2937',
-      nodeStroke: '#a78bfa',
-      text: '#e5e7eb',
-      line: '#cbd5e1',
-      clusterFill: '#111827',
-      clusterStroke: '#94a3b8',
-      edgeLabelFill: 'rgba(15, 23, 42, 0.85)',
-    };
-  }
-
-  return {
-    nodeFill: '#ECECFF',
-    nodeStroke: '#9370DB',
-    text: '#333333',
-    line: '#333333',
-    clusterFill: '#ffffde',
-    clusterStroke: '#aaaa33',
-    edgeLabelFill: 'rgba(232, 232, 232, 0.8)',
-  };
-}
-
-export function getMermaidDiagramKind(svg: SVGSVGElement): 'flowchart' | 'state' | 'pie' | 'sequence' | 'class' | 'other' {
-  if (svg.classList.contains('flowchart')) return 'flowchart';
-  if (svg.classList.contains('statediagram')) return 'state';
-  if (svg.classList.contains('classDiagram')) return 'class';
-  if (svg.getAttribute('aria-roledescription') === 'pie') return 'pie';
-  if (svg.getAttribute('aria-roledescription') === 'sequence') return 'sequence';
-  return 'other';
-}
-
 export function getRootMermaidSvg(el: HTMLElement): SVGSVGElement | null {
   const firstChild = el.firstElementChild;
   const svg = firstChild?.tagName.toLowerCase() === 'svg'
@@ -256,190 +275,7 @@ export function getRootMermaidSvg(el: HTMLElement): SVGSVGElement | null {
     : null;
 }
 
-export function removeMermaidHoistedStyle(el: HTMLElement): void {
-  const styleId = el.dataset.mermaidStyleId;
-  const doc = el.ownerDocument;
-  if (!styleId || !doc) return;
-  doc.getElementById(styleId)?.remove();
-  delete el.dataset.mermaidStyleId;
-}
-
-export function hoistMermaidSvgStyle(el: HTMLElement): void {
-  const doc = el.ownerDocument;
-  if (!doc) return;
-
-  const svg = getRootMermaidSvg(el);
-  if (!svg) return;
-
-  const styleNodes = Array.from(svg.children).filter((c) => c.tagName.toLowerCase() === 'style');
-  if (styleNodes.length === 0) return;
-
-  const cssText = styleNodes
-    .map((node) => node.textContent?.trim() ?? '')
-    .filter(Boolean)
-    .join('\n');
-  if (!cssText) return;
-
-  removeMermaidHoistedStyle(el);
-
-  const styleId = `mermaid-hoisted-style-${mermaidStyleCounter += 1}`;
-  const styleEl = doc.createElement('style');
-  styleEl.id = styleId;
-  styleEl.textContent = cssText;
-  doc.head.appendChild(styleEl);
-  el.dataset.mermaidStyleId = styleId;
-}
-
-export function inlineMermaidSvgTheme(el: HTMLElement, themeMode: 'light' | 'dark'): void {
-  const svg = getRootMermaidSvg(el);
-  if (!svg) return;
-
-  const palette = getMermaidInlinePalette(themeMode);
-  const diagramKind = getMermaidDiagramKind(svg);
-
-  for (const shape of svg.querySelectorAll<SVGElement>('.node rect, .node polygon, .node ellipse, .node circle')) {
-    shape.setAttribute('fill', palette.nodeFill);
-    shape.setAttribute('stroke', palette.nodeStroke);
-    shape.setAttribute('stroke-width', shape.getAttribute('stroke-width') || '1');
-  }
-
-  for (const shape of svg.querySelectorAll<SVGPathElement>('.node path')) {
-    shape.setAttribute('fill', palette.nodeFill);
-    shape.setAttribute('stroke', palette.nodeStroke);
-    shape.setAttribute('stroke-width', shape.getAttribute('stroke-width') || '1');
-  }
-
-  for (const clusterRect of svg.querySelectorAll<SVGRectElement>('.cluster rect')) {
-    clusterRect.setAttribute('fill', palette.clusterFill);
-    clusterRect.setAttribute('stroke', palette.clusterStroke);
-    clusterRect.setAttribute('stroke-width', clusterRect.getAttribute('stroke-width') || '1');
-  }
-
-  for (const edgePath of svg.querySelectorAll<SVGPathElement>('.edgePath .path, .flowchart-link')) {
-    edgePath.setAttribute('stroke', palette.line);
-    edgePath.setAttribute('fill', 'none');
-  }
-
-  for (const arrow of svg.querySelectorAll<SVGElement>('.marker, .marker .arrowMarkerPath, .arrowheadPath')) {
-    arrow.setAttribute('fill', palette.line);
-    arrow.setAttribute('stroke', palette.line);
-  }
-
-  if (diagramKind === 'flowchart') {
-    for (const bg of svg.querySelectorAll<SVGRectElement>('.edgeLabel rect, .edgeLabel .background')) {
-      bg.setAttribute('fill', 'none');
-      bg.setAttribute('stroke', 'none');
-    }
-
-    for (const bg of svg.querySelectorAll<SVGRectElement>('.cluster-label .background')) {
-      bg.setAttribute('fill', palette.edgeLabelFill);
-      bg.setAttribute('stroke', 'none');
-    }
-  } else if (diagramKind === 'state') {
-    for (const bg of svg.querySelectorAll<SVGRectElement>('.edgeLabel rect, .edgeLabel .background')) {
-      bg.setAttribute('fill', 'none');
-      bg.setAttribute('stroke', 'none');
-    }
-  }
-
-  for (const textNode of svg.querySelectorAll<SVGTextElement>('text, tspan')) {
-    textNode.setAttribute('fill', palette.text);
-  }
-
-  for (const htmlNode of svg.querySelectorAll<HTMLElement>('foreignObject div, foreignObject span, foreignObject p')) {
-    htmlNode.style.color = palette.text;
-    htmlNode.style.fill = palette.text;
-    htmlNode.style.backgroundColor = 'transparent';
-  }
-
-  if (diagramKind === 'pie') {
-    const sliceColors = Array.from(svg.querySelectorAll<SVGPathElement>('.pieCircle'))
-      .map((slice) => slice.getAttribute('fill'))
-      .filter((value): value is string => Boolean(value));
-    const legendRects = Array.from(svg.querySelectorAll<SVGRectElement>('.legend rect'));
-
-    legendRects.forEach((rect, index) => {
-      const styleFill = rect.style.fill?.trim();
-      const fill = styleFill || rect.getAttribute('fill') || sliceColors[index] || palette.nodeFill;
-      rect.setAttribute('fill', fill);
-      rect.setAttribute('stroke', fill);
-      rect.style.fill = fill;
-      rect.style.stroke = fill;
-    });
-  } else if (diagramKind === 'sequence') {
-    for (const line of svg.querySelectorAll<SVGLineElement>('.messageLine0, .messageLine1')) {
-      line.setAttribute('stroke', palette.line);
-      line.setAttribute('fill', 'none');
-    }
-
-    for (const line of svg.querySelectorAll<SVGLineElement>('.actor-line')) {
-      line.setAttribute('stroke', '#999999');
-      line.setAttribute('fill', 'none');
-    }
-
-    for (const path of svg.querySelectorAll<SVGPathElement>('#arrowhead path, #filled-head path')) {
-      path.setAttribute('fill', palette.line);
-      path.setAttribute('stroke', palette.line);
-    }
-
-    for (const path of svg.querySelectorAll<SVGPathElement>('#crosshead path')) {
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', palette.line);
-    }
-  } else if (diagramKind === 'class') {
-    for (const relation of svg.querySelectorAll<SVGPathElement>('.relation')) {
-      relation.setAttribute('stroke', palette.line);
-      relation.setAttribute('fill', 'none');
-    }
-
-    for (const divider of svg.querySelectorAll<SVGPathElement>('.divider path')) {
-      divider.setAttribute('stroke', palette.nodeStroke);
-      divider.setAttribute('fill', 'none');
-    }
-
-    for (const markerPath of svg.querySelectorAll<SVGPathElement>('marker.extension path, marker.aggregation path, marker.composition path, marker.dependency path')) {
-      const marker = markerPath.closest('marker');
-      if (marker?.classList.contains('extension') || marker?.classList.contains('aggregation')) {
-        markerPath.setAttribute('fill', 'transparent');
-      } else {
-        markerPath.setAttribute('fill', palette.line);
-      }
-      markerPath.setAttribute('stroke', palette.line);
-    }
-
-    for (const circle of svg.querySelectorAll<SVGCircleElement>('marker.lollipop circle')) {
-      circle.setAttribute('fill', palette.nodeFill);
-      circle.setAttribute('stroke', palette.line);
-    }
-  } else if (diagramKind === 'state') {
-    for (const transition of svg.querySelectorAll<SVGPathElement>('.transition')) {
-      transition.setAttribute('stroke', palette.line);
-      transition.setAttribute('fill', 'none');
-    }
-
-    for (const markerPath of svg.querySelectorAll<SVGPathElement>('marker path')) {
-      markerPath.setAttribute('fill', palette.line);
-      markerPath.setAttribute('stroke', palette.line);
-    }
-
-    for (const start of svg.querySelectorAll<SVGCircleElement>('.state-start, .fork-join')) {
-      start.setAttribute('fill', palette.line);
-      start.setAttribute('stroke', palette.line);
-    }
-
-    for (const end of svg.querySelectorAll<SVGCircleElement>('.state-end')) {
-      end.setAttribute('fill', palette.nodeStroke);
-      end.setAttribute('stroke', '#ffffff');
-    }
-
-    for (const inner of svg.querySelectorAll<SVGPathElement>('.end-state-inner')) {
-      inner.setAttribute('fill', '#ffffff');
-      inner.setAttribute('stroke', 'none');
-    }
-  }
-}
-
-export function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'): void {
+export function normalizeMermaidSvg(el: HTMLElement): void {
   const svg = getRootMermaidSvg(el);
   if (!svg) return;
 
@@ -450,8 +286,6 @@ export function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'
   removeSvgLengthAttribute(svg, 'width');
   removeSvgLengthAttribute(svg, 'height');
   svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
-
-  inlineMermaidSvgTheme(el, themeMode);
 
   if (naturalWidth && naturalHeight) {
     svg.style.width = `min(100%, ${naturalWidth}px)`;
@@ -473,7 +307,6 @@ export function normalizeMermaidSvg(el: HTMLElement, themeMode: 'light' | 'dark'
 export function resetMermaidPlaceholders(container: HTMLElement): void {
   for (const node of container.querySelectorAll('.mermaid')) {
     const el = node as HTMLElement;
-    removeMermaidHoistedStyle(el);
     const src = (el.dataset.mermaidSource || el.textContent || '').trim();
     if (!src) continue;
     el.replaceChildren(document.createTextNode(src));
@@ -481,14 +314,135 @@ export function resetMermaidPlaceholders(container: HTMLElement): void {
     delete el.dataset.mermaidRendered;
     delete el.dataset.mermaidTheme;
     delete el.dataset.mermaidSource;
+    delete el.dataset.mermaidEngine;
+    removeOfficialMermaidHoistedStyle(el);
+  }
+}
+
+function removeOfficialMermaidHoistedStyle(el: HTMLElement): void {
+  const styleId = el.dataset.mermaidStyleId;
+  const doc = el.ownerDocument;
+  if (!styleId || !doc) return;
+  doc.getElementById(styleId)?.remove();
+  delete el.dataset.mermaidStyleId;
+}
+
+function hoistOfficialMermaidSvgStyle(el: HTMLElement): void {
+  const doc = el.ownerDocument;
+  if (!doc) return;
+
+  const svg = getRootMermaidSvg(el);
+  if (!svg) return;
+
+  const styleNodes = Array.from(svg.children).filter((child) => child.tagName.toLowerCase() === 'style');
+  if (styleNodes.length === 0) return;
+
+  const cssText = styleNodes
+    .map((node) => node.textContent?.trim() ?? '')
+    .filter(Boolean)
+    .join('\n');
+  if (!cssText) return;
+
+  removeOfficialMermaidHoistedStyle(el);
+
+  const styleId = `mermaid-hoisted-style-${officialMermaidStyleCounter += 1}`;
+  const styleEl = doc.createElement('style');
+  styleEl.id = styleId;
+  styleEl.textContent = cssText;
+  doc.head.appendChild(styleEl);
+  el.dataset.mermaidStyleId = styleId;
+}
+
+function markMermaidRenderError(
+  el: HTMLElement,
+  definition: string,
+  themeMode: 'light' | 'dark',
+  engine: MermaidRendererKind,
+): void {
+  el.dataset.mermaidSource = definition;
+  el.dataset.mermaidTheme = themeMode;
+  el.dataset.mermaidEngine = engine;
+  el.dataset.mermaidRendered = 'error';
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'mermaid-error';
+  errorDiv.textContent = 'Failed to render diagram';
+  el.replaceChildren(errorDiv);
+}
+
+function markMermaidRenderSuccess(
+  el: HTMLElement,
+  definition: string,
+  themeMode: 'light' | 'dark',
+  engine: MermaidRendererKind,
+): void {
+  el.dataset.mermaidSource = definition;
+  el.dataset.mermaidTheme = themeMode;
+  el.dataset.mermaidEngine = engine;
+  normalizeMermaidSvg(el);
+  el.dataset.mermaidRendered = 'true';
+}
+
+async function renderBeautifulMermaidDiagram(el: HTMLElement, definition: string, themeMode: 'light' | 'dark'): Promise<void> {
+  try {
+    const svgMarkup = renderBeautifulMermaidSvg(definition, themeMode);
+    el.innerHTML = svgMarkup;
+
+    if (el.querySelector('svg')) {
+      markMermaidRenderSuccess(el, definition, themeMode, 'beautiful');
+    } else {
+      markMermaidRenderError(el, definition, themeMode, 'beautiful');
+    }
+  } catch (error) {
+    console.error('Mermaid render failed:', error);
+    markMermaidRenderError(el, definition, themeMode, 'beautiful');
+  }
+}
+
+async function renderOfficialMermaidDiagrams(
+  elements: HTMLElement[],
+  themeMode: 'light' | 'dark',
+): Promise<void> {
+  if (elements.length === 0) return;
+
+  const mermaid = await ensureOfficialMermaidConfigured(themeMode);
+  const sourceByEl = new Map<HTMLElement, string>();
+
+  for (const el of elements) {
+    const definition = getMermaidDefinition(el);
+    sourceByEl.set(el, definition);
+    el.removeAttribute('data-processed');
+    el.textContent = definition;
+  }
+
+  const renderBatchSize = 20;
+  for (let start = 0; start < elements.length; start += renderBatchSize) {
+    const batch = elements.slice(start, start + renderBatchSize);
+    try {
+      await mermaid.run({
+        nodes: batch,
+        suppressErrors: true,
+      });
+    } catch (error) {
+      console.error('Official Mermaid run failed:', error);
+    }
+  }
+
+  for (const el of elements) {
+    const definition = sourceByEl.get(el) ?? '';
+
+    if (el.querySelector('svg')) {
+      hoistOfficialMermaidSvgStyle(el);
+      markMermaidRenderSuccess(el, definition, themeMode, 'official');
+    } else {
+      removeOfficialMermaidHoistedStyle(el);
+      markMermaidRenderError(el, definition, themeMode, 'official');
+    }
   }
 }
 
 /**
  * Render all Mermaid diagrams in the container.
- * Uses Mermaid's official `run()` API so diagram text is read from
- * `innerHTML` (with entity decode / dedent) and `render` receives the host element — required
- * for reliable rendering in Mermaid 11 (pie, stateDiagram, classDiagram, etc.).
+ * Supported types use beautiful-mermaid; others fall back to official Mermaid.
  */
 export async function renderMermaidDiagrams(
   container?: HTMLElement | null,
@@ -504,82 +458,51 @@ export async function renderMermaidDiagrams(
 
   if (nodeList.length === 0) return;
 
-  const mermaid = await ensureMermaidConfigured(themeMode);
-  const all = Array.from(nodeList) as HTMLElement[];
-  const sourceByEl = new Map<HTMLElement, string>();
-  const pending: HTMLElement[] = [];
+  const pendingBeautiful: HTMLElement[] = [];
+  const pendingOfficial: HTMLElement[] = [];
 
-  for (const el of all) {
+  for (const el of Array.from(nodeList) as HTMLElement[]) {
     const def = getMermaidDefinition(el);
     if (!def && !el.querySelector('svg')) {
       continue;
     }
 
     const rect = el.getBoundingClientRect();
-    const hasVisibleLayout = rect.width >= 4;
-
-    // Skip diagrams that aren't laid out yet (e.g. during a width transition from 0px).
-    // Width is the critical dimension for Mermaid layout; height can legitimately be 0 before
-    // the SVG is injected, so gating on height can starve initial renders.
-    if (!hasVisibleLayout) {
+    if (rect.width < 4) {
       continue;
     }
 
+    const rendererKind = getMermaidRendererKind(def);
     const stable = el.querySelector('svg')
       && el.dataset.mermaidRendered === 'true'
       && el.dataset.mermaidSource === def
-      && (el.dataset.mermaidTheme ?? '') === themeMode;
+      && (el.dataset.mermaidTheme ?? '') === themeMode
+      && (el.dataset.mermaidEngine ?? rendererKind) === rendererKind;
     if (stable) {
       continue;
     }
 
-    sourceByEl.set(el, def);
-    el.removeAttribute('data-processed');
-    pending.push(el);
+    if (rendererKind === 'official') {
+      pendingOfficial.push(el);
+    } else {
+      pendingBeautiful.push(el);
+    }
   }
 
-  if (pending.length === 0) {
+  if (pendingBeautiful.length === 0 && pendingOfficial.length === 0) {
     return;
   }
 
-  // `mermaid.run` always reads the definition from `element.innerHTML`. After a prior pass the
-  // node may still hold an SVG (e.g. same React HTML while `themeMode` or deps re-fire). Reset to
-  // the stored source so Mermaid parses diagram text, not SVG markup.
-  for (const el of pending) {
-    const src = sourceByEl.get(el) ?? '';
-    el.textContent = src;
-  }
-
-  const renderBatchSize = 20;
-  for (let start = 0; start < pending.length; start += renderBatchSize) {
-    const batch = pending.slice(start, start + renderBatchSize);
-    try {
-      await mermaid.run({
-        nodes: batch,
-        suppressErrors: true,
-      });
-    } catch (e) {
-      console.error('Mermaid run failed:', e);
+  if (pendingBeautiful.length > 0) {
+    await loadBeautifulMermaidModule();
+    for (const el of pendingBeautiful) {
+      const definition = getMermaidDefinition(el);
+      if (!definition) continue;
+      await renderBeautifulMermaidDiagram(el, definition, themeMode);
     }
   }
 
-  for (const el of pending) {
-    const src = sourceByEl.get(el) ?? '';
-    el.dataset.mermaidSource = src;
-    el.dataset.mermaidTheme = themeMode;
-    if (el.querySelector('svg')) {
-      hoistMermaidSvgStyle(el);
-      normalizeMermaidSvg(el, themeMode);
-      el.dataset.mermaidRendered = 'true';
-    } else {
-      removeMermaidHoistedStyle(el);
-      el.dataset.mermaidRendered = 'error';
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'mermaid-error';
-      errorDiv.textContent = 'Failed to render diagram';
-      el.replaceChildren(errorDiv);
-    }
-  }
+  await renderOfficialMermaidDiagrams(pendingOfficial, themeMode);
 }
 
 /**

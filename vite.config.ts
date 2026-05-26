@@ -79,6 +79,10 @@ export default defineConfig(({ mode }) => {
                 return 'shiki-vendor';
               }
 
+              if (id.includes('/beautiful-mermaid/')) {
+                return 'beautiful-mermaid-vendor';
+              }
+
               if (
                 id.includes('/cytoscape/')
                 || id.includes('/cytoscape-')

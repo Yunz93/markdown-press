@@ -2,8 +2,17 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const renderMermaidSVG = vi.fn();
 const initialize = vi.fn();
 const run = vi.fn();
+
+vi.mock('beautiful-mermaid', () => ({
+  renderMermaidSVG: (...args: unknown[]) => renderMermaidSVG(...args),
+  THEMES: {
+    'nord-light': { bg: '#eceff4', fg: '#2e3440' },
+    nord: { bg: '#2e3440', fg: '#eceff4' },
+  },
+}));
 
 vi.mock('mermaid', () => ({
   default: {
@@ -32,17 +41,14 @@ import {
   applyKatexDarkTheme,
   getKatexRenderMode,
   getMermaidDefinition,
-  getMermaidDiagramKind,
-  getMermaidInlinePalette,
+  getMermaidFirstDirective,
+  getMermaidRendererKind,
   getRootMermaidSvg,
-  hoistMermaidSvgStyle,
   initKaTeX,
   initMermaid,
-  inlineMermaidSvgTheme,
   normalizeMermaidSvg,
   parseSvgLength,
   parseSvgViewBoxSize,
-  removeMermaidHoistedStyle,
   removeSvgLengthAttribute,
   renderMermaidDiagrams,
   resetMermaidPlaceholders,
@@ -116,6 +122,7 @@ describe('escapeHtml (KaTeX/Mermaid XSS prevention)', () => {
 
 describe('renderMermaidDiagrams', () => {
   beforeEach(() => {
+    renderMermaidSVG.mockReset();
     initialize.mockReset();
     run.mockReset();
     document.body.innerHTML = '';
@@ -132,8 +139,7 @@ describe('renderMermaidDiagrams', () => {
 
     await renderMermaidDiagrams(container, { themeMode: 'light' });
 
-    expect(initialize).toHaveBeenCalledTimes(1);
-    expect(run).not.toHaveBeenCalled();
+    expect(renderMermaidSVG).not.toHaveBeenCalled();
   });
 
   it('resets rendered placeholders back to source text', () => {
@@ -153,22 +159,19 @@ describe('renderMermaidDiagrams', () => {
   });
 
   it('marks a rendered diagram with source and theme metadata', async () => {
-    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
-      nodes.forEach((node) => {
-        node.innerHTML = '<svg viewBox="0 0 120 60"><style>.node{fill:red}</style><text>ok</text></svg>';
-      });
-    });
+    renderMermaidSVG.mockReturnValue('<svg viewBox="0 0 120 60"><text>ok</text></svg>');
     const container = document.createElement('div');
     const el = createVisibleMermaidHost('flowchart LR\nA-->B');
     container.appendChild(el);
 
     await renderMermaidDiagrams(container, { themeMode: 'light' });
 
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(renderMermaidSVG).toHaveBeenCalledTimes(1);
     expect(el.querySelector('svg')).not.toBeNull();
     expect(el.dataset.mermaidRendered).toBe('true');
     expect(el.dataset.mermaidSource).toBe('flowchart LR\nA-->B');
     expect(el.dataset.mermaidTheme).toBe('light');
+    expect(el.dataset.mermaidEngine).toBe('beautiful');
     expect(el.querySelector('.mermaid-error')).toBeNull();
   });
 
@@ -182,11 +185,7 @@ describe('renderMermaidDiagrams', () => {
       return removeAttribute.call(this, name);
     });
 
-    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
-      nodes.forEach((node) => {
-        node.innerHTML = '<svg width="" height="" viewBox="0 0 120 60"><text>ok</text></svg>';
-      });
-    });
+    renderMermaidSVG.mockReturnValue('<svg width="" height="" viewBox="0 0 120 60"><text>ok</text></svg>');
     const container = document.createElement('div');
     const el = createVisibleMermaidHost('flowchart LR\nA-->B');
     container.appendChild(el);
@@ -207,26 +206,22 @@ describe('renderMermaidDiagrams', () => {
   });
 
   it('shows a deterministic error state when Mermaid does not produce SVG', async () => {
-    run.mockResolvedValue(undefined);
+    renderMermaidSVG.mockReturnValue('<span>not svg</span>');
     const container = document.createElement('div');
     const el = createVisibleMermaidHost('flowchart LR\nA-->');
     container.appendChild(el);
 
     await renderMermaidDiagrams(container, { themeMode: 'dark' });
 
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(renderMermaidSVG).toHaveBeenCalledTimes(1);
     expect(el.querySelector('svg')).toBeNull();
     expect(el.dataset.mermaidRendered).toBe('error');
     expect(el.dataset.mermaidTheme).toBe('dark');
     expect(el.querySelector('.mermaid-error')?.textContent).toBe('Failed to render diagram');
   });
 
-  it('renders more than 20 diagrams in bounded batches instead of skipping all', async () => {
-    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
-      nodes.forEach((node) => {
-        node.innerHTML = '<svg viewBox="0 0 120 60"><text>ok</text></svg>';
-      });
-    });
+  it('renders more than 20 supported diagrams without batching limits', async () => {
+    renderMermaidSVG.mockReturnValue('<svg viewBox="0 0 120 60"><text>ok</text></svg>');
     const container = document.createElement('div');
     for (let index = 0; index < 25; index += 1) {
       container.appendChild(createVisibleMermaidHost(`flowchart LR\nA${index}-->B${index}`));
@@ -234,13 +229,29 @@ describe('renderMermaidDiagrams', () => {
 
     await renderMermaidDiagrams(container, { themeMode: 'light' });
 
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(run.mock.calls[0][0].nodes).toHaveLength(20);
-    expect(run.mock.calls[1][0].nodes).toHaveLength(5);
+    expect(renderMermaidSVG).toHaveBeenCalledTimes(25);
     expect(container.querySelectorAll('.mermaid svg')).toHaveLength(25);
     expect(Array.from(container.querySelectorAll<HTMLElement>('.mermaid')).every((node) => (
       node.dataset.mermaidRendered === 'true'
     ))).toBe(true);
+  });
+
+  it('routes pie charts to official Mermaid instead of beautiful-mermaid', async () => {
+    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
+      nodes.forEach((node) => {
+        node.innerHTML = '<svg viewBox="0 0 120 60"><text>pie</text></svg>';
+      });
+    });
+    const container = document.createElement('div');
+    const el = createVisibleMermaidHost('pie title Demo\n  "A" : 40\n  "B" : 60');
+    container.appendChild(el);
+
+    await renderMermaidDiagrams(container, { themeMode: 'light' });
+
+    expect(renderMermaidSVG).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(el.dataset.mermaidEngine).toBe('official');
+    expect(el.dataset.mermaidRendered).toBe('true');
   });
 
 });
@@ -325,6 +336,7 @@ describe('applyKatexDarkTheme', () => {
 
 describe('renderMermaidDiagrams edge cases', () => {
   beforeEach(() => {
+    renderMermaidSVG.mockReset();
     initialize.mockReset();
     run.mockReset();
     document.body.innerHTML = '';
@@ -353,20 +365,20 @@ describe('renderMermaidDiagrams edge cases', () => {
 
     await renderMermaidDiagrams(container, { themeMode: 'light' });
 
-    expect(run).not.toHaveBeenCalled();
+    expect(renderMermaidSVG).not.toHaveBeenCalled();
   });
 
-  it('logs error when mermaid.run throws but continues processing', async () => {
+  it('logs error when official Mermaid run throws but continues processing', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     run.mockRejectedValue(new Error('Mermaid crashed'));
 
     const container = document.createElement('div');
-    const el = createVisibleMermaidHost('flowchart LR\nA-->B');
+    const el = createVisibleMermaidHost('gantt\n  title Demo\n  dateFormat YYYY-MM-DD\n  section A\n  Task :a1, 2024-01-01, 1d');
     container.appendChild(el);
 
     await renderMermaidDiagrams(container, { themeMode: 'light' });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Mermaid run failed:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Official Mermaid run failed:', expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
 
@@ -377,29 +389,25 @@ describe('renderMermaidDiagrams edge cases', () => {
 
     await renderMermaidDiagrams(document.createElement('div'));
 
-    expect(run).not.toHaveBeenCalled();
+    expect(renderMermaidSVG).not.toHaveBeenCalled();
     globalThis.window = originalWindow;
   });
 
   it('returns early when no mermaid nodes exist', async () => {
     const container = document.createElement('div');
     await renderMermaidDiagrams(container, { themeMode: 'light' });
-    expect(run).not.toHaveBeenCalled();
+    expect(renderMermaidSVG).not.toHaveBeenCalled();
   });
 
   it('uses document.querySelectorAll when container is null', async () => {
-    run.mockImplementation(async ({ nodes }: { nodes: HTMLElement[] }) => {
-      nodes.forEach((node) => {
-        node.innerHTML = '<svg viewBox="0 0 120 60"><text>ok</text></svg>';
-      });
-    });
+    renderMermaidSVG.mockReturnValue('<svg viewBox="0 0 120 60"><text>ok</text></svg>');
 
     const el = createVisibleMermaidHost('flowchart LR\nA-->B');
     document.body.appendChild(el);
 
     await renderMermaidDiagrams(null, { themeMode: 'light' });
 
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(renderMermaidSVG).toHaveBeenCalledTimes(1);
     document.body.innerHTML = '';
   });
 
@@ -426,7 +434,7 @@ describe('renderMermaidDiagrams edge cases', () => {
 
     await renderMermaidDiagrams(container, { themeMode: 'light' });
 
-    expect(run).not.toHaveBeenCalled();
+    expect(renderMermaidSVG).not.toHaveBeenCalled();
   });
 });
 
@@ -593,6 +601,37 @@ describe('initMermaid', () => {
   });
 });
 
+describe('getMermaidRendererKind', () => {
+  it('routes common supported diagram types to beautiful-mermaid', () => {
+    expect(getMermaidRendererKind('flowchart LR\nA-->B')).toBe('beautiful');
+    expect(getMermaidRendererKind('graph TD\nA-->B')).toBe('beautiful');
+    expect(getMermaidRendererKind('sequenceDiagram\nA->>B: hi')).toBe('beautiful');
+    expect(getMermaidRendererKind('classDiagram\nclass A')).toBe('beautiful');
+    expect(getMermaidRendererKind('erDiagram\nA ||--o{ B : has')).toBe('beautiful');
+    expect(getMermaidRendererKind('stateDiagram-v2\n[*] --> A')).toBe('beautiful');
+    expect(getMermaidRendererKind('xychart-beta\n  title Demo\n  bar [1,2]')).toBe('beautiful');
+  });
+
+  it('routes unsupported diagram types to official Mermaid', () => {
+    expect(getMermaidRendererKind('pie title Demo\n  "A" : 40')).toBe('official');
+    expect(getMermaidRendererKind('gantt\n  title Demo')).toBe('official');
+    expect(getMermaidRendererKind('gitGraph\n  commit')).toBe('official');
+    expect(getMermaidRendererKind('journey\n  title Demo')).toBe('official');
+  });
+
+  it('ignores leading comments when detecting the diagram type', () => {
+    expect(getMermaidRendererKind('%% comment\npie title Demo\n  "A" : 40')).toBe('official');
+    expect(getMermaidRendererKind('%% comment\nflowchart LR\nA-->B')).toBe('beautiful');
+  });
+});
+
+describe('getMermaidFirstDirective', () => {
+  it('returns the first non-empty, non-comment line', () => {
+    expect(getMermaidFirstDirective('%% note\npie title Demo')).toBe('pie title demo');
+    expect(getMermaidFirstDirective('\n\nflowchart LR')).toBe('flowchart lr');
+  });
+});
+
 describe('getMermaidDefinition', () => {
   it('returns data-mermaid-source when present', () => {
     const el = document.createElement('div');
@@ -674,57 +713,6 @@ describe('removeSvgLengthAttribute', () => {
   });
 });
 
-describe('getMermaidInlinePalette', () => {
-  it('returns dark palette', () => {
-    const palette = getMermaidInlinePalette('dark');
-    expect(palette.nodeFill).toBe('#1f2937');
-    expect(palette.text).toBe('#e5e7eb');
-  });
-
-  it('returns light palette', () => {
-    const palette = getMermaidInlinePalette('light');
-    expect(palette.nodeFill).toBe('#ECECFF');
-    expect(palette.text).toBe('#333333');
-  });
-});
-
-describe('getMermaidDiagramKind', () => {
-  it('detects flowchart', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('flowchart');
-    expect(getMermaidDiagramKind(svg)).toBe('flowchart');
-  });
-
-  it('detects state diagram', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('statediagram');
-    expect(getMermaidDiagramKind(svg)).toBe('state');
-  });
-
-  it('detects class diagram', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('classDiagram');
-    expect(getMermaidDiagramKind(svg)).toBe('class');
-  });
-
-  it('detects pie chart via aria-roledescription', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('aria-roledescription', 'pie');
-    expect(getMermaidDiagramKind(svg)).toBe('pie');
-  });
-
-  it('detects sequence diagram via aria-roledescription', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('aria-roledescription', 'sequence');
-    expect(getMermaidDiagramKind(svg)).toBe('sequence');
-  });
-
-  it('defaults to other', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    expect(getMermaidDiagramKind(svg)).toBe('other');
-  });
-});
-
 describe('getRootMermaidSvg', () => {
   it('returns first child svg', () => {
     const el = document.createElement('div');
@@ -749,169 +737,6 @@ describe('getRootMermaidSvg', () => {
   });
 });
 
-describe('removeMermaidHoistedStyle', () => {
-  it('removes style element and clears dataset', () => {
-    const el = document.createElement('div');
-    const style = document.createElement('style');
-    style.id = 'mermaid-style-1';
-    document.head.appendChild(style);
-    el.dataset.mermaidStyleId = 'mermaid-style-1';
-
-    removeMermaidHoistedStyle(el);
-
-    expect(document.getElementById('mermaid-style-1')).toBeNull();
-    expect(el.dataset.mermaidStyleId).toBeUndefined();
-  });
-
-  it('does nothing when no styleId in dataset', () => {
-    const el = document.createElement('div');
-    expect(() => removeMermaidHoistedStyle(el)).not.toThrow();
-  });
-});
-
-describe('hoistMermaidSvgStyle', () => {
-  it('hoists style nodes from svg to document head', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = '.node { fill: red; }';
-    svg.appendChild(style);
-    el.appendChild(svg);
-
-    hoistMermaidSvgStyle(el);
-
-    expect(el.dataset.mermaidStyleId).toBeDefined();
-    const hoisted = document.getElementById(el.dataset.mermaidStyleId!);
-    expect(hoisted).not.toBeNull();
-    expect(hoisted?.textContent).toBe('.node { fill: red; }');
-  });
-
-  it('does nothing when svg has no style nodes', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    el.appendChild(svg);
-
-    hoistMermaidSvgStyle(el);
-
-    expect(el.dataset.mermaidStyleId).toBeUndefined();
-  });
-
-  it('does nothing when svg is absent', () => {
-    const el = document.createElement('div');
-    hoistMermaidSvgStyle(el);
-    expect(el.dataset.mermaidStyleId).toBeUndefined();
-  });
-
-  it('replaces previous hoisted style', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-
-    // First style
-    const style1 = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style1.textContent = '.node { fill: blue; }';
-    svg.appendChild(style1);
-    el.appendChild(svg);
-
-    hoistMermaidSvgStyle(el);
-    const firstId = el.dataset.mermaidStyleId;
-
-    // Remove first style from SVG and add second style
-    svg.removeChild(style1);
-    const style2 = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style2.textContent = '.node { fill: green; }';
-    svg.appendChild(style2);
-    hoistMermaidSvgStyle(el);
-
-    expect(document.getElementById(firstId!)).toBeNull();
-    expect(el.dataset.mermaidStyleId).not.toBe(firstId);
-    expect(document.getElementById(el.dataset.mermaidStyleId!)?.textContent).toBe('.node { fill: green; }');
-  });
-});
-
-describe('inlineMermaidSvgTheme', () => {
-  it('applies flowchart theme', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('flowchart');
-    const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    nodeGroup.classList.add('node');
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    nodeGroup.appendChild(rect);
-    svg.appendChild(nodeGroup);
-    el.appendChild(svg);
-
-    inlineMermaidSvgTheme(el, 'light');
-    expect(rect.getAttribute('fill')).toBe('#ECECFF');
-    expect(rect.getAttribute('stroke')).toBe('#9370DB');
-  });
-
-  it('applies state diagram theme', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('statediagram');
-    const edgeLabelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    edgeLabelGroup.classList.add('edgeLabel');
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    edgeLabelGroup.appendChild(rect);
-    svg.appendChild(edgeLabelGroup);
-    el.appendChild(svg);
-
-    inlineMermaidSvgTheme(el, 'dark');
-    expect(rect.getAttribute('fill')).toBe('none');
-    expect(rect.getAttribute('stroke')).toBe('none');
-  });
-
-  it('applies pie chart theme', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('aria-roledescription', 'pie');
-    const slice = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    slice.classList.add('pieCircle');
-    slice.setAttribute('fill', '#ff0000');
-    const legendGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    legendGroup.classList.add('legend');
-    const legendRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    legendGroup.appendChild(legendRect);
-    svg.appendChild(slice);
-    svg.appendChild(legendGroup);
-    el.appendChild(svg);
-
-    inlineMermaidSvgTheme(el, 'light');
-    expect(legendRect.getAttribute('fill')).toBe('#ff0000');
-  });
-
-  it('applies sequence diagram theme', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('aria-roledescription', 'sequence');
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.classList.add('messageLine0');
-    svg.appendChild(line);
-    el.appendChild(svg);
-
-    inlineMermaidSvgTheme(el, 'light');
-    expect(line.getAttribute('stroke')).toBe('#333333');
-  });
-
-  it('applies class diagram theme', () => {
-    const el = document.createElement('div');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('classDiagram');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.classList.add('relation');
-    svg.appendChild(path);
-    el.appendChild(svg);
-
-    inlineMermaidSvgTheme(el, 'light');
-    expect(path.getAttribute('stroke')).toBe('#333333');
-  });
-
-  it('does nothing when no svg is found', () => {
-    const el = document.createElement('div');
-    expect(() => inlineMermaidSvgTheme(el, 'light')).not.toThrow();
-  });
-});
-
 describe('normalizeMermaidSvg', () => {
   it('sets aspect ratio when viewBox is present', () => {
     const el = document.createElement('div');
@@ -920,7 +745,7 @@ describe('normalizeMermaidSvg', () => {
     svg.classList.add('flowchart');
     el.appendChild(svg);
 
-    normalizeMermaidSvg(el, 'light');
+    normalizeMermaidSvg(el);
     expect(svg.style.aspectRatio).toBe('100 / 200');
     expect(svg.style.height).toBe('auto');
     // happy-dom does not support CSS min() in style.width, just check it was set
@@ -935,7 +760,7 @@ describe('normalizeMermaidSvg', () => {
     svg.classList.add('flowchart');
     el.appendChild(svg);
 
-    normalizeMermaidSvg(el, 'light');
+    normalizeMermaidSvg(el);
     expect(svg.style.aspectRatio).toBe('150 / 300');
   });
 
@@ -945,7 +770,7 @@ describe('normalizeMermaidSvg', () => {
     svg.classList.add('flowchart');
     el.appendChild(svg);
 
-    normalizeMermaidSvg(el, 'light');
+    normalizeMermaidSvg(el);
     expect(svg.style.width).toBe('');
     expect(svg.style.height).toBe('auto');
     expect(svg.style.maxWidth).toBe('100%');
@@ -961,14 +786,14 @@ describe('normalizeMermaidSvg', () => {
     svg.classList.add('flowchart');
     el.appendChild(svg);
 
-    normalizeMermaidSvg(el, 'light');
+    normalizeMermaidSvg(el);
     expect(svg.hasAttribute('width')).toBe(false);
     expect(svg.hasAttribute('height')).toBe(false);
   });
 
   it('does nothing when no svg is found', () => {
     const el = document.createElement('div');
-    expect(() => normalizeMermaidSvg(el, 'light')).not.toThrow();
+    expect(() => normalizeMermaidSvg(el)).not.toThrow();
   });
 });
 
