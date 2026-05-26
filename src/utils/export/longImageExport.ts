@@ -7,6 +7,7 @@ import {
   prepareExportRenderTargetForRasterization,
   yieldToEventLoopForRasterCapture,
 } from './exportRasterHost';
+import { waitForNextPaint } from './images';
 
 export async function rasterizeExportHtmlToPngBlob(
   htmlContent: string,
@@ -31,6 +32,7 @@ export async function rasterizeExportHtmlToPngBlob(
     const prevOpacity = host.style.opacity;
     host.style.visibility = 'visible';
     host.style.opacity = '1';
+    await waitForNextPaint(2);
 
     const { default: html2canvas } = await import('html2canvas');
     let canvas: HTMLCanvasElement;

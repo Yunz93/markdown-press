@@ -2,6 +2,7 @@ import { renderMermaidDiagrams } from '../markdown-extensions';
 import { PREVIEW_PANEL_WIDTH_PX } from './types';
 import { enhanceExportAttachmentEmbeds, type ExportAttachmentContext } from './attachments';
 import { prepareExportImages, waitForImages, waitForNextPaint } from './images';
+import { patchExportDomForHtml2Canvas } from './rasterDomPatch';
 
 /**
  * Largest single-canvas dimension html2canvas can safely allocate.
@@ -90,6 +91,7 @@ export async function prepareExportRenderTargetForRasterization(
   if ('fonts' in document) {
     await document.fonts.ready;
   }
+  patchExportDomForHtml2Canvas(renderTarget);
   await waitForNextPaint(3);
 }
 

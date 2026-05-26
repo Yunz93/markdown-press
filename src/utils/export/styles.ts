@@ -226,6 +226,20 @@ ${markdownStyleCssVariables}
       padding-left: 2rem;
     }
 
+    /* html2canvas 对 outside marker + li>p 的垂直对齐不可靠；raster 前会加 mp-export-raster-list */
+    .export-document .markdown-body ul.mp-export-raster-list,
+    .export-document .markdown-body ol.mp-export-raster-list {
+      list-style-position: inside;
+      padding-left: 0.35rem;
+    }
+
+    .export-document .markdown-body ul.mp-export-raster-list ul,
+    .export-document .markdown-body ul.mp-export-raster-list ol,
+    .export-document .markdown-body ol.mp-export-raster-list ul,
+    .export-document .markdown-body ol.mp-export-raster-list ol {
+      padding-left: 1.35rem;
+    }
+
     .export-document .markdown-body li > ul,
     .export-document .markdown-body li > ol {
       margin-top: 0.25rem;
@@ -260,6 +274,16 @@ ${markdownStyleCssVariables}
     .export-document .markdown-body li > p {
       margin-top: 0.15em;
       margin-bottom: 0.15em;
+    }
+
+    .export-document .markdown-body .mp-export-raster-list li > p:first-child {
+      display: inline;
+      margin: 0 !important;
+    }
+
+    .export-document .markdown-body .mp-export-raster-list li > p + p {
+      display: block;
+      margin-top: 0.15em;
     }
 
     .export-document .markdown-body .task-list-item {
@@ -400,6 +424,24 @@ ${exportDelStrikeBlock}
       padding: 0.15rem 0.35rem;
       font-family: ${resolvedCodeFontFamily};
       font-size: ${resolvedCodeFontSize}px;
+    }
+
+    /* raster 前会把行内 code 拆成 chunk，避免 html2canvas 把背景画成整行宽矩形 */
+    .export-document .markdown-body code.mp-export-raster-code {
+      background: transparent !important;
+      padding: 0 !important;
+      border-radius: 0;
+    }
+
+    .export-document .markdown-body .mp-export-raster-code-chunk {
+      color: var(--mp-doc-code-text);
+      background: var(--mp-doc-code-bg);
+      border-radius: 0.45rem;
+      padding: 0.15rem 0.35rem;
+      font-family: ${resolvedCodeFontFamily};
+      font-size: ${resolvedCodeFontSize}px;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
 
     .export-document .markdown-body pre {

@@ -24,6 +24,14 @@ describe('buildExportStyles', () => {
   it('tightens li > p margins like preview (avoids misaligned html2canvas list markers)', () => {
     const css = buildExportStyles('light');
     expect(css).toMatch(/\.export-document \.markdown-body li > p\s*\{[^}]*margin-top:\s*0\.15em/m);
+    expect(css).toMatch(/\.mp-export-raster-list li > p:first-child\s*\{[^}]*display:\s*inline/m);
+    expect(css).toMatch(/list-style-position:\s*inside/);
+  });
+
+  it('includes raster inline-code chunk styles for html2canvas', () => {
+    const css = buildExportStyles('light');
+    expect(css).toMatch(/\.mp-export-raster-code-chunk\s*\{[^}]*background:\s*var\(--mp-doc-code-bg\)/m);
+    expect(css).toMatch(/code\.mp-export-raster-code\s*\{[^}]*background:\s*transparent/m);
   });
 
   it('draws del and s with native line-through like preview', () => {
