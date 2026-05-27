@@ -1,9 +1,17 @@
-import type { FileNode } from '../../types';
-import { createAttachmentResolverContext, resolveAttachmentTarget } from '../attachmentResolver';
-import { parseWikiLinkReference } from '../wikiLinks';
-import { renderMermaidDiagrams } from '../markdown-extensions';
-import { PREVIEW_PANEL_WIDTH_PX } from './types';
-import { prepareExportImages, waitForImages, waitForNextPaint, isImageAttachmentName } from './images';
+import type { FileNode } from "../../types";
+import {
+  createAttachmentResolverContext,
+  resolveAttachmentTarget,
+} from "../attachmentResolver";
+import { parseWikiLinkReference } from "../wikiLinks";
+import { renderMermaidDiagrams } from "../markdown-extensions";
+import { PREVIEW_PANEL_WIDTH_PX } from "./types";
+import {
+  prepareExportImages,
+  waitForImages,
+  waitForNextPaint,
+  isImageAttachmentName,
+} from "./images";
 
 /** Vault context so wiki-style image embeds resolve the same way as in preview (not only beside the note). */
 export type ExportAttachmentContext = {
@@ -23,32 +31,50 @@ export async function enhanceExportAttachmentEmbeds(
     attachmentContext?.rootFolderPath ?? null,
     sourceFilePath,
   );
-  const embeds = Array.from(container.querySelectorAll<HTMLElement>('article.markdown-body [data-wiki-embed], article.markdown-body a.markdown-embed'));
+  const embeds = Array.from(
+    container.querySelectorAll<HTMLElement>(
+      "article.markdown-body [data-wiki-embed], article.markdown-body a.markdown-embed",
+    ),
+  );
 
   for (const embed of embeds) {
-    const target = embed.dataset.wikiTarget?.trim() || embed.dataset.wikilink?.trim();
+    const target =
+      embed.dataset.wikiTarget?.trim() || embed.dataset.wikilink?.trim();
     if (!target) continue;
 
-    const resolvedTarget = await resolveAttachmentTarget(resolverContext, target);
+    const resolvedTarget = await resolveAttachmentTarget(
+      resolverContext,
+      target,
+    );
     if (!resolvedTarget || !isImageAttachmentName(resolvedTarget.name)) {
       continue;
     }
 
     const parsedTarget = parseWikiLinkReference(target, { embed: true });
-    const width = embed.dataset.wikiWidth || (parsedTarget.embedSize?.width ? String(parsedTarget.embedSize.width) : '');
-    const height = embed.dataset.wikiHeight || (parsedTarget.embedSize?.height ? String(parsedTarget.embedSize.height) : '');
-    const image = document.createElement('img');
-    image.className = 'preview-attachment-image';
+    const width =
+      embed.dataset.wikiWidth ||
+      (parsedTarget.embedSize?.width
+        ? String(parsedTarget.embedSize.width)
+        : "");
+    const height =
+      embed.dataset.wikiHeight ||
+      (parsedTarget.embedSize?.height
+        ? String(parsedTarget.embedSize.height)
+        : "");
+    const image = document.createElement("img");
+    image.className = "preview-attachment-image";
     image.alt = embed.dataset.wikiLabel?.trim() || resolvedTarget.name;
-    image.setAttribute('data-original-src', resolvedTarget.path);
-    image.setAttribute('src', resolvedTarget.path);
+    image.setAttribute("data-original-src", resolvedTarget.path);
+    image.setAttribute("src", resolvedTarget.path);
 
     if (width) {
       image.style.width = `${width}px`;
+      image.setAttribute("width", width);
     }
     if (height) {
       image.style.height = `${height}px`;
-      image.style.objectFit = 'contain';
+      image.style.objectFit = "contain";
+      image.setAttribute("height", height);
     }
 
     embed.replaceWith(image);
@@ -60,44 +86,58 @@ export async function prepareHtmlForDownload(
   sourceFilePath?: string,
   attachmentContext?: ExportAttachmentContext | null,
 ): Promise<string> {
-  const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
-  const styleContent = Array.from(parsed.head.querySelectorAll('style'))
-    .map((style) => style.textContent || '')
-    .join('\n');
-  const theme = parsed.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-  const backgroundColor = theme === 'dark' ? '#0d1117' : '#ffffff';
+  const parsed = new DOMParser().parseFromString(htmlContent, "text/html");
+  const styleContent = Array.from(parsed.head.querySelectorAll("style"))
+    .map((style) => style.textContent || "")
+    .join("\n");
+  const theme =
+    parsed.documentElement.getAttribute("data-theme") === "dark"
+      ? "dark"
+      : "light";
+  const backgroundColor = theme === "dark" ? "#0d1117" : "#ffffff";
 
-  const host = document.createElement('div');
-  host.setAttribute('aria-hidden', 'true');
-  host.style.position = 'fixed';
-  host.style.left = '-10000px';
-  host.style.top = '0';
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.position = "fixed";
+  host.style.left = "-10000px";
+  host.style.top = "0";
   host.style.width = `${PREVIEW_PANEL_WIDTH_PX + 64}px`;
   host.style.background = backgroundColor;
-  host.style.pointerEvents = 'none';
-  host.style.visibility = 'hidden';
-  host.style.opacity = '0';
-  host.style.overflow = 'visible';
+  host.style.pointerEvents = "none";
+  host.style.visibility = "hidden";
+  host.style.opacity = "0";
+  host.style.overflow = "visible";
   host.innerHTML = `<style>${styleContent}</style>${parsed.body.innerHTML}`;
   document.body.appendChild(host);
 
   try {
-    const exportRoot = host.querySelector('.export-document') as HTMLElement | null;
+    const exportRoot = host.querySelector(
+      ".export-document",
+    ) as HTMLElement | null;
     const renderTarget = exportRoot || host;
 
-    renderTarget.setAttribute('data-theme', theme);
-    await enhanceExportAttachmentEmbeds(renderTarget, sourceFilePath, attachmentContext);
+    renderTarget.setAttribute("data-theme", theme);
+    await enhanceExportAttachmentEmbeds(
+      renderTarget,
+      sourceFilePath,
+      attachmentContext,
+    );
     await prepareExportImages(renderTarget, sourceFilePath);
-    await renderMermaidDiagrams(renderTarget, { themeMode: theme === 'dark' ? 'dark' : 'light' });
+    await renderMermaidDiagrams(renderTarget, {
+      themeMode: theme === "dark" ? "dark" : "light",
+    });
     await waitForImages(renderTarget);
-    if ('fonts' in document) {
+    if ("fonts" in document) {
       await document.fonts.ready;
     }
     await waitForNextPaint(2);
 
-    const processedBody = host.innerHTML.replace(/^[\s]*<style>[\s\S]*?<\/style>/, '');
+    const processedBody = host.innerHTML.replace(
+      /^[\s]*<style>[\s\S]*?<\/style>/,
+      "",
+    );
     return `<!DOCTYPE html>
-<html lang="${parsed.documentElement.lang || 'en'}" data-theme="${theme}">
+<html lang="${parsed.documentElement.lang || "en"}" data-theme="${theme}">
 <head>
 ${parsed.head.innerHTML}
 </head>

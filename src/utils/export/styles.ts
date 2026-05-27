@@ -1,30 +1,40 @@
-import katexCss from 'katex/dist/katex.min.css?inline';
-import githubMarkdownCss from 'github-markdown-css/github-markdown.css?inline';
-import { escapeHtml } from './core';
-import { PREVIEW_PANEL_WIDTH_PX } from './types';
+import katexCss from "katex/dist/katex.min.css?inline";
+import githubMarkdownCss from "github-markdown-css/github-markdown.css?inline";
+import { escapeHtml } from "./core";
+import { PREVIEW_PANEL_WIDTH_PX } from "./types";
 import {
   buildDynamicFontFaceCss,
   type FontSettings,
   getBundledPresetDataUrlOverrides,
-} from '../fontSettings';
-import { getMarkdownStyleCssVariables, getMarkdownStyleTokens, normalizeMarkdownStylePreset } from '../markdownStyle';
-import type { MarkdownStylePreset } from '../../types';
+} from "../fontSettings";
+import {
+  getMarkdownStyleCssVariables,
+  getMarkdownStyleTokens,
+  normalizeMarkdownStylePreset,
+} from "../markdownStyle";
+import type { MarkdownStylePreset } from "../../types";
 
-export async function buildExportFontFaceCss(fontSettings?: FontSettings): Promise<string> {
+export async function buildExportFontFaceCss(
+  fontSettings?: FontSettings,
+): Promise<string> {
   if (!fontSettings) {
-    return '';
+    return "";
   }
 
   const overrides = await getBundledPresetDataUrlOverrides(fontSettings);
   return buildDynamicFontFaceCss(fontSettings, overrides);
 }
 
-export function renderProperties(frontmatter: Record<string, unknown> | null): string {
-  if (!frontmatter || Object.keys(frontmatter).length === 0) return '';
+export function renderProperties(
+  frontmatter: Record<string, unknown> | null,
+): string {
+  if (!frontmatter || Object.keys(frontmatter).length === 0) return "";
 
   const rows = Object.entries(frontmatter)
     .map(([key, value]) => {
-      const formattedValue = Array.isArray(value) ? value.join(', ') : String(value ?? '');
+      const formattedValue = Array.isArray(value)
+        ? value.join(", ")
+        : String(value ?? "");
       return `
         <div class="export-properties-row">
           <div class="export-properties-key">${escapeHtml(key)}</div>
@@ -32,7 +42,7 @@ export function renderProperties(frontmatter: Record<string, unknown> | null): s
         </div>
       `;
     })
-    .join('');
+    .join("");
 
   return `
     <section class="export-properties">
@@ -43,23 +53,49 @@ export function renderProperties(frontmatter: Record<string, unknown> | null): s
 }
 
 export function buildExportStyles(
-  theme: 'light' | 'dark',
+  theme: "light" | "dark",
   fontFamily?: string,
   fontSize?: number,
-  fontFaceCss = '',
+  fontFaceCss = "",
   codeFontFamily?: string,
   codeFontSize?: number,
-  markdownStylePreset: MarkdownStylePreset = 'nord',
+  markdownStylePreset: MarkdownStylePreset = "nord",
 ): string {
-  const resolvedFontFamily = fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
+  const resolvedFontFamily =
+    fontFamily ||
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
   const resolvedFontSize = fontSize ?? 16;
-  const resolvedCodeFontFamily = codeFontFamily || '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace';
-  const resolvedCodeFontSize = codeFontSize ?? Math.max(12, resolvedFontSize - 1);
-  const normalizedStylePreset = normalizeMarkdownStylePreset(markdownStylePreset);
+  const resolvedCodeFontFamily =
+    codeFontFamily ||
+    '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace';
+  const resolvedCodeFontSize =
+    codeFontSize ?? Math.max(12, resolvedFontSize - 1);
+  const normalizedStylePreset =
+    normalizeMarkdownStylePreset(markdownStylePreset);
   const tokens = getMarkdownStyleTokens(normalizedStylePreset, theme);
-  const markdownStyleCssVariables = Object.entries(getMarkdownStyleCssVariables(normalizedStylePreset, theme))
+  const markdownStyleCssVariables = Object.entries(
+    getMarkdownStyleCssVariables(normalizedStylePreset, theme),
+  )
     .map(([name, value]) => `      ${name}: ${value};`)
-    .join('\n');
+    .join("\n");
+
+  // Build a complete var() → value map for html2canvas compatibility.
+  // html2canvas does not resolve CSS custom properties, so every var(--mp-doc-*)
+  // would render as an invalid value and fall back to initial/inherit.
+  const cssVarValues: Record<string, string> = {
+    "--bg-primary": theme === "dark" ? "#0d1117" : "#ffffff",
+    "--bg-secondary": theme === "dark" ? "#161b22" : "#f6f8fa",
+    "--text-primary": tokens.text,
+    "--text-secondary": tokens.muted,
+    "--border-color": tokens.border,
+    "--accent-color": tokens.accent,
+    "--code-bg": tokens.codeBg,
+  };
+  Object.entries(
+    getMarkdownStyleCssVariables(normalizedStylePreset, theme),
+  ).forEach(([name, value]) => {
+    cssVarValues[name] = value;
+  });
 
   const exportDelStrikeBlock = `    .export-document .markdown-body del,
     .export-document .markdown-body s {
@@ -68,14 +104,14 @@ export function buildExportStyles(
     }
 `;
 
-  return `
+  const rawCss = `
     ${fontFaceCss}
     ${githubMarkdownCss}
     ${katexCss}
 
     :root {
-      --bg-primary: ${theme === 'dark' ? '#0d1117' : '#ffffff'};
-      --bg-secondary: ${theme === 'dark' ? '#161b22' : '#f6f8fa'};
+      --bg-primary: ${theme === "dark" ? "#0d1117" : "#ffffff"};
+      --bg-secondary: ${theme === "dark" ? "#161b22" : "#f6f8fa"};
       --text-primary: ${tokens.text};
       --text-secondary: ${tokens.muted};
       --border-color: ${tokens.border};
@@ -98,7 +134,7 @@ ${markdownStyleCssVariables}
 
     .export-stage {
       min-height: 100vh;
-      background: ${theme === 'dark' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(249, 250, 251, 0.6)'};
+      background: ${theme === "dark" ? "rgba(0, 0, 0, 0.5)" : "rgba(249, 250, 251, 0.6)"};
       padding: 0;
     }
 
@@ -451,9 +487,11 @@ ${exportDelStrikeBlock}
       border-radius: 1rem;
       padding: 0;
       overflow: hidden;
-      box-shadow: ${theme === 'dark'
-        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-        : 'inset 0 1px 0 rgba(255, 255, 255, 0.55)'};
+      box-shadow: ${
+        theme === "dark"
+          ? "inset 0 1px 0 rgba(255, 255, 255, 0.03)"
+          : "inset 0 1px 0 rgba(255, 255, 255, 0.55)"
+      };
     }
 
     .export-document .markdown-body pre:not(.shiki) code {
@@ -521,22 +559,22 @@ ${exportDelStrikeBlock}
 
     .export-properties {
       margin-bottom: 32px;
-      border: 1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#e5e7eb'};
+      border: 1px solid ${theme === "dark" ? "rgba(255,255,255,0.1)" : "#e5e7eb"};
       border-radius: 12px;
       overflow: hidden;
-      background: ${theme === 'dark' ? 'rgba(20, 20, 20, 0.75)' : 'rgba(255, 255, 255, 0.75)'};
-      box-shadow: ${theme === 'dark' ? 'none' : '0 8px 24px rgba(15, 23, 42, 0.05)'};
+      background: ${theme === "dark" ? "rgba(20, 20, 20, 0.75)" : "rgba(255, 255, 255, 0.75)"};
+      box-shadow: ${theme === "dark" ? "none" : "0 8px 24px rgba(15, 23, 42, 0.05)"};
     }
 
     .export-properties-header {
       padding: 8px 16px;
-      border-bottom: 1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#e5e7eb'};
-      background: ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 250, 251, 0.7)'};
+      border-bottom: 1px solid ${theme === "dark" ? "rgba(255,255,255,0.05)" : "#e5e7eb"};
+      background: ${theme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(249, 250, 251, 0.7)"};
       font-size: 12px;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: ${theme === 'dark' ? '#9ca3af' : '#6b7280'};
+      color: ${theme === "dark" ? "#9ca3af" : "#6b7280"};
     }
 
     .export-properties-table {
@@ -550,7 +588,7 @@ ${exportDelStrikeBlock}
     }
 
     .export-properties-row:hover {
-      background: ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'};
+      background: ${theme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"};
     }
 
     .export-properties-key,
@@ -564,7 +602,7 @@ ${exportDelStrikeBlock}
     .export-properties-key {
       width: 160px;
       font-weight: 500;
-      color: ${theme === 'dark' ? '#9ca3af' : '#6b7280'};
+      color: ${theme === "dark" ? "#9ca3af" : "#6b7280"};
     }
 
     .export-properties-value {
@@ -637,13 +675,44 @@ ${exportDelStrikeBlock}
       }
     }
   `;
+
+  return resolveCssVarReferences(rawCss, cssVarValues);
+}
+
+/**
+ * Replace var(--name) references with resolved values so html2canvas
+ * (which does not support CSS custom properties) can render them.
+ *
+ * Uses multiple passes to handle nested var() like
+ * {@code var(--mp-doc-task-checked, var(--mp-doc-accent))}.
+ */
+function resolveCssVarReferences(
+  css: string,
+  vars: Record<string, string>,
+): string {
+  let result = css;
+  for (let pass = 0; pass < 5; pass += 1) {
+    const prev = result;
+    // Pass 1: simple var(--name) without fallback
+    for (const [name, value] of Object.entries(vars)) {
+      result = result.split(`var(${name})`).join(value);
+    }
+    // Pass 2: var(--name, fallback) — try to resolve name, use fallback if missing
+    result = result.replace(
+      /var\((--[\w-]+)\s*,\s*([^;{}]+?)\)/g,
+      (_full: string, name: string, fallback: string) =>
+        vars[name] ?? fallback.trim(),
+    );
+    if (result === prev) break;
+  }
+  return result;
 }
 
 export function buildExportDocument(
   contentHtml: string,
   toc: string,
-  markdownStylePreset: MarkdownStylePreset = 'nord',
-  theme: 'light' | 'dark' = 'light',
+  markdownStylePreset: MarkdownStylePreset = "nord",
+  theme: "light" | "dark" = "light",
 ): string {
   return `
     <div class="export-stage">
@@ -663,11 +732,14 @@ export function generateTOC(content: string): string {
   while ((match = headingRegex.exec(content)) !== null) {
     const level = match[1].length;
     const text = match[2].trim();
-    const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const id = text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
     headings.push({ level, text, id });
   }
 
-  if (headings.length === 0) return '';
+  if (headings.length === 0) return "";
 
   let toc = '<div class="toc">\n<h2>Table of Contents</h2>\n<ul>\n';
   let lastLevel = 1;
@@ -676,19 +748,19 @@ export function generateTOC(content: string): string {
     const { level, text, id } = heading;
 
     if (level > lastLevel) {
-      toc += '<ul>\n'.repeat(level - lastLevel);
+      toc += "<ul>\n".repeat(level - lastLevel);
     } else if (level < lastLevel) {
-      toc += '</li>\n</ul>\n'.repeat(lastLevel - level);
+      toc += "</li>\n</ul>\n".repeat(lastLevel - level);
     } else {
-      toc += '</li>\n';
+      toc += "</li>\n";
     }
 
     toc += `<li><a href="#${id}">${text}</a>`;
     lastLevel = level;
   }
 
-  toc += '</li>\n</ul>\n'.repeat(lastLevel);
-  toc += '</div>\n';
+  toc += "</li>\n</ul>\n".repeat(lastLevel);
+  toc += "</div>\n";
 
   return toc;
 }
