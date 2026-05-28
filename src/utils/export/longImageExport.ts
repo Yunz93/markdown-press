@@ -14,6 +14,44 @@ import {
 } from "./exportRasterHost";
 import { waitForNextPaint } from "./images";
 
+export const EXPORT_CANVAS_TO_BLOB_TIMEOUT_MS = 30_000;
+export const EXPORT_LONG_IMAGE_PREPARE_TIMEOUT_MS = 45_000;
+
+export function canvasToPngBlob(
+  canvas: HTMLCanvasElement,
+  timeoutMs: number = EXPORT_CANVAS_TO_BLOB_TIMEOUT_MS,
+): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const settle = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+      callback();
+    };
+
+    timeoutId = setTimeout(() => {
+      settle(() => {
+        reject(new Error("Long image export timed out while encoding PNG"));
+      });
+    }, timeoutMs);
+
+    canvas.toBlob((b) => {
+      settle(() => {
+        if (b) {
+          resolve(b);
+        } else {
+          reject(new Error("Long image export failed: empty PNG blob"));
+        }
+      });
+    }, "image/png");
+  });
+}
+
 export async function rasterizeExportHtmlToPngBlob(
   htmlContent: string,
   sourceFilePath?: string,
@@ -22,11 +60,15 @@ export async function rasterizeExportHtmlToPngBlob(
   const { host, renderTarget, theme, backgroundColor } =
     mountExportHtmlForRasterization(htmlContent);
   try {
-    await prepareExportRenderTargetForRasterization(
-      renderTarget,
-      theme,
-      sourceFilePath,
-      attachmentContext,
+    await withExportTimeout(
+      prepareExportRenderTargetForRasterization(
+        renderTarget,
+        theme,
+        sourceFilePath,
+        attachmentContext,
+      ),
+      EXPORT_LONG_IMAGE_PREPARE_TIMEOUT_MS,
+      "Long image export timed out while preparing HTML",
     );
 
     const safeScale = computeSafeLongImageRenderScale(
@@ -58,15 +100,7 @@ export async function rasterizeExportHtmlToPngBlob(
       restoreExportRasterHostStyles(host, hostStyleSnapshot);
     }
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => {
-        if (b) {
-          resolve(b);
-        } else {
-          reject(new Error("Long image export failed: empty PNG blob"));
-        }
-      }, "image/png");
-    });
+    const blob = await canvasToPngBlob(canvas);
     return blob;
   } finally {
     disposeExportRasterHost(host);

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import { extractWechatDraftDefaults, prepareWechatDraftPublish } from './wechatPublish';
+import { clearMarkdownCache, renderMarkdown } from './markdown';
 
 describe('extractWechatDraftDefaults', () => {
   it('prefers frontmatter values when available', () => {
@@ -80,5 +81,31 @@ describe('prepareWechatDraftPublish', () => {
     expect(prepared.contentHtml).toContain('linktype="text"');
     expect(prepared.contentHtml).toContain('tab="outerlink"');
     expect(prepared.contentHtml).toContain('textvalue="OpenAI"');
+  });
+
+  it('does not send preview-only blank-line markers to WeChat drafts', async () => {
+    clearMarkdownCache();
+    const markdownContent = ['引言', '', '- 第一项', '', '- 第二项', '', '结尾'].join('\n');
+    const settings = {
+      previewFontFamily: 'Arial',
+      codeFontFamily: 'Menlo',
+      fontSize: 16,
+      markdownStylePreset: 'nord' as const,
+    };
+
+    expect(renderMarkdown(markdownContent, { themeMode: 'light', markdownStylePreset: 'nord' }))
+      .toContain('preview-source-blank-line');
+
+    const prepared = await prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: '/notes/list-post.md',
+      markdownContent,
+      settings,
+    });
+
+    expect(prepared.contentHtml).not.toContain('preview-source-blank-line');
+    expect(prepared.contentHtml).not.toMatch(/<li[^>]*>\s*<\/li>/);
+    expect(prepared.contentHtml).toContain('第一项');
+    expect(prepared.contentHtml).toContain('第二项');
   });
 });

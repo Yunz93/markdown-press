@@ -386,7 +386,11 @@ export async function prepareWechatDraftPublish(
 
   const { body } = parseFrontmatter(markdownContent);
   const markdownStylePreset = normalizeMarkdownStylePreset(settings.markdownStylePreset);
-  const renderedHtml = renderMarkdown(body, { themeMode: 'light', markdownStylePreset });
+  const renderedHtml = renderMarkdown(body, {
+    themeMode: 'light',
+    markdownStylePreset,
+    preserveSourceBlankLines: false,
+  });
   const host = document.createElement('div');
   host.innerHTML = renderedHtml;
 

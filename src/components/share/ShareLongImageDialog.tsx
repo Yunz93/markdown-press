@@ -3,7 +3,10 @@ import { Dialog } from "../ui/Dialog";
 import { useI18n } from "../../hooks/useI18n";
 import { useAppStore } from "../../store/appStore";
 import { rasterizeExportHtmlToPngBlob } from "../../utils/export/longImageExport";
-import { disposeAllExportRasterArtifacts } from "../../utils/export/exportRasterHost";
+import {
+  disposeAllExportRasterArtifacts,
+  withExportTimeout,
+} from "../../utils/export/exportRasterHost";
 import { saveExportFile } from "../../utils/export/core";
 import type { ExportAttachmentContext } from "../../utils/export/attachments";
 import { getFileSystem, isTauriEnvironment } from "../../types/filesystem";
@@ -15,6 +18,8 @@ interface ShareLongImageDialogProps {
   buildPayload: () => Promise<LongImageSharePayload | null>;
   attachmentContext: ExportAttachmentContext;
 }
+
+const LONG_IMAGE_PAYLOAD_TIMEOUT_MS = 30_000;
 
 export const ShareLongImageDialog: React.FC<ShareLongImageDialogProps> = ({
   isOpen,
@@ -53,7 +58,11 @@ export const ShareLongImageDialog: React.FC<ShareLongImageDialogProps> = ({
     const sessionId = ++generationSessionRef.current;
     setGenerating(true);
     try {
-      const payload = await buildPayload();
+      const payload = await withExportTimeout(
+        buildPayload(),
+        LONG_IMAGE_PAYLOAD_TIMEOUT_MS,
+        "Long image export timed out while building HTML",
+      );
       if (!payload || sessionId !== generationSessionRef.current) {
         return;
       }

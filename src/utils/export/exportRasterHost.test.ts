@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EXPORT_RASTER_HOST_CLASS,
   EXPORT_RASTER_STYLE_ID,
@@ -10,6 +10,7 @@ import {
   mountExportHtmlForRasterization,
   restoreExportRasterHostStyles,
   revealExportRasterHostForCapture,
+  withExportTimeout,
 } from "./exportRasterHost";
 
 describe("mountExportHtmlForRasterization", () => {
@@ -115,5 +116,22 @@ describe("disposeAllExportRasterArtifacts", () => {
 
     expect(document.getElementById(EXPORT_RASTER_STYLE_ID)).toBeNull();
     expect(document.querySelector(`.${EXPORT_RASTER_HOST_CLASS}`)).toBeNull();
+  });
+});
+
+describe("withExportTimeout", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("rejects when an export stage never settles", async () => {
+    vi.useFakeTimers();
+
+    const pending = expect(
+      withExportTimeout(new Promise(() => {}), 1000, "stage timed out"),
+    ).rejects.toThrow("stage timed out");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    await pending;
   });
 });

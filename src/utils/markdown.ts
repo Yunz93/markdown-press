@@ -19,6 +19,7 @@ interface MarkdownRenderOptions {
   highlighter?: ShikiHighlighter | null;
   markdownStylePreset?: MarkdownStylePreset;
   themeMode?: ThemeMode;
+  preserveSourceBlankLines?: boolean;
   /** When `loose`, preview preserves author numeric markers via `<li value="…">`. */
   orderedListMode?: OrderedListMode;
 }
@@ -341,7 +342,8 @@ function createCacheKey(markdown: string, options: MarkdownRenderOptions): strin
     ? `1_${typeof hl.__revision === 'number' ? hl.__revision : 0}`
     : '0';
   const olMode = options.orderedListMode ?? 'strict';
-  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}_${options.markdownStylePreset ?? 'nord'}_${olMode}`;
+  const sourceBlankLineMode = options.preserveSourceBlankLines === false ? 'compact' : 'preview-blanks';
+  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}_${options.markdownStylePreset ?? 'nord'}_${olMode}_${sourceBlankLineMode}`;
 }
 
 /**
@@ -442,7 +444,10 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
   // 把 alpha/roman marker 改写成阿拉伯数字,让 markdown-it 正常识别为有序列表;
   // 后续通过 token.map[0] 把原始风格(A./a./I./i.)以 type/start 属性回填到 ordered_list_open。
   const { src: alphaPreparedSrc, meta: alphaRomanMeta } = preprocessAlphaRomanLists(normalizedMarkdown);
-  const tokens = preservePreviewSourceBlankLines(md.parse(alphaPreparedSrc, env), alphaPreparedSrc);
+  const parsedTokens = md.parse(alphaPreparedSrc, env);
+  const tokens = options.preserveSourceBlankLines === false
+    ? parsedTokens
+    : preservePreviewSourceBlankLines(parsedTokens, alphaPreparedSrc);
   applyAlphaRomanListAttrs(tokens, alphaRomanMeta);
   const renderedHtml = md.renderer.render(tokens, md.options, env);
 
