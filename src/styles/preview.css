@@ -86,7 +86,8 @@
   min-width: 0;
   max-width: none;
   margin: 0;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--preview-content-bottom, var(--pane-content-bottom));
+  padding: var(--pane-content-top) var(--pane-content-px)
+    var(--preview-content-bottom, var(--pane-content-bottom));
   color: var(--mp-doc-text, #312e81);
   line-height: var(--preview-line-height);
   overflow-wrap: anywhere;
@@ -109,7 +110,8 @@
   min-width: 0;
   max-width: none;
   margin: 0;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--preview-content-bottom, var(--pane-content-bottom));
+  padding: var(--pane-content-top) var(--pane-content-px)
+    var(--preview-content-bottom, var(--pane-content-bottom));
   color: var(--mp-doc-text, #0f172a);
   font-family: var(--preview-font-family);
   font-size: var(--preview-font-size);
@@ -161,7 +163,8 @@
 .preview-pane-document.preview-pane-document-windows.markdown-body pre,
 .preview-pane-document.preview-pane-document-windows.markdown-body table,
 .preview-pane-document.preview-pane-document-windows.markdown-body blockquote,
-.preview-pane-document.preview-pane-document-windows.markdown-body .preview-note-embed,
+.preview-pane-document.preview-pane-document-windows.markdown-body
+  .preview-note-embed,
 .preview-pane-document.preview-pane-document-windows.markdown-body img,
 .preview-pane-document.preview-pane-document-windows.markdown-body iframe {
   content-visibility: visible;
@@ -225,22 +228,30 @@
 
 .preview-pane-document.markdown-body .preview-attachment-image {
   display: block;
-  width: auto;
   max-width: 100%;
   margin: 1rem 0;
   border-radius: 1rem;
-  box-shadow: 0 16px 40px color-mix(in srgb, var(--mp-doc-accent, #0f172a) 12%, transparent);
+  box-shadow: 0 16px 40px
+    color-mix(in srgb, var(--mp-doc-accent, #0f172a) 12%, transparent);
+}
+
+/* Only auto-width images without explicit sizing (the HTML width attribute provides
+   the fallback when WKWebView strips inline style and typed attr() is unavailable). */
+.preview-pane-document.markdown-body .preview-attachment-image:not([width]) {
+  width: auto;
 }
 
 /* Wiki `![[note|100]]` embeds: `data-wiki-embed-w` / `h` are set on <img> after async enhancement.
    Some WKWebView release paths drop inline `style` when HTML is re-serialized for React; typed
    `attr(... px)` keeps the requested size in author CSS. Values are bare numbers like "100". */
-.preview-pane-document.markdown-body img.preview-attachment-image[data-wiki-embed-w] {
+.preview-pane-document.markdown-body
+  img.preview-attachment-image[data-wiki-embed-w] {
   width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
   max-width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
 }
 
-.preview-pane-document.markdown-body img.preview-attachment-image[data-wiki-embed-h] {
+.preview-pane-document.markdown-body
+  img.preview-attachment-image[data-wiki-embed-h] {
   height: attr(data-wiki-embed-h px, auto) !important;
   max-height: attr(data-wiki-embed-h px, none) !important;
   object-fit: contain;
@@ -489,7 +500,10 @@
 }
 
 .preview-pane-document.markdown-body code {
-  background: var(--mp-doc-code-bg, var(--mp-doc-accent-soft, rgba(15, 23, 42, 0.06)));
+  background: var(
+    --mp-doc-code-bg,
+    var(--mp-doc-accent-soft, rgba(15, 23, 42, 0.06))
+  );
   color: var(--mp-doc-code-text, inherit);
   border-radius: 0.45rem;
   padding: 0.15rem 0.35rem;
@@ -633,10 +647,21 @@
 }
 
 .preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre,
-.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre:not(.shiki) code,
-.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki,
-.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki code,
-.preview-pane-document.markdown-body .preview-note-embed-body.markdown-body pre.shiki .line {
+.preview-pane-document.markdown-body
+  .preview-note-embed-body.markdown-body
+  pre:not(.shiki)
+  code,
+.preview-pane-document.markdown-body
+  .preview-note-embed-body.markdown-body
+  pre.shiki,
+.preview-pane-document.markdown-body
+  .preview-note-embed-body.markdown-body
+  pre.shiki
+  code,
+.preview-pane-document.markdown-body
+  .preview-note-embed-body.markdown-body
+  pre.shiki
+  .line {
   line-height: 1.15;
 }
 
@@ -659,7 +684,10 @@
 }
 
 .preview-pane-document.markdown-body table tr:hover {
-  background: var(--mp-doc-table-hover-bg, var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96)));
+  background: var(
+    --mp-doc-table-hover-bg,
+    var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96))
+  );
 }
 
 .preview-pane-document.markdown-body table th {
@@ -722,7 +750,7 @@
 }
 
 .preview-pane-document.markdown-body .task-list-item::marker {
-  content: '';
+  content: "";
 }
 
 .preview-pane-document.markdown-body .task-list-item + .task-list-item {
@@ -969,11 +997,17 @@
   white-space: nowrap;
 }
 
-html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex .katex-html {
+html[data-katex-render-mode="mathml"]
+  .preview-pane-document.markdown-body
+  .katex
+  .katex-html {
   display: none !important;
 }
 
-html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex .katex-mathml {
+html[data-katex-render-mode="mathml"]
+  .preview-pane-document.markdown-body
+  .katex
+  .katex-mathml {
   position: static !important;
   clip: auto !important;
   clip-path: none !important;
@@ -986,11 +1020,18 @@ html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .kate
   white-space: normal !important;
 }
 
-html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex math {
+html[data-katex-render-mode="mathml"]
+  .preview-pane-document.markdown-body
+  .katex
+  math {
   color: inherit;
 }
 
-html[data-katex-render-mode="mathml"] .preview-pane-document.markdown-body .katex-display > .katex .katex-mathml {
+html[data-katex-render-mode="mathml"]
+  .preview-pane-document.markdown-body
+  .katex-display
+  > .katex
+  .katex-mathml {
   display: block;
   text-align: center;
 }
