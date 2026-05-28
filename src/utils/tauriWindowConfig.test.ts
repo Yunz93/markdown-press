@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 type TauriWindowConfig = {
   label?: string;
   title?: string;
+  titleBarStyle?: string;
+  hiddenTitle?: boolean;
   devtools?: boolean;
   [key: string]: unknown;
 };
@@ -24,10 +26,18 @@ type TauriCapabilityConfig = {
   windows?: string[];
 };
 
-const ALLOWED_DEV_OVERRIDE_PATHS = new Set([
-  "app.windows.main.label",
-  "app.windows.main.devtools",
-]);
+const MAIN_WINDOW_CHROME_KEYS = [
+  "label",
+  "title",
+  "titleBarStyle",
+  "hiddenTitle",
+  "theme",
+  "width",
+  "height",
+  "resizable",
+  "fullscreen",
+  "dragDropEnabled",
+] as const;
 
 function readTauriConfig(path: string): TauriConfig {
   return JSON.parse(
@@ -55,42 +65,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** 模拟 Tauri CLI 的 JSON Merge Patch（RFC 7396）：数组会被整段替换。 */
 function mergeTauriConfigs(
   base: TauriConfig,
   overlay: TauriConfig,
 ): TauriConfig {
-  const merged = structuredClone(base);
+  function mergeValue(baseValue: unknown, overlayValue: unknown): unknown {
+    if (overlayValue === null) {
+      return null;
+    }
 
-  function mergeValue(
-    baseValue: unknown,
-    overlayValue: unknown,
-    path: string,
-  ): unknown {
     if (Array.isArray(overlayValue)) {
-      if (
-        path.endsWith(".windows") &&
-        overlayValue.every(
-          (item) => isPlainObject(item) && typeof item.label === "string",
-        )
-      ) {
-        const baseArray = Array.isArray(baseValue) ? [...baseValue] : [];
-        for (const overlayItem of overlayValue as TauriWindowConfig[]) {
-          const index = baseArray.findIndex(
-            (item) => isPlainObject(item) && item.label === overlayItem.label,
-          );
-          if (index >= 0) {
-            baseArray[index] = mergeValue(
-              baseArray[index],
-              overlayItem,
-              `${path}.${overlayItem.label}`,
-            ) as TauriWindowConfig;
-          } else {
-            baseArray.push(structuredClone(overlayItem));
-          }
-        }
-        return baseArray;
-      }
-
       return structuredClone(overlayValue);
     }
 
@@ -100,7 +85,6 @@ function mergeTauriConfigs(
         nextBase[key] = mergeValue(
           isPlainObject(baseValue) ? baseValue[key] : undefined,
           value,
-          path ? `${path}.${key}` : key,
         );
       }
       return nextBase;
@@ -109,6 +93,7 @@ function mergeTauriConfigs(
     return overlayValue;
   }
 
+  const merged = structuredClone(base);
   for (const [key, value] of Object.entries(overlay)) {
     if (key === "$schema") {
       continue;
@@ -116,70 +101,14 @@ function mergeTauriConfigs(
     (merged as Record<string, unknown>)[key] = mergeValue(
       (merged as Record<string, unknown>)[key],
       value,
-      key,
     );
   }
 
   return merged;
 }
 
-function collectLeafConfigPaths(value: unknown, path = ""): string[] {
-  if (Array.isArray(value)) {
-    if (path.endsWith(".windows")) {
-      return value.flatMap((item) => {
-        if (!isPlainObject(item) || typeof item.label !== "string") {
-          return collectLeafConfigPaths(item, path);
-        }
-        return collectLeafConfigPaths(item, `${path}.${item.label}`);
-      });
-    }
-
-    return value.flatMap((item, index) =>
-      collectLeafConfigPaths(item, `${path}[${index}]`),
-    );
-  }
-
-  if (isPlainObject(value)) {
-    const nestedPaths = Object.entries(value).flatMap(([key, nestedValue]) => {
-      const nextPath = path ? `${path}.${key}` : key;
-      return collectLeafConfigPaths(nestedValue, nextPath);
-    });
-    return nestedPaths.length > 0 ? nestedPaths : path ? [path] : [];
-  }
-
-  return path ? [path] : [];
-}
-
 function diffConfigPaths(left: unknown, right: unknown, path = ""): string[] {
   if (Array.isArray(left) && Array.isArray(right)) {
-    if (path.endsWith(".windows")) {
-      const leftByLabel = new Map(
-        left
-          .filter(
-            (item): item is TauriWindowConfig =>
-              isPlainObject(item) && typeof item.label === "string",
-          )
-          .map((item) => [item.label as string, item]),
-      );
-      const rightByLabel = new Map(
-        right
-          .filter(
-            (item): item is TauriWindowConfig =>
-              isPlainObject(item) && typeof item.label === "string",
-          )
-          .map((item) => [item.label as string, item]),
-      );
-
-      const labels = new Set([...leftByLabel.keys(), ...rightByLabel.keys()]);
-      return [...labels].flatMap((label) =>
-        diffConfigPaths(
-          leftByLabel.get(label),
-          rightByLabel.get(label),
-          `${path}.${label}`,
-        ),
-      );
-    }
-
     return JSON.stringify(left) === JSON.stringify(right) ? [] : [path];
   }
 
@@ -209,16 +138,17 @@ describe("Tauri window config", () => {
     expect(getMainWindowTitle(mergedDevConfig)).toBe(releaseConfig.productName);
   });
 
-  it("limits tauri.dev.conf.json to debug-only overrides", () => {
+  it("keeps dev overlay window chrome aligned with release because arrays are replaced", () => {
+    const releaseConfig = readTauriConfig("src-tauri/tauri.conf.json");
     const devOverlay = readTauriConfig("src-tauri/tauri.dev.conf.json");
-    const devPaths = collectLeafConfigPaths(devOverlay).filter(
-      (path) => path !== "$schema",
-    );
+    const releaseMainWindow = getMainWindow(releaseConfig);
+    const devMainWindow = getMainWindow(devOverlay);
 
-    expect(devPaths.length).toBeGreaterThan(0);
-    expect(devPaths.every((path) => ALLOWED_DEV_OVERRIDE_PATHS.has(path))).toBe(
-      true,
-    );
+    expect(devMainWindow).toBeDefined();
+    for (const key of MAIN_WINDOW_CHROME_KEYS) {
+      expect(devMainWindow?.[key]).toEqual(releaseMainWindow?.[key]);
+    }
+    expect(devMainWindow?.devtools).toBe(true);
   });
 
   it("keeps merged dev config aligned with release except for devtools", () => {
@@ -229,9 +159,11 @@ describe("Tauri window config", () => {
     const diffs = diffConfigPaths(releaseConfig, mergedDevConfig).filter(
       Boolean,
     );
-    expect(diffs).toEqual(["app.windows.main.devtools"]);
+    expect(diffs).toEqual(["app.windows"]);
     expect(getMainWindow(releaseConfig)?.devtools).toBe(false);
     expect(getMainWindow(mergedDevConfig)?.devtools).toBe(true);
+    expect(getMainWindow(mergedDevConfig)?.hiddenTitle).toBe(true);
+    expect(getMainWindow(mergedDevConfig)?.titleBarStyle).toBe("Overlay");
   });
 
   it("grants the default desktop permissions to file document windows", () => {
