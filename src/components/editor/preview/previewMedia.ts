@@ -1,5 +1,5 @@
 export interface ExternalVideoEmbed {
-  provider: 'youtube' | 'bilibili';
+  provider: "youtube" | "bilibili";
   src: string;
   title: string;
 }
@@ -10,7 +10,7 @@ export function hasUriScheme(value: string): boolean {
 
 export function isLocalPreviewLinkHref(href: string): boolean {
   const trimmed = href.trim();
-  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) {
+  if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("//")) {
     return false;
   }
 
@@ -19,10 +19,12 @@ export function isLocalPreviewLinkHref(href: string): boolean {
 
 export function getLocalPreviewLinkTarget(href: string): string {
   const trimmed = href.trim();
-  const hashIndex = trimmed.indexOf('#');
+  const hashIndex = trimmed.indexOf("#");
   const withoutHash = hashIndex >= 0 ? trimmed.slice(0, hashIndex) : trimmed;
-  const queryIndex = withoutHash.indexOf('?');
-  return (queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash).trim();
+  const queryIndex = withoutHash.indexOf("?");
+  return (
+    queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash
+  ).trim();
 }
 
 export function isImageAttachment(fileName: string): boolean {
@@ -37,16 +39,21 @@ export function isPdfAttachment(fileName: string): boolean {
   return /\.pdf$/i.test(fileName);
 }
 
-export function createPreviewPdfContainer(document: Document, src: string, title: string, path?: string): HTMLDivElement {
-  const container = document.createElement('div');
-  container.className = 'preview-attachment-pdf preview-pdfjs';
+export function createPreviewPdfContainer(
+  document: Document,
+  src: string,
+  title: string,
+  path?: string,
+): HTMLDivElement {
+  const container = document.createElement("div");
+  container.className = "preview-attachment-pdf preview-pdfjs";
   container.dataset.pdfSrc = src;
   container.dataset.pdfTitle = title;
   if (path) {
     container.dataset.pdfPath = path;
   }
-  container.dataset.pdfjsState = 'pending';
-  container.textContent = 'Loading PDF...';
+  container.dataset.pdfjsState = "pending";
+  container.textContent = "Loading PDF...";
   return container;
 }
 
@@ -64,58 +71,64 @@ export function hasWikiEmbedsInHtml(html: string): boolean {
   // (`markdown-embed` before `markdown-link`) or normalize `data-wiki-embed` across
   // engines. If this returns false, preview skips async embed enhancement entirely
   // (release WKWebView then shows unsized placeholder links).
+  // 参见 src/utils/webkitCompat.ts — Quirk 6
   return /\bdata-wiki-embed\b/i.test(html);
 }
 
 export function hasEmbeddableMediaLinksInHtml(html: string): boolean {
-  return /href="https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|youtube-nocookie\.com|bilibili\.com|player\.bilibili\.com)\//i.test(html);
+  return /href="https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|youtube-nocookie\.com|bilibili\.com|player\.bilibili\.com)\//i.test(
+    html,
+  );
 }
 
 function resolveYouTubeEmbed(url: URL): ExternalVideoEmbed | null {
-  const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
-  let videoId = '';
+  const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+  let videoId = "";
 
-  if (hostname === 'youtu.be') {
-    videoId = url.pathname.split('/').filter(Boolean)[0] ?? '';
-  } else if (hostname === 'youtube.com' || hostname === 'm.youtube.com') {
-    if (url.pathname === '/watch') {
-      videoId = url.searchParams.get('v') ?? '';
-    } else if (url.pathname.startsWith('/shorts/')) {
-      videoId = url.pathname.split('/')[2] ?? '';
-    } else if (url.pathname.startsWith('/embed/')) {
-      videoId = url.pathname.split('/')[2] ?? '';
+  if (hostname === "youtu.be") {
+    videoId = url.pathname.split("/").filter(Boolean)[0] ?? "";
+  } else if (hostname === "youtube.com" || hostname === "m.youtube.com") {
+    if (url.pathname === "/watch") {
+      videoId = url.searchParams.get("v") ?? "";
+    } else if (url.pathname.startsWith("/shorts/")) {
+      videoId = url.pathname.split("/")[2] ?? "";
+    } else if (url.pathname.startsWith("/embed/")) {
+      videoId = url.pathname.split("/")[2] ?? "";
     }
-  } else if (hostname === 'youtube-nocookie.com' && url.pathname.startsWith('/embed/')) {
-    videoId = url.pathname.split('/')[2] ?? '';
+  } else if (
+    hostname === "youtube-nocookie.com" &&
+    url.pathname.startsWith("/embed/")
+  ) {
+    videoId = url.pathname.split("/")[2] ?? "";
   }
 
   if (!videoId) return null;
 
   const embedUrl = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
-  const start = url.searchParams.get('t') ?? url.searchParams.get('start');
+  const start = url.searchParams.get("t") ?? url.searchParams.get("start");
   if (start) {
-    embedUrl.searchParams.set('start', start.replace(/s$/i, ''));
+    embedUrl.searchParams.set("start", start.replace(/s$/i, ""));
   }
 
   return {
-    provider: 'youtube',
+    provider: "youtube",
     src: embedUrl.toString(),
-    title: 'YouTube video',
+    title: "YouTube video",
   };
 }
 
 function resolveBilibiliEmbed(url: URL): ExternalVideoEmbed | null {
-  const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
+  const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
 
-  if (hostname === 'player.bilibili.com' && url.pathname === '/player.html') {
+  if (hostname === "player.bilibili.com" && url.pathname === "/player.html") {
     return {
-      provider: 'bilibili',
+      provider: "bilibili",
       src: url.toString(),
-      title: 'Bilibili video',
+      title: "Bilibili video",
     };
   }
 
-  if (!hostname.endsWith('bilibili.com')) {
+  if (!hostname.endsWith("bilibili.com")) {
     return null;
   }
 
@@ -123,27 +136,29 @@ function resolveBilibiliEmbed(url: URL): ExternalVideoEmbed | null {
   if (!match) return null;
 
   const rawId = match[1];
-  const embedUrl = new URL('https://player.bilibili.com/player.html');
+  const embedUrl = new URL("https://player.bilibili.com/player.html");
 
   if (/^BV/i.test(rawId)) {
-    embedUrl.searchParams.set('bvid', rawId);
+    embedUrl.searchParams.set("bvid", rawId);
   } else {
-    embedUrl.searchParams.set('aid', rawId.replace(/^av/i, ''));
+    embedUrl.searchParams.set("aid", rawId.replace(/^av/i, ""));
   }
 
-  const page = url.searchParams.get('p');
+  const page = url.searchParams.get("p");
   if (page) {
-    embedUrl.searchParams.set('page', page);
+    embedUrl.searchParams.set("page", page);
   }
 
   return {
-    provider: 'bilibili',
+    provider: "bilibili",
     src: embedUrl.toString(),
-    title: 'Bilibili video',
+    title: "Bilibili video",
   };
 }
 
-export function resolveExternalVideoEmbed(rawUrl: string): ExternalVideoEmbed | null {
+export function resolveExternalVideoEmbed(
+  rawUrl: string,
+): ExternalVideoEmbed | null {
   try {
     const url = new URL(rawUrl);
     return resolveYouTubeEmbed(url) ?? resolveBilibiliEmbed(url);
@@ -152,20 +167,23 @@ export function resolveExternalVideoEmbed(rawUrl: string): ExternalVideoEmbed | 
   }
 }
 
-export function buildIframeEmbed(document: Document, embed: ExternalVideoEmbed): HTMLElement {
-  const wrapper = document.createElement('div');
+export function buildIframeEmbed(
+  document: Document,
+  embed: ExternalVideoEmbed,
+): HTMLElement {
+  const wrapper = document.createElement("div");
   wrapper.className = `preview-external-video-embed is-${embed.provider}`;
 
-  const frame = document.createElement('iframe');
-  frame.className = 'preview-external-video-frame';
+  const frame = document.createElement("iframe");
+  frame.className = "preview-external-video-frame";
   frame.src = embed.src;
   frame.title = embed.title;
-  frame.loading = 'lazy';
-  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.loading = "lazy";
+  frame.referrerPolicy = "strict-origin-when-cross-origin";
   frame.allowFullscreen = true;
   frame.setAttribute(
-    'allow',
-    'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+    "allow",
+    "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
   );
 
   wrapper.appendChild(frame);
@@ -173,27 +191,31 @@ export function buildIframeEmbed(document: Document, embed: ExternalVideoEmbed):
 }
 
 export function normalizeExistingIframe(frame: HTMLIFrameElement): void {
-  frame.classList.add('preview-external-video-frame');
-  if (!frame.getAttribute('loading')) {
-    frame.setAttribute('loading', 'lazy');
+  frame.classList.add("preview-external-video-frame");
+  if (!frame.getAttribute("loading")) {
+    frame.setAttribute("loading", "lazy");
   }
-  if (!frame.getAttribute('referrerpolicy')) {
-    frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  if (!frame.getAttribute("referrerpolicy")) {
+    frame.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
   }
-  if (!frame.getAttribute('allow')) {
+  if (!frame.getAttribute("allow")) {
     frame.setAttribute(
-      'allow',
-      'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+      "allow",
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
     );
   }
-  frame.setAttribute('allowfullscreen', 'true');
+  frame.setAttribute("allowfullscreen", "true");
 }
 
-export function configurePreviewImageElement(image: HTMLImageElement, src: string, originalSrc: string): void {
-  image.setAttribute('src', src);
-  image.setAttribute('data-original-src', originalSrc);
-  image.setAttribute('data-preview-warmed', 'true');
-  image.setAttribute('decoding', 'async');
-  image.setAttribute('loading', 'lazy');
-  image.setAttribute('fetchpriority', 'auto');
+export function configurePreviewImageElement(
+  image: HTMLImageElement,
+  src: string,
+  originalSrc: string,
+): void {
+  image.setAttribute("src", src);
+  image.setAttribute("data-original-src", originalSrc);
+  image.setAttribute("data-preview-warmed", "true");
+  image.setAttribute("decoding", "async");
+  image.setAttribute("loading", "lazy");
+  image.setAttribute("fetchpriority", "auto");
 }

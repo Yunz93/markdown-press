@@ -247,6 +247,7 @@ export function usePreviewRenderer(
         // WKWebView can strip Shiki token inline styles when reading subtree HTML back via
         // `innerHTML` after mutations (same symptom DomParser round-trips had). Substitute
         // `<pre class="shiki">` fragments from the source strings and restore after readback.
+        // 参见 src/utils/webkitCompat.ts — Quirk 1
         const host = document.createElement("div");
         const shikiSnapshots: string[] = [];
         host.innerHTML = protectShikiPresInHtmlString(

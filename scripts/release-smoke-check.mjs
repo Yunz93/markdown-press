@@ -134,12 +134,12 @@ const { cssAsset, jsAsset } = assertReleaseDistOutput();
 const checklist = [
   "Cold launch the packaged app and verify the first opened file has correct editor width.",
   "In Preview mode, open Outline in a non-fullscreen window and confirm the panel renders and headings jump correctly.",
-  "Open a note with fenced code blocks and confirm syntax highlighting still works in the packaged app.",
-  "Open a note with valid and invalid Mermaid diagrams; confirm valid diagrams render as SVG and invalid diagrams show an error state.",
+  "Open a note with fenced code blocks and confirm syntax highlighting still works in the packaged app.  [auto: releaseSmokeAuto.test.ts]",
+  "Open a note with valid and invalid Mermaid diagrams; confirm valid diagrams render as SVG and invalid diagrams show an error state.  [auto: releaseSmokeAuto.test.ts]",
   "Open a PDF directly from the sidebar and confirm the PDF.js canvas preview renders instead of staying on the loading state.",
   "Open a Markdown note with ![[sample.pdf]] and confirm the embedded PDF.js canvas preview renders like direct preview.",
   "Compare Editor mode styling against dev: caret, frontmatter colors, markdown token colors, and line wrapping.",
-  "Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.",
+  "Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.  [auto: releaseSmokeAuto.test.ts + releaseParity.test.ts]",
   "Click external links from Preview and confirm the system browser opens.",
   "Switch between Editor / Preview / Split, resize the window, and confirm layout widths stay stable.",
   "For tagged releases, confirm updater signature assets and latest.json are attached to the GitHub Release.",
@@ -148,6 +148,18 @@ const checklist = [
 console.log("\nRelease smoke check passed.\n");
 console.log(`Verified Tauri-built dist assets: ${cssAsset}, ${jsAsset}`);
 console.log(`Verified app bundle: ${appBundlePath}`);
+
+console.log("\nAutomated parity gates (run in CI & release workflow):");
+console.log("  npm run test:release-parity");
+console.log(
+  "  - tauriWindowConfig.test.ts: dev config whitelist & window parity",
+);
+console.log(
+  "  - releaseParity.test.ts: fixture-based render invariants (__PROD__ mode)",
+);
+console.log(
+  "  - releaseSmokeAuto.test.ts: Shiki, Mermaid, KaTeX, wiki embeds, WKWebView snapshots",
+);
 
 console.log("\nManual checklist:");
 for (const item of checklist) {

@@ -31,7 +31,7 @@ import { ViewMode } from "./types";
 import { focusEditorRangeByOffset } from "./utils/editorSelectionBridge";
 import { requestPreviewHeadingScroll } from "./utils/previewNavigationBridge";
 import { getResolvedUiFontFamily } from "./utils/fontSettings";
-import { logEnvironment } from "./utils/environment";
+import { logEnvironment, assertDevReleaseParity } from "./utils/environment";
 import { useI18n } from "./hooks/useI18n";
 import { getPathBasename, findFileInTree } from "./app/appShellUtils";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
@@ -75,6 +75,7 @@ function isPreviewOnlyFile(name: string): boolean {
 // Log environment info on app initialization for debugging
 if (typeof window !== "undefined" && import.meta.env.DEV) {
   logEnvironment();
+  assertDevReleaseParity();
 }
 
 const App: React.FC = () => {

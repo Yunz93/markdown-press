@@ -2,6 +2,8 @@
  * WKWebView (Tauri release) may strip inline token styles when serializing a subtree with
  * `innerHTML`. Shiki highlights rely on those spans, so we substitute `<pre class="shiki">…</pre>`
  * fragments from the original HTML strings before DOM mutation and splice them back after.
+ *
+ * 参见 src/utils/webkitCompat.ts — Quirk 1
  */
 
 // If we wrap Shiki blocks (for consistent rounded corners), snapshot the wrapper+pre together;
