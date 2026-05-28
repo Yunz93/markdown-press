@@ -324,6 +324,7 @@ export function useExportActions(
         rootFolderPath: latestRootFolderPath,
         currentFilePath: activeFile.path,
         markdownContent: markdownForPublish,
+        markdownStylePreset: storeState.settings.markdownStylePreset,
       });
 
       if (prepared.unresolvedImages.length > 0) {

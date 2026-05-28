@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { extractWechatDraftDefaults } from './wechatPublish';
+import { extractWechatDraftDefaults, prepareWechatDraftPublish } from './wechatPublish';
 
 describe('extractWechatDraftDefaults', () => {
   it('prefers frontmatter values when available', () => {
@@ -38,5 +39,25 @@ wechat_draft_media_id: MEDIA123
     expect(defaults.digest).toContain('第一段正文会被用来生成摘要');
     expect(defaults.existingDraftMediaId).toBe('');
     expect(defaults.showCoverPic).toBe(true);
+  });
+});
+
+describe('prepareWechatDraftPublish', () => {
+  it('applies the selected markdown style preset to the prepared HTML', async () => {
+    const prepared = await prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: '/notes/styled-post.md',
+      markdownContent: '# 标题\n\n> 引用\n\n`code`',
+      settings: {
+        previewFontFamily: 'Arial',
+        codeFontFamily: 'Menlo',
+        fontSize: 16,
+        markdownStylePreset: 'topaz',
+      },
+    });
+
+    expect(prepared.contentHtml).toContain('data-markdown-style="topaz"');
+    expect(prepared.contentHtml).toContain('color: #1f6f6d');
+    expect(prepared.contentHtml).toContain('color: #255f5d');
   });
 });

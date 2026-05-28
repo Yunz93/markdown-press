@@ -2,6 +2,7 @@ import { createAttachmentResolverContext, resolveAttachmentTarget } from './atta
 import { parseFrontmatter } from './frontmatter';
 import { renderMarkdown } from './markdown';
 import { getResolvedCodeFontFamily, getResolvedPreviewFontFamily } from './fontSettings';
+import { getMarkdownStyleTokens, normalizeMarkdownStylePreset } from './markdownStyle';
 import { getPathBasename } from '../app/appShellUtils';
 import type { AppSettings, FileNode, Frontmatter } from '../types';
 
@@ -41,7 +42,7 @@ interface PrepareWechatDraftPublishOptions {
   rootFolderPath?: string | null;
   currentFilePath: string;
   markdownContent: string;
-  settings: Pick<AppSettings, 'previewFontFamily' | 'codeFontFamily' | 'fontSize'>;
+  settings: Pick<AppSettings, 'previewFontFamily' | 'codeFontFamily' | 'fontSize' | 'markdownStylePreset'>;
 }
 
 const IMAGE_FILE_PATTERN = /\.(png|jpe?g|gif|svg|webp|bmp|avif)$/i;
@@ -122,18 +123,30 @@ function setInlineStyle(element: HTMLElement, styles: Record<string, string | nu
 
 function applyWechatPreviewStyles(
   host: HTMLDivElement,
-  settings: Pick<AppSettings, 'previewFontFamily' | 'codeFontFamily' | 'fontSize'>,
+  settings: Pick<AppSettings, 'previewFontFamily' | 'codeFontFamily' | 'fontSize' | 'markdownStylePreset'>,
 ): void {
+  const markdownStylePreset = normalizeMarkdownStylePreset(settings.markdownStylePreset);
+  const tokens = getMarkdownStyleTokens(markdownStylePreset, 'light');
   const previewFontFamily = getResolvedPreviewFontFamily(settings);
   const codeFontFamily = getResolvedCodeFontFamily(settings);
   const previewFontSize = `${settings.fontSize}px`;
   const codeFontSize = `${Math.max(12, settings.fontSize - 2)}px`;
+  const headingColors = [
+    tokens.heading1,
+    tokens.heading2,
+    tokens.heading3,
+    tokens.heading4,
+    tokens.heading5,
+    tokens.heading6,
+  ];
+
+  host.setAttribute('data-markdown-style', markdownStylePreset);
 
   setInlineStyle(host, {
     'font-family': previewFontFamily,
     'font-size': previewFontSize,
     'line-height': '1.95',
-    color: '#1f2937',
+    color: tokens.text,
     'overflow-wrap': 'anywhere',
     'word-break': 'break-word',
   });
@@ -148,9 +161,9 @@ function applyWechatPreviewStyles(
     const headingLevel = Number(heading.tagName.slice(1));
     const fontSizes = ['2.1em', '1.7em', '1.4em', '1.18em', '1em', '0.92em'];
     setInlineStyle(heading, {
-      color: '#7c3aed',
+      color: headingColors[headingLevel - 1] ?? tokens.accent,
       'letter-spacing': '0.01em',
-      'font-weight': '700',
+      'font-weight': tokens.headingWeight,
       'line-height': '1.35',
       'margin-top': headingLevel === 1 ? '1.1em' : '1em',
       'margin-bottom': '0.55em',
@@ -160,14 +173,14 @@ function applyWechatPreviewStyles(
     if (headingLevel === 2) {
       setInlineStyle(heading, {
         'padding-bottom': '0.3em',
-        'border-bottom': '1px solid rgba(124, 58, 237, 0.18)',
+        'border-bottom': `1px solid ${tokens.headingBorder}`,
       });
     }
   });
 
   host.querySelectorAll<HTMLAnchorElement>('a').forEach((link) => {
     setInlineStyle(link, {
-      color: '#0f9aa8',
+      color: tokens.link,
       'text-decoration': 'underline',
       'text-decoration-thickness': '1.5px',
       'text-underline-offset': '0.12em',
@@ -176,9 +189,9 @@ function applyWechatPreviewStyles(
 
   host.querySelectorAll<HTMLElement>('blockquote').forEach((blockquote) => {
     setInlineStyle(blockquote, {
-      'border-left': '4px solid rgba(124, 58, 237, 0.28)',
-      color: '#5b21b6',
-      background: 'rgba(124, 58, 237, 0.04)',
+      'border-left': `4px solid ${tokens.headingBorder}`,
+      color: tokens.quoteText,
+      background: tokens.quoteBg,
       'border-radius': '0 14px 14px 0',
       padding: '0.9rem 1rem',
       margin: '1rem 0',
@@ -200,20 +213,21 @@ function applyWechatPreviewStyles(
     }
 
     setInlineStyle(code, {
-      background: 'rgba(15, 23, 42, 0.06)',
+      background: tokens.codeBg,
+      border: `1px solid ${tokens.codeBorder}`,
       'border-radius': '0.45rem',
       padding: '0.15rem 0.35rem',
       'font-family': codeFontFamily,
       'font-size': codeFontSize,
-      color: '#1f2937',
+      color: tokens.codeText,
     });
   });
 
   host.querySelectorAll<HTMLElement>('pre').forEach((pre) => {
     setInlineStyle(pre, {
-      background: 'rgba(248, 250, 252, 0.96)',
-      color: '#1f2937',
-      border: '1px solid rgba(148, 163, 184, 0.2)',
+      background: tokens.codeBg,
+      color: tokens.codeText,
+      border: `1px solid ${tokens.codeBorder}`,
       'border-radius': '1rem',
       padding: '1rem 1.1rem',
       overflow: 'auto',
@@ -229,7 +243,7 @@ function applyWechatPreviewStyles(
       width: '100%',
       'max-width': '100%',
       'border-collapse': 'collapse',
-      color: '#1f2937',
+      color: tokens.text,
       margin: '1rem 0',
       'font-size': '0.95em',
     });
@@ -237,23 +251,23 @@ function applyWechatPreviewStyles(
 
   host.querySelectorAll<HTMLElement>('thead tr').forEach((row) => {
     setInlineStyle(row, {
-      background: 'rgba(241, 245, 249, 0.96)',
+      background: tokens.tableHeaderBg,
     });
   });
 
   host.querySelectorAll<HTMLElement>('tbody tr').forEach((row, index) => {
     setInlineStyle(row, {
-      background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.92)' : 'rgba(248, 250, 252, 0.96)',
-      'border-top': '1px solid rgba(148, 163, 184, 0.26)',
+      background: index % 2 === 0 ? 'transparent' : tokens.tableRowAltBg,
+      'border-top': `1px solid ${tokens.border}`,
     });
   });
 
   host.querySelectorAll<HTMLElement>('th').forEach((cell) => {
     setInlineStyle(cell, {
-      background: 'rgba(241, 245, 249, 0.96)',
-      color: '#334155',
+      background: tokens.tableHeaderBg,
+      color: tokens.text,
       'font-weight': '600',
-      border: '1px solid rgba(148, 163, 184, 0.26)',
+      border: `1px solid ${tokens.border}`,
       padding: '0.55rem 0.75rem',
       'text-align': 'left',
     });
@@ -261,7 +275,7 @@ function applyWechatPreviewStyles(
 
   host.querySelectorAll<HTMLElement>('td').forEach((cell) => {
     setInlineStyle(cell, {
-      border: '1px solid rgba(148, 163, 184, 0.26)',
+      border: `1px solid ${tokens.border}`,
       padding: '0.55rem 0.75rem',
     });
   });
@@ -283,8 +297,37 @@ function applyWechatPreviewStyles(
   host.querySelectorAll<HTMLHRElement>('hr').forEach((rule) => {
     setInlineStyle(rule, {
       border: 'none',
-      'border-top': '1px solid rgba(124, 58, 237, 0.18)',
+      'border-top': `1px solid ${tokens.headingBorder}`,
       margin: '1.5rem 0',
+    });
+  });
+
+  host.querySelectorAll<HTMLElement>('strong').forEach((strong) => {
+    setInlineStyle(strong, {
+      color: tokens.strong,
+      'font-weight': '700',
+    });
+  });
+
+  host.querySelectorAll<HTMLElement>('em').forEach((emphasis) => {
+    setInlineStyle(emphasis, {
+      color: tokens.emphasis,
+    });
+  });
+
+  host.querySelectorAll<HTMLElement>('del, s').forEach((deleted) => {
+    setInlineStyle(deleted, {
+      color: tokens.strikethrough,
+      'text-decoration': 'line-through',
+    });
+  });
+
+  host.querySelectorAll<HTMLElement>('mark').forEach((mark) => {
+    setInlineStyle(mark, {
+      background: tokens.markBg,
+      color: tokens.markText,
+      padding: '0.1rem 0.2rem',
+      'border-radius': '0.25rem',
     });
   });
 
@@ -310,7 +353,8 @@ export async function prepareWechatDraftPublish(
   }
 
   const { body } = parseFrontmatter(markdownContent);
-  const renderedHtml = renderMarkdown(body, { themeMode: 'light' });
+  const markdownStylePreset = normalizeMarkdownStylePreset(settings.markdownStylePreset);
+  const renderedHtml = renderMarkdown(body, { themeMode: 'light', markdownStylePreset });
   const host = document.createElement('div');
   host.innerHTML = renderedHtml;
 

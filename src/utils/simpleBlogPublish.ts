@@ -1,10 +1,11 @@
 import { createAttachmentResolverContext, resolveAttachmentTarget } from './attachmentResolver';
 import { generateFrontmatter, parseFrontmatter } from './frontmatter';
+import { normalizeMarkdownStylePreset } from './markdownStyle';
 import { normalizeBlogSiteUrl } from './blogRepo';
 import { createHeadingSlug } from './outline';
 import { parseWikiLinkReference, resolveWikiLinkFile } from './wikiLinks';
 import { getFileSystem } from '../types/filesystem';
-import type { FileNode, Frontmatter } from '../types';
+import type { FileNode, Frontmatter, MarkdownStylePreset } from '../types';
 
 export interface SimpleBlogPublishAsset {
   sourcePath: string;
@@ -25,6 +26,7 @@ interface PrepareSimpleBlogPublishOptions {
   rootFolderPath?: string | null;
   currentFilePath: string;
   markdownContent: string;
+  markdownStylePreset?: MarkdownStylePreset;
 }
 
 const MARKDOWN_IMAGE_REGEX = /!\[([^\]]*)\]\(([^)\n]+)\)/g;
@@ -273,7 +275,11 @@ function resolveSimpleBlogPublishSlug(markdownContent: string, currentFilePath: 
     || 'published-post';
 }
 
-function ensurePublishedFrontmatter(markdownContent: string, currentFilePath: string): {
+function ensurePublishedFrontmatter(
+  markdownContent: string,
+  currentFilePath: string,
+  markdownStylePreset?: MarkdownStylePreset,
+): {
   frontmatter: Frontmatter;
   body: string;
   content: string;
@@ -289,6 +295,9 @@ function ensurePublishedFrontmatter(markdownContent: string, currentFilePath: st
     slug: resolvedSlug,
     is_publish: true,
   };
+  if (markdownStylePreset) {
+    nextFrontmatter.markdown_style = normalizeMarkdownStylePreset(markdownStylePreset);
+  }
 
   return {
     frontmatter: nextFrontmatter,
@@ -327,8 +336,8 @@ export function buildSimpleBlogPostUrl(
 export async function prepareSimpleBlogPublish(
   options: PrepareSimpleBlogPublishOptions
 ): Promise<PreparedSimpleBlogPublish> {
-  const { blogSiteUrl, currentFilePath, files, markdownContent, rootFolderPath } = options;
-  const published = ensurePublishedFrontmatter(markdownContent, currentFilePath);
+  const { blogSiteUrl, currentFilePath, files, markdownContent, rootFolderPath, markdownStylePreset } = options;
+  const published = ensurePublishedFrontmatter(markdownContent, currentFilePath, markdownStylePreset);
   const currentFileName = getPathBasename(currentFilePath);
   const baseName = stripExtension(currentFileName) || 'published-post';
   const assetDirectoryRelativePath = `resource/${sanitizeAssetDirectoryName(baseName)}`;
