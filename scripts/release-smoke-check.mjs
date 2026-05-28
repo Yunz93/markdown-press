@@ -1,23 +1,32 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const distDir = join(projectRoot, 'dist');
-const distAssetsDir = join(distDir, 'assets');
-const appBundlePath = join(projectRoot, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'M記.app');
+const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const distDir = join(projectRoot, "dist");
+const distAssetsDir = join(distDir, "assets");
+const appBundlePath = join(
+  projectRoot,
+  "src-tauri",
+  "target",
+  "release",
+  "bundle",
+  "macos",
+  "M記.app",
+);
 
-const shouldBuildApp = process.argv.includes('--app');
-const workflowOnly = process.argv.includes('--workflow-only');
+const shouldBuildApp = process.argv.includes("--app");
+const workflowOnly = process.argv.includes("--workflow-only");
 
-function run(command, args) {
+function run(command, args, env = undefined) {
   const result = spawnSync(command, args, {
     cwd: projectRoot,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
+    stdio: "inherit",
+    shell: process.platform === "win32",
+    env: env ? { ...process.env, ...env } : process.env,
   });
 
   if (result.status !== 0) {
@@ -33,9 +42,9 @@ function assertExists(path, label) {
 }
 
 function readEntrypointAssets() {
-  const html = readFileSync(join(distDir, 'index.html'), 'utf8');
-  const cssMatch = html.match(/href="\.\/*assets\/([^"]+\.css)"/);
-  const jsMatch = html.match(/src="\.\/*assets\/([^"]+\.js)"/);
+  const html = readFileSync(join(distDir, "index.html"), "utf8");
+  const cssMatch = html.match(/href="(?:\.\/)?\/?assets\/([^"]+\.css)"/);
+  const jsMatch = html.match(/src="(?:\.\/)?\/?assets\/([^"]+\.js)"/);
 
   return {
     cssAsset: cssMatch?.[1] ?? null,
@@ -44,82 +53,103 @@ function readEntrypointAssets() {
 }
 
 function assertReleaseWorkflowConfig() {
-  const workflowPath = join(projectRoot, '.github', 'workflows', 'release.yml');
-  const workflow = readFileSync(workflowPath, 'utf8');
+  const workflowPath = join(projectRoot, ".github", "workflows", "release.yml");
+  const workflow = readFileSync(workflowPath, "utf8");
 
-  if (workflow.includes('TAURI_SIGNING_PRIVATE_KEY_PATH')) {
-    console.error('release.yml must pass the prepared updater key path through TAURI_SIGNING_PRIVATE_KEY, not TAURI_SIGNING_PRIVATE_KEY_PATH.');
+  if (workflow.includes("TAURI_SIGNING_PRIVATE_KEY_PATH")) {
+    console.error(
+      "release.yml must pass the prepared updater key path through TAURI_SIGNING_PRIVATE_KEY, not TAURI_SIGNING_PRIVATE_KEY_PATH.",
+    );
     process.exit(1);
   }
 
-  if (/\${{\s*steps\.prepare_signing_key\.outputs\.private_key\s*}}/.test(workflow)) {
-    console.error('release.yml must not read a non-existent prepare_signing_key private_key output; the script writes TAURI_SIGNING_PRIVATE_KEY through GITHUB_ENV.');
+  if (
+    /\${{\s*steps\.prepare_signing_key\.outputs\.private_key\s*}}/.test(
+      workflow,
+    )
+  ) {
+    console.error(
+      "release.yml must not read a non-existent prepare_signing_key private_key output; the script writes TAURI_SIGNING_PRIVATE_KEY through GITHUB_ENV.",
+    );
     process.exit(1);
   }
 
-  if (workflow.includes('releaseAssetNamePattern')) {
-    console.error('tauri-action@v0 ignores releaseAssetNamePattern; use assetNamePattern for release asset names.');
+  if (workflow.includes("releaseAssetNamePattern")) {
+    console.error(
+      "tauri-action@v0 ignores releaseAssetNamePattern; use assetNamePattern for release asset names.",
+    );
     process.exit(1);
   }
 
-  const releaseAssetPattern = 'assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]';
+  const releaseAssetPattern =
+    "assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]";
   const patternCount = workflow.split(releaseAssetPattern).length - 1;
 
   if (patternCount !== 2) {
-    console.error(`release.yml must set "${releaseAssetPattern}" for both macOS and Windows release jobs.`);
+    console.error(
+      `release.yml must set "${releaseAssetPattern}" for both macOS and Windows release jobs.`,
+    );
     process.exit(1);
   }
+}
+
+function assertReleaseDistOutput() {
+  assertExists(distDir, "dist output");
+  assertExists(join(distDir, "index.html"), "dist index.html");
+  assertExists(distAssetsDir, "dist assets directory");
+
+  const { cssAsset, jsAsset } = readEntrypointAssets();
+
+  if (!cssAsset || !jsAsset) {
+    console.error("Missing entrypoint assets in dist/index.html");
+    process.exit(1);
+  }
+
+  assertExists(join(distAssetsDir, cssAsset), "entrypoint CSS asset");
+  assertExists(join(distAssetsDir, jsAsset), "entrypoint JS asset");
+
+  return { cssAsset, jsAsset };
 }
 
 assertReleaseWorkflowConfig();
 
 if (workflowOnly) {
-  console.log('Release workflow config check passed.');
+  console.log("Release workflow config check passed.");
   process.exit(0);
 }
 
-run('npm', ['run', 'build']);
-
-assertExists(distDir, 'dist output');
-assertExists(join(distDir, 'index.html'), 'dist index.html');
-assertExists(distAssetsDir, 'dist assets directory');
-
-const { cssAsset, jsAsset } = readEntrypointAssets();
-
-if (!cssAsset || !jsAsset) {
-  console.error('Missing entrypoint assets in dist/index.html');
+if (!shouldBuildApp) {
+  console.error(
+    "Usage: node scripts/release-smoke-check.mjs --app | --workflow-only",
+  );
   process.exit(1);
 }
 
-assertExists(join(distAssetsDir, cssAsset), 'entrypoint CSS asset');
-assertExists(join(distAssetsDir, jsAsset), 'entrypoint JS asset');
+// Release frontend dist must come from Tauri beforeBuildCommand, not a standalone Vite build.
+run("npx", ["tauri", "build", "--bundles", "app", "--no-sign"]);
+assertExists(appBundlePath, "macOS .app bundle");
 
-if (shouldBuildApp) {
-  run('npx', ['tauri', 'build', '--bundles', 'app', '--no-sign']);
-  assertExists(appBundlePath, 'macOS .app bundle');
-}
+const { cssAsset, jsAsset } = assertReleaseDistOutput();
 
 const checklist = [
-  'Cold launch the packaged app and verify the first opened file has correct editor width.',
-  'In Preview mode, open Outline in a non-fullscreen window and confirm the panel renders and headings jump correctly.',
-  'Open a note with fenced code blocks and confirm syntax highlighting still works in the packaged app.',
-  'Open a note with valid and invalid Mermaid diagrams; confirm valid diagrams render as SVG and invalid diagrams show an error state.',
-  'Open a PDF directly from the sidebar and confirm the PDF.js canvas preview renders instead of staying on the loading state.',
-  'Open a Markdown note with ![[sample.pdf]] and confirm the embedded PDF.js canvas preview renders like direct preview.',
-  'Compare Editor mode styling against dev: caret, frontmatter colors, markdown token colors, and line wrapping.',
-  'Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.',
-  'Click external links from Preview and confirm the system browser opens.',
-  'Switch between Editor / Preview / Split, resize the window, and confirm layout widths stay stable.',
-  'For tagged releases, confirm updater signature assets and latest.json are attached to the GitHub Release.',
+  "Cold launch the packaged app and verify the first opened file has correct editor width.",
+  "In Preview mode, open Outline in a non-fullscreen window and confirm the panel renders and headings jump correctly.",
+  "Open a note with fenced code blocks and confirm syntax highlighting still works in the packaged app.",
+  "Open a note with valid and invalid Mermaid diagrams; confirm valid diagrams render as SVG and invalid diagrams show an error state.",
+  "Open a PDF directly from the sidebar and confirm the PDF.js canvas preview renders instead of staying on the loading state.",
+  "Open a Markdown note with ![[sample.pdf]] and confirm the embedded PDF.js canvas preview renders like direct preview.",
+  "Compare Editor mode styling against dev: caret, frontmatter colors, markdown token colors, and line wrapping.",
+  "Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.",
+  "Click external links from Preview and confirm the system browser opens.",
+  "Switch between Editor / Preview / Split, resize the window, and confirm layout widths stay stable.",
+  "For tagged releases, confirm updater signature assets and latest.json are attached to the GitHub Release.",
 ];
 
-console.log('\nRelease smoke check passed.\n');
-console.log(`Verified dist assets: ${cssAsset}, ${jsAsset}`);
-if (shouldBuildApp) {
-  console.log(`Verified app bundle: ${appBundlePath}`);
-}
+console.log("\nRelease smoke check passed.\n");
+console.log(`Verified Tauri-built dist assets: ${cssAsset}, ${jsAsset}`);
+console.log(`Verified app bundle: ${appBundlePath}`);
 
-console.log('\nManual checklist:');
+console.log("\nManual checklist:");
 for (const item of checklist) {
   console.log(`- ${item}`);
 }

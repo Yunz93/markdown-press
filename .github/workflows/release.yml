@@ -36,6 +36,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Release workflow smoke gate
+        run: npm run smoke:release-workflow
+
+      - name: Config parity and release fixture tests
+        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts
+
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -167,6 +173,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Release workflow smoke gate
+        run: npm run smoke:release-workflow
+
+      - name: Config parity and release fixture tests
+        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts
 
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')

@@ -8,10 +8,17 @@ npm run smoke:release
 
 What it does:
 
-- builds the frontend production bundle
-- builds the macOS `.app` bundle without generating a DMG
+- builds the macOS `.app` bundle via `tauri build --bundles app --no-sign`
+- verifies the frontend `dist/` produced by Tauri's `beforeBuildCommand`, not a standalone `npm run build`
 - verifies the expected hashed frontend assets and `.app` output exist
 - prints the manual UI checklist below
+
+CI and release workflow gates:
+
+```bash
+npm run smoke:release-workflow
+npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts
+```
 
 Manual checklist:
 
