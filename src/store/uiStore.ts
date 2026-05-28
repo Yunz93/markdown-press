@@ -84,7 +84,7 @@ export const defaultSettings: AppSettings = {
   aiProvider: 'deepseek',
   fontDefaultsVersion: FONT_DEFAULTS_VERSION,
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
-  uiFontSize: 18,
+  uiFontSize: 16,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   previewFontFamily: DEFAULT_PREVIEW_FONT_FAMILY,
   codeFontFamily: DEFAULT_CODE_FONT_FAMILY,

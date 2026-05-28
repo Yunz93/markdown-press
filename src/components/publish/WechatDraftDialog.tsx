@@ -85,19 +85,21 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       onClose={onClose}
       title={t('wechatDraftDialog_title')}
       className="max-w-2xl"
+      contentClassName="py-3"
+      contentScroll={false}
     >
-      <div className="flex min-h-0 h-full flex-col">
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
-          <p className="text-sm leading-7 text-gray-500 dark:text-gray-400">{t('wechatDraftDialog_desc')}</p>
+      <div className="publish-form-panel flex min-h-0 h-full flex-col">
+        <div className="-mx-1 space-y-3 px-1">
+          <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{t('wechatDraftDialog_desc')}</p>
 
           {defaults?.existingDraftMediaId && (
-            <div className="rounded-xl border border-emerald-200/70 bg-emerald-50 px-4 py-3 text-xs leading-6 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
               {t('wechatDraftDialog_updateHint')}
             </div>
           )}
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
               {t('wechatDraftDialog_titleLabel')}
             </label>
             <input
@@ -111,7 +113,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('wechatDraftDialog_authorLabel')}
               </label>
               <input
@@ -123,7 +125,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('wechatDraftDialog_sourceUrlLabel')}
               </label>
               <input
@@ -137,22 +139,22 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
               {t('wechatDraftDialog_digestLabel')}
             </label>
             <textarea
               value={digest}
               onChange={(event) => setDigest(event.target.value)}
-              rows={5}
-              className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all resize-y min-h-32"
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all resize-y min-h-24"
             />
           </div>
 
-          <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="rounded-xl border border-gray-200/70 bg-white/70 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex-1 min-w-56">
                 <div className="text-sm font-semibold text-gray-900 dark:text-white">{t('wechatDraftDialog_coverLabel')}</div>
-                <p className="mt-1 text-xs leading-6 text-gray-500 dark:text-gray-400">{t('wechatDraftDialog_coverDesc')}</p>
+                <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{t('wechatDraftDialog_coverDesc')}</p>
               </div>
               <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
@@ -165,11 +167,11 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
               </label>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => { void handlePickCover(); }}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200/70 bg-white/85 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-200 dark:hover:bg-white/10"
               >
                 {t('wechatDraftDialog_pickCover')}
               </button>
@@ -180,7 +182,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           </div>
         </div>
 
-        <div className="mt-4 flex shrink-0 justify-end gap-3 border-t border-gray-200/50 pt-4 dark:border-white/10">
+        <div className="mt-3 flex shrink-0 justify-end gap-3 border-t border-gray-200/50 pt-3 dark:border-white/10">
           <button
             type="button"
             onClick={onClose}

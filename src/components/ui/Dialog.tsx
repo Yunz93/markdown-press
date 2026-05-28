@@ -9,6 +9,8 @@ interface DialogProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
+  contentScroll?: boolean;
 }
 
 /**
@@ -19,7 +21,9 @@ export const Dialog: React.FC<DialogProps> = ({
   onClose,
   title,
   children,
-  className = ''
+  className = '',
+  contentClassName = '',
+  contentScroll = true,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -70,6 +74,7 @@ export const Dialog: React.FC<DialogProps> = ({
     <div
       className="ui-scaled fixed inset-0 z-[200] flex items-center justify-center p-4"
       style={{
+        '--ui-font-size': `${settings.uiFontSize}px`,
         '--ui-font-scale': `${uiFontScale}`,
         fontFamily: uiFontFamily,
       } as React.CSSProperties}
@@ -115,7 +120,7 @@ export const Dialog: React.FC<DialogProps> = ({
         )}
 
         {/* Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className={`min-h-0 flex-1 ${contentScroll ? 'overflow-y-auto' : 'overflow-visible'} px-6 py-4 ${contentClassName}`}>
           {children}
         </div>
       </div>
