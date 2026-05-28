@@ -21,11 +21,30 @@ vi.mock("@tauri-apps/api/path", () => ({
   normalize: vi.fn(async (path: string) => path),
 }));
 
+vi.mock("../attachmentResolver", () => ({
+  createAttachmentResolverContext: vi.fn(
+    (files, rootFolderPath, currentFilePath) => ({
+      files,
+      rootFolderPath,
+      currentFilePath,
+    }),
+  ),
+  resolveAttachmentTarget: vi.fn(async (_context, target: string) => {
+    if (target === "resources/poster.png") {
+      return { path: "/vault/resources/poster.png", name: "poster.png" };
+    }
+    return null;
+  }),
+}));
+
 import { getFileSystem } from "../../types/filesystem";
+import * as attachmentResolver from "../attachmentResolver";
 import {
   inlineExportImageSource,
   prepareExportImages,
+  resolveExportImageLocalPath,
   resolveLocalImageAbsolutePath,
+  waitForImages,
 } from "./images";
 
 describe("resolveLocalImageAbsolutePath", () => {
@@ -42,6 +61,34 @@ describe("resolveLocalImageAbsolutePath", () => {
         "/vault/notes/a.md",
       ),
     ).resolves.toBe("/vault/resources/poster.jpg");
+  });
+});
+
+describe("resolveExportImageLocalPath", () => {
+  const attachmentContext = {
+    files: [],
+    rootFolderPath: "/vault",
+  };
+
+  it("resolves vault resource paths through attachmentResolver like preview", async () => {
+    await expect(
+      resolveExportImageLocalPath(
+        "resources/poster.png",
+        "/vault/notes/a.md",
+        attachmentContext,
+      ),
+    ).resolves.toBe("/vault/resources/poster.png");
+    expect(attachmentResolver.resolveAttachmentTarget).toHaveBeenCalled();
+  });
+
+  it("falls back to note-relative paths when attachmentResolver misses", async () => {
+    await expect(
+      resolveExportImageLocalPath(
+        "img/local.png",
+        "/vault/notes/a.md",
+        attachmentContext,
+      ),
+    ).resolves.toBe("/vault/notes/img/local.png");
   });
 });
 
@@ -111,10 +158,43 @@ describe("prepareExportImages", () => {
       />
     `;
 
-    await prepareExportImages(host, "/vault/notes/a.md");
+    await prepareExportImages(host, "/vault/notes/a.md", {
+      files: [],
+      rootFolderPath: "/vault",
+    });
 
     const img = host.querySelector("img") as HTMLImageElement;
     expect(img.getAttribute("src")).toMatch(/^data:/);
     expect(img.getAttribute("crossorigin")).toBeNull();
+  });
+
+  it("inlines markdown images resolved via attachmentContext", async () => {
+    const host = document.createElement("div");
+    host.innerHTML = `<img src="resources/poster.png" alt="poster" />`;
+
+    await prepareExportImages(host, "/vault/notes/a.md", {
+      files: [],
+      rootFolderPath: "/vault",
+    });
+
+    const img = host.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toMatch(/^data:/);
+    expect(readBinaryFile).toHaveBeenCalledWith("/vault/resources/poster.png");
+  });
+});
+
+describe("waitForImages", () => {
+  it("times out instead of waiting forever for images that never load", async () => {
+    vi.useFakeTimers();
+    const host = document.createElement("div");
+    host.innerHTML = '<img src="https://example.invalid/missing.png" />';
+    document.body.appendChild(host);
+
+    const pending = waitForImages(host, 1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(pending).resolves.toBeUndefined();
+
+    vi.useRealTimers();
+    host.remove();
   });
 });

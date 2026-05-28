@@ -1,10 +1,17 @@
-import type { FontSettings } from '../fontSettings';
-import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
-import type { MarkdownStylePreset } from '../../types';
+import type { FileNode } from "../../types";
+import type { FontSettings } from "../fontSettings";
+import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
+import type { MarkdownStylePreset } from "../../types";
+
+/** Vault file tree context for resolving wiki embeds and attachment paths during export. */
+export type ExportAttachmentContext = {
+  files: FileNode[];
+  rootFolderPath: string | null;
+};
 
 export interface ExportOptions {
   title?: string;
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
   includeTOC?: boolean;
   fontFamily?: string;
   codeFontFamily?: string;

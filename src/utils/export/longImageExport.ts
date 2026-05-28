@@ -1,22 +1,33 @@
-import { saveExportFile } from './core';
-import type { ExportAttachmentContext } from './attachments';
+import { saveExportFile } from "./core";
+import type { ExportAttachmentContext } from "./types";
 import {
+  EXPORT_HTML2CANVAS_TIMEOUT_MS,
+  buildHtml2CanvasRasterOptions,
   computeSafeLongImageRenderScale,
   disposeExportRasterHost,
   mountExportHtmlForRasterization,
   prepareExportRenderTargetForRasterization,
+  restoreExportRasterHostStyles,
+  revealExportRasterHostForCapture,
+  withExportTimeout,
   yieldToEventLoopForRasterCapture,
-} from './exportRasterHost';
-import { waitForNextPaint } from './images';
+} from "./exportRasterHost";
+import { waitForNextPaint } from "./images";
 
 export async function rasterizeExportHtmlToPngBlob(
   htmlContent: string,
   sourceFilePath?: string,
   attachmentContext?: ExportAttachmentContext | null,
 ): Promise<Blob> {
-  const { host, renderTarget, theme, backgroundColor } = mountExportHtmlForRasterization(htmlContent);
+  const { host, renderTarget, theme, backgroundColor } =
+    mountExportHtmlForRasterization(htmlContent);
   try {
-    await prepareExportRenderTargetForRasterization(renderTarget, theme, sourceFilePath, attachmentContext);
+    await prepareExportRenderTargetForRasterization(
+      renderTarget,
+      theme,
+      sourceFilePath,
+      attachmentContext,
+    );
 
     const safeScale = computeSafeLongImageRenderScale(
       renderTarget.scrollWidth,
@@ -25,43 +36,36 @@ export async function rasterizeExportHtmlToPngBlob(
 
     await yieldToEventLoopForRasterCapture();
 
-    // html2canvas treats nodes under opacity:0 / visibility:hidden as unpaintable
-    // (see element-stack visibility gate in html2canvas). The off-screen host uses
-    // those styles so the user never sees a layout flash; restore them after capture.
-    const prevVisibility = host.style.visibility;
-    const prevOpacity = host.style.opacity;
-    host.style.visibility = 'visible';
-    host.style.opacity = '1';
+    const hostStyleSnapshot = revealExportRasterHostForCapture(host);
     await waitForNextPaint(2);
 
-    const { default: html2canvas } = await import('html2canvas');
+    const { default: html2canvas } = await import("html2canvas");
     let canvas: HTMLCanvasElement;
     try {
-      canvas = await html2canvas(renderTarget, {
-        scale: safeScale,
-        useCORS: true,
-        backgroundColor,
-        windowWidth: renderTarget.scrollWidth,
-        scrollX: 0,
-        scrollY: 0,
-        logging: false,
-      });
+      canvas = await withExportTimeout(
+        html2canvas(
+          renderTarget,
+          buildHtml2CanvasRasterOptions({
+            scale: safeScale,
+            backgroundColor,
+            renderTarget,
+          }) as Parameters<typeof html2canvas>[1],
+        ),
+        EXPORT_HTML2CANVAS_TIMEOUT_MS,
+        "Long image export timed out while rasterizing HTML",
+      );
     } finally {
-      host.style.visibility = prevVisibility;
-      host.style.opacity = prevOpacity;
+      restoreExportRasterHostStyles(host, hostStyleSnapshot);
     }
 
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (b) => {
-          if (b) {
-            resolve(b);
-          } else {
-            reject(new Error('Long image export failed: empty PNG blob'));
-          }
-        },
-        'image/png',
-      );
+      canvas.toBlob((b) => {
+        if (b) {
+          resolve(b);
+        } else {
+          reject(new Error("Long image export failed: empty PNG blob"));
+        }
+      }, "image/png");
     });
     return blob;
   } finally {
@@ -75,13 +79,17 @@ export async function exportLongImagePng(
   sourceFilePath?: string,
   attachmentContext?: ExportAttachmentContext | null,
 ): Promise<string | null> {
-  const blob = await rasterizeExportHtmlToPngBlob(htmlContent, sourceFilePath, attachmentContext);
+  const blob = await rasterizeExportHtmlToPngBlob(
+    htmlContent,
+    sourceFilePath,
+    attachmentContext,
+  );
   const arrayBuffer = await blob.arrayBuffer();
   return saveExportFile({
     content: new Uint8Array(arrayBuffer),
     filename,
-    defaultExtension: '.png',
-    mimeType: 'image/png',
-    description: 'PNG Image',
+    defaultExtension: ".png",
+    mimeType: "image/png",
+    description: "PNG Image",
   });
 }

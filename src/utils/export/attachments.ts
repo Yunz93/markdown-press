@@ -1,11 +1,10 @@
-import type { FileNode } from "../../types";
 import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
 } from "../attachmentResolver";
 import { parseWikiLinkReference } from "../wikiLinks";
 import { renderMermaidDiagrams } from "../markdown-extensions";
-import { PREVIEW_PANEL_WIDTH_PX } from "./types";
+import { PREVIEW_PANEL_WIDTH_PX, type ExportAttachmentContext } from "./types";
 import {
   prepareExportImages,
   waitForImages,
@@ -13,11 +12,7 @@ import {
   isImageAttachmentName,
 } from "./images";
 
-/** Vault context so wiki-style image embeds resolve the same way as in preview (not only beside the note). */
-export type ExportAttachmentContext = {
-  files: FileNode[];
-  rootFolderPath: string | null;
-};
+export type { ExportAttachmentContext } from "./types";
 
 export async function enhanceExportAttachmentEmbeds(
   container: HTMLElement,
@@ -122,7 +117,7 @@ export async function prepareHtmlForDownload(
       sourceFilePath,
       attachmentContext,
     );
-    await prepareExportImages(renderTarget, sourceFilePath);
+    await prepareExportImages(renderTarget, sourceFilePath, attachmentContext);
     await renderMermaidDiagrams(renderTarget, {
       themeMode: theme === "dark" ? "dark" : "light",
     });

@@ -1,4 +1,9 @@
 import { getFileSystem, isTauriEnvironment } from "../../types/filesystem";
+import {
+  createAttachmentResolverContext,
+  resolveAttachmentTarget,
+} from "../attachmentResolver";
+import type { ExportAttachmentContext } from "./types";
 
 export function hasUrlScheme(value: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(value);
@@ -176,6 +181,43 @@ export async function resolveLocalImageAbsolutePath(
   return `${baseDir}/${trimmedSrc.replace(/\\/g, "/")}`.replace(/\/+/g, "/");
 }
 
+export async function resolveExportImageLocalPath(
+  src: string,
+  sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
+): Promise<string | null> {
+  const trimmedSrc = decodeLocalImageSource(src.trim());
+  if (
+    !trimmedSrc ||
+    trimmedSrc.startsWith("data:") ||
+    trimmedSrc.startsWith("blob:")
+  ) {
+    return null;
+  }
+
+  if (isRemoteHttpUrl(trimmedSrc) || trimmedSrc.startsWith("//")) {
+    return null;
+  }
+
+  if (trimmedSrc.startsWith("asset:") || trimmedSrc.startsWith("tauri:")) {
+    return null;
+  }
+
+  if (!hasUrlScheme(trimmedSrc) && sourceFilePath && attachmentContext) {
+    const resolverContext = createAttachmentResolverContext(
+      attachmentContext.files,
+      attachmentContext.rootFolderPath,
+      sourceFilePath,
+    );
+    const resolved = await resolveAttachmentTarget(resolverContext, trimmedSrc);
+    if (resolved?.path) {
+      return resolved.path;
+    }
+  }
+
+  return resolveLocalImageAbsolutePath(trimmedSrc, sourceFilePath);
+}
+
 export async function resolveImageSource(
   src: string,
   sourceFilePath?: string,
@@ -229,8 +271,13 @@ export async function resolveImageSource(
 export async function inlineExportImageSource(
   rawSrc: string,
   sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
 ): Promise<string> {
-  const localPath = await resolveLocalImageAbsolutePath(rawSrc, sourceFilePath);
+  const localPath = await resolveExportImageLocalPath(
+    rawSrc,
+    sourceFilePath,
+    attachmentContext,
+  );
   if (localPath) {
     return inlineLocalImageFile(localPath);
   }
@@ -246,6 +293,7 @@ export async function inlineExportImageSource(
 export async function prepareExportImages(
   container: HTMLElement,
   sourceFilePath?: string,
+  attachmentContext?: ExportAttachmentContext | null,
 ): Promise<void> {
   const images = Array.from(container.querySelectorAll("img"));
   await Promise.all(
@@ -261,6 +309,7 @@ export async function prepareExportImages(
         exportSrc = await inlineExportImageSource(
           inlineCandidate,
           sourceFilePath,
+          attachmentContext,
         );
       } catch (error) {
         const resolvedSrc = await resolveImageSource(
@@ -298,7 +347,10 @@ export async function prepareExportImages(
   );
 }
 
-export async function waitForImages(container: HTMLElement): Promise<void> {
+export async function waitForImages(
+  container: HTMLElement,
+  timeoutMs = 12_000,
+): Promise<void> {
   const images = Array.from(container.querySelectorAll("img"));
   const pendingImages = images.filter((image) => !image.complete);
 
@@ -310,8 +362,15 @@ export async function waitForImages(container: HTMLElement): Promise<void> {
     pendingImages.map(
       (image) =>
         new Promise<void>((resolve) => {
-          image.addEventListener("load", () => resolve(), { once: true });
-          image.addEventListener("error", () => resolve(), { once: true });
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+          };
+          image.addEventListener("load", finish, { once: true });
+          image.addEventListener("error", finish, { once: true });
+          window.setTimeout(finish, timeoutMs);
         }),
     ),
   );

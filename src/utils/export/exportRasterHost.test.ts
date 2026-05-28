@@ -1,0 +1,119 @@
+/** @vitest-environment happy-dom */
+
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  EXPORT_RASTER_HOST_CLASS,
+  EXPORT_RASTER_STYLE_ID,
+  buildHtml2CanvasRasterOptions,
+  disposeAllExportRasterArtifacts,
+  disposeExportRasterHost,
+  mountExportHtmlForRasterization,
+  restoreExportRasterHostStyles,
+  revealExportRasterHostForCapture,
+} from "./exportRasterHost";
+
+describe("mountExportHtmlForRasterization", () => {
+  afterEach(() => {
+    document.getElementById(EXPORT_RASTER_STYLE_ID)?.remove();
+    document.body.innerHTML = "";
+  });
+
+  it("injects export CSS into document.head for html2canvas", () => {
+    const html = `<!DOCTYPE html><html data-theme="light"><head><style>
+      .export-document .markdown-body { color: #112233; }
+    </style></head><body><div class="export-document"><article class="markdown-body"><p>Hi</p></article></div></body></html>`;
+
+    const { host } = mountExportHtmlForRasterization(html);
+    const styleElement = document.getElementById(EXPORT_RASTER_STYLE_ID);
+
+    expect(styleElement?.textContent).toContain("color: #112233");
+    expect(host.querySelector("style")).toBeNull();
+
+    disposeExportRasterHost(host);
+    expect(document.getElementById(EXPORT_RASTER_STYLE_ID)).toBeNull();
+  });
+
+  it("keeps the raster host in-viewport instead of far off-screen offsets", () => {
+    const html = `<!DOCTYPE html><html data-theme="light"><head><style></style></head><body><div class="export-document"><p>Hi</p></div></body></html>`;
+    const { host } = mountExportHtmlForRasterization(html);
+
+    expect(host.className).toBe(EXPORT_RASTER_HOST_CLASS);
+    expect(host.style.left).toBe("0px");
+    expect(host.style.top).toBe("0px");
+    expect(host.style.visibility).toBe("visible");
+    expect(Number.parseFloat(host.style.opacity)).toBeCloseTo(0.01, 5);
+
+    disposeExportRasterHost(host);
+  });
+});
+
+describe("revealExportRasterHostForCapture", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("restores host styles after capture", () => {
+    const host = document.createElement("div");
+    host.style.left = "0";
+    host.style.top = "0";
+    host.style.opacity = "0.01";
+    host.style.visibility = "visible";
+    host.style.zIndex = "-1";
+    document.body.appendChild(host);
+
+    const snapshot = revealExportRasterHostForCapture(host);
+    expect(host.style.opacity).toBe("1");
+    expect(host.style.zIndex).toBe("-1");
+
+    restoreExportRasterHostStyles(host, snapshot);
+    expect(host.style.opacity).toBe("0.01");
+  });
+});
+
+describe("buildHtml2CanvasRasterOptions", () => {
+  it("includes explicit canvas and window dimensions", () => {
+    const renderTarget = document.createElement("div");
+    Object.defineProperty(renderTarget, "scrollWidth", {
+      value: 832,
+      configurable: true,
+    });
+    Object.defineProperty(renderTarget, "scrollHeight", {
+      value: 4200,
+      configurable: true,
+    });
+
+    expect(
+      buildHtml2CanvasRasterOptions({
+        scale: 2,
+        backgroundColor: "#ffffff",
+        renderTarget,
+      }),
+    ).toMatchObject({
+      width: 832,
+      height: 4200,
+      windowWidth: 832,
+      windowHeight: 4200,
+    });
+  });
+});
+
+describe("disposeAllExportRasterArtifacts", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("removes stale raster hosts and injected export styles", () => {
+    const style = document.createElement("style");
+    style.id = EXPORT_RASTER_STYLE_ID;
+    document.head.appendChild(style);
+
+    const host = document.createElement("div");
+    host.className = EXPORT_RASTER_HOST_CLASS;
+    document.body.appendChild(host);
+
+    disposeAllExportRasterArtifacts();
+
+    expect(document.getElementById(EXPORT_RASTER_STYLE_ID)).toBeNull();
+    expect(document.querySelector(`.${EXPORT_RASTER_HOST_CLASS}`)).toBeNull();
+  });
+});
