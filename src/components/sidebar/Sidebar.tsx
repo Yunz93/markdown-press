@@ -475,7 +475,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                       className="flex w-full min-w-0 items-start justify-between gap-3 text-left"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        <div
+                          className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100"
+                          title={file.name.replace(/\.md$/i, '')}
+                        >
                           {highlightSearchText(file.name.replace(/\.md$/i, ''), searchQuery)}
                         </div>
                         <div

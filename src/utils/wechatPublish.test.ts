@@ -60,4 +60,25 @@ describe('prepareWechatDraftPublish', () => {
     expect(prepared.contentHtml).toContain('color: #1f6f6d');
     expect(prepared.contentHtml).toContain('color: #255f5d');
   });
+
+  it('keeps markdown links as WeChat-compatible hyperlinks', async () => {
+    const prepared = await prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: '/notes/link-post.md',
+      markdownContent: '[OpenAI](https://openai.com/)',
+      settings: {
+        previewFontFamily: 'Arial',
+        codeFontFamily: 'Menlo',
+        fontSize: 16,
+        markdownStylePreset: 'nord',
+      },
+    });
+
+    expect(prepared.contentHtml).toContain('href="https://openai.com/"');
+    expect(prepared.contentHtml).toContain('target="_blank"');
+    expect(prepared.contentHtml).toContain('data-linktype="2"');
+    expect(prepared.contentHtml).toContain('linktype="text"');
+    expect(prepared.contentHtml).toContain('tab="outerlink"');
+    expect(prepared.contentHtml).toContain('textvalue="OpenAI"');
+  });
 });

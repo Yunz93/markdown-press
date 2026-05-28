@@ -80,7 +80,10 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
           {fileName ? (
             <>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm md:text-base">
+                <span
+                  className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm md:text-base"
+                  title={displayFileName}
+                >
                   {displayFileName}
                 </span>
                 {isSaving && (

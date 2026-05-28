@@ -107,6 +107,26 @@ function isRemoteImageSource(value: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(value) || value.startsWith('//');
 }
 
+function isWechatPublishableHref(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function resolveWechatLinkTab(value: string): 'innerlink' | 'outerlink' {
+  try {
+    const url = new URL(value);
+    return url.hostname === 'mp.weixin.qq.com' || url.hostname.endsWith('.mp.weixin.qq.com')
+      ? 'innerlink'
+      : 'outerlink';
+  } catch {
+    return 'outerlink';
+  }
+}
+
 function isImagePath(value: string): boolean {
   return IMAGE_FILE_PATTERN.test(value);
 }
@@ -179,6 +199,18 @@ function applyWechatPreviewStyles(
   });
 
   host.querySelectorAll<HTMLAnchorElement>('a').forEach((link) => {
+    const href = link.getAttribute('href')?.trim() || '';
+    if (isWechatPublishableHref(href)) {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('data-linktype', '2');
+      link.setAttribute('linktype', 'text');
+      link.setAttribute('tab', resolveWechatLinkTab(href));
+      const textValue = link.textContent?.trim();
+      if (textValue) {
+        link.setAttribute('textvalue', textValue);
+      }
+    }
+
     setInlineStyle(link, {
       color: tokens.link,
       'text-decoration': 'underline',

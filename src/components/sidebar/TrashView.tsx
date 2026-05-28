@@ -55,7 +55,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
                 <FileTypeIcon fileName={node.name} className="h-3.5 w-3.5" size={14} />
               )}
             </span>
-            <span className="truncate flex-1">{node.name}</span>
+            <span className="truncate flex-1" title={node.name}>{node.name}</span>
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
             <button

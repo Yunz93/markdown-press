@@ -206,11 +206,13 @@ export const TabBar: React.FC<TabBarProps> = React.memo(({ onToggleSidebar }) =>
                 handleTabClick(fileId);
               }}
               onContextMenu={(event) => handleTabContextMenu(event, fileId)}
-              title={file.path}
             >
               <div className="tab-surface">
                 <span className="tab-side-spacer" aria-hidden />
-                <span className="tab-title truncate text-xs font-medium">
+                <span
+                  className="tab-title truncate text-xs font-medium"
+                  title={getDisplayFileName(file.name)}
+                >
                   {getDisplayFileName(file.name)}
                 </span>
                 <span className="tab-actions">

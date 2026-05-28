@@ -125,6 +125,9 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
 
   const isActive = node.id === activeId;
   const isInLocatedPath = Boolean(expandedPathIds?.has(node.id));
+  const displayName = node.type === 'file'
+    ? node.name.replace(/\.md$/i, '')
+    : node.name;
 
   useEffect(() => {
     if (locateRequestKey <= 0 || !isFolder || !isInLocatedPath) return;
@@ -163,6 +166,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
         onDragEnd={handleDragEnd}
         onClick={handleClick}
         onContextMenu={handleRightClick}
+        title={displayName}
       >
         <span className={`mr-2.5 transition-colors ${isActive ? 'text-accent-DEFAULT' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`}>
           {isFolder ? (
@@ -179,7 +183,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
             <FileTypeIcon fileName={node.name} className="w-4 h-4" size={16} />
           )}
         </span>
-        <span className="truncate flex-1">{node.name.replace('.md', '')}</span>
+        <span className="truncate flex-1">{displayName}</span>
         {isFolder && (
           <span className="ml-auto opacity-30 group-hover:opacity-100 transition-opacity">
             {expanded ? (
