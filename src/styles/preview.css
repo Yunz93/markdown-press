@@ -41,8 +41,10 @@
 }
 
 .preview-pane-properties-multi-value {
-  display: grid;
-  gap: 0.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
   padding: 0;
   border: none;
   background: transparent;
@@ -50,16 +52,23 @@
 }
 
 .preview-pane-properties-multi-value-item {
-  display: block;
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
-  padding: 0.1rem 0;
-  line-height: 1.72;
+  padding: 0.12rem 0.5rem;
+  line-height: 1.35;
+  border-radius: 0.45rem;
+  background: var(--mp-doc-tag-bg, rgba(148, 163, 184, 0.18));
+  color: var(--mp-doc-tag-text, #475569);
+  border: 1px solid var(--mp-doc-tag-border, rgba(148, 163, 184, 0.24));
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .preview-pane-properties-multi-value-item.is-empty {
   color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.16);
 }
 
 .preview-pane-properties-multi-value:focus-visible {
@@ -70,6 +79,8 @@
 
 .dark .preview-pane-properties-multi-value-item.is-empty {
   color: #64748b;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .preview-pane-sheet {
