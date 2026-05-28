@@ -108,7 +108,7 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
 
       {notification && (
         <div
-          className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-50 animate-fade-in border glass ${
+          className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-[250] animate-fade-in border glass ${
             notification.type === "success"
               ? "text-green-600 border-green-100 dark:border-green-900"
               : "text-red-500 border-red-100 dark:border-red-900"
