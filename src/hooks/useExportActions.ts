@@ -375,10 +375,6 @@ export function useExportActions(
       const latestFiles = storeState.files;
       const latestRootFolderPath = storeState.rootFolderPath;
 
-      console.log("[publish] rootFolderPath:", latestRootFolderPath);
-      console.log("[publish] currentFilePath:", activeFile.path);
-      console.log("[publish] file tree entries:", latestFiles.length);
-
       const hostingResult = await replaceLocalImagesWithHostingForPublish(
         contentToPublish,
         {

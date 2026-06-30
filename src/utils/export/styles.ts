@@ -1,6 +1,7 @@
 import katexCss from "katex/dist/katex.min.css?inline";
 import githubMarkdownCss from "github-markdown-css/github-markdown.css?inline";
 import { escapeHtml } from "./core";
+import { flattenHeadingNodes, parseHeadings } from "../outline";
 import { PREVIEW_PANEL_WIDTH_PX } from "./types";
 import {
   buildDynamicFontFaceCss,
@@ -725,24 +726,15 @@ export function buildExportDocument(
 }
 
 export function generateTOC(content: string): string {
-  const headings: { level: number; text: string; id: string }[] = [];
-  const headingRegex = /^(#{1,6})\s+(.+)$/gm;
-  let match;
-
-  while ((match = headingRegex.exec(content)) !== null) {
-    const level = match[1].length;
-    const text = match[2].trim();
-    const id = text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    headings.push({ level, text, id });
-  }
+  // Reuse the same heading parser/slugger as the preview/outline so that the
+  // anchor ids match injectExportHeadingIds() — including CJK headings, which
+  // the previous ASCII-only slug regex would collapse to empty.
+  const headings = flattenHeadingNodes(parseHeadings(content));
 
   if (headings.length === 0) return "";
 
   let toc = '<div class="toc">\n<h2>Table of Contents</h2>\n<ul>\n';
-  let lastLevel = 1;
+  let lastLevel = headings[0].level;
 
   for (const heading of headings) {
     const { level, text, id } = heading;
@@ -755,7 +747,7 @@ export function generateTOC(content: string): string {
       toc += "</li>\n";
     }
 
-    toc += `<li><a href="#${id}">${text}</a>`;
+    toc += `<li><a href="#${id}">${escapeHtml(text)}</a>`;
     lastLevel = level;
   }
 
@@ -763,4 +755,28 @@ export function generateTOC(content: string): string {
   toc += "</div>\n";
 
   return toc;
+}
+
+/**
+ * Inject `id` attributes onto rendered heading elements so that the table of
+ * contents anchors resolve. Headings in the rendered HTML appear in the same
+ * order as parseHeadings() produces, so we can align them by index (mirrors
+ * applyPreviewHeadingAttributes() used in the live preview).
+ */
+export function injectExportHeadingIds(html: string, content: string): string {
+  const headings = flattenHeadingNodes(parseHeadings(content));
+  if (headings.length === 0) return html;
+
+  let index = 0;
+  return html.replace(
+    /<h([1-6])\b([^>]*)>/gi,
+    (match, level: string, attrs: string) => {
+      const heading = headings[index];
+      index += 1;
+      if (!heading || /\sid\s*=/.test(attrs)) {
+        return match;
+      }
+      return `<h${level}${attrs} id="${escapeHtml(heading.id)}">`;
+    },
+  );
 }

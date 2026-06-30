@@ -78,15 +78,6 @@ export interface PreviewPaneHandle {
   scrollToTop: () => void;
 }
 
-function syncPreviewContainerScroll(
-  element: HTMLElement,
-  percentage: number,
-): void {
-  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-  if (maxScrollTop <= 0) return;
-  element.scrollTop = maxScrollTop * Math.min(Math.max(percentage, 0), 1);
-}
-
 // Helper functions
 function isExternalLink(href: string): boolean {
   return /^(https?:|mailto:|tel:)/i.test(href.trim());

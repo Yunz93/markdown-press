@@ -21,6 +21,7 @@ export {
   buildExportFontFaceCss,
   renderProperties,
   generateTOC,
+  injectExportHeadingIds,
 } from "./styles";
 
 // Export HTML export

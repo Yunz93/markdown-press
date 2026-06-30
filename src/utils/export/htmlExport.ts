@@ -1,25 +1,32 @@
-import { renderMarkdown } from '../markdown';
-import { parseFrontmatter } from '../frontmatter';
-import { buildCodeExportFontFamily, buildPreviewExportFontFamily } from '../fontSettings';
-import { getKatexRenderMode } from '../markdown-extensions';
-import type { ExportOptions } from './types';
+import { renderMarkdown } from "../markdown";
+import { parseFrontmatter } from "../frontmatter";
+import {
+  buildCodeExportFontFamily,
+  buildPreviewExportFontFamily,
+} from "../fontSettings";
+import { getKatexRenderMode } from "../markdown-extensions";
+import type { ExportOptions } from "./types";
 import {
   buildExportStyles,
   buildExportDocument,
   buildExportFontFaceCss,
   renderProperties,
   generateTOC,
-} from './styles';
-import { saveExportFile } from './core';
-import { prepareHtmlForDownload, type ExportAttachmentContext } from './attachments';
+  injectExportHeadingIds,
+} from "./styles";
+import { saveExportFile } from "./core";
+import {
+  prepareHtmlForDownload,
+  type ExportAttachmentContext,
+} from "./attachments";
 
 export async function exportToHtml(
   content: string,
-  options: ExportOptions = {}
+  options: ExportOptions = {},
 ): Promise<string> {
   const {
-    title = 'Exported Document',
-    theme = 'light',
+    title = "Exported Document",
+    theme = "light",
     includeTOC = false,
     fontFamily,
     codeFontFamily,
@@ -28,17 +35,29 @@ export async function exportToHtml(
     codeFontSize,
     includeProperties = true,
     highlighter,
-    markdownStylePreset = 'nord',
+    markdownStylePreset = "nord",
   } = options;
 
   const { frontmatter, body } = parseFrontmatter(content);
-  const htmlContent = renderMarkdown(body, { highlighter, markdownStylePreset, themeMode: theme });
+  const renderedContent = renderMarkdown(body, {
+    highlighter,
+    markdownStylePreset,
+    themeMode: theme,
+  });
   const katexRenderMode = getKatexRenderMode();
 
-  // Generate table of contents if requested
-  const toc = includeTOC ? generateTOC(body) : '';
-  const resolvedFontFamily = fontFamily || (fontSettings ? buildPreviewExportFontFamily(fontSettings) : undefined);
-  const resolvedCodeFontFamily = codeFontFamily || (fontSettings ? buildCodeExportFontFamily(fontSettings) : undefined);
+  // Generate table of contents if requested. When enabled, bake matching
+  // heading ids into the rendered HTML so the anchors resolve.
+  const toc = includeTOC ? generateTOC(body) : "";
+  const htmlContent = includeTOC
+    ? injectExportHeadingIds(renderedContent, body)
+    : renderedContent;
+  const resolvedFontFamily =
+    fontFamily ||
+    (fontSettings ? buildPreviewExportFontFamily(fontSettings) : undefined);
+  const resolvedCodeFontFamily =
+    codeFontFamily ||
+    (fontSettings ? buildCodeExportFontFamily(fontSettings) : undefined);
   const fontFaceCss = await buildExportFontFaceCss(fontSettings);
   const styles = buildExportStyles(
     theme,
@@ -49,7 +68,7 @@ export async function exportToHtml(
     codeFontSize,
     markdownStylePreset,
   );
-  const propertiesHtml = includeProperties ? renderProperties(frontmatter) : '';
+  const propertiesHtml = includeProperties ? renderProperties(frontmatter) : "";
   const documentMarkup = buildExportDocument(
     `${propertiesHtml}<article class="markdown-body" data-markdown-style="${markdownStylePreset}">${htmlContent}</article>`,
     toc,
@@ -58,7 +77,7 @@ export async function exportToHtml(
   );
 
   const html = `<!DOCTYPE html>
-	<html lang="en" data-theme="${theme}" class="${theme === 'dark' ? 'dark' : ''}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ''}>
+	<html lang="en" data-theme="${theme}" class="${theme === "dark" ? "dark" : ""}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ""}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -82,10 +101,14 @@ export async function downloadHtml(
   attachmentContext?: ExportAttachmentContext | null,
 ): Promise<string | null> {
   return saveExportFile({
-    content: await prepareHtmlForDownload(htmlContent, sourceFilePath, attachmentContext),
+    content: await prepareHtmlForDownload(
+      htmlContent,
+      sourceFilePath,
+      attachmentContext,
+    ),
     filename,
-    defaultExtension: '.html',
-    mimeType: 'text/html;charset=utf-8',
-    description: 'HTML Document',
+    defaultExtension: ".html",
+    mimeType: "text/html;charset=utf-8",
+    description: "HTML Document",
   });
 }
