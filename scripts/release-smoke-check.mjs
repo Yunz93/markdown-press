@@ -91,6 +91,27 @@ function assertReleaseWorkflowConfig() {
     );
     process.exit(1);
   }
+
+  if (!workflow.includes("scripts/import-apple-certificate.sh")) {
+    console.error(
+      "release.yml must import Apple Developer certificates via scripts/import-apple-certificate.sh for macOS signing.",
+    );
+    process.exit(1);
+  }
+
+  if (workflow.includes('APPLE_SIGNING_IDENTITY: "-"')) {
+    console.error(
+      'release.yml must not hardcode APPLE_SIGNING_IDENTITY to ad-hoc "-"; use conditional signing when APPLE_CERTIFICATE is configured.',
+    );
+    process.exit(1);
+  }
+
+  if (!workflow.includes("scripts/prepare-apple-notarization.mjs")) {
+    console.error(
+      "release.yml must prepare App Store Connect API credentials via scripts/prepare-apple-notarization.mjs.",
+    );
+    process.exit(1);
+  }
 }
 
 function assertReleaseDistOutput() {

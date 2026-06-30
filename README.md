@@ -14,13 +14,17 @@
 
 ### macOS
 
-未签名应用可能被拦截。将 `M記.app` 放入「应用程序」后执行：
+GitHub Release 在配置 Apple 开发者证书与公证凭据后会进行签名与公证，通常可直接拖入「应用程序」打开。
+
+若系统仍提示无法验证开发者，将 `M記.app` 放入「应用程序」后执行：
 
 ```bash
 xattr -cr /Applications/M記.app
 ```
 
 若仍在「下载」中，把路径换成 `~/Downloads/M記.app`。
+
+证书与公证配置见 [开发文档 - macOS 签名公证](./docs/DEVELOPMENT.md#macos-签名与公证)。
 
 ### Windows
 
@@ -38,19 +42,19 @@ xattr -cr /Applications/M記.app
 
 默认键位；完整列表见 **Settings → Shortcuts**。
 
-| 快捷键 | 动作 |
-| --- | --- |
-| `Cmd/Ctrl + S` | 保存 |
-| `Cmd/Ctrl + 0` | 设置 |
-| `Cmd/Ctrl + 1` ~ `5` | 侧边栏 / Outline / 视图模式 / 主题 / AI 增强 |
-| `Cmd + Shift + F` | 当前文件搜索 |
-| `Cmd + Shift + S` | 侧边栏搜索 |
-| `Cmd + Shift + K` / `L` | 打开知识库 / 定位当前文件 |
-| `Cmd + Shift + H` | 导出 PDF |
-| `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹 |
-| `Cmd/Ctrl + W` | 关闭标签 |
-| `Cmd + Shift + -` | 清理未引用附件 |
-| `Escape` | 关闭搜索面板、弹窗或菜单 |
+| 快捷键                                  | 动作                                         |
+| --------------------------------------- | -------------------------------------------- |
+| `Cmd/Ctrl + S`                          | 保存                                         |
+| `Cmd/Ctrl + 0`                          | 设置                                         |
+| `Cmd/Ctrl + 1` ~ `5`                    | 侧边栏 / Outline / 视图模式 / 主题 / AI 增强 |
+| `Cmd + Shift + F`                       | 当前文件搜索                                 |
+| `Cmd + Shift + S`                       | 侧边栏搜索                                   |
+| `Cmd + Shift + K` / `L`                 | 打开知识库 / 定位当前文件                    |
+| `Cmd + Shift + H`                       | 导出 PDF                                     |
+| `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹                            |
+| `Cmd/Ctrl + W`                          | 关闭标签                                     |
+| `Cmd + Shift + -`                       | 清理未引用附件                               |
+| `Escape`                                | 关闭搜索面板、弹窗或菜单                     |
 
 ## 发布到 simple-blog
 
