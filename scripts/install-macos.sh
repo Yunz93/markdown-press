@@ -27,7 +27,6 @@ require_command() {
 [[ "$(uname -s)" == "Darwin" ]] || die "此脚本仅支持 macOS。"
 
 require_command curl
-require_command python3
 require_command hdiutil
 require_command ditto
 require_command xattr
@@ -49,48 +48,50 @@ cleanup() {
 }
 trap cleanup EXIT
 
+normalize_release_tag() {
+  local tag="${1:-}"
+  tag="${tag#"${tag%%[![:space:]]*}"}"
+  tag="${tag%"${tag##*[![:space:]]}"}"
+
+  if [[ -z "${tag}" ]]; then
+    tag="$(
+      curl -fsSL -o /dev/null -w '%{url_effective}' \
+        "https://github.com/${REPO}/releases/latest" \
+        | sed -E 's|.*/tag/||' \
+        | tr -d '\r\n'
+    )"
+  fi
+
+  [[ -n "${tag}" ]] || return 1
+  [[ "${tag}" == v* ]] || tag="v${tag}"
+  printf '%s' "${tag}"
+}
+
+build_asset_url() {
+  local tag="$1"
+  local version="${tag#v}"
+  printf 'https://github.com/%s/releases/download/%s/MarkdownPress_%s_%s.dmg' \
+    "${REPO}" "${tag}" "${version}" "${ASSET_ARCH}"
+}
+
+asset_url_exists() {
+  local url="$1"
+  local status
+  status="$(
+    curl -fsS -o /dev/null -w '%{http_code}' -L -I \
+      -H "User-Agent: markdown-press-installer" \
+      "${url}" 2>/dev/null || true
+  )"
+  [[ "${status}" == "200" || "${status}" == "302" ]]
+}
+
 resolve_asset_url() {
-  python3 - "${REPO}" "${ASSET_ARCH}" "${RELEASE_TAG:-}" <<'PY'
-import json
-import sys
-import urllib.error
-import urllib.request
+  local tag asset_url
 
-repo, arch, release_tag = sys.argv[1], sys.argv[2], sys.argv[3].strip()
-suffix = f"_{arch}.dmg"
-
-if release_tag:
-    if not release_tag.startswith("v"):
-        release_tag = f"v{release_tag}"
-    url = f"https://api.github.com/repos/{repo}/releases/tags/{release_tag}"
-else:
-    url = f"https://api.github.com/repos/{repo}/releases/latest"
-
-request = urllib.request.Request(
-    url,
-    headers={"Accept": "application/vnd.github+json", "User-Agent": "markdown-press-installer"},
-)
-
-try:
-    with urllib.request.urlopen(request, timeout=60) as response:
-        data = json.load(response)
-except urllib.error.HTTPError as error:
-    print(f"无法获取 Release 信息 (HTTP {error.code})", file=sys.stderr)
-    sys.exit(1)
-
-for asset in data.get("assets", []):
-    name = asset.get("name", "")
-    if name.endswith(suffix):
-        print(asset["browser_download_url"])
-        sys.exit(0)
-
-available = ", ".join(asset.get("name", "") for asset in data.get("assets", []))
-print(
-    f"未找到适用于 {arch} 的安装包 ({suffix})。当前 Release 资产: {available or '无'}",
-    file=sys.stderr,
-)
-sys.exit(2)
-PY
+  tag="$(normalize_release_tag "${RELEASE_TAG:-}")" || return 1
+  asset_url="$(build_asset_url "${tag}")"
+  asset_url_exists "${asset_url}" || return 1
+  printf '%s' "${asset_url}"
 }
 
 log "正在查询 ${REPO} 的最新 macOS 安装包 (${ASSET_ARCH})..."
@@ -98,12 +99,12 @@ if ! ASSET_URL="$(resolve_asset_url)"; then
   if [[ "${ASSET_ARCH}" == "x64" ]]; then
     die "未找到 Intel (x64) 版 macOS 安装包。当前 Release 可能仅提供 Apple Silicon (aarch64) 版本。"
   fi
-  die "未找到可用的 macOS 安装包。"
+  die "未找到可用的 macOS 安装包。可尝试手动下载: https://github.com/${REPO}/releases/latest"
 fi
 
 DMG_PATH="${TMP_DIR}/markdown-press.dmg"
 log "正在下载: ${ASSET_URL}"
-curl -fsSL -o "${DMG_PATH}" "${ASSET_URL}"
+curl -fsSL -o "${DMG_PATH}" -H "User-Agent: markdown-press-installer" "${ASSET_URL}"
 
 log "正在移除下载隔离标记..."
 xattr -cr "${DMG_PATH}" 2>/dev/null || true

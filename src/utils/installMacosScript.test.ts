@@ -12,6 +12,8 @@ describe("install-macos.sh", () => {
     expect(script).toContain('readonly REPO="Yunz93/markdown-press"');
     expect(script).toContain('readonly APP_NAME="M記"');
     expect(script).toContain("releases/latest");
+    expect(script).toContain("MarkdownPress_");
+    expect(script).not.toContain("api.github.com");
     expect(script).toContain('ASSET_ARCH="aarch64"');
     expect(script).toContain('ASSET_ARCH="x64"');
     expect(script).toContain("xattr -cr");
