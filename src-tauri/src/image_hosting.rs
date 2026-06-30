@@ -7,6 +7,8 @@ use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::url_encode::{percent_encode_component, percent_encode_path};
+
 const UPLOAD_CONNECT_TIMEOUT_SECS: u64 = 10;
 const UPLOAD_REQUEST_TIMEOUT_SECS: u64 = 60;
 
@@ -205,7 +207,7 @@ async fn github_get_existing_file_sha(
         owner,
         repo,
         encoded_path,
-        percent_encode_query_component(branch)
+        percent_encode_component(branch)
     );
 
     let response = client
@@ -662,42 +664,6 @@ fn hex_sha256(data: &[u8]) -> String {
 
 fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
-/// Encode a string for use in a query value (e.g. `?ref=` branch names with `/`).
-fn percent_encode_query_component(value: &str) -> String {
-    value
-        .as_bytes()
-        .iter()
-        .map(|&b| {
-            let c = b as char;
-            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
-                c.to_string()
-            } else {
-                format!("%{:02X}", b)
-            }
-        })
-        .collect()
-}
-
-fn percent_encode_path(path: &str) -> String {
-    path.split('/')
-        .map(|segment| {
-            segment
-                .as_bytes()
-                .iter()
-                .map(|&b| {
-                    let c = b as char;
-                    if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
-                        (c as char).to_string()
-                    } else {
-                        format!("%{:02X}", b)
-                    }
-                })
-                .collect::<String>()
-        })
-        .collect::<Vec<_>>()
-        .join("/")
 }
 
 // ─── Date/Time Helpers ──────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ mod publishing;
 mod sample_notes;
 mod secure_settings;
 mod system_fonts;
+mod url_encode;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use sample_notes::{CopySampleNotesResult, SAMPLE_NOTES_FOLDER_NAME};
