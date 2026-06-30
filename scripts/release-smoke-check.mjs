@@ -92,6 +92,13 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
+  if (!workflow.includes("scripts/install-macos.sh")) {
+    console.error(
+      "release.yml must document the macOS one-line install script scripts/install-macos.sh.",
+    );
+    process.exit(1);
+  }
+
   if (!workflow.includes("scripts/import-apple-certificate.sh")) {
     console.error(
       "release.yml must import Apple Developer certificates via scripts/import-apple-certificate.sh for macOS signing.",

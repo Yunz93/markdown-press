@@ -90,11 +90,13 @@ git push origin v0.1.1
 
 CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
 
+macOS 用户推荐使用一键安装脚本 `scripts/install-macos.sh`（自动下载 Release、执行 `xattr -cr` 并安装到 `/Applications`）。
+
 ### macOS 签名与公证
 
 macOS 从浏览器下载的应用必须通过 **Developer ID 签名 + Apple 公证（notarization）** 才能通过 Gatekeeper，否则会出现「无法验证开发者」或「已损坏」提示。
 
-Release 工作流会在 GitHub Secrets 齐全时自动完成签名与公证；未配置证书时回退到 ad-hoc 签名（需用户执行 `xattr -cr`）。
+Release 工作流会在 GitHub Secrets 齐全时自动完成签名与公证；未配置证书时回退到 ad-hoc 签名（需用户执行 `xattr -cr` 或使用一键安装脚本）。
 
 在仓库 Settings → Secrets and variables → Actions 中配置：
 

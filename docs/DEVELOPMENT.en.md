@@ -90,11 +90,13 @@ git push origin v0.1.1
 
 CI automatically syncs the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` to the tag, then runs the Tauri build and uploads to GitHub Releases.
 
+macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`.
+
 ### macOS signing & notarization
 
 Apps downloaded from the browser must be **Developer ID signed and notarized** to pass Gatekeeper. Otherwise macOS shows “cannot verify developer” or “damaged” warnings.
 
-The release workflow signs and notarizes automatically when the GitHub Secrets below are configured. Without them it falls back to ad-hoc signing and users must run `xattr -cr`.
+The release workflow signs and notarizes automatically when the GitHub Secrets below are configured. Without them it falls back to ad-hoc signing and users must run `xattr -cr` or use the one-line installer.
 
 Configure these in **Settings → Secrets and variables → Actions**:
 

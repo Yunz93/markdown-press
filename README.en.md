@@ -14,9 +14,21 @@ Grab the installer for your platform from [GitHub Releases](https://github.com/Y
 
 ### macOS
 
-Signed and notarized GitHub Releases should open normally after you drag **M記.app** into Applications.
+### macOS
 
-If Gatekeeper still blocks the app, run:
+**Recommended: one-line install** (downloads, clears quarantine, and copies to Applications):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+```
+
+Pin a release (optional):
+
+```bash
+RELEASE_TAG=v0.9.5 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+```
+
+Signed and notarized GitHub Releases should also open normally after you drag **M記.app** into Applications. If Gatekeeper still blocks the app, run:
 
 ```bash
 xattr -cr /Applications/M記.app
