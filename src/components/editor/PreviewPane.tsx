@@ -33,6 +33,8 @@ import {
 } from "./hooks";
 import {
   getLocalPreviewLinkTarget,
+  getPreviewFileType,
+  isImageAttachment,
   isLocalPreviewLinkHref,
 } from "./preview/previewMedia";
 import { mountPdfPreview } from "../../utils/pdfPreview";
@@ -90,38 +92,6 @@ function isValidExternalUrl(href: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isImageAttachment(fileName: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
-}
-
-function isMarkdownNote(fileName: string): boolean {
-  return /\.(md|markdown)$/i.test(fileName);
-}
-
-function isPdfAttachment(fileName: string): boolean {
-  return /\.pdf$/i.test(fileName);
-}
-
-function isVideoAttachment(fileName: string): boolean {
-  return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
-}
-
-function isHtmlDocument(fileName: string): boolean {
-  return /\.html?$/i.test(fileName);
-}
-
-function getPreviewFileType(
-  filePath: string | null | undefined,
-): "markdown" | "image" | "video" | "pdf" | "html" | "unsupported" {
-  if (!filePath) return "markdown";
-  if (isImageAttachment(filePath)) return "image";
-  if (isVideoAttachment(filePath)) return "video";
-  if (isPdfAttachment(filePath)) return "pdf";
-  if (isHtmlDocument(filePath)) return "html";
-  if (isMarkdownNote(filePath)) return "markdown";
-  return "unsupported";
 }
 
 type FrontmatterValue = Frontmatter[keyof Frontmatter];
