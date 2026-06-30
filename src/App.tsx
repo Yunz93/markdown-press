@@ -27,6 +27,7 @@ import { OutlinePanel } from "./components/outline/OutlinePanel";
 import { ContentSearch } from "./components/search/ContentSearch";
 import { TabBar } from "./components/tabs/TabBar";
 import { useExportActions } from "./hooks/useExportActions";
+import { usePublishActions } from "./hooks/usePublishActions";
 import { ViewMode } from "./types";
 import { focusEditorRangeByOffset } from "./utils/editorSelectionBridge";
 import { requestPreviewHeadingScroll } from "./utils/previewNavigationBridge";
@@ -140,12 +141,10 @@ const App: React.FC = () => {
   });
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
-  const {
-    handleExportToPdf,
-    buildLongImageSharePayload,
-    handlePublishSimpleBlog,
-    handlePublishWechatDraft,
-  } = useExportActions(forceSave, highlighter);
+  const { handleExportToPdf, buildLongImageSharePayload } =
+    useExportActions(highlighter);
+  const { handlePublishSimpleBlog, handlePublishWechatDraft } =
+    usePublishActions(forceSave);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
