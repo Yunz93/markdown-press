@@ -1,6 +1,7 @@
-import type { FileNode } from '../types';
-import { getFileSystem } from '../types/filesystem';
-import { resolveWikiLinkFile } from './wikiLinks';
+import type { FileNode } from "../types";
+import { getFileSystem, isTauriEnvironment } from "../types/filesystem";
+import { getPathDirname, joinFsPath, normalizeSlashes } from "./pathHelpers";
+import { resolveWikiLinkFile } from "./wikiLinks";
 
 export interface ResolvedAttachmentTarget {
   path: string;
@@ -14,7 +15,10 @@ export interface AttachmentResolverContext {
   files: FileNode[];
 }
 
-const resolvedAttachmentCache = new Map<string, Promise<ResolvedAttachmentTarget | null>>();
+const resolvedAttachmentCache = new Map<
+  string,
+  Promise<ResolvedAttachmentTarget | null>
+>();
 const fileExistenceCache = new Map<string, Promise<boolean>>();
 
 export function clearAttachmentResolverCache(): void {
@@ -23,7 +27,7 @@ export function clearAttachmentResolverCache(): void {
 }
 
 function hasUriScheme(value: string): boolean {
-  return /^[a-z][a-z\d+\-.]*:/i.test(value) || value.startsWith('//');
+  return /^[a-z][a-z\d+\-.]*:/i.test(value) || value.startsWith("//");
 }
 
 function decodeLocalAttachmentTarget(rawTarget: string): string {
@@ -39,7 +43,10 @@ function decodeLocalAttachmentTarget(rawTarget: string): string {
   }
 }
 
-function buildCacheKey(context: AttachmentResolverContext, rawTarget: string): string {
+function buildCacheKey(
+  context: AttachmentResolverContext,
+  rawTarget: string,
+): string {
   return `${context.cacheNamespace}::${rawTarget.trim()}`;
 }
 
@@ -52,24 +59,66 @@ async function cachedFileExists(path: string): Promise<boolean> {
   pending = getFileSystem()
     .then((fs) => fs.fileExists(path))
     .catch(() => false)
-    .finally(() => {
-      // Keep resolved entries only; retry on transient failures.
+    .then((exists) => {
+      if (!exists) {
+        fileExistenceCache.delete(path);
+      }
+      return exists;
     });
 
   fileExistenceCache.set(path, pending);
   return pending;
 }
 
+async function normalizeAttachmentCandidate(
+  candidate: string,
+): Promise<string> {
+  if (isTauriEnvironment()) {
+    const { normalize } = await import("@tauri-apps/api/path");
+    return normalize(candidate);
+  }
+
+  return normalizeSlashes(candidate);
+}
+
+async function buildAttachmentPathCandidates(
+  normalizedTarget: string,
+  context: AttachmentResolverContext,
+): Promise<string[]> {
+  const candidates = new Set<string>();
+
+  if (/^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(normalizedTarget)) {
+    candidates.add(normalizedTarget);
+  }
+
+  if (context.currentFilePath) {
+    candidates.add(
+      joinFsPath(getPathDirname(context.currentFilePath), normalizedTarget),
+    );
+  }
+
+  if (context.rootFolderPath) {
+    candidates.add(joinFsPath(context.rootFolderPath, normalizedTarget));
+  }
+
+  const normalizedCandidates: string[] = [];
+  for (const candidate of candidates) {
+    normalizedCandidates.push(await normalizeAttachmentCandidate(candidate));
+  }
+
+  return normalizedCandidates;
+}
+
 export function createAttachmentResolverContext(
   files: FileNode[],
   rootFolderPath?: string | null,
-  currentFilePath?: string | null
+  currentFilePath?: string | null,
 ): AttachmentResolverContext {
   const filePaths: string[] = [];
 
   const visit = (nodes: FileNode[]) => {
     for (const node of nodes) {
-      if (node.type === 'file' && !node.isTrash) {
+      if (node.type === "file" && !node.isTrash) {
         filePaths.push(node.path);
       }
       if (node.children?.length) {
@@ -81,7 +130,7 @@ export function createAttachmentResolverContext(
   visit(files);
 
   return {
-    cacheNamespace: `${rootFolderPath ?? ''}::${currentFilePath ?? ''}::${filePaths.sort().join('|')}`,
+    cacheNamespace: `${rootFolderPath ?? ""}::${currentFilePath ?? ""}::${filePaths.sort().join("|")}`,
     currentFilePath,
     rootFolderPath,
     files,
@@ -90,7 +139,7 @@ export function createAttachmentResolverContext(
 
 export async function resolveAttachmentTarget(
   context: AttachmentResolverContext,
-  rawTarget: string
+  rawTarget: string,
 ): Promise<ResolvedAttachmentTarget | null> {
   const normalizedTarget = decodeLocalAttachmentTarget(rawTarget);
   if (!normalizedTarget) return null;
@@ -106,7 +155,7 @@ export async function resolveAttachmentTarget(
       context.files,
       normalizedTarget,
       context.rootFolderPath,
-      context.currentFilePath
+      context.currentFilePath,
     );
 
     if (matchedFile) {
@@ -117,25 +166,17 @@ export async function resolveAttachmentTarget(
     }
 
     try {
-      const { dirname, join, normalize } = await import('@tauri-apps/api/path');
-      const candidates = new Set<string>();
+      const candidates = await buildAttachmentPathCandidates(
+        normalizedTarget,
+        context,
+      );
 
-      if (/^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(normalizedTarget)) {
-        candidates.add(normalizedTarget);
-      }
-
-      if (context.currentFilePath) {
-        candidates.add(await join(await dirname(context.currentFilePath), normalizedTarget));
-      }
-
-      if (context.rootFolderPath) {
-        candidates.add(await join(context.rootFolderPath, normalizedTarget));
-      }
-
-      for (const candidate of candidates) {
-        const normalizedCandidate = await normalize(candidate);
+      for (const normalizedCandidate of candidates) {
         if (await cachedFileExists(normalizedCandidate)) {
-          const fileName = normalizedCandidate.split(/[\\/]/).pop() || normalizedTarget.split('/').pop() || normalizedTarget;
+          const fileName =
+            normalizedCandidate.split(/[\\/]/).pop() ||
+            normalizedTarget.split("/").pop() ||
+            normalizedTarget;
           return {
             path: normalizedCandidate,
             name: fileName,
@@ -143,7 +184,11 @@ export async function resolveAttachmentTarget(
         }
       }
     } catch (error) {
-      console.error('Failed to resolve attachment target:', normalizedTarget, error);
+      console.error(
+        "Failed to resolve attachment target:",
+        normalizedTarget,
+        error,
+      );
     }
 
     return null;

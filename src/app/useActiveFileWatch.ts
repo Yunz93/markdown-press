@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
-import { useAppStore } from '../store/appStore';
-import { findFileInTree } from './appShellUtils';
-import type { FileNode } from '../types';
-import type { FileWatchEvent } from '../types/filesystem';
-import type { TranslationKey } from '../utils/i18n';
+import { useEffect } from "react";
+import { useAppStore } from "../store/appStore";
+import { findFileInTree } from "./appShellUtils";
+import type { FileNode } from "../types";
+import type { FileWatchEvent } from "../types/filesystem";
+import type { TranslationKey } from "../utils/i18n";
 
 interface UseActiveFileWatchOptions {
   activeTabId: string | null;
@@ -11,8 +11,11 @@ interface UseActiveFileWatchOptions {
   files: FileNode[];
   readFile: (file: FileNode) => Promise<string>;
   setCurrentFilePath: (path: string | null) => void;
-  showNotification: (message: string, type: 'success' | 'error') => void;
-  watchFile: (path: string, callback: (event: FileWatchEvent | null) => void) => Promise<(() => void) | null>;
+  showNotification: (message: string, type: "success" | "error") => void;
+  watchFile: (
+    path: string,
+    callback: (event: FileWatchEvent | null) => void,
+  ) => Promise<(() => void) | null>;
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
 }
 
@@ -29,7 +32,9 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
   } = options;
 
   useEffect(() => {
-    const nextPath = activeTabId ? findFileInTree(files, activeTabId)?.path ?? null : null;
+    const nextPath = activeTabId
+      ? (findFileInTree(files, activeTabId)?.path ?? null)
+      : null;
     if (currentFilePath !== nextPath) {
       setCurrentFilePath(nextPath);
     }
@@ -47,33 +52,33 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
         unwatch = null;
       }
 
-      unwatch = await watchFile(currentFilePath, async (event) => {
+      const watcher = await watchFile(currentFilePath, async (event) => {
         if (disposed) return;
-        if (event?.type === 'deleted') {
-          showNotification(t('notifications_fileDeletedOnDisk'), 'error');
+        if (event?.type === "deleted") {
+          showNotification(t("notifications_fileDeletedOnDisk"), "error");
           return;
         }
-        if (event?.type === 'error') {
-          showNotification(t('notifications_watchFileFailed'), 'error');
+        if (event?.type === "error") {
+          showNotification(t("notifications_watchFileFailed"), "error");
           return;
         }
-        if (event?.type !== 'modified') return;
+        if (event?.type !== "modified") return;
 
         const state = useAppStore.getState();
         if (state.hasUnsavedChanges(activeTabId)) {
-          showNotification(t('notifications_fileChangedOnDisk'), 'error');
+          showNotification(t("notifications_fileChangedOnDisk"), "error");
           return;
         }
 
         const node = findFileInTree(state.files, activeTabId);
-        if (!node || node.type !== 'file') return;
+        if (!node || node.type !== "file") return;
 
         try {
           const latestContent = await readFile(node);
           const stateAfterRead = useAppStore.getState();
 
           if (stateAfterRead.hasUnsavedChanges(activeTabId)) {
-            showNotification(t('notifications_fileChangedOnDisk'), 'error');
+            showNotification(t("notifications_fileChangedOnDisk"), "error");
             return;
           }
 
@@ -82,12 +87,19 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
 
           stateAfterRead.updateTabContent(activeTabId, latestContent);
           stateAfterRead.markAsSaved(activeTabId);
-          showNotification(t('notifications_fileReloaded'), 'success');
+          showNotification(t("notifications_fileReloaded"), "success");
         } catch (error) {
-          console.error('Failed to reload file from disk:', error);
-          showNotification(t('notifications_reloadFileFailed'), 'error');
+          console.error("Failed to reload file from disk:", error);
+          showNotification(t("notifications_reloadFileFailed"), "error");
         }
       });
+
+      if (disposed) {
+        watcher?.();
+        return;
+      }
+
+      unwatch = watcher;
     };
 
     void setupWatcher();

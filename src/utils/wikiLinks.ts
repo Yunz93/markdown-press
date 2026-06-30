@@ -1,8 +1,8 @@
-import type { FileNode } from '../types';
-import { parseFrontmatter } from './frontmatter';
-import { createHeadingSlug } from './outline';
+import type { FileNode } from "../types";
+import { parseFrontmatter } from "./frontmatter";
+import { createHeadingSlug } from "./outline";
 
-export type WikiSubpathType = 'heading' | 'block' | null;
+export type WikiSubpathType = "heading" | "block" | null;
 
 export interface ParsedWikiLinkReference {
   raw: string;
@@ -25,14 +25,16 @@ interface ExtractedNoteFragment {
 const BLOCK_REFERENCE_REGEX = /^\s*\^([A-Za-z0-9_-]+)\s*$/;
 
 function normalizeSlashes(value: string): string {
-  return value.replace(/\\/g, '/');
+  return value.replace(/\\/g, "/");
 }
 
 function stripMarkdownExtension(value: string): string {
-  return value.replace(/\.(md|markdown)$/i, '');
+  return value.replace(/\.(md|markdown)$/i, "");
 }
 
-function parseEmbedSize(rawAlias: string): ParsedWikiLinkReference['embedSize'] {
+function parseEmbedSize(
+  rawAlias: string,
+): ParsedWikiLinkReference["embedSize"] {
   const trimmed = rawAlias.trim();
   if (!trimmed) return null;
 
@@ -49,16 +51,18 @@ function parseEmbedSize(rawAlias: string): ParsedWikiLinkReference['embedSize'] 
 
 function normalizeWikiLinkTarget(target: string): string {
   return stripMarkdownExtension(
-    normalizeSlashes(target)
-      .replace(/^\/+/, '')
-      .replace(/^\.\//, '')
-      .trim()
+    normalizeSlashes(target).replace(/^\/+/, "").replace(/^\.\//, "").trim(),
   ).toLowerCase();
 }
 
-function getRelativePath(path: string, rootPath: string | null | undefined): string {
+function getRelativePath(
+  path: string,
+  rootPath: string | null | undefined,
+): string {
   const normalizedPath = normalizeSlashes(path);
-  const normalizedRoot = rootPath ? normalizeSlashes(rootPath).replace(/\/+$/, '') : '';
+  const normalizedRoot = rootPath
+    ? normalizeSlashes(rootPath).replace(/\/+$/, "")
+    : "";
 
   if (normalizedRoot && normalizedPath.startsWith(`${normalizedRoot}/`)) {
     return normalizedPath.slice(normalizedRoot.length + 1);
@@ -69,7 +73,7 @@ function getRelativePath(path: string, rootPath: string | null | undefined): str
 
 function flattenFiles(nodes: FileNode[]): FileNode[] {
   return nodes.flatMap((node) => {
-    if (node.type === 'folder') {
+    if (node.type === "folder") {
       return flattenFiles(node.children ?? []);
     }
 
@@ -84,17 +88,23 @@ function splitMarkdownLines(markdown: string): string[] {
 function stripStandaloneBlockReferenceLines(markdown: string): string {
   return splitMarkdownLines(markdown)
     .filter((line) => !BLOCK_REFERENCE_REGEX.test(line))
-    .join('\n')
+    .join("\n")
     .trim();
 }
 
-function buildHeadingTitle(path: string, subpath: string, body: string): string {
+function buildHeadingTitle(
+  path: string,
+  subpath: string,
+  body: string,
+): string {
   if (subpath.trim()) {
-    return subpath.trim().replace(/^\^/, '');
+    return subpath.trim().replace(/^\^/, "");
   }
 
   if (path.trim()) {
-    return stripMarkdownExtension(path.split('/').filter(Boolean).pop() || path.trim());
+    return stripMarkdownExtension(
+      path.split("/").filter(Boolean).pop() || path.trim(),
+    );
   }
 
   const firstHeading = splitMarkdownLines(body)
@@ -102,11 +112,14 @@ function buildHeadingTitle(path: string, subpath: string, body: string): string 
     .find((line) => /^#{1,6}\s+/.test(line));
 
   return firstHeading
-    ? firstHeading.replace(/^#{1,6}\s+/, '').trim()
-    : 'Embedded note';
+    ? firstHeading.replace(/^#{1,6}\s+/, "").trim()
+    : "Embedded note";
 }
 
-function extractHeadingSection(body: string, rawSubpath: string): string | null {
+function extractHeadingSection(
+  body: string,
+  rawSubpath: string,
+): string | null {
   const normalizedCandidates = new Set([
     rawSubpath.trim(),
     createHeadingSlug(rawSubpath.trim()),
@@ -145,7 +158,7 @@ function extractHeadingSection(body: string, rawSubpath: string): string | null 
     }
   }
 
-  return lines.slice(startIndex, endIndex).join('\n').trim();
+  return lines.slice(startIndex, endIndex).join("\n").trim();
 }
 
 function extractBlockSection(body: string, blockId: string): string | null {
@@ -170,7 +183,7 @@ function extractBlockSection(body: string, blockId: string): string | null {
     }
 
     const safeStartIndex = Math.max(0, startIndex);
-    return lines.slice(safeStartIndex, index).join('\n').trim();
+    return lines.slice(safeStartIndex, index).join("\n").trim();
   }
 
   return null;
@@ -178,22 +191,27 @@ function extractBlockSection(body: string, blockId: string): string | null {
 
 export function parseWikiLinkReference(
   raw: string,
-  options?: { embed?: boolean }
+  options?: { embed?: boolean },
 ): ParsedWikiLinkReference {
-  const [targetPart = '', aliasPart = ''] = raw.split('|');
+  const [targetPart = "", aliasPart = ""] = raw.split("|");
   const target = targetPart.trim();
   const alias = aliasPart.trim();
-  const hashIndex = target.indexOf('#');
+  const hashIndex = target.indexOf("#");
   const path = hashIndex >= 0 ? target.slice(0, hashIndex).trim() : target;
-  const subpath = hashIndex >= 0 ? target.slice(hashIndex + 1).trim() : '';
+  const subpath = hashIndex >= 0 ? target.slice(hashIndex + 1).trim() : "";
   const subpathType: WikiSubpathType = !subpath
     ? null
-    : (subpath.startsWith('^') ? 'block' : 'heading');
+    : subpath.startsWith("^")
+      ? "block"
+      : "heading";
   const embedSize = options?.embed ? parseEmbedSize(alias) : null;
-  const cleanedPath = stripMarkdownExtension(path.split('/').filter(Boolean).pop() || path);
-  const fallbackLabel = subpathType === 'block'
-    ? subpath.replace(/^\^/, '')
-    : (subpath || cleanedPath || 'Untitled');
+  const cleanedPath = stripMarkdownExtension(
+    path.split("/").filter(Boolean).pop() || path,
+  );
+  const fallbackLabel =
+    subpathType === "block"
+      ? subpath.replace(/^\^/, "")
+      : subpath || cleanedPath || "Untitled";
   const displayText = alias && !embedSize ? alias : fallbackLabel;
 
   return {
@@ -207,16 +225,18 @@ export function parseWikiLinkReference(
   };
 }
 
-export function buildWikiReferenceTarget(reference: Pick<ParsedWikiLinkReference, 'subpath' | 'subpathType'>): string | null {
+export function buildWikiReferenceTarget(
+  reference: Pick<ParsedWikiLinkReference, "subpath" | "subpathType">,
+): string | null {
   if (!reference.subpath.trim()) return null;
-  return reference.subpathType === 'block'
-    ? `^${reference.subpath.replace(/^\^/, '').trim()}`
+  return reference.subpathType === "block"
+    ? `^${reference.subpath.replace(/^\^/, "").trim()}`
     : reference.subpath.trim();
 }
 
 export function extractWikiNoteFragment(
   content: string,
-  rawReference: string
+  rawReference: string,
 ): ExtractedNoteFragment {
   const parsedReference = parseWikiLinkReference(rawReference);
   const { body } = parseFrontmatter(content);
@@ -224,17 +244,26 @@ export function extractWikiNoteFragment(
   if (!parsedReference.subpathType) {
     return {
       markdown: stripStandaloneBlockReferenceLines(body),
-      title: buildHeadingTitle(parsedReference.path, parsedReference.subpath, body),
+      title: buildHeadingTitle(
+        parsedReference.path,
+        parsedReference.subpath,
+        body,
+      ),
     };
   }
 
-  const fragment = parsedReference.subpathType === 'block'
-    ? extractBlockSection(body, parsedReference.subpath.replace(/^\^/, ''))
-    : extractHeadingSection(body, parsedReference.subpath);
+  const fragment =
+    parsedReference.subpathType === "block"
+      ? extractBlockSection(body, parsedReference.subpath.replace(/^\^/, ""))
+      : extractHeadingSection(body, parsedReference.subpath);
 
   return {
     markdown: fragment ? stripStandaloneBlockReferenceLines(fragment) : null,
-    title: buildHeadingTitle(parsedReference.path, parsedReference.subpath, body),
+    title: buildHeadingTitle(
+      parsedReference.path,
+      parsedReference.subpath,
+      body,
+    ),
   };
 }
 
@@ -242,43 +271,59 @@ export function resolveWikiLinkFile(
   files: FileNode[],
   target: string,
   rootFolderPath?: string | null,
-  currentFilePath?: string | null
+  currentFilePath?: string | null,
 ): FileNode | null {
   const parsedReference = parseWikiLinkReference(target);
   const normalizedTarget = normalizeWikiLinkTarget(parsedReference.path);
   if (!normalizedTarget) return null;
 
-  const targetBasename = normalizedTarget.split('/').filter(Boolean).pop() || normalizedTarget;
+  const targetBasename =
+    normalizedTarget.split("/").filter(Boolean).pop() || normalizedTarget;
 
   const allFiles = flattenFiles(files);
-  const currentRelativePath = currentFilePath && rootFolderPath
-    ? getRelativePath(currentFilePath, rootFolderPath)
-    : '';
-  const currentDir = currentRelativePath.includes('/')
-    ? currentRelativePath.split('/').slice(0, -1).join('/')
-    : '';
-  const relativeCandidate = currentDir ? `${currentDir}/${normalizedTarget}` : normalizedTarget;
+  const currentRelativePath =
+    currentFilePath && rootFolderPath
+      ? getRelativePath(currentFilePath, rootFolderPath)
+      : "";
+  const currentDir = currentRelativePath.includes("/")
+    ? currentRelativePath.split("/").slice(0, -1).join("/")
+    : "";
+  const relativeCandidate = currentDir
+    ? `${currentDir}/${normalizedTarget}`
+    : normalizedTarget;
 
   let exactPathMatch: FileNode | null = null;
   let relativePathMatch: FileNode | null = null;
-  let basenameMatch: FileNode | null = null;
+  const suffixMatches: FileNode[] = [];
+  const basenameMatches: FileNode[] = [];
 
   for (const file of allFiles) {
-    const relativePath = stripMarkdownExtension(getRelativePath(file.path, rootFolderPath)).toLowerCase();
+    const relativePath = stripMarkdownExtension(
+      getRelativePath(file.path, rootFolderPath),
+    ).toLowerCase();
     const basename = stripMarkdownExtension(file.name).toLowerCase();
 
     if (!exactPathMatch && relativePath === normalizedTarget) {
       exactPathMatch = file;
     }
 
-    if (!relativePathMatch && (relativePath === relativeCandidate.toLowerCase() || relativePath.endsWith(`/${normalizedTarget}`))) {
+    if (
+      !relativePathMatch &&
+      relativePath === relativeCandidate.toLowerCase()
+    ) {
       relativePathMatch = file;
+    } else if (relativePath.endsWith(`/${normalizedTarget}`)) {
+      suffixMatches.push(file);
     }
 
-    if (!basenameMatch && (basename === normalizedTarget || basename === targetBasename)) {
-      basenameMatch = file;
+    if (basename === normalizedTarget || basename === targetBasename) {
+      basenameMatches.push(file);
     }
   }
 
-  return exactPathMatch || relativePathMatch || basenameMatch;
+  const suffixMatch = suffixMatches.length === 1 ? suffixMatches[0] : null;
+  const basenameMatch =
+    basenameMatches.length === 1 ? basenameMatches[0] : null;
+
+  return exactPathMatch || relativePathMatch || suffixMatch || basenameMatch;
 }

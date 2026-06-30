@@ -19,7 +19,7 @@ export interface TabActions {
   updateTabContent: (fileId: string, content: string) => void;
   getActiveContent: () => string | undefined;
   clearAllCache: () => void;
-  markAsSaved: (fileId: string) => void;
+  markAsSaved: (fileId: string, savedContent?: string) => void;
   hasUnsavedChanges: (fileId: string) => boolean;
 }
 
@@ -38,7 +38,7 @@ export const initialTabState: TabState = {
  */
 export function createTabSlice(
   set: (fn: (state: TabState) => Partial<TabState>) => void,
-  get: () => TabState & TabActions
+  get: () => TabState & TabActions,
 ): TabState & TabActions {
   const moveTabToFront = (tabs: string[], fileId: string): string[] => [
     fileId,
@@ -48,73 +48,83 @@ export function createTabSlice(
   return {
     ...initialTabState,
 
-    addTab: (fileId, content) => set((state) => {
-      const existingTabs = state.openTabs;
-      const nextTabs = moveTabToFront(existingTabs, fileId);
-      return {
-        openTabs: nextTabs,
+    addTab: (fileId, content) =>
+      set((state) => {
+        const existingTabs = state.openTabs;
+        const nextTabs = moveTabToFront(existingTabs, fileId);
+        return {
+          openTabs: nextTabs,
+          activeTabId: fileId,
+          fileContents:
+            content !== undefined
+              ? { ...state.fileContents, [fileId]: content }
+              : state.fileContents,
+          lastSavedContent:
+            content !== undefined
+              ? { ...state.lastSavedContent, [fileId]: content }
+              : state.lastSavedContent,
+        };
+      }),
+
+    closeTab: (fileId) =>
+      set((state) => {
+        const tabIndex = state.openTabs.indexOf(fileId);
+        if (tabIndex === -1) return state;
+
+        const newTabs = state.openTabs.filter((id) => id !== fileId);
+        const newFileContents = { ...state.fileContents };
+        const newLastSavedContent = { ...state.lastSavedContent };
+        delete newFileContents[fileId];
+        delete newLastSavedContent[fileId];
+
+        // If closing the active tab, activate adjacent tab
+        let newActiveTabId = state.activeTabId;
+        if (state.activeTabId === fileId) {
+          newActiveTabId =
+            newTabs.length > 0
+              ? newTabs[Math.min(tabIndex, newTabs.length - 1)]
+              : null;
+        }
+
+        return {
+          openTabs: newTabs,
+          activeTabId: newActiveTabId,
+          fileContents: newFileContents,
+          lastSavedContent: newLastSavedContent,
+        };
+      }),
+
+    closeOtherTabs: (fileId) =>
+      set((state) => {
+        if (!state.openTabs.includes(fileId)) return state;
+
+        const nextFileContents =
+          state.fileContents[fileId] === undefined
+            ? {}
+            : { [fileId]: state.fileContents[fileId] };
+        const nextLastSavedContent =
+          state.lastSavedContent[fileId] === undefined
+            ? {}
+            : { [fileId]: state.lastSavedContent[fileId] };
+
+        return {
+          openTabs: [fileId],
+          activeTabId: fileId,
+          fileContents: nextFileContents,
+          lastSavedContent: nextLastSavedContent,
+        };
+      }),
+
+    setActiveTab: (fileId) =>
+      set((state) => ({
         activeTabId: fileId,
-        fileContents: content !== undefined
-          ? { ...state.fileContents, [fileId]: content }
-          : state.fileContents,
-        lastSavedContent: content !== undefined
-          ? { ...state.lastSavedContent, [fileId]: content }
-          : state.lastSavedContent,
-      };
-    }),
+        openTabs: moveTabToFront(state.openTabs, fileId),
+      })),
 
-    closeTab: (fileId) => set((state) => {
-      const tabIndex = state.openTabs.indexOf(fileId);
-      if (tabIndex === -1) return state;
-
-      const newTabs = state.openTabs.filter((id) => id !== fileId);
-      const newFileContents = { ...state.fileContents };
-      const newLastSavedContent = { ...state.lastSavedContent };
-      delete newFileContents[fileId];
-      delete newLastSavedContent[fileId];
-
-      // If closing the active tab, activate adjacent tab
-      let newActiveTabId = state.activeTabId;
-      if (state.activeTabId === fileId) {
-        newActiveTabId = newTabs.length > 0
-          ? newTabs[Math.min(tabIndex, newTabs.length - 1)]
-          : null;
-      }
-
-      return {
-        openTabs: newTabs,
-        activeTabId: newActiveTabId,
-        fileContents: newFileContents,
-        lastSavedContent: newLastSavedContent,
-      };
-    }),
-
-    closeOtherTabs: (fileId) => set((state) => {
-      if (!state.openTabs.includes(fileId)) return state;
-
-      const nextFileContents = state.fileContents[fileId] === undefined
-        ? {}
-        : { [fileId]: state.fileContents[fileId] };
-      const nextLastSavedContent = state.lastSavedContent[fileId] === undefined
-        ? {}
-        : { [fileId]: state.lastSavedContent[fileId] };
-
-      return {
-        openTabs: [fileId],
-        activeTabId: fileId,
-        fileContents: nextFileContents,
-        lastSavedContent: nextLastSavedContent,
-      };
-    }),
-
-    setActiveTab: (fileId) => set((state) => ({
-      activeTabId: fileId,
-      openTabs: moveTabToFront(state.openTabs, fileId),
-    })),
-
-    updateTabContent: (fileId, content) => set((state) => ({
-      fileContents: { ...state.fileContents, [fileId]: content },
-    })),
+    updateTabContent: (fileId, content) =>
+      set((state) => ({
+        fileContents: { ...state.fileContents, [fileId]: content },
+      })),
 
     getActiveContent: () => {
       const state = get();
@@ -122,21 +132,22 @@ export function createTabSlice(
       return state.fileContents[state.activeTabId];
     },
 
-    clearAllCache: () => set(() => ({
-      fileContents: {},
-      lastSavedContent: {},
-      openTabs: [],
-      activeTabId: null,
-      content: '',
-    })),
+    clearAllCache: () =>
+      set(() => ({
+        fileContents: {},
+        lastSavedContent: {},
+        openTabs: [],
+        activeTabId: null,
+      })),
 
-    markAsSaved: (fileId) => set((state) => {
-      const content = state.fileContents[fileId];
-      if (content === undefined) return state;
-      return {
-        lastSavedContent: { ...state.lastSavedContent, [fileId]: content },
-      };
-    }),
+    markAsSaved: (fileId, savedContent) =>
+      set((state) => {
+        const content = savedContent ?? state.fileContents[fileId];
+        if (content === undefined) return state;
+        return {
+          lastSavedContent: { ...state.lastSavedContent, [fileId]: content },
+        };
+      }),
 
     hasUnsavedChanges: (fileId) => {
       const state = get();

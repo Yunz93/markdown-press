@@ -482,6 +482,7 @@ export default {
   notifications_saveBeforePublishFailed: "发布前保存笔记失败。",
   notifications_publishTimeout:
     "发布超时。请检查 GitHub 网络连接和令牌权限后再试。",
+  notifications_publishInProgress: "已有发布任务正在进行，请等待完成后再试。",
   notifications_publishBackfillFailed:
     "已发布到博客，但把文章链接写回笔记失败了。",
   notifications_publishUrlBuildFailed: "已发布到博客，但生成文章链接失败。",

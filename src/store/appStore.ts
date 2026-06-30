@@ -1,11 +1,40 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { createFileSlice, type FileState, type FileActions, initialFileState } from './fileStore';
-import { createTabSlice, type TabState, type TabActions, initialTabState } from './tabStore';
-import { createEditorSlice, type EditorState, type EditorActions, initialEditorState, selectContent } from './editorStore';
-import { createUISlice, type UIState, type UIActions, initialUIState, defaultSettings, normalizeLanguage, normalizeThemeMode } from './uiStore';
-import { ViewMode, type FileNode, type AppSettings, type Notification } from '../types';
-import type { HeadingNode } from '../utils/outline';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import {
+  createFileSlice,
+  type FileState,
+  type FileActions,
+  initialFileState,
+} from "./fileStore";
+import {
+  createTabSlice,
+  type TabState,
+  type TabActions,
+  initialTabState,
+} from "./tabStore";
+import {
+  createEditorSlice,
+  type EditorState,
+  type EditorActions,
+  initialEditorState,
+  selectContent,
+} from "./editorStore";
+import {
+  createUISlice,
+  type UIState,
+  type UIActions,
+  initialUIState,
+  defaultSettings,
+  normalizeLanguage,
+  normalizeThemeMode,
+} from "./uiStore";
+import {
+  ViewMode,
+  type FileNode,
+  type AppSettings,
+  type Notification,
+} from "../types";
+import type { HeadingNode } from "../utils/outline";
 import {
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_EDITOR_FONT_FAMILY,
@@ -18,68 +47,94 @@ import {
   normalizeStoredEditorFontFamily,
   normalizeStoredPreviewFontFamily,
   normalizeStoredUiFontFamily,
-} from '../utils/fontSettings';
-import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from '../utils/blogRepo';
-import { normalizeMetadataFields } from '../utils/metadataFields';
-import { normalizeTrashFolder } from '../utils/trashFolder';
-import { normalizeWikiFolder } from '../utils/wikiGeneration';
-import { normalizeMarkdownStylePreset } from '../utils/markdownStyle';
-import { normalizeShortcutConfigForPlatform } from '../utils/shortcuts';
+} from "../utils/fontSettings";
+import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from "../utils/blogRepo";
+import { normalizeMetadataFields } from "../utils/metadataFields";
+import { normalizeTrashFolder } from "../utils/trashFolder";
+import { normalizeWikiFolder } from "../utils/wikiGeneration";
+import { normalizeMarkdownStylePreset } from "../utils/markdownStyle";
+import { normalizeShortcutConfigForPlatform } from "../utils/shortcuts";
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
   DEFAULT_AI_SYSTEM_PROMPT_EN,
   DEFAULT_WIKI_PROMPT_TEMPLATE,
   DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-} from '../services/aiPrompts';
+} from "../services/aiPrompts";
+import { SENSITIVE_SETTING_KEYS } from "../services/sensitiveSettingKeys";
 
 // Re-export types from slice stores
-export type { FileState, FileActions, TabState, TabActions, EditorState, EditorActions, UIState, UIActions };
+export type {
+  FileState,
+  FileActions,
+  TabState,
+  TabActions,
+  EditorState,
+  EditorActions,
+  UIState,
+  UIActions,
+};
 // Re-export selector for convenience
 export { selectContent };
 
 // Complete AppState combines all slices
-export interface AppState extends
-  FileState,
-  TabState,
-  EditorState,
-  UIState,
-  FileActions,
-  TabActions,
-  EditorActions,
-  UIActions {}
+export interface AppState
+  extends
+    FileState,
+    TabState,
+    EditorState,
+    UIState,
+    FileActions,
+    TabActions,
+    EditorActions,
+    UIActions {}
 
-const SENSITIVE_SETTING_KEYS = ['blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey', 'deepseekApiKey'] as const;
-const REMOVED_SETTING_KEYS = ['exportStrikethroughMode'] as const;
+const REMOVED_SETTING_KEYS = ["exportStrikethroughMode"] as const;
 
-function clampPersistedNumber(value: unknown, min: number, max: number, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+function clampPersistedNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback;
 }
 
 function resolveFirstValidNumber(
-  settings: Record<string, unknown>, keys: string[], min: number, max: number, fallback: number,
+  settings: Record<string, unknown>,
+  keys: string[],
+  min: number,
+  max: number,
+  fallback: number,
 ): number {
   for (const key of keys) {
     const v = settings[key];
-    if (typeof v === 'number' && Number.isFinite(v)) {
+    if (typeof v === "number" && Number.isFinite(v)) {
       return Math.min(max, Math.max(min, v));
     }
   }
   return fallback;
 }
 
-function resolveFirstValidString(settings: Record<string, unknown>, keys: string[]): string {
+function resolveFirstValidString(
+  settings: Record<string, unknown>,
+  keys: string[],
+): string {
   for (const key of keys) {
     const v = settings[key];
-    if (typeof v === 'string' && v.trim()) return v;
+    if (typeof v === "string" && v.trim()) return v;
   }
-  return '';
+  return "";
 }
 
 type FontSettingNormalizer = (value: string | undefined) => string;
 
-function shouldMigrateLegacyDefaultFonts(persistedSettings: Record<string, unknown>): boolean {
+function shouldMigrateLegacyDefaultFonts(
+  persistedSettings: Record<string, unknown>,
+): boolean {
   const version = persistedSettings.fontDefaultsVersion;
-  return typeof version !== 'number' || version < FONT_DEFAULTS_VERSION;
+  return typeof version !== "number" || version < FONT_DEFAULTS_VERSION;
 }
 
 function resolvePersistedFontFamily(
@@ -88,17 +143,15 @@ function resolvePersistedFontFamily(
   fallback: string,
   migrateLegacyDefaults: boolean,
 ): string {
-  if (typeof value !== 'string' || !value.trim()) {
+  if (typeof value !== "string" || !value.trim()) {
     return fallback;
   }
 
   const normalized = normalize(value);
   if (
-    migrateLegacyDefaults
-    && (
-      normalized === LEGACY_DEFAULT_BUNDLED_FONT_FAMILY
-      || normalized === LEGACY_DEFAULT_CODE_FONT_FAMILY
-    )
+    migrateLegacyDefaults &&
+    (normalized === LEGACY_DEFAULT_BUNDLED_FONT_FAMILY ||
+      normalized === LEGACY_DEFAULT_CODE_FONT_FAMILY)
   ) {
     return fallback;
   }
@@ -108,19 +161,47 @@ function resolvePersistedFontFamily(
 
 export function resolvePersistedFontSettings(
   persistedSettings: Record<string, unknown>,
-): Pick<AppSettings, 'fontDefaultsVersion' | 'uiFontFamily' | 'uiFontSize' | 'editorFontFamily' | 'previewFontFamily' | 'codeFontFamily' | 'fontSize'> {
-  const migrateLegacyDefaults = shouldMigrateLegacyDefaultFonts(persistedSettings);
+): Pick<
+  AppSettings,
+  | "fontDefaultsVersion"
+  | "uiFontFamily"
+  | "uiFontSize"
+  | "editorFontFamily"
+  | "previewFontFamily"
+  | "codeFontFamily"
+  | "fontSize"
+> {
+  const migrateLegacyDefaults =
+    shouldMigrateLegacyDefaultFonts(persistedSettings);
   const legacyContentFontFamily = resolvePersistedFontFamily(
-    resolveFirstValidString(persistedSettings, ['chineseFontFamily', 'englishFontFamily', 'fontFamily']),
+    resolveFirstValidString(persistedSettings, [
+      "chineseFontFamily",
+      "englishFontFamily",
+      "fontFamily",
+    ]),
     normalizeStoredEditorFontFamily,
     DEFAULT_EDITOR_FONT_FAMILY,
     migrateLegacyDefaults,
   );
-  const legacyContentFontSize = clampPersistedNumber(persistedSettings.fontSize, 12, 32, 16);
+  const legacyContentFontSize = clampPersistedNumber(
+    persistedSettings.fontSize,
+    12,
+    32,
+    16,
+  );
   const resolvedSharedFontSize = resolveFirstValidNumber(
     persistedSettings,
-    ['fontSize', 'editorFontSize', 'previewFontSize', 'codeFontSize', 'editorCodeFontSize', 'previewCodeFontSize'],
-    11, 32, legacyContentFontSize,
+    [
+      "fontSize",
+      "editorFontSize",
+      "previewFontSize",
+      "codeFontSize",
+      "editorCodeFontSize",
+      "previewCodeFontSize",
+    ],
+    11,
+    32,
+    legacyContentFontSize,
   );
 
   return {
@@ -131,9 +212,11 @@ export function resolvePersistedFontSettings(
       DEFAULT_UI_FONT_FAMILY,
       migrateLegacyDefaults,
     ),
-    uiFontSize: typeof persistedSettings.uiFontSize === 'number' && Number.isFinite(persistedSettings.uiFontSize)
-      ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
-      : defaultSettings.uiFontSize,
+    uiFontSize:
+      typeof persistedSettings.uiFontSize === "number" &&
+      Number.isFinite(persistedSettings.uiFontSize)
+        ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
+        : defaultSettings.uiFontSize,
     editorFontFamily: resolvePersistedFontFamily(
       persistedSettings.editorFontFamily,
       normalizeStoredEditorFontFamily,
@@ -156,7 +239,9 @@ export function resolvePersistedFontSettings(
   };
 }
 
-export function stripNonRuntimeSettings(settings: Record<string, unknown>): Record<string, unknown> {
+export function stripNonRuntimeSettings(
+  settings: Record<string, unknown>,
+): Record<string, unknown> {
   const sanitized = { ...settings };
   [...SENSITIVE_SETTING_KEYS, ...REMOVED_SETTING_KEYS].forEach((key) => {
     delete sanitized[key];
@@ -165,33 +250,39 @@ export function stripNonRuntimeSettings(settings: Record<string, unknown>): Reco
 }
 
 function sanitizeSettingsForPersistence(settings: AppSettings): AppSettings {
-  return stripNonRuntimeSettings(settings as unknown as Record<string, unknown>) as unknown as AppSettings;
+  return stripNonRuntimeSettings(
+    settings as unknown as Record<string, unknown>,
+  ) as unknown as AppSettings;
 }
 
-function resolvePersistedBlogRepoUrl(persistedSettings: Record<string, unknown>): string {
-  if (typeof persistedSettings.blogRepoUrl === 'string') {
+function resolvePersistedBlogRepoUrl(
+  persistedSettings: Record<string, unknown>,
+): string {
+  if (typeof persistedSettings.blogRepoUrl === "string") {
     const normalized = normalizeBlogRepoUrl(persistedSettings.blogRepoUrl);
     if (normalized) {
       return normalized;
     }
   }
 
-  if (typeof persistedSettings.simpleBlogPath === 'string') {
+  if (typeof persistedSettings.simpleBlogPath === "string") {
     const normalized = normalizeBlogRepoUrl(persistedSettings.simpleBlogPath);
     if (normalized) {
       return normalized;
     }
   }
 
-  return '';
+  return "";
 }
 
-function resolvePersistedBlogSiteUrl(persistedSettings: Record<string, unknown>): string {
-  if (typeof persistedSettings.blogSiteUrl === 'string') {
+function resolvePersistedBlogSiteUrl(
+  persistedSettings: Record<string, unknown>,
+): string {
+  if (typeof persistedSettings.blogSiteUrl === "string") {
     return normalizeBlogSiteUrl(persistedSettings.blogSiteUrl);
   }
 
-  return '';
+  return "";
 }
 
 function resolvePromptVariant(
@@ -199,55 +290,63 @@ function resolvePromptVariant(
   legacyValue: string,
   defaultZh: string,
   defaultEn: string,
-  language: 'zh-CN' | 'en',
+  language: "zh-CN" | "en",
 ): string {
-  if (typeof localizedValue === 'string' && localizedValue.trim()) {
+  if (typeof localizedValue === "string" && localizedValue.trim()) {
     return localizedValue;
   }
 
   const trimmedLegacyValue = legacyValue.trim();
-  if (!trimmedLegacyValue || trimmedLegacyValue === defaultZh.trim() || trimmedLegacyValue === defaultEn.trim()) {
-    return language === 'en' ? defaultEn : defaultZh;
+  if (
+    !trimmedLegacyValue ||
+    trimmedLegacyValue === defaultZh.trim() ||
+    trimmedLegacyValue === defaultEn.trim()
+  ) {
+    return language === "en" ? defaultEn : defaultZh;
   }
 
   return legacyValue;
 }
 
-export function resolveLocalizedPrompts(persistedSettings: Record<string, unknown>) {
-  const legacySystemPrompt = typeof persistedSettings.aiSystemPrompt === 'string'
-    ? persistedSettings.aiSystemPrompt
-    : '';
-  const legacyWikiPrompt = typeof persistedSettings.wikiPromptTemplate === 'string'
-    ? persistedSettings.wikiPromptTemplate
-    : '';
+export function resolveLocalizedPrompts(
+  persistedSettings: Record<string, unknown>,
+) {
+  const legacySystemPrompt =
+    typeof persistedSettings.aiSystemPrompt === "string"
+      ? persistedSettings.aiSystemPrompt
+      : "";
+  const legacyWikiPrompt =
+    typeof persistedSettings.wikiPromptTemplate === "string"
+      ? persistedSettings.wikiPromptTemplate
+      : "";
 
   const aiSystemPromptZh = resolvePromptVariant(
     persistedSettings.aiSystemPromptZh,
     legacySystemPrompt,
     DEFAULT_AI_SYSTEM_PROMPT,
     DEFAULT_AI_SYSTEM_PROMPT_EN,
-    'zh-CN',
+    "zh-CN",
   );
   const aiSystemPromptEn = resolvePromptVariant(
     persistedSettings.aiSystemPromptEn,
     legacySystemPrompt,
     DEFAULT_AI_SYSTEM_PROMPT,
     DEFAULT_AI_SYSTEM_PROMPT_EN,
-    'en',
+    "en",
   );
   const wikiPromptTemplateZh = resolvePromptVariant(
     persistedSettings.wikiPromptTemplateZh,
     legacyWikiPrompt,
     DEFAULT_WIKI_PROMPT_TEMPLATE,
     DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-    'zh-CN',
+    "zh-CN",
   );
   const wikiPromptTemplateEn = resolvePromptVariant(
     persistedSettings.wikiPromptTemplateEn,
     legacyWikiPrompt,
     DEFAULT_WIKI_PROMPT_TEMPLATE,
     DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-    'en',
+    "en",
   );
 
   return {
@@ -261,47 +360,66 @@ export function resolveLocalizedPrompts(persistedSettings: Record<string, unknow
 }
 
 function looksLikeGeminiModel(value: unknown): boolean {
-  return typeof value === 'string' && /^gemini(?:-|$)/i.test(value.trim());
+  return typeof value === "string" && /^gemini(?:-|$)/i.test(value.trim());
 }
 
 function looksLikeOpenAIModel(value: unknown): boolean {
-  return typeof value === 'string' && /^(gpt-|o[1-9]\b|o[1-9]-|codex\b)/i.test(value.trim());
+  return (
+    typeof value === "string" &&
+    /^(gpt-|o[1-9]\b|o[1-9]-|codex\b)/i.test(value.trim())
+  );
 }
 
 function looksLikeDeepSeekModel(value: unknown): boolean {
-  return typeof value === 'string' && /^deepseek(?:-|$)/i.test(value.trim());
+  return typeof value === "string" && /^deepseek(?:-|$)/i.test(value.trim());
 }
 
-export function resolvePersistedAISettings(persistedSettings: Record<string, unknown>) {
-  const persistedProvider = typeof persistedSettings.aiProvider === 'string'
-    ? persistedSettings.aiProvider
-    : '';
-  const persistedGeminiModel = typeof persistedSettings.geminiModel === 'string'
-    ? persistedSettings.geminiModel.trim()
-    : '';
-  const persistedCodexModel = typeof persistedSettings.codexModel === 'string'
-    ? persistedSettings.codexModel.trim()
-    : '';
-  const persistedDeepSeekModel = typeof persistedSettings.deepseekModel === 'string'
-    ? persistedSettings.deepseekModel.trim()
-    : '';
+export function resolvePersistedAISettings(
+  persistedSettings: Record<string, unknown>,
+) {
+  const persistedProvider =
+    typeof persistedSettings.aiProvider === "string"
+      ? persistedSettings.aiProvider
+      : "";
+  const persistedGeminiModel =
+    typeof persistedSettings.geminiModel === "string"
+      ? persistedSettings.geminiModel.trim()
+      : "";
+  const persistedCodexModel =
+    typeof persistedSettings.codexModel === "string"
+      ? persistedSettings.codexModel.trim()
+      : "";
+  const persistedDeepSeekModel =
+    typeof persistedSettings.deepseekModel === "string"
+      ? persistedSettings.deepseekModel.trim()
+      : "";
 
-  if (persistedProvider === 'codex' || persistedProvider === 'gemini' || persistedProvider === 'deepseek') {
+  if (
+    persistedProvider === "codex" ||
+    persistedProvider === "gemini" ||
+    persistedProvider === "deepseek"
+  ) {
     return {
       aiProvider: persistedProvider,
-      codexModel: persistedCodexModel || (persistedProvider === 'codex' && looksLikeOpenAIModel(persistedGeminiModel)
-        ? persistedGeminiModel
-        : defaultSettings.codexModel),
+      codexModel:
+        persistedCodexModel ||
+        (persistedProvider === "codex" &&
+        looksLikeOpenAIModel(persistedGeminiModel)
+          ? persistedGeminiModel
+          : defaultSettings.codexModel),
       geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
-      deepseekModel: persistedDeepSeekModel || (persistedProvider === 'deepseek' && looksLikeDeepSeekModel(persistedGeminiModel)
-        ? persistedGeminiModel
-        : defaultSettings.deepseekModel),
+      deepseekModel:
+        persistedDeepSeekModel ||
+        (persistedProvider === "deepseek" &&
+        looksLikeDeepSeekModel(persistedGeminiModel)
+          ? persistedGeminiModel
+          : defaultSettings.deepseekModel),
     };
   }
 
   if (!persistedDeepSeekModel && looksLikeDeepSeekModel(persistedGeminiModel)) {
     return {
-      aiProvider: 'deepseek',
+      aiProvider: "deepseek",
       codexModel: persistedCodexModel || defaultSettings.codexModel,
       geminiModel: defaultSettings.geminiModel,
       deepseekModel: persistedGeminiModel || defaultSettings.deepseekModel,
@@ -310,16 +428,21 @@ export function resolvePersistedAISettings(persistedSettings: Record<string, unk
 
   if (!persistedCodexModel && looksLikeOpenAIModel(persistedGeminiModel)) {
     return {
-      aiProvider: 'codex',
-      codexModel: persistedCodexModel || persistedGeminiModel || defaultSettings.codexModel,
-      geminiModel: looksLikeGeminiModel(persistedGeminiModel) ? persistedGeminiModel : defaultSettings.geminiModel,
+      aiProvider: "codex",
+      codexModel:
+        persistedCodexModel ||
+        persistedGeminiModel ||
+        defaultSettings.codexModel,
+      geminiModel: looksLikeGeminiModel(persistedGeminiModel)
+        ? persistedGeminiModel
+        : defaultSettings.geminiModel,
       deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
     };
   }
 
   if (looksLikeGeminiModel(persistedGeminiModel)) {
     return {
-      aiProvider: 'gemini',
+      aiProvider: "gemini",
       codexModel: persistedCodexModel || defaultSettings.codexModel,
       geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
       deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
@@ -327,7 +450,7 @@ export function resolvePersistedAISettings(persistedSettings: Record<string, unk
   }
 
   return {
-    aiProvider: 'deepseek',
+    aiProvider: "deepseek",
     codexModel: persistedCodexModel || defaultSettings.codexModel,
     geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
     deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
@@ -336,8 +459,9 @@ export function resolvePersistedAISettings(persistedSettings: Record<string, unk
 
 function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
   const persistedShortcuts =
-    persistedSettings.shortcuts && typeof persistedSettings.shortcuts === 'object'
-      ? persistedSettings.shortcuts as Record<string, unknown>
+    persistedSettings.shortcuts &&
+    typeof persistedSettings.shortcuts === "object"
+      ? (persistedSettings.shortcuts as Record<string, unknown>)
       : {};
 
   const mergedShortcuts = {
@@ -345,24 +469,41 @@ function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
     ...persistedShortcuts,
   };
 
-  const defaultShortcutMigrations: Partial<Record<keyof typeof mergedShortcuts, string[]>> = {
-    aiAnalyze: ['Cmd+J', 'Ctrl+J'],
-    toggleView: ['Ctrl+E', 'Cmd+Shift+V', 'Ctrl+Shift+V'],
-    search: ['Ctrl+F'],
-    sidebarSearch: ['Ctrl+Shift+F'],
-    settings: ['Ctrl+,', 'Cmd+,', 'Command+,', 'Meta+,', 'Cmd+Shift+0', 'Ctrl+Shift+0'],
-    toggleOutline: ['Ctrl+O', 'Cmd+Shift+O', 'Ctrl+Shift+O'],
-    toggleSidebar: ['Ctrl+B', 'Cmd+Shift+B', 'Ctrl+Shift+B'],
-    toggleTheme: ['Ctrl+T', 'Cmd+Shift+T', 'Ctrl+Shift+T'],
-    openKnowledgeBase: ['Ctrl+Shift+O'],
-    exportPdf: ['Ctrl+Shift+E'],
+  const defaultShortcutMigrations: Partial<
+    Record<keyof typeof mergedShortcuts, string[]>
+  > = {
+    aiAnalyze: ["Cmd+J", "Ctrl+J"],
+    toggleView: ["Ctrl+E", "Cmd+Shift+V", "Ctrl+Shift+V"],
+    search: ["Ctrl+F"],
+    sidebarSearch: ["Ctrl+Shift+F"],
+    settings: [
+      "Ctrl+,",
+      "Cmd+,",
+      "Command+,",
+      "Meta+,",
+      "Cmd+Shift+0",
+      "Ctrl+Shift+0",
+    ],
+    toggleOutline: ["Ctrl+O", "Cmd+Shift+O", "Ctrl+Shift+O"],
+    toggleSidebar: ["Ctrl+B", "Cmd+Shift+B", "Ctrl+Shift+B"],
+    toggleTheme: ["Ctrl+T", "Cmd+Shift+T", "Ctrl+Shift+T"],
+    openKnowledgeBase: ["Ctrl+Shift+O"],
+    exportPdf: ["Ctrl+Shift+E"],
   };
 
-  (Object.keys(defaultShortcutMigrations) as Array<keyof typeof mergedShortcuts>).forEach((key) => {
+  (
+    Object.keys(defaultShortcutMigrations) as Array<
+      keyof typeof mergedShortcuts
+    >
+  ).forEach((key) => {
     const persistedValue = persistedShortcuts[key];
     const legacyValues = defaultShortcutMigrations[key] ?? [];
 
-    if (persistedValue === undefined || (typeof persistedValue === 'string' && legacyValues.includes(persistedValue))) {
+    if (
+      persistedValue === undefined ||
+      (typeof persistedValue === "string" &&
+        legacyValues.includes(persistedValue))
+    ) {
       mergedShortcuts[key] = defaultSettings.shortcuts[key];
     }
   });
@@ -383,13 +524,20 @@ export const useAppStore = create<AppState>()(
       ...createUISlice(set as any, get as any),
     }),
     {
-      name: 'markdown-press-settings',
-      partialize: (state) => ({ settings: sanitizeSettingsForPersistence((state as any).settings) }),
+      name: "markdown-press-settings",
+      partialize: (state) => ({
+        settings: sanitizeSettingsForPersistence((state as any).settings),
+      }),
       merge: (persistedState, currentState) => {
-        const persistedSettings = stripNonRuntimeSettings((persistedState as any)?.settings ?? {});
-        const resolvedAISettings = resolvePersistedAISettings(persistedSettings);
-        const resolvedLocalizedPrompts = resolveLocalizedPrompts(persistedSettings);
-        const resolvedFontSettings = resolvePersistedFontSettings(persistedSettings);
+        const persistedSettings = stripNonRuntimeSettings(
+          (persistedState as any)?.settings ?? {},
+        );
+        const resolvedAISettings =
+          resolvePersistedAISettings(persistedSettings);
+        const resolvedLocalizedPrompts =
+          resolveLocalizedPrompts(persistedSettings);
+        const resolvedFontSettings =
+          resolvePersistedFontSettings(persistedSettings);
         const mergedSettings = {
           ...defaultSettings,
           ...persistedSettings,
@@ -398,27 +546,37 @@ export const useAppStore = create<AppState>()(
           ...resolvedFontSettings,
           ...resolvedAISettings,
           ...resolvedLocalizedPrompts,
-          language: normalizeLanguage(persistedSettings.language ?? defaultSettings.language),
-          themeMode: normalizeThemeMode(persistedSettings.themeMode ?? defaultSettings.themeMode),
-          markdownStylePreset: normalizeMarkdownStylePreset(persistedSettings.markdownStylePreset),
-          wikiFolder: normalizeWikiFolder(
-            typeof persistedSettings.wikiFolder === 'string'
-              ? persistedSettings.wikiFolder
-              : defaultSettings.wikiFolder
+          language: normalizeLanguage(
+            persistedSettings.language ?? defaultSettings.language,
           ),
-          trashFolder: normalizeTrashFolder(persistedSettings.trashFolder ?? defaultSettings.trashFolder),
-          metadataFields: normalizeMetadataFields(persistedSettings.metadataFields),
+          themeMode: normalizeThemeMode(
+            persistedSettings.themeMode ?? defaultSettings.themeMode,
+          ),
+          markdownStylePreset: normalizeMarkdownStylePreset(
+            persistedSettings.markdownStylePreset,
+          ),
+          wikiFolder: normalizeWikiFolder(
+            typeof persistedSettings.wikiFolder === "string"
+              ? persistedSettings.wikiFolder
+              : defaultSettings.wikiFolder,
+          ),
+          trashFolder: normalizeTrashFolder(
+            persistedSettings.trashFolder ?? defaultSettings.trashFolder,
+          ),
+          metadataFields: normalizeMetadataFields(
+            persistedSettings.metadataFields,
+          ),
           shortcuts: resolvePersistedShortcuts(persistedSettings),
         };
 
         return {
           ...currentState,
           ...(persistedState as any),
-          settings: mergedSettings
+          settings: mergedSettings,
         };
       },
-    }
-  )
+    },
+  ),
 );
 
 // Re-export default settings for convenience

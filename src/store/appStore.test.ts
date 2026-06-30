@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
   DEFAULT_AI_SYSTEM_PROMPT_EN,
   DEFAULT_WIKI_PROMPT_TEMPLATE,
   DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-} from '../services/aiPrompts';
+} from "../services/aiPrompts";
 import {
   defaultSettings,
   resolveLocalizedPrompts,
@@ -12,11 +12,11 @@ import {
   resolvePersistedAISettings,
   stripNonRuntimeSettings,
   useAppStore,
-} from './appStore';
+} from "./appStore";
 import {
   FONT_DEFAULTS_VERSION,
   SYSTEM_DEFAULT_FONT_FAMILY,
-} from '../utils/fontSettings';
+} from "../utils/fontSettings";
 
 afterEach(() => {
   useAppStore.setState({
@@ -27,54 +27,67 @@ afterEach(() => {
   });
 });
 
-describe('stripNonRuntimeSettings', () => {
-  it('removes AI API keys from persisted settings', () => {
+describe("stripNonRuntimeSettings", () => {
+  it("removes AI API keys from persisted settings", () => {
     const settings = stripNonRuntimeSettings({
-      geminiApiKey: 'gemini-secret',
-      codexApiKey: 'openai-secret',
-      deepseekApiKey: 'deepseek-secret',
-      language: 'zh-CN',
+      geminiApiKey: "gemini-secret",
+      codexApiKey: "openai-secret",
+      deepseekApiKey: "deepseek-secret",
+      language: "zh-CN",
     });
 
-    expect(settings).toEqual({ language: 'zh-CN' });
+    expect(settings).toEqual({ language: "zh-CN" });
   });
 
-  it('removes deleted export strikethrough setting from persisted settings', () => {
+  it("removes image hosting secrets from persisted settings", () => {
     const settings = stripNonRuntimeSettings({
-      language: 'zh-CN',
-      exportStrikethroughMode: 'raster-safe',
+      imageHostingGithubToken: "ghp_secret",
+      imageHostingS3SecretAccessKey: "s3-secret",
+      imageHostingOssAccessKeySecret: "oss-secret",
+      imageHostingQiniuSecretKey: "qiniu-secret",
+      language: "en",
     });
 
-    expect(settings).toEqual({ language: 'zh-CN' });
+    expect(settings).toEqual({ language: "en" });
+  });
+
+  it("removes deleted export strikethrough setting from persisted settings", () => {
+    const settings = stripNonRuntimeSettings({
+      language: "zh-CN",
+      exportStrikethroughMode: "raster-safe",
+    });
+
+    expect(settings).toEqual({ language: "zh-CN" });
   });
 });
 
-describe('defaultSettings', () => {
-  it('uses DeepSeek as the default AI provider', () => {
-    expect(defaultSettings.aiProvider).toBe('deepseek');
-    expect(defaultSettings.deepseekApiBaseUrl).toBe('https://api.deepseek.com');
-    expect(defaultSettings.deepseekModel).toBe('deepseek-v4-flash');
+describe("defaultSettings", () => {
+  it("uses DeepSeek as the default AI provider", () => {
+    expect(defaultSettings.aiProvider).toBe("deepseek");
+    expect(defaultSettings.deepseekApiBaseUrl).toBe("https://api.deepseek.com");
+    expect(defaultSettings.deepseekModel).toBe("deepseek-v4-flash");
   });
 });
 
-describe('persisted AI settings migration', () => {
-  it('keeps legacy Gemini-only settings on the Gemini provider', () => {
+describe("persisted AI settings migration", () => {
+  it("keeps legacy Gemini-only settings on the Gemini provider", () => {
     const settings = resolvePersistedAISettings({
-      geminiModel: 'gemini-2.0-flash-exp',
+      geminiModel: "gemini-2.0-flash-exp",
     });
 
-    expect(settings.aiProvider).toBe('gemini');
-    expect(settings.geminiModel).toBe('gemini-2.0-flash-exp');
+    expect(settings.aiProvider).toBe("gemini");
+    expect(settings.geminiModel).toBe("gemini-2.0-flash-exp");
   });
 });
 
-describe('persisted font settings migration', () => {
-  it('migrates old bundled default font settings to the system default', () => {
+describe("persisted font settings migration", () => {
+  it("migrates old bundled default font settings to the system default", () => {
     const settings = resolvePersistedFontSettings({
-      uiFontFamily: 'preset:tsanger-jinkai',
-      editorFontFamily: 'preset:tsanger-jinkai',
-      previewFontFamily: 'Tsanger JinKai 02',
-      codeFontFamily: '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace',
+      uiFontFamily: "preset:tsanger-jinkai",
+      editorFontFamily: "preset:tsanger-jinkai",
+      previewFontFamily: "Tsanger JinKai 02",
+      codeFontFamily:
+        '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace',
     });
 
     expect(settings.fontDefaultsVersion).toBe(FONT_DEFAULTS_VERSION);
@@ -84,18 +97,18 @@ describe('persisted font settings migration', () => {
     expect(settings.codeFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
   });
 
-  it('preserves an explicit bundled font after the default-font migration has run', () => {
+  it("preserves an explicit bundled font after the default-font migration has run", () => {
     const settings = resolvePersistedFontSettings({
       fontDefaultsVersion: FONT_DEFAULTS_VERSION,
-      editorFontFamily: 'preset:tsanger-jinkai',
+      editorFontFamily: "preset:tsanger-jinkai",
     });
 
-    expect(settings.editorFontFamily).toBe('preset:tsanger-jinkai');
+    expect(settings.editorFontFamily).toBe("preset:tsanger-jinkai");
   });
 });
 
-describe('resolveLocalizedPrompts', () => {
-  it('maps legacy built-in English prompts back to localized defaults', () => {
+describe("resolveLocalizedPrompts", () => {
+  it("maps legacy built-in English prompts back to localized defaults", () => {
     const prompts = resolveLocalizedPrompts({
       aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT_EN,
       wikiPromptTemplate: DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
@@ -107,41 +120,45 @@ describe('resolveLocalizedPrompts', () => {
     expect(prompts.wikiPromptTemplateEn).toBe(DEFAULT_WIKI_PROMPT_TEMPLATE_EN);
   });
 
-  it('preserves custom legacy prompts for both languages when no localized fields exist', () => {
+  it("preserves custom legacy prompts for both languages when no localized fields exist", () => {
     const prompts = resolveLocalizedPrompts({
-      aiSystemPrompt: 'Custom shared prompt',
-      wikiPromptTemplate: 'Custom shared wiki prompt',
+      aiSystemPrompt: "Custom shared prompt",
+      wikiPromptTemplate: "Custom shared wiki prompt",
     });
 
-    expect(prompts.aiSystemPromptZh).toBe('Custom shared prompt');
-    expect(prompts.aiSystemPromptEn).toBe('Custom shared prompt');
-    expect(prompts.wikiPromptTemplateZh).toBe('Custom shared wiki prompt');
-    expect(prompts.wikiPromptTemplateEn).toBe('Custom shared wiki prompt');
+    expect(prompts.aiSystemPromptZh).toBe("Custom shared prompt");
+    expect(prompts.aiSystemPromptEn).toBe("Custom shared prompt");
+    expect(prompts.wikiPromptTemplateZh).toBe("Custom shared wiki prompt");
+    expect(prompts.wikiPromptTemplateEn).toBe("Custom shared wiki prompt");
   });
 
-  it('keeps explicit localized prompt overrides', () => {
+  it("keeps explicit localized prompt overrides", () => {
     const prompts = resolveLocalizedPrompts({
       aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT_EN,
-      aiSystemPromptZh: '显式中文提示词',
+      aiSystemPromptZh: "显式中文提示词",
       wikiPromptTemplate: DEFAULT_WIKI_PROMPT_TEMPLATE,
-      wikiPromptTemplateEn: 'Explicit English wiki prompt',
+      wikiPromptTemplateEn: "Explicit English wiki prompt",
     });
 
-    expect(prompts.aiSystemPromptZh).toBe('显式中文提示词');
+    expect(prompts.aiSystemPromptZh).toBe("显式中文提示词");
     expect(prompts.aiSystemPromptEn).toBe(DEFAULT_AI_SYSTEM_PROMPT_EN);
     expect(prompts.wikiPromptTemplateZh).toBe(DEFAULT_WIKI_PROMPT_TEMPLATE);
-    expect(prompts.wikiPromptTemplateEn).toBe('Explicit English wiki prompt');
+    expect(prompts.wikiPromptTemplateEn).toBe("Explicit English wiki prompt");
   });
 });
 
-describe('tab saved baseline', () => {
-  it('treats content loaded from disk as saved when opening a tab', () => {
-    const fileId = '/vault/note.md';
+describe("tab saved baseline", () => {
+  it("treats content loaded from disk as saved when opening a tab", () => {
+    const fileId = "/vault/note.md";
 
-    useAppStore.getState().addTab(fileId, '# Loaded from disk\n');
+    useAppStore.getState().addTab(fileId, "# Loaded from disk\n");
 
-    expect(useAppStore.getState().fileContents[fileId]).toBe('# Loaded from disk\n');
-    expect(useAppStore.getState().lastSavedContent[fileId]).toBe('# Loaded from disk\n');
+    expect(useAppStore.getState().fileContents[fileId]).toBe(
+      "# Loaded from disk\n",
+    );
+    expect(useAppStore.getState().lastSavedContent[fileId]).toBe(
+      "# Loaded from disk\n",
+    );
     expect(useAppStore.getState().hasUnsavedChanges(fileId)).toBe(false);
   });
 });

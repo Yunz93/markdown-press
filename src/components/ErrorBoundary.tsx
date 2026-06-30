@@ -9,15 +9,16 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  retryKey: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, retryKey: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
@@ -25,6 +26,14 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("[ErrorBoundary]", error, errorInfo);
     this.props.onError?.(error, errorInfo);
   }
+
+  private handleRetry = (): void => {
+    this.setState((state) => ({
+      hasError: false,
+      error: null,
+      retryKey: state.retryKey + 1,
+    }));
+  };
 
   render() {
     if (this.state.hasError) {
@@ -41,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
               "An unexpected error occurred in this component."}
           </p>
           <button
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={this.handleRetry}
             className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
             Try Again
@@ -50,6 +59,10 @@ export class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    return (
+      <React.Fragment key={this.state.retryKey}>
+        {this.props.children}
+      </React.Fragment>
+    );
   }
 }
