@@ -90,7 +90,27 @@ git push origin v0.1.1
 
 CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
 
-当前仓库的 macOS GitHub Release 使用 `ad-hoc signing`，不依赖 Apple Developer 证书，因此可以直接在 CI 中产出 `.app` 和 `.dmg`。如果后续需要"下载后可直接安装、无需手动放行"的体验，需要 Apple Developer 证书和 notarization。
+### macOS 签名与公证
+
+macOS 从浏览器下载的应用必须通过 **Developer ID 签名 + Apple 公证（notarization）** 才能通过 Gatekeeper，否则会出现「无法验证开发者」或「已损坏」提示。
+
+Release 工作流会在 GitHub Secrets 齐全时自动完成签名与公证；未配置证书时回退到 ad-hoc 签名（需用户执行 `xattr -cr`）。
+
+在仓库 Settings → Secrets and variables → Actions 中配置：
+
+| Secret                       | 说明                                                              |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `APPLE_CERTIFICATE`          | 从 Keychain 导出的 Developer ID Application `.p12` 经 base64 编码 |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` 导出密码                                                   |
+| `KEYCHAIN_PASSWORD`          | CI 临时钥匙串密码（任意强密码）                                   |
+| `APPLE_ID`                   | Apple ID 邮箱（与下方二选一）                                     |
+| `APPLE_PASSWORD`             | App 专用密码                                                      |
+| `APPLE_TEAM_ID`              | Apple Developer Team ID                                           |
+| `APPLE_API_KEY`              | App Store Connect API Key ID（推荐，与上方二选一）                |
+| `APPLE_API_ISSUER`           | App Store Connect Issuer ID                                       |
+| `APPLE_API_KEY_CONTENT`      | 下载的 `.p8` 私钥全文                                             |
+
+证书导出与公证流程参考 [Tauri macOS 签名文档](https://v2.tauri.app/distribute/sign/macos/)。
 
 ## Release 校验
 
