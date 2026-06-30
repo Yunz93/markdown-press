@@ -57,9 +57,14 @@ import { applyPreviewHeadingAttributes } from "../../utils/previewHeadingAttribu
 import { parseFrontmatter } from "../../utils/frontmatter";
 import { openExternalUrl } from "../../utils/externalLinks";
 import { isWindowsPlatform } from "../../utils/platform";
-import type { FileNode, Frontmatter } from "../../types";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
+import {
+  getFrontmatterDisplayItems,
+  isExternalLink,
+  isValidExternalUrl,
+  type FrontmatterValue,
+} from "./preview/previewPaneHelpers";
 
 interface PreviewPaneProps {
   highlighter?: ShikiHighlighter | null;
@@ -78,37 +83,6 @@ export interface PreviewPaneHandle {
   getScrollPosition: () => { top: number; left: number };
   restoreScrollPosition: (position: { top: number; left: number }) => void;
   scrollToTop: () => void;
-}
-
-// Helper functions
-function isExternalLink(href: string): boolean {
-  return /^(https?:|mailto:|tel:)/i.test(href.trim());
-}
-
-function isValidExternalUrl(href: string): boolean {
-  try {
-    const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-type FrontmatterValue = Frontmatter[keyof Frontmatter];
-
-function getFrontmatterDisplayItems(value: FrontmatterValue): string[] {
-  if (Array.isArray(value)) {
-    const items = value
-      .map((item) => String(item ?? "").trim())
-      .filter(Boolean);
-    return items.length > 0 ? items : [""];
-  }
-
-  if (value === null || value === undefined) {
-    return [""];
-  }
-
-  return [String(value)];
 }
 
 export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
