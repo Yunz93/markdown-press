@@ -65,12 +65,14 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: bash scripts/import-apple-certificate.sh
 
-      - name: Prepare Apple notarization API key
-        if: env.APPLE_API_KEY_CONTENT != ''
+      - name: Prepare Apple notarization credentials
         env:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node scripts/prepare-apple-notarization.mjs
 
       - name: Build and upload release assets
@@ -78,11 +80,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY || '-' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}

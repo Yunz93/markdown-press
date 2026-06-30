@@ -29,10 +29,11 @@ describe("macOS release signing configuration", () => {
     expect(workflow).toContain("scripts/import-apple-certificate.sh");
     expect(workflow).toContain("scripts/prepare-apple-notarization.mjs");
     expect(workflow).toContain("env.APPLE_CERTIFICATE != ''");
+    expect(workflow).toContain("Prepare Apple notarization credentials");
     expect(workflow).not.toContain('APPLE_SIGNING_IDENTITY: "-"');
-    expect(workflow).toContain("APPLE_ID: ${{ secrets.APPLE_ID }}");
-    expect(workflow).toContain(
-      "APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}",
+    expect(workflow).not.toMatch(
+      /Build and upload release assets[\s\S]*APPLE_ID: \$\{\{ secrets\.APPLE_ID \}\}/,
     );
+    expect(workflow).toContain("APPLE_ID: ${{ secrets.APPLE_ID }}");
   });
 });

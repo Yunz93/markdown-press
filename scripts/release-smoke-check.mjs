@@ -113,9 +113,9 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
-  if (!workflow.includes("scripts/prepare-apple-notarization.mjs")) {
+  if (!workflow.includes("Prepare Apple notarization credentials")) {
     console.error(
-      "release.yml must prepare App Store Connect API credentials via scripts/prepare-apple-notarization.mjs.",
+      "release.yml must prepare Apple notarization credentials via scripts/prepare-apple-notarization.mjs.",
     );
     process.exit(1);
   }
