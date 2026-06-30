@@ -1,8 +1,7 @@
 export interface FileNode {
   id: string;
   name: string;
-  type: 'file' | 'folder';
-  content?: string;
+  type: "file" | "folder";
   children?: FileNode[];
   path: string;
   isPublished?: boolean;
@@ -33,9 +32,9 @@ export interface MarkdownFile {
 }
 
 export enum ViewMode {
-  EDITOR = 'EDITOR',
-  PREVIEW = 'PREVIEW',
-  SPLIT = 'SPLIT'
+  EDITOR = "EDITOR",
+  PREVIEW = "PREVIEW",
+  SPLIT = "SPLIT",
 }
 
 export interface AIAnalysisResult {
@@ -61,7 +60,7 @@ export interface AIWikiGenerationResult {
   citations: string[];
 }
 
-export type AIProvider = 'gemini' | 'codex' | 'deepseek';
+export type AIProvider = "gemini" | "codex" | "deepseek";
 
 export interface ShortcutConfig {
   save: string;
@@ -92,14 +91,20 @@ export interface KnowledgeBaseMeta {
   lastOpenedAt: string;
 }
 
-export type ThemeMode = 'light' | 'dark';
-export type AppLanguage = 'zh-CN' | 'en';
-export type AttachmentPasteFormat = 'markdown' | 'obsidian';
-export type OrderedListMode = 'strict' | 'loose';
-export type MarkdownStylePreset = 'nord' | 'topaz' | 'typewriter' | 'primary';
+export type ThemeMode = "light" | "dark";
+export type AppLanguage = "zh-CN" | "en";
+export type AttachmentPasteFormat = "markdown" | "obsidian";
+export type OrderedListMode = "strict" | "loose";
+export type MarkdownStylePreset = "nord" | "topaz" | "typewriter" | "primary";
 
-export type ImageHostingProvider = 'none' | 'github' | 's3' | 'aliyun_oss' | 'qiniu' | 'custom';
-export type ImagePasteAction = 'local' | 'upload';
+export type ImageHostingProvider =
+  | "none"
+  | "github"
+  | "s3"
+  | "aliyun_oss"
+  | "qiniu"
+  | "custom";
+export type ImagePasteAction = "local" | "upload";
 
 export interface ImageHostingGitHubConfig {
   repo: string;
@@ -135,7 +140,7 @@ export interface ImageHostingQiniuConfig {
 
 export interface ImageHostingCustomConfig {
   uploadUrl: string;
-  method: 'POST' | 'PUT';
+  method: "POST" | "PUT";
   headers: string;
   fileFieldName: string;
   responseUrlJsonPath: string;
@@ -208,7 +213,7 @@ export interface AppSettings {
 
 export interface Notification {
   msg: string;
-  type: 'success' | 'error' | 'info';
+  type: "success" | "error" | "info";
 }
 
 export interface DragDropEvent {

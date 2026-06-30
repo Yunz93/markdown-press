@@ -45,7 +45,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     currentFilePath,
     isSaving,
     setSaving,
-    updateFileContent,
     updateTabContent,
     markAsSaved,
     showNotification,
@@ -141,7 +140,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           }
         }
 
-        updateFileContent(activeTabId, contentToSave);
         markAsSaved(activeTabId, contentToSave);
         lastSavedContentRef.current = contentToSave;
         saveStateRef.current = {
@@ -213,7 +211,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     [
       activeTabId,
       setSaving,
-      updateFileContent,
       updateTabContent,
       markAsSaved,
       showNotification,

@@ -123,7 +123,6 @@ export function useExportActions(
       }
 
       stateBeforeWrite.updateTabContent(fileId, linkedContent);
-      stateBeforeWrite.updateFileContent(fileId, linkedContent);
 
       try {
         const fs = await getFileSystem();

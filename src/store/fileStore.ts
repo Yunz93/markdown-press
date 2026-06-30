@@ -1,4 +1,4 @@
-import type { FileNode } from '../types';
+import type { FileNode } from "../types";
 
 /**
  * File store state interface
@@ -16,7 +16,6 @@ export interface FileActions {
   setFiles: (files: FileNode[]) => void;
   setCurrentFilePath: (path: string | null) => void;
   setRootFolderPath: (path: string | null) => void;
-  updateFileContent: (fileId: string, content: string) => void;
   addFile: (file: FileNode) => void;
   removeFile: (fileId: string) => void;
   updateFileName: (fileId: string, newName: string, newPath: string) => void;
@@ -38,7 +37,7 @@ export const initialFileState: FileState = {
  */
 export function createFileSlice(
   set: (fn: (state: FileState) => Partial<FileState>) => void,
-  get: () => FileState & FileActions
+  get: () => FileState & FileActions,
 ): FileState & FileActions {
   return {
     ...initialFileState,
@@ -49,23 +48,12 @@ export function createFileSlice(
 
     setRootFolderPath: (path) => set(() => ({ rootFolderPath: path })),
 
-    updateFileContent: (fileId, content) => {
-      set((state) => {
-        const updateTree = (nodes: FileNode[]): FileNode[] =>
-          nodes.map((node) =>
-            node.id === fileId
-              ? { ...node, content }
-              : node.children
-                ? { ...node, children: updateTree(node.children) }
-                : node
-          );
-        return { files: updateTree(state.files) };
-      });
-    },
-
     addFile: (file) => {
       set((state) => {
-        const parentPath = file.path.substring(0, file.path.lastIndexOf(file.name) - 1);
+        const parentPath = file.path.substring(
+          0,
+          file.path.lastIndexOf(file.name) - 1,
+        );
 
         if (!parentPath || parentPath === state.rootFolderPath) {
           return { files: [...state.files, file] };
@@ -93,7 +81,7 @@ export function createFileSlice(
             .map((node) =>
               node.children
                 ? { ...node, children: removeFromTree(node.children) }
-                : node
+                : node,
             );
         return { files: removeFromTree(state.files) };
       });
@@ -101,20 +89,28 @@ export function createFileSlice(
 
     updateFileName: (fileId, newName, newPath) => {
       set((state) => {
-        const updateNodeAndChildren = (node: FileNode, oldBasePath: string, nextBasePath: string): FileNode => {
-          const nextPath = node.path === oldBasePath
-            ? nextBasePath
-            : node.path.replace(oldBasePath, nextBasePath);
-          const nextId = node.id === oldBasePath
-            ? nextBasePath
-            : node.id.replace(oldBasePath, nextBasePath);
+        const updateNodeAndChildren = (
+          node: FileNode,
+          oldBasePath: string,
+          nextBasePath: string,
+        ): FileNode => {
+          const nextPath =
+            node.path === oldBasePath
+              ? nextBasePath
+              : node.path.replace(oldBasePath, nextBasePath);
+          const nextId =
+            node.id === oldBasePath
+              ? nextBasePath
+              : node.id.replace(oldBasePath, nextBasePath);
 
           return {
             ...node,
             name: node.id === fileId ? newName : node.name,
             path: nextPath,
             id: nextId,
-            children: node.children?.map((child) => updateNodeAndChildren(child, oldBasePath, nextBasePath))
+            children: node.children?.map((child) =>
+              updateNodeAndChildren(child, oldBasePath, nextBasePath),
+            ),
           };
         };
 
@@ -157,7 +153,7 @@ export function createFileSlice(
             .map((node) =>
               node.children
                 ? { ...node, children: removeFromTree(node.children) }
-                : node
+                : node,
             );
         return { files: removeFromTree(state.files) };
       });

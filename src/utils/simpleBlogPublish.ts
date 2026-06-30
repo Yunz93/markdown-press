@@ -392,10 +392,6 @@ export async function prepareSimpleBlogPublish(
     }
 
     const pending = (async () => {
-      if (typeof file.content === "string" && file.content.length > 0) {
-        return file.content;
-      }
-
       try {
         const fs = await getFileSystem();
         return await fs.readFile(file.path);
