@@ -31,8 +31,13 @@ import {
   ORDERED_LIST_REGEX,
   UNORDERED_LIST_REGEX,
   TASK_LIST_REGEX,
+  BLOCKQUOTE_REGEX,
+  isBlankLine as isBlankLineFromCore,
 } from "./core";
 
+// Keep these as literals (not re-exports of core consts): this module
+// participates in an import cycle with core, so a module-init re-export would
+// capture `undefined` in the temporal dead zone.
 export const LIST_INDENT_UNIT = "    ";
 export const LIST_INDENT_SIZE = 4;
 
@@ -250,7 +255,6 @@ export function formatOrderedMarkerValue(
 function extractOrderedMarkerRawPartFromLineText(
   lineText: string,
 ): string | null {
-  const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
   let text = lineText;
   const quoteMatch = text.match(BLOCKQUOTE_REGEX);
   if (quoteMatch) {
@@ -272,8 +276,7 @@ export function parseListItem(
   startPos: number,
 ): ListItemInfo | null {
   // 支持引用块内列表："> - item" / "> 1. item"
-  // 这里不要依赖 behavior/quotes.ts 以避免循环依赖，使用与 core.ts 同形的正则。
-  const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
+  // 复用 core.ts 导出的 BLOCKQUOTE_REGEX，避免两处漂移。
   let quotePrefix = "";
   let text = lineText;
   const quoteMatch = text.match(BLOCKQUOTE_REGEX);
@@ -355,14 +358,8 @@ export function parseListItem(
   return null;
 }
 
-/**
- * 判断是否为空白行
- * 使用与 behavior/core.ts 一致的正则
- */
-function isBlankLine(lineText: string): boolean {
-  const EMPTY_LINE_REGEX = /^[ \t]*$/;
-  return EMPTY_LINE_REGEX.test(lineText);
-}
+// 判断是否为空白行：复用 core.ts 实现，保持行为一致。
+const isBlankLine = isBlankLineFromCore;
 
 /**
  * 光标所在行是否为同一 Markdown ListItem 内「第一项之后的行」（懒延续 / 多段正文）。

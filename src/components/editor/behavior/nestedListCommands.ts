@@ -10,7 +10,11 @@ import {
   type StateCommand,
   type Transaction,
 } from "@codemirror/state";
-import { updateSelectedLines as updateSelectedLinesWithSelectionMap } from "./core";
+import {
+  updateSelectedLines as updateSelectedLinesWithSelectionMap,
+  isBlankLine,
+  getLeadingIndent,
+} from "./core";
 import {
   type ListItemInfo,
   type ListType,
@@ -30,14 +34,6 @@ import {
 } from "./nestedListBehavior";
 
 // ==================== 辅助函数 ====================
-
-function isBlankLine(lineText: string): boolean {
-  return /^[ \t]*$/.test(lineText);
-}
-
-function getLeadingIndent(lineText: string): string {
-  return lineText.match(/^[ \t]*/)![0];
-}
 
 function getMarkerText(item: ListItemInfo): string {
   if (item.type === "ordered") {
