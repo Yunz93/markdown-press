@@ -90,7 +90,29 @@ git push origin v0.1.1
 
 CI automatically syncs the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` to the tag, then runs the Tauri build and uploads to GitHub Releases.
 
-macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`. Releases are still ad-hoc signed; seamless browser `.dmg` installs require Apple Developer signing and notarization.
+macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`.
+
+### macOS signing & notarization
+
+Apps downloaded from the browser must be **Developer ID signed and notarized** to pass Gatekeeper. Otherwise macOS shows “cannot verify developer” or “damaged” warnings.
+
+The release workflow signs and notarizes automatically when the GitHub Secrets below are configured. Without them it falls back to ad-hoc signing and users must run `xattr -cr` or use the one-line installer.
+
+Configure these in **Settings → Secrets and variables → Actions**:
+
+| Secret                       | Purpose                                                |
+| ---------------------------- | ------------------------------------------------------ |
+| `APPLE_CERTIFICATE`          | Base64-encoded Developer ID Application `.p12` export  |
+| `APPLE_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12`                |
+| `KEYCHAIN_PASSWORD`          | Temporary CI keychain password                         |
+| `APPLE_ID`                   | Apple ID email (use with password auth below)          |
+| `APPLE_PASSWORD`             | App-specific password                                  |
+| `APPLE_TEAM_ID`              | Apple Developer Team ID                                |
+| `APPLE_API_KEY`              | App Store Connect API Key ID (recommended alternative) |
+| `APPLE_API_ISSUER`           | App Store Connect Issuer ID                            |
+| `APPLE_API_KEY_CONTENT`      | Full `.p8` private key text                            |
+
+See the [Tauri macOS signing guide](https://v2.tauri.app/distribute/sign/macos/) for certificate export and notarization details.
 
 ## Release Smoke Test
 

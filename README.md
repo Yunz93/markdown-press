@@ -14,6 +14,8 @@
 
 ### macOS
 
+### macOS
+
 **推荐：一键安装**（自动下载、移除隔离标记并安装到「应用程序」）
 
 ```bash
@@ -26,13 +28,15 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 RELEASE_TAG=v0.9.5 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
-也可在 [GitHub Releases](https://github.com/Yunz93/markdown-press/releases) 手动下载 `.dmg`。若系统提示无法验证开发者，将 `M記.app` 放入「应用程序」后执行：
+已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `M記.app` 放入「应用程序」后执行：
 
 ```bash
 xattr -cr /Applications/M記.app
 ```
 
 若仍在「下载」中，把路径换成 `~/Downloads/M記.app`。
+
+证书与公证配置见 [开发文档 - macOS 签名公证](./docs/DEVELOPMENT.md#macos-签名与公证)。
 
 ### Windows
 

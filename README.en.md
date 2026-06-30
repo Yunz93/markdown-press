@@ -14,6 +14,8 @@ Grab the installer for your platform from [GitHub Releases](https://github.com/Y
 
 ### macOS
 
+### macOS
+
 **Recommended: one-line install** (downloads, clears quarantine, and copies to Applications):
 
 ```bash
@@ -26,13 +28,15 @@ Pin a release (optional):
 RELEASE_TAG=v0.9.5 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
-You can also download the `.dmg` from [GitHub Releases](https://github.com/Yunz93/markdown-press/releases). If Gatekeeper blocks the app, run:
+Signed and notarized GitHub Releases should also open normally after you drag **M記.app** into Applications. If Gatekeeper still blocks the app, run:
 
 ```bash
 xattr -cr /Applications/M記.app
 ```
 
 If it is still in Downloads, use `~/Downloads/M記.app` instead.
+
+See [Development guide — macOS signing & notarization](./docs/DEVELOPMENT.en.md#macos-signing--notarization) for the CI secret setup.
 
 ### Windows
 
