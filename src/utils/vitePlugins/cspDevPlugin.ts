@@ -7,7 +7,7 @@ import type { Plugin } from "vite";
 // 与 src-tauri/tauri.conf.json 中 app.security.csp 保持一致
 // 额外加入 Vite dev server 必需的 ws: (HMR WebSocket) 和 'unsafe-inline' (HMR inline script)
 // 这两项在 Tauri release 中不需要（无 HMR、无 inline script），仅 dev 使用
-const DEV_CSP =
+export const DEV_CSP =
   "default-src 'self'; " +
   "connect-src 'self' http: https: ws: blob: asset:; " +
   "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' blob: asset:; " +
@@ -15,7 +15,7 @@ const DEV_CSP =
   "style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: blob: asset: http: https:; " +
   "font-src 'self' data: blob: asset:; " +
-  "frame-src 'self' blob: asset:; " +
+  "frame-src 'self' https: blob: asset:; " +
   "object-src 'self' blob: asset:; " +
   "media-src 'self' blob: asset: http: https:;";
 

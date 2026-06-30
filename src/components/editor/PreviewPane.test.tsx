@@ -1,10 +1,16 @@
 /** @vitest-environment happy-dom */
 
-import React, { createRef } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useAppStore } from '../../store/appStore';
-import type { PreviewPaneHandle } from './PreviewPane';
+import React, { createRef } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { useAppStore } from "../../store/appStore";
+import type { PreviewPaneHandle } from "./PreviewPane";
 
 const {
   mockNavigateToWikilink,
@@ -17,70 +23,87 @@ const {
   mockCancelScrollSync,
   mockRenderMermaidDiagrams,
   mockResetMermaidPlaceholders,
+  mockOpenExternalUrl,
 } = vi.hoisted(() => ({
   mockNavigateToWikilink: vi.fn(async () => true),
   mockNavigateToHashLink: vi.fn(() => true),
   mockHandleFileSelect: vi.fn(async () => {}),
   mockHandleRevealInExplorer: vi.fn(async () => {}),
+  mockOpenExternalUrl: vi.fn(async () => {}),
   mockMountPdfPreview: vi.fn<
-    (container: HTMLElement, src: string, title: string, pdfPath?: string) => () => void
+    (
+      container: HTMLElement,
+      src: string,
+      title: string,
+      pdfPath?: string,
+    ) => () => void
   >(() => () => {}),
   mockResolveAttachmentTarget: vi.fn(),
   mockSyncScrollTo: vi.fn(),
   mockCancelScrollSync: vi.fn(),
   mockRenderMermaidDiagrams: vi.fn<
-    (container: HTMLElement, options?: { themeMode?: 'light' | 'dark' }) => Promise<void>
+    (
+      container: HTMLElement,
+      options?: { themeMode?: "light" | "dark" },
+    ) => Promise<void>
   >(async () => {}),
-  mockResetMermaidPlaceholders: vi.fn<(container: HTMLElement) => void>(() => {}),
+  mockResetMermaidPlaceholders: vi.fn<(container: HTMLElement) => void>(
+    () => {},
+  ),
 }));
 
-vi.mock('../../hooks/useFileOperations', () => ({
+vi.mock("../../hooks/useFileOperations", () => ({
   useFileOperations: () => ({
     handleFileSelect: mockHandleFileSelect,
     handleRevealInExplorer: mockHandleRevealInExplorer,
   }),
 }));
 
-vi.mock('../../hooks/useFileSystem', () => ({
+vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
-    readFile: vi.fn(async () => ''),
+    readFile: vi.fn(async () => ""),
   }),
 }));
 
-vi.mock('../../utils/attachmentResolver', () => ({
+vi.mock("../../utils/attachmentResolver", () => ({
   createAttachmentResolverContext: vi.fn(() => ({})),
   resolveAttachmentTarget: mockResolveAttachmentTarget,
 }));
 
-vi.mock('../../utils/pdfPreview', () => ({
+vi.mock("../../utils/pdfPreview", () => ({
   mountPdfPreview: mockMountPdfPreview,
 }));
 
-vi.mock('../../utils/previewImageCache', () => ({
+vi.mock("../../utils/previewImageCache", () => ({
   warmPreviewImage: vi.fn(async (src: string) => src),
   resolvePreviewSource: vi.fn(async (src: string) => src),
 }));
 
-vi.mock('../../utils/markdown-extensions', () => ({
+vi.mock("../../utils/markdown-extensions", () => ({
   renderMermaidDiagrams: mockRenderMermaidDiagrams,
   resetMermaidPlaceholders: mockResetMermaidPlaceholders,
 }));
 
-vi.mock('../../utils/performance', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../utils/performance')>();
+vi.mock("../../utils/performance", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../utils/performance")>();
   return {
     ...actual,
     useThrottledResize: () => () => {},
   };
 });
 
-vi.mock('./hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./hooks')>();
+vi.mock("./hooks", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./hooks")>();
   return {
     ...actual,
     usePreviewRenderer: vi.fn(() => ({
       parsedContent: {
-        frontmatter: { title: 'Note', tags: ['a', 'b'], link: 'https://example.com/doc' },
+        frontmatter: {
+          title: "Note",
+          tags: ["a", "b"],
+          link: "https://example.com/doc",
+        },
         bodyHTML: `
           <p><a class="markdown-wikilink" href="#" data-wikilink="Other Note">Other</a></p>
           <p><a href="https://example.com/page">External</a></p>
@@ -91,8 +114,8 @@ vi.mock('./hooks', async (importOriginal) => {
           </a>
         `,
       },
-      enhancedBodyHtml: '',
-      sanitizedHtmlPreview: '<p>html preview</p>',
+      enhancedBodyHtml: "",
+      sanitizedHtmlPreview: "<p>html preview</p>",
       requiresAsyncEnhancement: false,
     })),
     usePreviewScroll: vi.fn(() => ({
@@ -115,41 +138,57 @@ vi.mock('./hooks', async (importOriginal) => {
   };
 });
 
-vi.mock('@tauri-apps/plugin-shell', () => ({
+vi.mock("@tauri-apps/plugin-shell", () => ({
   open: vi.fn(async () => {}),
 }));
 
-import { PreviewPane } from './PreviewPane';
+vi.mock("../../utils/externalLinks", () => ({
+  openExternalUrl: mockOpenExternalUrl,
+}));
 
-function seedMarkdownStore(overrides: Partial<ReturnType<typeof useAppStore.getState>> = {}) {
+import { PreviewPane } from "./PreviewPane";
+
+function seedMarkdownStore(
+  overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
+) {
   useAppStore.setState({
     settings: {
-      language: 'en',
-      themeMode: 'light',
+      language: "en",
+      themeMode: "light",
       fontSize: 16,
-      markdownStylePreset: 'nord',
-      orderedListMode: 'strict',
-      previewFontFamily: 'system',
-      codeFontFamily: 'system',
+      markdownStylePreset: "nord",
+      orderedListMode: "strict",
+      previewFontFamily: "system",
+      codeFontFamily: "system",
     } as never,
-    currentFilePath: '/vault/notes/a.md',
-    rootFolderPath: '/vault',
-    files: [{ id: '/vault/notes/a.md', name: 'a.md', path: '/vault/notes/a.md', type: 'file' }],
-    activeTabId: '/vault/notes/a.md',
-    fileContents: { '/vault/notes/a.md': '---\ntitle: Note\ntags:\n  - a\n  - b\nlink: https://example.com/doc\n---\n\n# Hello' },
+    currentFilePath: "/vault/notes/a.md",
+    rootFolderPath: "/vault",
+    files: [
+      {
+        id: "/vault/notes/a.md",
+        name: "a.md",
+        path: "/vault/notes/a.md",
+        type: "file",
+      },
+    ],
+    activeTabId: "/vault/notes/a.md",
+    fileContents: {
+      "/vault/notes/a.md":
+        "---\ntitle: Note\ntags:\n  - a\n  - b\nlink: https://example.com/doc\n---\n\n# Hello",
+    },
     showNotification: vi.fn(),
     ...overrides,
   } as never);
 }
 
-describe('PreviewPane', () => {
+describe("PreviewPane", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('requestIdleCallback', (callback: IdleRequestCallback) => {
+    vi.stubGlobal("requestIdleCallback", (callback: IdleRequestCallback) => {
       callback({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline);
       return 1;
     });
-    vi.stubGlobal('cancelIdleCallback', vi.fn());
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
     seedMarkdownStore();
   });
 
@@ -164,61 +203,90 @@ describe('PreviewPane', () => {
     } as never);
   });
 
-  it('renders markdown preview article and frontmatter properties', async () => {
+  it("renders markdown preview article and frontmatter properties", async () => {
     render(<PreviewPane previewRenderActive previewLayoutActive />);
 
-    expect(await screen.findByText('Properties')).toBeTruthy();
-    expect(await waitFor(() => document.querySelector('.preview-pane-document.markdown-body'))).toBeTruthy();
-    expect(document.querySelector('.preview-pane-properties-multi-value-item')?.textContent).toBe('a');
-    expect(document.querySelector('a[href="https://example.com/doc"]')).toBeTruthy();
+    expect(await screen.findByText("Properties")).toBeTruthy();
+    expect(
+      await waitFor(() =>
+        document.querySelector(".preview-pane-document.markdown-body"),
+      ),
+    ).toBeTruthy();
+    expect(
+      document.querySelector(".preview-pane-properties-multi-value-item")
+        ?.textContent,
+    ).toBe("a");
+    expect(
+      document.querySelector('a[href="https://example.com/doc"]'),
+    ).toBeTruthy();
   });
 
-  it('routes click events to wikilink, external, local, and hash handlers', async () => {
+  it("routes click events to wikilink, external, local, and hash handlers", async () => {
     mockResolveAttachmentTarget.mockResolvedValue({
-      path: '/vault/papers/local.pdf',
-      name: 'local.pdf',
+      path: "/vault/papers/local.pdf",
+      name: "local.pdf",
     });
 
     render(<PreviewPane previewRenderActive previewLayoutActive />);
 
-    fireEvent.click(await screen.findByText('Other'));
-    expect(mockNavigateToWikilink).toHaveBeenCalledWith('Other Note');
+    fireEvent.click(await screen.findByText("Other"));
+    expect(mockNavigateToWikilink).toHaveBeenCalledWith("Other Note");
 
-    fireEvent.click(screen.getByText('External'));
-    const { open } = await import('@tauri-apps/plugin-shell');
-    expect(open).toHaveBeenCalledWith('https://example.com/page');
+    fireEvent.click(screen.getByText("External"));
+    expect(mockOpenExternalUrl).toHaveBeenCalledWith(
+      "https://example.com/page",
+    );
 
-    fireEvent.click(screen.getByText('Local PDF'));
+    fireEvent.click(screen.getByText("Local PDF"));
     await waitFor(() => {
-      expect(mockHandleFileSelect).toHaveBeenCalledWith(expect.objectContaining({ path: '/vault/papers/local.pdf' }));
+      expect(mockHandleFileSelect).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/vault/papers/local.pdf" }),
+      );
     });
 
-    fireEvent.click(screen.getByText('Section'));
-    expect(mockNavigateToHashLink).toHaveBeenCalledWith('Section');
+    fireEvent.click(screen.getByText("Section"));
+    expect(mockNavigateToHashLink).toHaveBeenCalledWith("Section");
   });
 
-  it('reveals attachments on double-click', async () => {
+  it("reveals attachments on double-click", async () => {
     render(<PreviewPane previewRenderActive previewLayoutActive />);
 
-    const attachment = await waitFor(() => document.querySelector('[data-attachment-path]') as HTMLElement);
+    const attachment = await waitFor(
+      () => document.querySelector("[data-attachment-path]") as HTMLElement,
+    );
     fireEvent.doubleClick(attachment);
-    expect(mockHandleRevealInExplorer).toHaveBeenCalledWith('/vault/data.zip');
+    expect(mockHandleRevealInExplorer).toHaveBeenCalledWith("/vault/data.zip");
   });
 
-  it('renders asset tabs for image, video, pdf, html, and unsupported files', async () => {
+  it("renders asset tabs for image, video, pdf, html, and unsupported files", async () => {
     const cases = [
-      { path: '/vault/img/photo.png', selector: 'img.preview-attachment-image' },
-      { path: '/vault/media/clip.mp4', selector: 'video.preview-pane-video-player' },
-      { path: '/vault/papers/paper.pdf', selector: '.preview-pdfjs[data-pdf-src]' },
-      { path: '/vault/page.html', selector: '.preview-html-document' },
-      { path: '/vault/readme.txt', text: 'Preview is not supported for this file type.' },
+      {
+        path: "/vault/img/photo.png",
+        selector: "img.preview-attachment-image",
+      },
+      {
+        path: "/vault/media/clip.mp4",
+        selector: "video.preview-pane-video-player",
+      },
+      {
+        path: "/vault/papers/paper.pdf",
+        selector: ".preview-pdfjs[data-pdf-src]",
+      },
+      { path: "/vault/page.html", selector: ".preview-html-document" },
+      {
+        path: "/vault/readme.txt",
+        text: "Preview is not supported for this file type.",
+      },
     ] as const;
 
     for (const testCase of cases) {
       cleanup();
-      seedMarkdownStore({ currentFilePath: testCase.path, activeTabId: testCase.path });
+      seedMarkdownStore({
+        currentFilePath: testCase.path,
+        activeTabId: testCase.path,
+      });
       render(<PreviewPane previewRenderActive previewLayoutActive />);
-      if ('selector' in testCase) {
+      if ("selector" in testCase) {
         await waitFor(() => {
           expect(document.querySelector(testCase.selector)).toBeTruthy();
         });
@@ -228,9 +296,16 @@ describe('PreviewPane', () => {
     }
   });
 
-  it('exposes imperative scroll helpers on the ref handle', () => {
+  it("exposes imperative scroll helpers on the ref handle", () => {
     const ref = createRef<PreviewPaneHandle>();
-    render(<PreviewPane ref={ref} previewRenderActive previewLayoutActive syncedPercentage={0.25} />);
+    render(
+      <PreviewPane
+        ref={ref}
+        previewRenderActive
+        previewLayoutActive
+        syncedPercentage={0.25}
+      />,
+    );
 
     ref.current?.syncScrollTo(0.5, { immediate: true });
     expect(mockSyncScrollTo).toHaveBeenCalled();
@@ -243,15 +318,17 @@ describe('PreviewPane', () => {
     expect(ref.current?.getScrollPosition().top).toBeGreaterThanOrEqual(0);
   });
 
-  it('mounts pdf.js preview containers discovered in markdown', async () => {
-    const { usePreviewRenderer } = await import('./hooks');
+  it("mounts pdf.js preview containers discovered in markdown", async () => {
+    const { usePreviewRenderer } = await import("./hooks");
     vi.mocked(usePreviewRenderer).mockReturnValueOnce({
       parsedContent: {
         frontmatter: null,
-        bodyHTML: '<div class="preview-pdfjs" data-pdf-src="blob:pdf" data-pdf-title="Paper"></div>',
+        bodyHTML:
+          '<div class="preview-pdfjs" data-pdf-src="blob:pdf" data-pdf-title="Paper"></div>',
       },
-      enhancedBodyHtml: '<div class="preview-pdfjs" data-pdf-src="blob:pdf" data-pdf-title="Paper"></div>',
-      sanitizedHtmlPreview: '',
+      enhancedBodyHtml:
+        '<div class="preview-pdfjs" data-pdf-src="blob:pdf" data-pdf-title="Paper"></div>',
+      sanitizedHtmlPreview: "",
       requiresAsyncEnhancement: false,
     });
 
@@ -261,15 +338,15 @@ describe('PreviewPane', () => {
     });
   });
 
-  it('renders mermaid diagrams after markdown paint when preview layout is active', async () => {
-    const { usePreviewRenderer } = await import('./hooks');
+  it("renders mermaid diagrams after markdown paint when preview layout is active", async () => {
+    const { usePreviewRenderer } = await import("./hooks");
     vi.mocked(usePreviewRenderer).mockReturnValue({
       parsedContent: {
         frontmatter: null,
         bodyHTML: '<div class="mermaid">graph TD; A-->B;</div>',
       },
       enhancedBodyHtml: '<div class="mermaid">graph TD; A-->B;</div>',
-      sanitizedHtmlPreview: '',
+      sanitizedHtmlPreview: "",
       requiresAsyncEnhancement: false,
     });
 
@@ -280,48 +357,52 @@ describe('PreviewPane', () => {
     });
   });
 
-  it('skips mermaid rendering when the preview column has zero layout width', async () => {
-    const { usePreviewRenderer } = await import('./hooks');
+  it("skips mermaid rendering when the preview column has zero layout width", async () => {
+    const { usePreviewRenderer } = await import("./hooks");
     vi.mocked(usePreviewRenderer).mockReturnValue({
       parsedContent: {
         frontmatter: null,
         bodyHTML: '<div class="mermaid">graph TD; A-->B;</div>',
       },
       enhancedBodyHtml: '<div class="mermaid">graph TD; A-->B;</div>',
-      sanitizedHtmlPreview: '',
+      sanitizedHtmlPreview: "",
       requiresAsyncEnhancement: false,
     });
 
     render(<PreviewPane previewRenderActive previewLayoutActive={false} />);
 
     await waitFor(() => {
-      expect(document.querySelector('.mermaid')).toBeTruthy();
+      expect(document.querySelector(".mermaid")).toBeTruthy();
     });
     expect(mockRenderMermaidDiagrams).not.toHaveBeenCalled();
   });
 
-  it('does not attempt mermaid rendering when there are too many diagrams', async () => {
-    const manyMermaidNodes = Array.from({ length: 21 }, (_, index) =>
-      `<div class="mermaid">graph TD; A${index}-->B${index};</div>`,
-    ).join('');
+  it("does not attempt mermaid rendering when there are too many diagrams", async () => {
+    const manyMermaidNodes = Array.from(
+      { length: 21 },
+      (_, index) =>
+        `<div class="mermaid">graph TD; A${index}-->B${index};</div>`,
+    ).join("");
 
-    const { usePreviewRenderer } = await import('./hooks');
+    const { usePreviewRenderer } = await import("./hooks");
     vi.mocked(usePreviewRenderer).mockReturnValue({
       parsedContent: {
         frontmatter: null,
         bodyHTML: manyMermaidNodes,
       },
       enhancedBodyHtml: manyMermaidNodes,
-      sanitizedHtmlPreview: '',
+      sanitizedHtmlPreview: "",
       requiresAsyncEnhancement: false,
     });
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     render(<PreviewPane previewRenderActive previewLayoutActive />);
 
     await waitFor(() => {
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Too many Mermaid diagrams'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Too many Mermaid diagrams"),
+      );
     });
     expect(mockRenderMermaidDiagrams).not.toHaveBeenCalled();
 

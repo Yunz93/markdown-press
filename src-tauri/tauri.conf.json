@@ -27,31 +27,22 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http: https: blob: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: asset:; worker-src 'self' blob: asset:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http: https:; font-src 'self' data: blob: asset:; frame-src 'self' blob: asset:; object-src 'self' blob: asset:; media-src 'self' blob: asset: http: https:;"
+      "csp": "default-src 'self'; connect-src 'self' http: https: blob: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: asset:; worker-src 'self' blob: asset:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http: https:; font-src 'self' data: blob: asset:; frame-src 'self' https: blob: asset:; object-src 'self' blob: asset:; media-src 'self' blob: asset: http: https:;"
     }
   },
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": false,
-    "targets": [
-      "app",
-      "dmg",
-      "nsis"
-    ],
+    "targets": ["app", "dmg", "nsis"],
     "fileAssociations": [
       {
-        "ext": [
-          "md",
-          "markdown"
-        ],
+        "ext": ["md", "markdown"],
         "mimeType": "text/markdown",
         "name": "Markdown Document",
         "description": "Markdown document",
         "role": "Editor",
         "rank": "Default",
-        "contentTypes": [
-          "net.daringfireball.markdown"
-        ]
+        "contentTypes": ["net.daringfireball.markdown"]
       }
     ],
     "icon": [
