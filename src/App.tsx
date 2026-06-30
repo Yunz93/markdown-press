@@ -79,7 +79,6 @@ const App: React.FC = () => {
     isPublishing,
     settings,
     fileContents,
-    outlineHeadings,
     activeHeadingId,
     closeTab,
     setContent,
@@ -110,7 +109,7 @@ const App: React.FC = () => {
   const { handleAIAnalyze, handleGenerateWikiFromSelection } = useAIAnalyze();
   const fileOps = useFileOperations();
 
-  useOutline();
+  const { headings: outlineHeadings } = useOutline();
   useUndoRedo();
 
   useThemeSync(settings.themeMode);

@@ -1,23 +1,20 @@
-import { useEffect } from 'react';
-import { parseHeadings, type HeadingNode } from '../utils/outline';
-import { useAppStore, selectContent } from '../store/appStore';
+import { useMemo } from "react";
+import { parseHeadings } from "../utils/outline";
+import { useAppStore, selectContent } from "../store/appStore";
 
 export const useOutline = () => {
   const content = useAppStore(selectContent);
-  const setOutlineHeadings = useAppStore((state) => state.setOutlineHeadings);
   const setActiveHeadingId = useAppStore((state) => state.setActiveHeadingId);
-  const outlineHeadings = useAppStore((state) => state.outlineHeadings);
 
-  useEffect(() => {
-    const headings = parseHeadings(content);
-    setOutlineHeadings(headings);
-  }, [content, setOutlineHeadings]);
+  // Outline headings are fully derived from the document content, so compute
+  // them here instead of mirroring them into the store.
+  const headings = useMemo(() => parseHeadings(content), [content]);
 
   const scrollToHeading = (line: number) => {
-    setActiveHeadingId(outlineHeadings.find((h) => h.line === line)?.id || null);
+    setActiveHeadingId(headings.find((h) => h.line === line)?.id || null);
     // Editor scroll will be handled by the editor component
     return line;
   };
 
-  return { headings: outlineHeadings, scrollToHeading };
+  return { headings, scrollToHeading };
 };
