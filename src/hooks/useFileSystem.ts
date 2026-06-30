@@ -1,107 +1,106 @@
-import { useCallback } from 'react';
-import { getFileSystem } from '../types/filesystem';
-import { useAppStore } from '../store/appStore';
-import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
-import { ViewMode } from '../types';
-import type { FileNode } from '../types';
-import type { FileWatchEvent } from '../types/filesystem';
-import { localizeKnownError, t } from '../utils/i18n';
-import { DEFAULT_TRASH_FOLDER, sanitizeTrashFolder } from '../utils/trashFolder';
-import { isTauriEnvironment } from '../types/filesystem';
-import { getPathSeparator, joinFsPath, normalizeSlashes, getPathBasename } from '../utils/pathHelpers';
-import { openKnowledgeBaseWorkspace } from '../services/filesystem/knowledgeBaseService';
-import { initializeSampleNotesIfSupported } from '../services/filesystem/sampleNotesService';
-import { moveItemToTrash, restoreItemFromTrash } from '../services/filesystem/trashService';
-import { deleteFileAndCleanupTrash, moveFilePath } from '../services/filesystem/fileMutationService';
-import { createFileNode, createFolderNode, openStandaloneFile, openStandaloneFileByPath, revealFileInExplorer } from '../services/filesystem/basicFileService';
-import { readFileContent, saveFileContent, writeBinaryFileContent, writeFileContent } from '../services/filesystem/ioService';
+import { useCallback } from "react";
+import { getFileSystem } from "../types/filesystem";
+import { useAppStore } from "../store/appStore";
+import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
+import { ViewMode } from "../types";
+import type { FileNode } from "../types";
+import type { FileWatchEvent } from "../types/filesystem";
+import { localizeKnownError, t } from "../utils/i18n";
+import {
+  DEFAULT_TRASH_FOLDER,
+  sanitizeTrashFolder,
+} from "../utils/trashFolder";
+import { isTauriEnvironment } from "../types/filesystem";
+import {
+  getPathSeparator,
+  joinFsPath,
+  normalizeSlashes,
+  getPathBasename,
+} from "../utils/pathHelpers";
+import { openKnowledgeBaseWorkspace } from "../services/filesystem/knowledgeBaseService";
+import { initializeSampleNotesIfSupported } from "../services/filesystem/sampleNotesService";
+import {
+  moveItemToTrash,
+  restoreItemFromTrash,
+} from "../services/filesystem/trashService";
+import {
+  deleteFileAndCleanupTrash,
+  moveFilePath,
+} from "../services/filesystem/fileMutationService";
+import {
+  createFileNode,
+  createFolderNode,
+  openStandaloneFile,
+  openStandaloneFileByPath,
+  revealFileInExplorer,
+} from "../services/filesystem/basicFileService";
+import {
+  readFileContent,
+  saveFileContent,
+  writeBinaryFileContent,
+  writeFileContent,
+} from "../services/filesystem/ioService";
+import { findFileInTree, findFirstMatchingFile } from "../utils/fileTree";
+import { isMarkdownFile, isOpenableFile } from "../utils/fileTypes";
 
-const TRASH_ROOT_MARKER = '__root__';
-
-function isMarkdownFile(name: string): boolean {
-  return /\.(md|markdown)$/i.test(name);
-}
-
-function isPreviewOnlyFile(name: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp|pdf|html?)$/i.test(name);
-}
-
-function isOpenableFile(node: FileNode): boolean {
-  return node.type === 'file' && (isMarkdownFile(node.name) || isPreviewOnlyFile(node.name));
-}
-
-function findFirstMatchingFile(
-  nodes: FileNode[],
-  predicate: (node: FileNode) => boolean
-): FileNode | null {
-  for (const node of nodes) {
-    if (predicate(node)) {
-      return node;
-    }
-    if (node.children) {
-      const found = findFirstMatchingFile(node.children, predicate);
-      if (found) {
-        return found;
-      }
-    }
-  }
-
-  return null;
-}
+const TRASH_ROOT_MARKER = "__root__";
 
 function findFirstOpenableFile(nodes: FileNode[]): FileNode | null {
   return (
-    findFirstMatchingFile(nodes, (node) => node.type === 'file' && isMarkdownFile(node.name)) ??
-    findFirstMatchingFile(nodes, isOpenableFile)
+    findFirstMatchingFile(
+      nodes,
+      (node) => node.type === "file" && isMarkdownFile(node.name),
+    ) ?? findFirstMatchingFile(nodes, isOpenableFile)
   );
-}
-
-function findFileInTree(nodes: FileNode[], id: string): FileNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    if (node.children) {
-      const found = findFileInTree(node.children, id);
-      if (found) return found;
-    }
-  }
-
-  return undefined;
 }
 
 function hasOpenedKnowledgeBaseBefore(path: string): boolean {
   const normalizedPath = normalizeSlashes(path);
   const history = useAppStore.getState().settings.knowledgeBases || [];
-  return history.some((knowledgeBase) => normalizeSlashes(knowledgeBase.path) === normalizedPath);
+  return history.some(
+    (knowledgeBase) => normalizeSlashes(knowledgeBase.path) === normalizedPath,
+  );
 }
 
 function joinPathSegments(basePath: string, ...segments: string[]): string {
-  return segments.filter(Boolean).reduce((acc, segment) => joinFsPath(acc, segment), basePath);
+  return segments
+    .filter(Boolean)
+    .reduce((acc, segment) => joinFsPath(acc, segment), basePath);
 }
 
-async function registerTauriAllowedPath(path: string, recursive: boolean): Promise<void> {
+async function registerTauriAllowedPath(
+  path: string,
+  recursive: boolean,
+): Promise<void> {
   if (!isTauriEnvironment()) return;
-  const { invoke } = await import('@tauri-apps/api/core');
-  
+  const { invoke } = await import("@tauri-apps/api/core");
+
   // Add 3 second timeout to prevent hanging
   const timeoutPromise = new Promise<void>((_, reject) => {
-    setTimeout(() => reject(new Error('register_allowed_path timed out')), 3000);
+    setTimeout(
+      () => reject(new Error("register_allowed_path timed out")),
+      3000,
+    );
   });
-  
+
   await Promise.race([
-    invoke('register_allowed_path', { path, recursive }),
-    timeoutPromise
+    invoke("register_allowed_path", { path, recursive }),
+    timeoutPromise,
   ]);
 }
 
-async function registerTauriAllowedPathIfExists(path: string, recursive: boolean): Promise<void> {
+async function registerTauriAllowedPathIfExists(
+  path: string,
+  recursive: boolean,
+): Promise<void> {
   try {
     await registerTauriAllowedPath(path, recursive);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (
-      message.includes('No such file or directory')
-      || message.includes('cannot find the path specified')
-      || message.includes('Failed to resolve path')
+      message.includes("No such file or directory") ||
+      message.includes("cannot find the path specified") ||
+      message.includes("Failed to resolve path")
     ) {
       return;
     }
@@ -112,7 +111,7 @@ async function registerTauriAllowedPathIfExists(path: string, recursive: boolean
 function getRelativePathFromRoot(path: string, rootPath: string): string {
   const normalizedPath = normalizeSlashes(path);
   const normalizedRoot = normalizeSlashes(rootPath);
-  if (normalizedPath === normalizedRoot) return '';
+  if (normalizedPath === normalizedRoot) return "";
   const withSlash = `${normalizedRoot}/`;
   if (normalizedPath.startsWith(withSlash)) {
     return normalizedPath.slice(withSlash.length);
@@ -121,12 +120,16 @@ function getRelativePathFromRoot(path: string, rootPath: string): string {
 }
 
 function getParentRelativePath(relativePath: string): string {
-  const parts = relativePath.split('/').filter(Boolean);
-  if (parts.length <= 1) return '';
-  return parts.slice(0, -1).join('/');
+  const parts = relativePath.split("/").filter(Boolean);
+  if (parts.length <= 1) return "";
+  return parts.slice(0, -1).join("/");
 }
 
-function isPathInTrash(path: string, rootPath: string, trashFolder: string): boolean {
+function isPathInTrash(
+  path: string,
+  rootPath: string,
+  trashFolder: string,
+): boolean {
   const normalizedPath = normalizeSlashes(path);
   const normalizedRoot = normalizeSlashes(rootPath);
   const trashDirName = sanitizeTrashFolder(trashFolder);
@@ -137,15 +140,21 @@ function isPathInTrash(path: string, rootPath: string, trashFolder: string): boo
 }
 
 function createTrashContainerName(parentRelativePath: string): string {
-  const encodedParent = encodeURIComponent(parentRelativePath || TRASH_ROOT_MARKER);
+  const encodedParent = encodeURIComponent(
+    parentRelativePath || TRASH_ROOT_MARKER,
+  );
   return `${Date.now()}__${encodedParent}`;
 }
 
 function parseTrashPathInfo(
   path: string,
   rootPath: string,
-  trashFolder: string
-): { trashDirName: string; containerName: string; originalRelativePath: string } | null {
+  trashFolder: string,
+): {
+  trashDirName: string;
+  containerName: string;
+  originalRelativePath: string;
+} | null {
   const normalizedPath = normalizeSlashes(path);
   const normalizedRoot = normalizeSlashes(rootPath);
   const trashDirName = sanitizeTrashFolder(trashFolder);
@@ -153,38 +162,38 @@ function parseTrashPathInfo(
   if (!normalizedPath.startsWith(trashPrefix)) return null;
 
   const remainder = normalizedPath.slice(trashPrefix.length);
-  const parts = remainder.split('/').filter(Boolean);
+  const parts = remainder.split("/").filter(Boolean);
   if (parts.length < 2) return null;
 
   const [containerName, ...itemParts] = parts;
   const match = containerName.match(/^\d+__(.+)$/);
   const encodedParent = match?.[1];
-  let parentRelativePath = '';
+  let parentRelativePath = "";
   if (encodedParent) {
     try {
       const decoded = decodeURIComponent(encodedParent);
-      parentRelativePath = decoded === TRASH_ROOT_MARKER ? '' : decoded;
+      parentRelativePath = decoded === TRASH_ROOT_MARKER ? "" : decoded;
     } catch {
-      parentRelativePath = '';
+      parentRelativePath = "";
     }
   }
 
   const originalRelativePath = [
-    ...parentRelativePath.split('/').filter(Boolean),
-    ...itemParts
-  ].join('/');
+    ...parentRelativePath.split("/").filter(Boolean),
+    ...itemParts,
+  ].join("/");
 
   return {
     trashDirName,
     containerName,
-    originalRelativePath
+    originalRelativePath,
   };
 }
 
 async function ensureTrashRootDirectory(
   fs: Awaited<ReturnType<typeof getFileSystem>>,
   rootPath: string,
-  trashFolder: string
+  trashFolder: string,
 ): Promise<{
   trashDirName: string;
   trashRootPath: string;
@@ -195,7 +204,7 @@ async function ensureTrashRootDirectory(
   await fs.createDirectory(trashRootPath);
   return {
     trashDirName,
-    trashRootPath
+    trashRootPath,
   };
 }
 
@@ -223,12 +232,14 @@ export function useFileSystem() {
 
     useAppStore.getState().updateSettings((state) => {
       const existing = state.settings.knowledgeBases || [];
-      const next = [{ path, name, lastOpenedAt: now }, ...existing.filter((kb) => kb.path !== path)]
-        .slice(0, 20);
+      const next = [
+        { path, name, lastOpenedAt: now },
+        ...existing.filter((kb) => kb.path !== path),
+      ].slice(0, 20);
 
       return {
         knowledgeBases: next,
-        lastKnowledgeBasePath: path
+        lastKnowledgeBasePath: path,
       };
     });
   }, []);
@@ -240,7 +251,7 @@ export function useFileSystem() {
     const fs = await getFileSystem();
     const fileNodes = await withErrorHandling(
       () => fs.readDirectory(rootPath),
-      'Failed to refresh knowledge base'
+      "Failed to refresh knowledge base",
     );
     setFiles(fileNodes);
   }, [setFiles]);
@@ -248,14 +259,21 @@ export function useFileSystem() {
   /**
    * Handle file system errors with user-friendly notifications
    */
-  const handleFileSystemError = useCallback((error: unknown, context: string) => {
-    if (error instanceof FileSystemError) {
-      showNotification(localizeKnownError(settings.language, error.toUserMessage()), 'error');
-    } else {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      showNotification(`${context}: ${message}`, 'error');
-    }
-  }, [settings.language, showNotification]);
+  const handleFileSystemError = useCallback(
+    (error: unknown, context: string) => {
+      if (error instanceof FileSystemError) {
+        showNotification(
+          localizeKnownError(settings.language, error.toUserMessage()),
+          "error",
+        );
+      } else {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        showNotification(`${context}: ${message}`, "error");
+      }
+    },
+    [settings.language, showNotification],
+  );
 
   /**
    * Open a single file
@@ -263,136 +281,205 @@ export function useFileSystem() {
   const openFile = useCallback(async () => {
     try {
       const fs = await getFileSystem();
-      const result = await openStandaloneFile(fs, getPathBasename, withErrorHandling);
+      const result = await openStandaloneFile(
+        fs,
+        getPathBasename,
+        withErrorHandling,
+      );
       if (result) {
         setFiles([result.file]);
         addTab(result.file.id, result.content);
         setCurrentFilePath(result.file.path);
-        showNotification(t(settings.language, 'notifications_fileOpenedSuccessfully'), 'success');
+        showNotification(
+          t(settings.language, "notifications_fileOpenedSuccessfully"),
+          "success",
+        );
       }
     } catch (error) {
-      handleFileSystemError(error, 'Failed to open file');
+      handleFileSystemError(error, "Failed to open file");
     }
-  }, [setFiles, addTab, setCurrentFilePath, showNotification, handleFileSystemError]);
+  }, [
+    setFiles,
+    addTab,
+    setCurrentFilePath,
+    showNotification,
+    handleFileSystemError,
+  ]);
 
-  const openFilePath = useCallback(async (
-    path: string,
-    options?: { silentSuccess?: boolean; suppressErrors?: boolean }
-  ): Promise<string | null> => {
-    try {
-      const existingState = useAppStore.getState();
-      if (existingState.openTabs.includes(path)) {
-        setActiveTab(path);
-        setCurrentFilePath(path);
-        return path;
+  const openFilePath = useCallback(
+    async (
+      path: string,
+      options?: { silentSuccess?: boolean; suppressErrors?: boolean },
+    ): Promise<string | null> => {
+      try {
+        const existingState = useAppStore.getState();
+        if (existingState.openTabs.includes(path)) {
+          setActiveTab(path);
+          setCurrentFilePath(path);
+          return path;
+        }
+
+        const fs = await getFileSystem();
+        const result = await openStandaloneFileByPath(
+          fs,
+          path,
+          getPathBasename,
+          withErrorHandling,
+        );
+        const state = useAppStore.getState();
+        const fileExistsInTree = Boolean(
+          findFileInTree(state.files, result.file.id),
+        );
+
+        if (!fileExistsInTree) {
+          setFiles([...state.files, result.file]);
+        }
+
+        addTab(result.file.id, result.content);
+        setCurrentFilePath(result.file.path);
+
+        if (!options?.silentSuccess) {
+          showNotification(
+            t(settings.language, "notifications_fileOpenedSuccessfully"),
+            "success",
+          );
+        }
+
+        return result.file.path;
+      } catch (error) {
+        if (!options?.suppressErrors) {
+          handleFileSystemError(error, "Failed to open file");
+        } else {
+          console.warn("Failed to open external file:", error);
+        }
+        return null;
       }
-
-      const fs = await getFileSystem();
-      const result = await openStandaloneFileByPath(fs, path, getPathBasename, withErrorHandling);
-      const state = useAppStore.getState();
-      const fileExistsInTree = Boolean(findFileInTree(state.files, result.file.id));
-
-      if (!fileExistsInTree) {
-        setFiles([...state.files, result.file]);
-      }
-
-      addTab(result.file.id, result.content);
-      setCurrentFilePath(result.file.path);
-
-      if (!options?.silentSuccess) {
-        showNotification(t(settings.language, 'notifications_fileOpenedSuccessfully'), 'success');
-      }
-
-      return result.file.path;
-    } catch (error) {
-      if (!options?.suppressErrors) {
-        handleFileSystemError(error, 'Failed to open file');
-      } else {
-        console.warn('Failed to open external file:', error);
-      }
-      return null;
-    }
-  }, [setActiveTab, setCurrentFilePath, setFiles, addTab, showNotification, handleFileSystemError, settings.language]);
+    },
+    [
+      setActiveTab,
+      setCurrentFilePath,
+      setFiles,
+      addTab,
+      showNotification,
+      handleFileSystemError,
+      settings.language,
+    ],
+  );
 
   /**
    * Initialize sample notes for first-time users
    * With timeout to prevent hanging if the backend command fails
    */
-  const initializeSampleNotes = useCallback(async (targetDir: string): Promise<boolean> => {
-    try {
-      const fs = await getFileSystem();
-      const updated = await initializeSampleNotesIfSupported(fs, targetDir);
+  const initializeSampleNotes = useCallback(
+    async (targetDir: string): Promise<boolean> => {
+      try {
+        const fs = await getFileSystem();
+        const updated = await initializeSampleNotesIfSupported(fs, targetDir);
 
-      if (updated) {
-        showNotification(t(settings.language, 'notifications_sampleNotesSynced'), 'success');
+        if (updated) {
+          showNotification(
+            t(settings.language, "notifications_sampleNotesSynced"),
+            "success",
+          );
+        }
+        return updated;
+      } catch (error) {
+        console.error("Failed to initialize sample notes:", error);
+        // Don't show error notification - this is not critical
+        return false;
       }
-      return updated;
-    } catch (error) {
-      console.error('Failed to initialize sample notes:', error);
-      // Don't show error notification - this is not critical
-      return false;
-    }
-  }, [showNotification]);
+    },
+    [showNotification],
+  );
 
   /**
    * Open a knowledge base directory.
    * If path is provided, opens directly; otherwise prompts user to select.
    */
-  const openKnowledgeBase = useCallback(async (
-    path?: string,
-    options?: { silentSuccess?: boolean; skipSampleNotes?: boolean; suppressErrors?: boolean }
-  ): Promise<string | null> => {
-    try {
-      const fs = await getFileSystem();
-      const result = await openKnowledgeBaseWorkspace({
-        addTab,
-        clearAllCache,
-        findPreferredFile: findFileInTree,
-        findInitialOpenableFile: findFirstOpenableFile,
-        fs,
-        hasOpenedKnowledgeBaseBefore,
-        handleInitialFileError: (error) => {
-          if (!options?.suppressErrors) {
-            handleFileSystemError(error, 'Failed to open initial file');
-          } else {
-            console.warn('Failed to open initial file during silent knowledge base restore:', error);
-          }
-        },
-        initializeSampleNotes,
-        lastOpenedFilePath: useAppStore.getState().settings.lastOpenedFilePath ?? null,
-        options: {
-          path,
-          silentSuccess: options?.silentSuccess,
-          skipSampleNotes: options?.skipSampleNotes,
-        },
-        registerAllowedPath: registerTauriAllowedPath,
-        registerAllowedPathIfExists: registerTauriAllowedPathIfExists,
-        setCurrentFilePath,
-        setFiles,
-        setRootFolderPath,
-        trashFolder: settings.trashFolder,
-        withErrorHandling,
-      });
-      if (!result) return null;
+  const openKnowledgeBase = useCallback(
+    async (
+      path?: string,
+      options?: {
+        silentSuccess?: boolean;
+        skipSampleNotes?: boolean;
+        suppressErrors?: boolean;
+      },
+    ): Promise<string | null> => {
+      try {
+        const fs = await getFileSystem();
+        const result = await openKnowledgeBaseWorkspace({
+          addTab,
+          clearAllCache,
+          findPreferredFile: findFileInTree,
+          findInitialOpenableFile: findFirstOpenableFile,
+          fs,
+          hasOpenedKnowledgeBaseBefore,
+          handleInitialFileError: (error) => {
+            if (!options?.suppressErrors) {
+              handleFileSystemError(error, "Failed to open initial file");
+            } else {
+              console.warn(
+                "Failed to open initial file during silent knowledge base restore:",
+                error,
+              );
+            }
+          },
+          initializeSampleNotes,
+          lastOpenedFilePath:
+            useAppStore.getState().settings.lastOpenedFilePath ?? null,
+          options: {
+            path,
+            silentSuccess: options?.silentSuccess,
+            skipSampleNotes: options?.skipSampleNotes,
+          },
+          registerAllowedPath: registerTauriAllowedPath,
+          registerAllowedPathIfExists: registerTauriAllowedPathIfExists,
+          setCurrentFilePath,
+          setFiles,
+          setRootFolderPath,
+          trashFolder: settings.trashFolder,
+          withErrorHandling,
+        });
+        if (!result) return null;
 
-      if (result.openedPreviewOnly) {
-        setViewMode(ViewMode.PREVIEW);
-      }
+        if (result.openedPreviewOnly) {
+          setViewMode(ViewMode.PREVIEW);
+        }
 
-      updateKnowledgeBaseMetadata(result.dirPath);
-      if (!options?.silentSuccess) {
-        showNotification(t(settings.language, 'notifications_knowledgeBaseOpenedSuccessfully'), 'success');
+        updateKnowledgeBaseMetadata(result.dirPath);
+        if (!options?.silentSuccess) {
+          showNotification(
+            t(
+              settings.language,
+              "notifications_knowledgeBaseOpenedSuccessfully",
+            ),
+            "success",
+          );
+        }
+        return result.dirPath;
+      } catch (error) {
+        if (!options?.suppressErrors) {
+          handleFileSystemError(error, "Failed to open knowledge base");
+        } else {
+          console.warn("Failed to restore knowledge base silently:", error);
+        }
+        return null;
       }
-      return result.dirPath;
-    } catch (error) {
-      if (!options?.suppressErrors) {
-        handleFileSystemError(error, 'Failed to open knowledge base');
-      } else {
-        console.warn('Failed to restore knowledge base silently:', error);
-      }
-      return null;
-    }
-  }, [clearAllCache, addTab, setCurrentFilePath, setFiles, setRootFolderPath, setViewMode, showNotification, handleFileSystemError, updateKnowledgeBaseMetadata, initializeSampleNotes, settings.trashFolder]);
+    },
+    [
+      clearAllCache,
+      addTab,
+      setCurrentFilePath,
+      setFiles,
+      setRootFolderPath,
+      setViewMode,
+      showNotification,
+      handleFileSystemError,
+      updateKnowledgeBaseMetadata,
+      initializeSampleNotes,
+      settings.trashFolder,
+    ],
+  );
 
   /**
    * Backward-compatible alias used by existing UI call sites.
@@ -412,297 +499,407 @@ export function useFileSystem() {
   /**
    * Write a file
    */
-  const writeFile = useCallback(async (path: string, content: string): Promise<void> => {
-    const fs = await getFileSystem();
-    await writeFileContent(fs, path, content, withErrorHandling);
-  }, []);
+  const writeFile = useCallback(
+    async (path: string, content: string): Promise<void> => {
+      const fs = await getFileSystem();
+      await writeFileContent(fs, path, content, withErrorHandling);
+    },
+    [],
+  );
 
-  const writeBinaryFile = useCallback(async (path: string, content: Uint8Array): Promise<void> => {
-    const fs = await getFileSystem();
-    await writeBinaryFileContent(fs, path, content, withErrorHandling);
-  }, []);
+  const writeBinaryFile = useCallback(
+    async (path: string, content: Uint8Array): Promise<void> => {
+      const fs = await getFileSystem();
+      await writeBinaryFileContent(fs, path, content, withErrorHandling);
+    },
+    [],
+  );
 
   /**
    * Save current file
    */
-  const saveFile = useCallback(async (path: string | null, content: string): Promise<string | null> => {
-    try {
-      const fs = await getFileSystem();
-      const savedPath = await saveFileContent(fs, path, content, withErrorHandling);
-      if (savedPath && path !== savedPath) {
-        setCurrentFilePath(savedPath);
+  const saveFile = useCallback(
+    async (path: string | null, content: string): Promise<string | null> => {
+      try {
+        const fs = await getFileSystem();
+        const savedPath = await saveFileContent(
+          fs,
+          path,
+          content,
+          withErrorHandling,
+        );
+        if (savedPath && path !== savedPath) {
+          setCurrentFilePath(savedPath);
+        }
+        return savedPath;
+      } catch (error) {
+        handleFileSystemError(error, "Failed to save file");
+        return null;
       }
-      return savedPath;
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to save file');
-      return null;
-    }
-  }, [setCurrentFilePath, handleFileSystemError]);
+    },
+    [setCurrentFilePath, handleFileSystemError],
+  );
 
   /**
    * Create a new file
    */
-  const createFile = useCallback(async (fileName: string, content: string = '', folderPath?: string): Promise<FileNode | null> => {
-    try {
-      const fs = await getFileSystem();
-      const basePath = folderPath || useAppStore.getState().rootFolderPath;
-      if (!basePath) {
-        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
+  const createFile = useCallback(
+    async (
+      fileName: string,
+      content: string = "",
+      folderPath?: string,
+    ): Promise<FileNode | null> => {
+      try {
+        const fs = await getFileSystem();
+        const basePath = folderPath || useAppStore.getState().rootFolderPath;
+        if (!basePath) {
+          showNotification(
+            t(settings.language, "notifications_noKnowledgeBaseOpened"),
+            "error",
+          );
+          return null;
+        }
+
+        const fullPath = joinFsPath(basePath, fileName);
+        const newFile = await createFileNode(
+          fs,
+          fullPath,
+          fileName,
+          content,
+          withErrorHandling,
+        );
+
+        // Add to store recursively
+        useAppStore.getState().addFile(newFile);
+
+        return newFile;
+      } catch (error) {
+        handleFileSystemError(error, "Failed to create file");
         return null;
       }
-
-      const fullPath = joinFsPath(basePath, fileName);
-      const newFile = await createFileNode(fs, fullPath, fileName, content, withErrorHandling);
-
-      // Add to store recursively
-      useAppStore.getState().addFile(newFile);
-
-      return newFile;
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to create file');
-      return null;
-    }
-  }, [showNotification, handleFileSystemError]);
+    },
+    [showNotification, handleFileSystemError],
+  );
 
   /**
    * Create a new folder
    */
-  const createFolder = useCallback(async (folderName: string, parentPath?: string): Promise<FileNode | null> => {
-    try {
-      const fs = await getFileSystem();
-      const basePath = parentPath || useAppStore.getState().rootFolderPath;
-      if (!basePath) {
-        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
+  const createFolder = useCallback(
+    async (
+      folderName: string,
+      parentPath?: string,
+    ): Promise<FileNode | null> => {
+      try {
+        const fs = await getFileSystem();
+        const basePath = parentPath || useAppStore.getState().rootFolderPath;
+        if (!basePath) {
+          showNotification(
+            t(settings.language, "notifications_noKnowledgeBaseOpened"),
+            "error",
+          );
+          return null;
+        }
+
+        const fullPath = joinFsPath(basePath, folderName);
+        const newNode = await createFolderNode(
+          fs,
+          fullPath,
+          folderName,
+          withErrorHandling,
+        );
+
+        useAppStore.getState().addFile(newNode);
+        return newNode;
+      } catch (error) {
+        handleFileSystemError(error, "Failed to create folder");
         return null;
       }
-
-      const fullPath = joinFsPath(basePath, folderName);
-      const newNode = await createFolderNode(fs, fullPath, folderName, withErrorHandling);
-
-      useAppStore.getState().addFile(newNode);
-      return newNode;
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to create folder');
-      return null;
-    }
-  }, [showNotification, handleFileSystemError]);
+    },
+    [showNotification, handleFileSystemError],
+  );
 
   /**
    * Reveal in explorer
    */
-  const revealInExplorer = useCallback(async (path: string) => {
-    try {
-      const fs = await getFileSystem();
-      const result = await revealFileInExplorer(fs, path, withErrorHandling);
-      if (result === 'unsupported') {
-        showNotification(t(settings.language, 'notifications_revealInExplorerUnsupported'), 'error');
+  const revealInExplorer = useCallback(
+    async (path: string) => {
+      try {
+        const fs = await getFileSystem();
+        const result = await revealFileInExplorer(fs, path, withErrorHandling);
+        if (result === "unsupported") {
+          showNotification(
+            t(settings.language, "notifications_revealInExplorerUnsupported"),
+            "error",
+          );
+        }
+      } catch (error) {
+        handleFileSystemError(error, "Failed to reveal in explorer");
       }
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to reveal in explorer');
-    }
-  }, [showNotification, handleFileSystemError]);
+    },
+    [showNotification, handleFileSystemError],
+  );
 
   /**
    * Rename a file
    */
-  const renameFile = useCallback(async (file: FileNode, newName: string): Promise<string | null> => {
-    try {
-      const fs = await getFileSystem();
-      const newPath = await withErrorHandling(
-        () => fs.renameEntry
-          ? fs.renameEntry(file.path, newName, file.type === 'folder')
-          : fs.renameFile(file.path, newName),
-        `Failed to rename ${file.type}`
-      );
-      if (newPath) {
-        const normalizedName = file.type === 'file'
-          ? (newName.endsWith('.md') ? newName : `${newName}.md`)
-          : newName;
-        useAppStore.getState().updateFileName(file.id, normalizedName, newPath);
+  const renameFile = useCallback(
+    async (file: FileNode, newName: string): Promise<string | null> => {
+      try {
+        const fs = await getFileSystem();
+        const newPath = await withErrorHandling(
+          () =>
+            fs.renameEntry
+              ? fs.renameEntry(file.path, newName, file.type === "folder")
+              : fs.renameFile(file.path, newName),
+          `Failed to rename ${file.type}`,
+        );
+        if (newPath) {
+          const normalizedName =
+            file.type === "file"
+              ? newName.endsWith(".md")
+                ? newName
+                : `${newName}.md`
+              : newName;
+          useAppStore
+            .getState()
+            .updateFileName(file.id, normalizedName, newPath);
+        }
+        return newPath;
+      } catch (error) {
+        handleFileSystemError(error, `Failed to rename ${file.type}`);
+        return null;
       }
-      return newPath;
-    } catch (error) {
-      handleFileSystemError(error, `Failed to rename ${file.type}`);
-      return null;
-    }
-  }, [handleFileSystemError]);
+    },
+    [handleFileSystemError],
+  );
 
   /**
    * Delete a file. Pass `skipRefresh: true` when batching deletes under the same root so the caller can call `refreshFileTree()` once at the end.
    */
-  const deleteFile = useCallback(async (
-    file: FileNode,
-    options?: { skipRefresh?: boolean }
-  ): Promise<void> => {
-    try {
-      const rootPath = useAppStore.getState().rootFolderPath;
-      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
-      const fs = await getFileSystem();
-      const cleanedTrashContainer = await deleteFileAndCleanupTrash({
-        file,
-        fs,
-        joinFsPath,
-        parseTrashPathInfo,
-        rootPath,
-        trashFolder,
-        withErrorHandling,
-      });
+  const deleteFile = useCallback(
+    async (
+      file: FileNode,
+      options?: { skipRefresh?: boolean },
+    ): Promise<void> => {
+      try {
+        const rootPath = useAppStore.getState().rootFolderPath;
+        const trashFolder = sanitizeTrashFolder(
+          useAppStore.getState().settings.trashFolder,
+        );
+        const fs = await getFileSystem();
+        const cleanedTrashContainer = await deleteFileAndCleanupTrash({
+          file,
+          fs,
+          joinFsPath,
+          parseTrashPathInfo,
+          rootPath,
+          trashFolder,
+          withErrorHandling,
+        });
 
-      if (cleanedTrashContainer) {
-        if (!options?.skipRefresh) {
-          await refreshFileTree();
+        if (cleanedTrashContainer) {
+          if (!options?.skipRefresh) {
+            await refreshFileTree();
+          }
+        } else {
+          useAppStore.getState().removeFile(file.id);
         }
-      } else {
-        useAppStore.getState().removeFile(file.id);
+      } catch (error) {
+        handleFileSystemError(error, "Failed to delete file");
+        throw error; // Re-throw to let caller handle it
       }
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to delete file');
-      throw error; // Re-throw to let caller handle it
-    }
-  }, [refreshFileTree, handleFileSystemError]);
+    },
+    [refreshFileTree, handleFileSystemError],
+  );
 
   /**
    * Move a file/folder to trash (soft delete)
    */
-  const moveToTrash = useCallback(async (
-    file: FileNode,
-    options?: { silent?: boolean; skipRefresh?: boolean }
-  ): Promise<string | null> => {
-    try {
-      const rootPath = useAppStore.getState().rootFolderPath;
-      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
-      const fs = await getFileSystem();
-      const result = await moveItemToTrash({
-        file,
-        fs,
-        getParentRelativePath,
-        getRelativePathFromRoot,
-        isPathInTrash,
-        joinFsPath,
-        createTrashContainerName,
-        registerAllowedPath: registerTauriAllowedPath,
-        rootPath,
-        trashFolder,
-        ensureTrashRootDirectory: (serviceFs, serviceRootPath, serviceTrashFolder) => (
-          ensureTrashRootDirectory(
-            serviceFs as Awaited<ReturnType<typeof getFileSystem>>,
+  const moveToTrash = useCallback(
+    async (
+      file: FileNode,
+      options?: { silent?: boolean; skipRefresh?: boolean },
+    ): Promise<string | null> => {
+      try {
+        const rootPath = useAppStore.getState().rootFolderPath;
+        const trashFolder = sanitizeTrashFolder(
+          useAppStore.getState().settings.trashFolder,
+        );
+        const fs = await getFileSystem();
+        const result = await moveItemToTrash({
+          file,
+          fs,
+          getParentRelativePath,
+          getRelativePathFromRoot,
+          isPathInTrash,
+          joinFsPath,
+          createTrashContainerName,
+          registerAllowedPath: registerTauriAllowedPath,
+          rootPath,
+          trashFolder,
+          ensureTrashRootDirectory: (
+            serviceFs,
             serviceRootPath,
-            serviceTrashFolder
-          )
-        ),
-        withErrorHandling,
-      });
+            serviceTrashFolder,
+          ) =>
+            ensureTrashRootDirectory(
+              serviceFs as Awaited<ReturnType<typeof getFileSystem>>,
+              serviceRootPath,
+              serviceTrashFolder,
+            ),
+          withErrorHandling,
+        });
 
-      if (result.kind === 'no_root') {
+        if (result.kind === "no_root") {
+          if (!options?.silent) {
+            showNotification(
+              t(settings.language, "notifications_noKnowledgeBaseOpened"),
+              "error",
+            );
+          }
+          return null;
+        }
+
+        if (result.kind === "already_in_trash") {
+          if (!options?.silent) {
+            showNotification(
+              t(settings.language, "notifications_itemAlreadyInTrash"),
+              "error",
+            );
+          }
+          return null;
+        }
+
+        if (result.kind === "unsupported") {
+          if (!options?.silent) {
+            showNotification(
+              t(settings.language, "notifications_moveToTrashUnsupported"),
+              "error",
+            );
+          }
+          return null;
+        }
+        if (result.kind !== "success") {
+          return null;
+        }
+
+        if (!options?.skipRefresh) {
+          await refreshFileTree();
+        }
         if (!options?.silent) {
-          showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
+          showNotification(
+            t(settings.language, "notifications_movedToTrash"),
+            "success",
+          );
+        }
+        return result.movedPath;
+      } catch (error) {
+        if (!options?.silent) {
+          handleFileSystemError(error, "Failed to move item to trash");
         }
         return null;
       }
-
-      if (result.kind === 'already_in_trash') {
-        if (!options?.silent) {
-          showNotification(t(settings.language, 'notifications_itemAlreadyInTrash'), 'error');
-        }
-        return null;
-      }
-
-      if (result.kind === 'unsupported') {
-        if (!options?.silent) {
-          showNotification(t(settings.language, 'notifications_moveToTrashUnsupported'), 'error');
-        }
-        return null;
-      }
-      if (result.kind !== 'success') {
-        return null;
-      }
-
-      if (!options?.skipRefresh) {
-        await refreshFileTree();
-      }
-      if (!options?.silent) {
-        showNotification(t(settings.language, 'notifications_movedToTrash'), 'success');
-      }
-      return result.movedPath;
-    } catch (error) {
-      if (!options?.silent) {
-        handleFileSystemError(error, 'Failed to move item to trash');
-      }
-      return null;
-    }
-  }, [showNotification, refreshFileTree, handleFileSystemError]);
+    },
+    [showNotification, refreshFileTree, handleFileSystemError],
+  );
 
   /**
    * Restore a file/folder from trash to original location
    */
-  const restoreFromTrash = useCallback(async (file: FileNode): Promise<string | null> => {
-    try {
-      const rootPath = useAppStore.getState().rootFolderPath;
-      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
-      const fs = await getFileSystem();
-      const result = await restoreItemFromTrash({
-        file,
-        fs,
-        getParentRelativePath,
-        getPathBasename,
-        joinFsPath,
-        joinPathSegments,
-        parseTrashPathInfo,
-        rootPath,
-        trashFolder,
-        withErrorHandling,
-      });
+  const restoreFromTrash = useCallback(
+    async (file: FileNode): Promise<string | null> => {
+      try {
+        const rootPath = useAppStore.getState().rootFolderPath;
+        const trashFolder = sanitizeTrashFolder(
+          useAppStore.getState().settings.trashFolder,
+        );
+        const fs = await getFileSystem();
+        const result = await restoreItemFromTrash({
+          file,
+          fs,
+          getParentRelativePath,
+          getPathBasename,
+          joinFsPath,
+          joinPathSegments,
+          parseTrashPathInfo,
+          rootPath,
+          trashFolder,
+          withErrorHandling,
+        });
 
-      if (result.kind === 'no_root') {
-        showNotification(t(settings.language, 'notifications_noKnowledgeBaseOpened'), 'error');
+        if (result.kind === "no_root") {
+          showNotification(
+            t(settings.language, "notifications_noKnowledgeBaseOpened"),
+            "error",
+          );
+          return null;
+        }
+
+        if (result.kind === "invalid_path") {
+          showNotification(
+            t(settings.language, "notifications_invalidTrashItemPath"),
+            "error",
+          );
+          return null;
+        }
+
+        if (result.kind === "unsupported") {
+          showNotification(
+            t(settings.language, "notifications_restoreFromTrashUnsupported"),
+            "error",
+          );
+          return null;
+        }
+
+        if (result.kind === "target_exists") {
+          showNotification(
+            t(settings.language, "notifications_restoreTargetExists"),
+            "error",
+          );
+          return null;
+        }
+        if (result.kind !== "success") {
+          return null;
+        }
+
+        await refreshFileTree();
+        showNotification(
+          t(settings.language, "notifications_restoredFromTrash"),
+          "success",
+        );
+        return result.restoredPath;
+      } catch (error) {
+        handleFileSystemError(error, "Failed to restore item from trash");
         return null;
       }
-
-      if (result.kind === 'invalid_path') {
-        showNotification(t(settings.language, 'notifications_invalidTrashItemPath'), 'error');
-        return null;
-      }
-
-      if (result.kind === 'unsupported') {
-        showNotification(t(settings.language, 'notifications_restoreFromTrashUnsupported'), 'error');
-        return null;
-      }
-
-      if (result.kind === 'target_exists') {
-        showNotification(t(settings.language, 'notifications_restoreTargetExists'), 'error');
-        return null;
-      }
-      if (result.kind !== 'success') {
-        return null;
-      }
-
-      await refreshFileTree();
-      showNotification(t(settings.language, 'notifications_restoredFromTrash'), 'success');
-      return result.restoredPath;
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to restore item from trash');
-      return null;
-    }
-  }, [showNotification, refreshFileTree, handleFileSystemError]);
+    },
+    [showNotification, refreshFileTree, handleFileSystemError],
+  );
 
   /**
    * Move a file to a new folder
    */
-  const moveFile = useCallback(async (sourceFile: FileNode, targetFolderPath: string): Promise<string | null> => {
-    try {
-      const fs = await getFileSystem();
-      const newPath = await moveFilePath(
-        fs,
-        sourceFile.path,
-        targetFolderPath,
-        withErrorHandling,
-      );
-      return newPath;
-    } catch (error) {
-      handleFileSystemError(error, 'Failed to move file');
-      return null;
-    }
-  }, [handleFileSystemError]);
+  const moveFile = useCallback(
+    async (
+      sourceFile: FileNode,
+      targetFolderPath: string,
+    ): Promise<string | null> => {
+      try {
+        const fs = await getFileSystem();
+        const newPath = await moveFilePath(
+          fs,
+          sourceFile.path,
+          targetFolderPath,
+          withErrorHandling,
+        );
+        return newPath;
+      } catch (error) {
+        handleFileSystemError(error, "Failed to move file");
+        return null;
+      }
+    },
+    [handleFileSystemError],
+  );
 
   /**
    * Check if file has unsaved changes
@@ -717,18 +914,24 @@ export function useFileSystem() {
   /**
    * Watch file for changes (Tauri only)
    */
-  const watchFile = useCallback(async (path: string, callback: (event: FileWatchEvent | null) => void): Promise<(() => void) | null> => {
-    try {
-      const fs = await getFileSystem();
-      if (typeof fs.watchFile === 'function') {
-        return await fs.watchFile(path, callback);
+  const watchFile = useCallback(
+    async (
+      path: string,
+      callback: (event: FileWatchEvent | null) => void,
+    ): Promise<(() => void) | null> => {
+      try {
+        const fs = await getFileSystem();
+        if (typeof fs.watchFile === "function") {
+          return await fs.watchFile(path, callback);
+        }
+        return null;
+      } catch (error) {
+        console.error("Failed to watch file:", error);
+        return null;
       }
-      return null;
-    } catch (error) {
-      console.error('Failed to watch file:', error);
-      return null;
-    }
-  }, []);
+    },
+    [],
+  );
 
   return {
     files,

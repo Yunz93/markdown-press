@@ -32,22 +32,9 @@ import {
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
 import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
+import { findFileInTree } from "../utils/fileTree";
 
 const PUBLISH_TIMEOUT_MS = 45000;
-
-function findFileInTree(
-  nodes: import("../types").FileNode[],
-  id: string,
-): import("../types").FileNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    if (node.children) {
-      const found = findFileInTree(node.children, id);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
 
 /**
  * Encapsulates export and blog publish actions.

@@ -34,6 +34,7 @@ import { getResolvedUiFontFamily } from "./utils/fontSettings";
 import { logEnvironment, assertDevReleaseParity } from "./utils/environment";
 import { useI18n } from "./hooks/useI18n";
 import { getPathBasename, findFileInTree } from "./app/appShellUtils";
+import { isPreviewOnlyFile } from "./utils/fileTypes";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
@@ -52,22 +53,6 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KnowledgeBaseOnboarding } from "./components/KnowledgeBaseOnboarding";
 import { KnowledgeBaseLoadingScreen } from "./components/KnowledgeBaseLoadingScreen";
 import { AppDialogs } from "./components/AppDialogs";
-
-function isImageFile(name: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
-}
-
-function isPdfFile(name: string): boolean {
-  return /\.pdf$/i.test(name);
-}
-
-function isHtmlFile(name: string): boolean {
-  return /\.html?$/i.test(name);
-}
-
-function isPreviewOnlyFile(name: string): boolean {
-  return isImageFile(name) || isPdfFile(name) || isHtmlFile(name);
-}
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
