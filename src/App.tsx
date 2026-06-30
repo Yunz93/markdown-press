@@ -140,7 +140,7 @@ const App: React.FC = () => {
     t,
   });
 
-  const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
+  const { forceSave } = useAutoSave({ enabled: true });
   const { handleExportToPdf, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
