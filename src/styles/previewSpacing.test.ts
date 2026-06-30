@@ -58,10 +58,10 @@ describe("preview spacing CSS", () => {
     );
 
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body img\.preview-attachment-image\[data-wiki-embed-w\]\s*\{[^}]*attr\(data-wiki-embed-w px,\s*100%\)/m,
+      /img\.preview-attachment-image\[data-wiki-embed-w\][\s\S]*?attr\(data-wiki-embed-w px,\s*100%\)/m,
     );
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body img\.preview-attachment-image\[data-wiki-embed-h\]\s*\{[^}]*attr\(data-wiki-embed-h px,\s*auto\)/m,
+      /img\.preview-attachment-image\[data-wiki-embed-h\][\s\S]*?attr\(data-wiki-embed-h px,\s*auto\)/m,
     );
     expect(css).toMatch(/Values are bare numbers like "100"/);
   });

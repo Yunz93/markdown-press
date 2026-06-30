@@ -1,10 +1,13 @@
-import { useEffect, useCallback, useRef } from 'react';
-import { useAppStore, selectContent } from '../store/appStore';
-import { getFileSystem } from '../types/filesystem';
-import { withErrorHandling, FileSystemError } from '../utils/errorHandler';
-import { refreshDocumentUpdateTime } from '../utils/metadataFields';
-import { t } from '../utils/i18n';
-import { formatMarkdownForSave, isMarkdownDocumentPath } from '../utils/markdownFormat';
+import { useEffect, useCallback, useRef } from "react";
+import { useAppStore, selectContent } from "../store/appStore";
+import { getFileSystem } from "../types/filesystem";
+import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
+import { refreshDocumentUpdateTime } from "../utils/metadataFields";
+import { t } from "../utils/i18n";
+import {
+  formatMarkdownForSave,
+  isMarkdownDocumentPath,
+} from "../utils/markdownFormat";
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -14,7 +17,7 @@ interface UseAutoSaveOptions {
 }
 
 interface SaveState {
-  status: 'idle' | 'saving' | 'saved' | 'error';
+  status: "idle" | "saving" | "saved" | "error";
   lastSavedAt: Date | null;
   error: string | null;
   retryCount: number;
@@ -22,7 +25,7 @@ interface SaveState {
 
 interface ForceSaveOptions {
   formatBeforeSave?: boolean;
-  trigger?: 'auto' | 'manual' | 'system';
+  trigger?: "auto" | "manual" | "system";
 }
 
 /**
@@ -33,7 +36,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     debounceMs,
     enabled = true,
     maxRetries = 3,
-    retryDelayMs = 1000
+    retryDelayMs = 1000,
   } = options;
 
   const content = useAppStore(selectContent);
@@ -46,7 +49,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     updateTabContent,
     markAsSaved,
     showNotification,
-    settings
+    settings,
   } = useAppStore();
 
   // Use configured auto-save interval or override from options
@@ -56,12 +59,12 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   const pathRef = useRef(currentFilePath);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const saveStateRef = useRef<SaveState>({
-    status: 'idle',
+    status: "idle",
     lastSavedAt: null,
     error: null,
     retryCount: 0,
   });
-  const lastSavedContentRef = useRef<string>('');
+  const lastSavedContentRef = useRef<string>("");
   const isSavingRef = useRef(false);
 
   // Keep refs updated
@@ -77,7 +80,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   useEffect(() => {
     lastSavedContentRef.current = content;
     saveStateRef.current = {
-      status: 'idle',
+      status: "idle",
       lastSavedAt: null,
       error: null,
       retryCount: 0,
@@ -85,104 +88,139 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   }, [activeTabId]);
 
   // Execute save operation with retry logic
-  const executeSave = useCallback(async (retryCount = 0, options?: ForceSaveOptions): Promise<boolean> => {
-    const currentContent = contentRef.current;
-    const currentPath = pathRef.current;
+  const executeSave = useCallback(
+    async (retryCount = 0, options?: ForceSaveOptions): Promise<boolean> => {
+      const currentContent = contentRef.current;
+      const currentPath = pathRef.current;
 
-    if (!currentPath || !activeTabId) return false;
-    if (!isMarkdownDocumentPath(currentPath)) return false;
+      if (!currentPath || !activeTabId) return false;
+      if (!isMarkdownDocumentPath(currentPath)) return false;
 
-    const shouldFormatBeforeSave = options?.trigger === 'manual'
-      && options.formatBeforeSave === true
-      && isMarkdownDocumentPath(currentPath);
+      const shouldFormatBeforeSave =
+        options?.trigger === "manual" &&
+        options.formatBeforeSave === true &&
+        isMarkdownDocumentPath(currentPath);
 
-    const preparedContent = shouldFormatBeforeSave
-      ? formatMarkdownForSave(currentContent, { orderedListMode: settings.orderedListMode })
-      : currentContent;
+      const preparedContent = shouldFormatBeforeSave
+        ? formatMarkdownForSave(currentContent, {
+            orderedListMode: settings.orderedListMode,
+          })
+        : currentContent;
 
-    // Check if content has changed
-    if (preparedContent === lastSavedContentRef.current) {
-      return true; // No changes to save
-    }
+      // Check if content has changed
+      if (preparedContent === lastSavedContentRef.current) {
+        return true; // No changes to save
+      }
 
-    const contentToSave = options?.trigger === 'auto'
-      ? preparedContent
-      : refreshDocumentUpdateTime(preparedContent);
+      const contentToSave =
+        options?.trigger === "auto"
+          ? preparedContent
+          : refreshDocumentUpdateTime(preparedContent);
 
-    // Prevent concurrent saves
-    if (isSavingRef.current) {
-      return false;
-    }
+      // Prevent concurrent saves
+      if (isSavingRef.current) {
+        return false;
+      }
 
-    isSavingRef.current = true;
-    setSaving(true);
-    saveStateRef.current.status = 'saving';
+      isSavingRef.current = true;
+      setSaving(true);
+      saveStateRef.current.status = "saving";
 
-    try {
-      await withErrorHandling(
-        async () => {
+      try {
+        await withErrorHandling(async () => {
           const fs = await getFileSystem();
           await fs.writeFile(currentPath, contentToSave);
-        },
-        'Auto-save failed'
-      );
+        }, "Auto-save failed");
 
-      if (contentToSave !== currentContent) {
-        contentRef.current = contentToSave;
-        updateTabContent(activeTabId, contentToSave);
-      }
+        const latestContent = contentRef.current;
 
-      updateFileContent(activeTabId, contentToSave);
-      markAsSaved(activeTabId);
-      lastSavedContentRef.current = contentToSave;
-      saveStateRef.current = {
-        status: 'saved',
-        lastSavedAt: new Date(),
-        error: null,
-        retryCount: 0,
-      };
-      isSavingRef.current = false;
-      setSaving(false);
-      return true;
-    } catch (error) {
-      console.error(`Auto-save failed (attempt ${retryCount + 1}):`, error);
+        if (latestContent === contentToSave) {
+          if (contentToSave !== currentContent) {
+            contentRef.current = contentToSave;
+            updateTabContent(activeTabId, contentToSave);
+          }
+        }
 
-      // Check if we should retry
-      if (retryCount < maxRetries) {
-        saveStateRef.current.retryCount = retryCount + 1;
-
-        // Wait before retry with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, retryDelayMs * Math.pow(2, retryCount)));
-
+        updateFileContent(activeTabId, contentToSave);
+        markAsSaved(activeTabId, contentToSave);
+        lastSavedContentRef.current = contentToSave;
+        saveStateRef.current = {
+          status: "saved",
+          lastSavedAt: new Date(),
+          error: null,
+          retryCount: 0,
+        };
         isSavingRef.current = false;
-        return executeSave(retryCount + 1, options);
+        setSaving(false);
+
+        if (latestContent !== contentToSave) {
+          void executeSave(0, options);
+        }
+
+        return true;
+      } catch (error) {
+        console.error(`Auto-save failed (attempt ${retryCount + 1}):`, error);
+
+        // Check if we should retry
+        if (retryCount < maxRetries) {
+          saveStateRef.current.retryCount = retryCount + 1;
+
+          // Wait before retry with exponential backoff
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryDelayMs * Math.pow(2, retryCount)),
+          );
+
+          isSavingRef.current = false;
+          return executeSave(retryCount + 1, options);
+        }
+
+        // Max retries exceeded
+        const errorMessage =
+          error instanceof FileSystemError
+            ? error.toUserMessage()
+            : error instanceof Error
+              ? error.message
+              : "Save failed";
+
+        saveStateRef.current = {
+          status: "error",
+          lastSavedAt: saveStateRef.current.lastSavedAt,
+          error: errorMessage,
+          retryCount: retryCount + 1,
+        };
+        isSavingRef.current = false;
+        setSaving(false);
+
+        // Save to local storage as backup
+        try {
+          localStorage.setItem(`draft_${activeTabId}`, contentToSave);
+          showNotification(
+            t(settings.language, "notifications_saveBackupCreated"),
+            "error",
+          );
+        } catch (backupError) {
+          showNotification(
+            t(settings.language, "notifications_saveFailed", {
+              message: saveStateRef.current.error || "",
+            }),
+            "error",
+          );
+        }
+
+        return false;
       }
-
-      // Max retries exceeded
-      const errorMessage = error instanceof FileSystemError
-        ? error.toUserMessage()
-        : (error instanceof Error ? error.message : 'Save failed');
-
-      saveStateRef.current = {
-        status: 'error',
-        lastSavedAt: saveStateRef.current.lastSavedAt,
-        error: errorMessage,
-        retryCount: retryCount + 1,
-      };
-      isSavingRef.current = false;
-      setSaving(false);
-
-      // Save to local storage as backup
-      try {
-        localStorage.setItem(`draft_${activeTabId}`, contentToSave);
-        showNotification(t(settings.language, 'notifications_saveBackupCreated'), 'error');
-      } catch (backupError) {
-        showNotification(t(settings.language, 'notifications_saveFailed', { message: saveStateRef.current.error || '' }), 'error');
-      }
-
-      return false;
-    }
-  }, [activeTabId, setSaving, updateFileContent, updateTabContent, markAsSaved, showNotification, maxRetries, retryDelayMs]);
+    },
+    [
+      activeTabId,
+      setSaving,
+      updateFileContent,
+      updateTabContent,
+      markAsSaved,
+      showNotification,
+      maxRetries,
+      retryDelayMs,
+    ],
+  );
 
   // Debounced auto-save effect
   useEffect(() => {
@@ -195,7 +233,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
     // Set new timer
     timerRef.current = setTimeout(() => {
-      void executeSave(0, { trigger: 'auto' });
+      void executeSave(0, { trigger: "auto" });
     }, effectiveDebounceMs);
 
     return () => {
@@ -203,23 +241,39 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [content, enabled, activeTabId, currentFilePath, effectiveDebounceMs, executeSave]);
+  }, [
+    content,
+    enabled,
+    activeTabId,
+    currentFilePath,
+    effectiveDebounceMs,
+    executeSave,
+  ]);
 
   // Force save function (for manual save)
-  const forceSave = useCallback(async (contentOverride?: string, options?: ForceSaveOptions): Promise<boolean> => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
+  const forceSave = useCallback(
+    async (
+      contentOverride?: string,
+      options?: ForceSaveOptions,
+    ): Promise<boolean> => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
 
-    if (contentOverride !== undefined) {
-      contentRef.current = contentOverride;
-    }
+      if (contentOverride !== undefined) {
+        contentRef.current = contentOverride;
+      }
 
-    return executeSave(0, options);
-  }, [executeSave]);
+      return executeSave(0, options);
+    },
+    [executeSave],
+  );
 
   // Get save state
-  const getSaveState = useCallback((): SaveState => ({ ...saveStateRef.current }), []);
+  const getSaveState = useCallback(
+    (): SaveState => ({ ...saveStateRef.current }),
+    [],
+  );
 
   // Restore draft from local storage
   const restoreDraft = useCallback((fileId: string): string | null => {

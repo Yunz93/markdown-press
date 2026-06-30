@@ -1,18 +1,18 @@
 // @vitest-environment happy-dom
 
-import React from 'react';
-import { render, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useAppStore } from '../store/appStore';
-import type { FileNode } from '../types';
-import type { FileWatchEvent } from '../types/filesystem';
-import { useActiveFileWatch } from './useActiveFileWatch';
+import React from "react";
+import { render, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "../store/appStore";
+import type { FileNode } from "../types";
+import type { FileWatchEvent } from "../types/filesystem";
+import { useActiveFileWatch } from "./useActiveFileWatch";
 
 const note: FileNode = {
-  id: '/vault/note.md',
-  name: 'note.md',
-  path: '/vault/note.md',
-  type: 'file',
+  id: "/vault/note.md",
+  name: "note.md",
+  path: "/vault/note.md",
+  type: "file",
 };
 
 afterEach(() => {
@@ -27,25 +27,30 @@ afterEach(() => {
   });
 });
 
-describe('useActiveFileWatch', () => {
-  it('reloads external disk changes without marking them as local unsaved edits', async () => {
+describe("useActiveFileWatch", () => {
+  it("reloads external disk changes without marking them as local unsaved edits", async () => {
     const watched = {
       callback: null as ((event: FileWatchEvent | null) => void) | null,
     };
-    const readFile = vi.fn(async () => '# Changed outside\n');
+    const readFile = vi.fn(async () => "# Changed outside\n");
     const showNotification = vi.fn();
-    const watchFile = vi.fn(async (_path: string, callback: (event: FileWatchEvent | null) => void) => {
-      watched.callback = callback;
-      return vi.fn();
-    });
+    const watchFile = vi.fn(
+      async (
+        _path: string,
+        callback: (event: FileWatchEvent | null) => void,
+      ) => {
+        watched.callback = callback;
+        return vi.fn();
+      },
+    );
 
     useAppStore.setState({
       files: [note],
       currentFilePath: note.path,
       openTabs: [note.id],
       activeTabId: note.id,
-      fileContents: { [note.id]: '# Original\n' },
-      lastSavedContent: { [note.id]: '# Original\n' },
+      fileContents: { [note.id]: "# Original\n" },
+      lastSavedContent: { [note.id]: "# Original\n" },
     });
 
     function Harness() {
@@ -69,13 +74,54 @@ describe('useActiveFileWatch', () => {
       expect(watched.callback).not.toBeNull();
     });
 
-    const emitWatchedEvent = watched.callback as (event: FileWatchEvent | null) => void;
-    emitWatchedEvent({ path: note.path, type: 'modified' });
+    const emitWatchedEvent = watched.callback as (
+      event: FileWatchEvent | null,
+    ) => void;
+    emitWatchedEvent({ path: note.path, type: "modified" });
 
     await waitFor(() => {
-      expect(useAppStore.getState().fileContents[note.id]).toBe('# Changed outside\n');
-      expect(useAppStore.getState().lastSavedContent[note.id]).toBe('# Changed outside\n');
+      expect(useAppStore.getState().fileContents[note.id]).toBe(
+        "# Changed outside\n",
+      );
+      expect(useAppStore.getState().lastSavedContent[note.id]).toBe(
+        "# Changed outside\n",
+      );
       expect(useAppStore.getState().hasUnsavedChanges(note.id)).toBe(false);
+    });
+  });
+
+  it("does not leave a watcher active after unmounting during async setup", async () => {
+    let resolveWatch: (unwatch: () => void) => void = () => {};
+    const unwatch = vi.fn();
+    const watchFile = vi.fn(
+      () =>
+        new Promise<() => void>((resolve) => {
+          resolveWatch = resolve;
+        }),
+    );
+
+    function Harness() {
+      useActiveFileWatch({
+        activeTabId: note.id,
+        currentFilePath: note.path,
+        files: [note],
+        readFile: vi.fn(),
+        setCurrentFilePath: useAppStore.getState().setCurrentFilePath,
+        showNotification: vi.fn(),
+        watchFile,
+        t: (key) => key,
+      });
+
+      return null;
+    }
+
+    const { unmount } = render(React.createElement(Harness));
+    unmount();
+
+    resolveWatch(unwatch);
+
+    await waitFor(() => {
+      expect(unwatch).toHaveBeenCalled();
     });
   });
 });

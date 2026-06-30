@@ -523,6 +523,8 @@ export default {
     "Failed to save the note before publishing.",
   notifications_publishTimeout:
     "Publishing timed out. Check your GitHub connection and token permissions, then try again.",
+  notifications_publishInProgress:
+    "A publish is already in progress. Wait for it to finish before trying again.",
   notifications_publishBackfillFailed:
     "Published to the blog, but failed to write the article URL back into the note.",
   notifications_publishUrlBuildFailed:

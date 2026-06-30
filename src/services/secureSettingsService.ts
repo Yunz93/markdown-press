@@ -1,18 +1,16 @@
-import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
-import type { AppSettings } from '../types';
-import { useAppStore } from '../store/appStore';
-import { isTauriEnvironment, waitForTauri } from '../types/filesystem';
+import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import type { AppSettings } from "../types";
+import { useAppStore } from "../store/appStore";
+import { isTauriEnvironment, waitForTauri } from "../types/filesystem";
+import {
+  SENSITIVE_SETTING_KEYS,
+  type SensitiveSettingKey,
+} from "./sensitiveSettingKeys";
 
-const SETTINGS_STORAGE_KEY = 'markdown-press-settings';
+const SETTINGS_STORAGE_KEY = "markdown-press-settings";
 const SECURE_SETTINGS_WAIT_MS = 5000;
 
-export const SENSITIVE_SETTING_KEYS = [
-  'blogGithubToken', 'wechatAppSecret', 'geminiApiKey', 'codexApiKey', 'deepseekApiKey',
-  'imageHostingGithubToken', 'imageHostingS3SecretAccessKey',
-  'imageHostingOssAccessKeySecret', 'imageHostingQiniuSecretKey',
-] as const;
-
-export type SensitiveSettingKey = typeof SENSITIVE_SETTING_KEYS[number];
+export { SENSITIVE_SETTING_KEYS, type SensitiveSettingKey };
 export type SensitiveSettings = Pick<AppSettings, SensitiveSettingKey>;
 
 interface SecureSettingsPayload {
@@ -33,11 +31,11 @@ let secureSettingsCache: Partial<SensitiveSettings> | null = null;
 let hasLoadedSecureSettingsFromBackend = false;
 
 function normalizeSecretValue(value: string | null | undefined): string {
-  return typeof value === 'string' ? value : '';
+  return typeof value === "string" ? value : "";
 }
 
 async function ensureSecureSettingsBackendReady(): Promise<boolean> {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return false;
   }
 
@@ -48,10 +46,13 @@ async function ensureSecureSettingsBackendReady(): Promise<boolean> {
   return waitForTauri(SECURE_SETTINGS_WAIT_MS);
 }
 
-async function invokeSecureSettingsCommand<T>(command: string, args?: InvokeArgs): Promise<T> {
+async function invokeSecureSettingsCommand<T>(
+  command: string,
+  args?: InvokeArgs,
+): Promise<T> {
   const ready = await ensureSecureSettingsBackendReady();
   if (!ready) {
-    throw new Error('Secure settings backend is unavailable.');
+    throw new Error("Secure settings backend is unavailable.");
   }
 
   try {
@@ -63,18 +64,18 @@ async function invokeSecureSettingsCommand<T>(command: string, args?: InvokeArgs
 }
 
 function scrubSensitiveSettingsInObject(target: unknown): boolean {
-  if (!target || typeof target !== 'object') {
+  if (!target || typeof target !== "object") {
     return false;
   }
 
   let changed = false;
   const record = target as Record<string, unknown>;
 
-  if (record.settings && typeof record.settings === 'object') {
+  if (record.settings && typeof record.settings === "object") {
     changed = scrubSensitiveSettingsInObject(record.settings) || changed;
   }
 
-  if (record.state && typeof record.state === 'object') {
+  if (record.state && typeof record.state === "object") {
     changed = scrubSensitiveSettingsInObject(record.state) || changed;
   }
 
@@ -89,7 +90,7 @@ function scrubSensitiveSettingsInObject(target: unknown): boolean {
 }
 
 export function scrubSensitiveSettingsFromLocalStorage(): void {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return;
   }
 
@@ -105,11 +106,16 @@ export function scrubSensitiveSettingsFromLocalStorage(): void {
     }
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(parsed));
   } catch (error) {
-    console.warn('Failed to scrub sensitive settings from localStorage:', error);
+    console.warn(
+      "Failed to scrub sensitive settings from localStorage:",
+      error,
+    );
   }
 }
 
-export async function loadSecureSettings(): Promise<Partial<SensitiveSettings>> {
+export async function loadSecureSettings(): Promise<
+  Partial<SensitiveSettings>
+> {
   scrubSensitiveSettingsFromLocalStorage();
 
   if (hasLoadedSecureSettingsFromBackend && secureSettingsCache) {
@@ -117,35 +123,48 @@ export async function loadSecureSettings(): Promise<Partial<SensitiveSettings>> 
   }
 
   try {
-    const payload = await invokeSecureSettingsCommand<SecureSettingsPayload>('get_secure_settings');
+    const payload = await invokeSecureSettingsCommand<SecureSettingsPayload>(
+      "get_secure_settings",
+    );
     secureSettingsCache = {
       blogGithubToken: normalizeSecretValue(payload.blogGithubToken),
       wechatAppSecret: normalizeSecretValue(payload.wechatAppSecret),
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
       deepseekApiKey: normalizeSecretValue(payload.deepseekApiKey),
-      imageHostingGithubToken: normalizeSecretValue(payload.imageHostingGithubToken),
-      imageHostingS3SecretAccessKey: normalizeSecretValue(payload.imageHostingS3SecretAccessKey),
-      imageHostingOssAccessKeySecret: normalizeSecretValue(payload.imageHostingOssAccessKeySecret),
-      imageHostingQiniuSecretKey: normalizeSecretValue(payload.imageHostingQiniuSecretKey),
+      imageHostingGithubToken: normalizeSecretValue(
+        payload.imageHostingGithubToken,
+      ),
+      imageHostingS3SecretAccessKey: normalizeSecretValue(
+        payload.imageHostingS3SecretAccessKey,
+      ),
+      imageHostingOssAccessKeySecret: normalizeSecretValue(
+        payload.imageHostingOssAccessKeySecret,
+      ),
+      imageHostingQiniuSecretKey: normalizeSecretValue(
+        payload.imageHostingQiniuSecretKey,
+      ),
     };
     hasLoadedSecureSettingsFromBackend = true;
     return { ...secureSettingsCache };
   } catch (error) {
-    console.warn('Failed to load secure settings:', error);
+    console.warn("Failed to load secure settings:", error);
     return {};
   }
 }
 
-export async function persistSecureSetting(key: SensitiveSettingKey, value: string): Promise<void> {
+export async function persistSecureSetting(
+  key: SensitiveSettingKey,
+  value: string,
+): Promise<void> {
   scrubSensitiveSettingsFromLocalStorage();
 
   const previousWrite = secureWriteQueue.get(key) ?? Promise.resolve();
   const nextWrite = previousWrite
-    .catch((e) => console.warn('Previous secure write failed:', e))
+    .catch((e) => console.warn("Previous secure write failed:", e))
     .then(async () => {
       const trimmed = value.trim();
-      await invokeSecureSettingsCommand('set_secure_secret', {
+      await invokeSecureSettingsCommand("set_secure_secret", {
         key,
         value: trimmed ? trimmed : null,
       });
@@ -167,15 +186,15 @@ export async function persistSecureSetting(key: SensitiveSettingKey, value: stri
 }
 
 export async function migrateLegacySensitiveSettings(
-  settings: AppSettings
+  settings: AppSettings,
 ): Promise<Partial<SensitiveSettings>> {
   const secureBackendReady = await ensureSecureSettingsBackendReady();
   const loaded = secureBackendReady ? await loadSecureSettings() : {};
   const next: Partial<SensitiveSettings> = { ...loaded };
 
   for (const key of SENSITIVE_SETTING_KEYS) {
-    const legacyValue = typeof settings[key] === 'string' ? settings[key] : '';
-    const secureValue = typeof loaded[key] === 'string' ? loaded[key] : '';
+    const legacyValue = typeof settings[key] === "string" ? settings[key] : "";
+    const secureValue = typeof loaded[key] === "string" ? loaded[key] : "";
 
     if (!secureValue && legacyValue.trim() && secureBackendReady) {
       await persistSecureSetting(key, legacyValue);
@@ -183,7 +202,7 @@ export async function migrateLegacySensitiveSettings(
       continue;
     }
 
-    next[key] = secureValue || legacyValue || '';
+    next[key] = secureValue || legacyValue || "";
   }
 
   scrubSensitiveSettingsFromLocalStorage();
@@ -191,8 +210,10 @@ export async function migrateLegacySensitiveSettings(
 }
 
 export async function hydrateSensitiveSettingsIntoStore(
-  settings: AppSettings = useAppStore.getState().settings
+  settings: AppSettings = useAppStore.getState().settings,
 ): Promise<AppSettings> {
+  const backendReady = await ensureSecureSettingsBackendReady();
+
   if (hasLoadedSecureSettingsFromBackend) {
     if (secureSettingsCache) {
       useAppStore.getState().updateSettings(secureSettingsCache);
@@ -204,7 +225,6 @@ export async function hydrateSensitiveSettingsIntoStore(
     secureHydrationPromise = migrateLegacySensitiveSettings(settings)
       .then((secureSettings) => {
         secureSettingsCache = { ...secureSettings };
-        hasLoadedSecureSettingsFromBackend = true;
         useAppStore.getState().updateSettings(secureSettings);
         return secureSettings;
       })
@@ -214,5 +234,13 @@ export async function hydrateSensitiveSettingsIntoStore(
   }
 
   await secureHydrationPromise;
+
+  if (!hasLoadedSecureSettingsFromBackend && backendReady) {
+    const loaded = await loadSecureSettings();
+    if (hasLoadedSecureSettingsFromBackend) {
+      useAppStore.getState().updateSettings(loaded);
+    }
+  }
+
   return useAppStore.getState().settings;
 }

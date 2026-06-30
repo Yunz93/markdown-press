@@ -1,21 +1,39 @@
-import { open, save } from '@tauri-apps/plugin-dialog';
-import { readTextFile, readFile as readBinaryFile, writeTextFile, writeFile, exists, mkdir, readDir, rename, remove } from '@tauri-apps/plugin-fs';
-import { basename, dirname, join } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
-import type { FileNode } from '../types';
-import type { FileWatchEvent, IFileSystem } from '../types/filesystem';
-import { useAppStore } from '../store/appStore';
-import { sanitizeTrashFolder } from '../utils/trashFolder';
+import { open, save } from "@tauri-apps/plugin-dialog";
+import {
+  readTextFile,
+  readFile as readBinaryFile,
+  writeTextFile,
+  writeFile,
+  exists,
+  mkdir,
+  readDir,
+  rename,
+  remove,
+} from "@tauri-apps/plugin-fs";
+import { basename, dirname, join } from "@tauri-apps/api/path";
+import { invoke } from "@tauri-apps/api/core";
+import type { FileNode } from "../types";
+import type { FileWatchEvent, IFileSystem } from "../types/filesystem";
+import { useAppStore } from "../store/appStore";
+import { sanitizeTrashFolder } from "../utils/trashFolder";
 
 /**
  * Supported file extensions
  */
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
-const DOCUMENT_EXTENSIONS = ['.pdf'];
-const HTML_EXTENSIONS = ['.html', '.htm'];
-const CONFIG_EXTENSIONS = ['.json', '.yaml', '.yml', '.toml'];
-type LineEnding = '\n' | '\r\n';
+const MARKDOWN_EXTENSIONS = [".md", ".markdown"];
+const IMAGE_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".svg",
+  ".webp",
+  ".bmp",
+];
+const DOCUMENT_EXTENSIONS = [".pdf"];
+const HTML_EXTENSIONS = [".html", ".htm"];
+const CONFIG_EXTENSIONS = [".json", ".yaml", ".yml", ".toml"];
+type LineEnding = "\n" | "\r\n";
 
 interface FileFormatState {
   lineEnding: LineEnding;
@@ -43,15 +61,16 @@ export class TauriFileSystem implements IFileSystem {
 
   private getMimeType(path: string): string {
     const normalized = path.toLowerCase();
-    if (normalized.endsWith('.png')) return 'image/png';
-    if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
-    if (normalized.endsWith('.gif')) return 'image/gif';
-    if (normalized.endsWith('.webp')) return 'image/webp';
-    if (normalized.endsWith('.svg')) return 'image/svg+xml';
-    if (normalized.endsWith('.bmp')) return 'image/bmp';
-    if (normalized.endsWith('.avif')) return 'image/avif';
-    if (normalized.endsWith('.pdf')) return 'application/pdf';
-    return 'application/octet-stream';
+    if (normalized.endsWith(".png")) return "image/png";
+    if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg"))
+      return "image/jpeg";
+    if (normalized.endsWith(".gif")) return "image/gif";
+    if (normalized.endsWith(".webp")) return "image/webp";
+    if (normalized.endsWith(".svg")) return "image/svg+xml";
+    if (normalized.endsWith(".bmp")) return "image/bmp";
+    if (normalized.endsWith(".avif")) return "image/avif";
+    if (normalized.endsWith(".pdf")) return "application/pdf";
+    return "application/octet-stream";
   }
 
   private invalidateObjectUrl(path: string): void {
@@ -72,34 +91,52 @@ export class TauriFileSystem implements IFileSystem {
   }
 
   async registerAllowedPath(path: string, recursive: boolean): Promise<void> {
-    await invoke('register_allowed_path', { path, recursive });
+    await invoke("register_allowed_path", { path, recursive });
   }
 
   static getInstance(): TauriFileSystem {
     if (!TauriFileSystem.instance) {
       TauriFileSystem.instance = new TauriFileSystem();
+      if (typeof window !== "undefined") {
+        window.addEventListener("beforeunload", () => {
+          TauriFileSystem.instance.revokeAllObjectUrls();
+        });
+      }
     }
     return TauriFileSystem.instance;
+  }
+
+  private revokeAllObjectUrls(): void {
+    for (const url of this.objectUrls.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.objectUrls.clear();
   }
 
   /**
    * Configure which files to show
    */
-  setDisplayOptions(options: { showHidden?: boolean; showImages?: boolean; showConfigFiles?: boolean }): void {
-    if (options.showHidden !== undefined) this.showHiddenFiles = options.showHidden;
+  setDisplayOptions(options: {
+    showHidden?: boolean;
+    showImages?: boolean;
+    showConfigFiles?: boolean;
+  }): void {
+    if (options.showHidden !== undefined)
+      this.showHiddenFiles = options.showHidden;
     if (options.showImages !== undefined) this.showImages = options.showImages;
-    if (options.showConfigFiles !== undefined) this.showConfigFiles = options.showConfigFiles;
+    if (options.showConfigFiles !== undefined)
+      this.showConfigFiles = options.showConfigFiles;
   }
 
   private captureFileFormat(path: string, raw: string): string {
-    const hasBom = raw.startsWith('\uFEFF');
+    const hasBom = raw.startsWith("\uFEFF");
     const content = hasBom ? raw.slice(1) : raw;
-    const lineEnding: LineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+    const lineEnding: LineEnding = content.includes("\r\n") ? "\r\n" : "\n";
 
     this.fileFormatStates.set(path, {
       lineEnding,
       hasBom,
-      lastContent: content
+      lastContent: content,
     });
 
     return content;
@@ -108,23 +145,26 @@ export class TauriFileSystem implements IFileSystem {
   private prepareContentForWrite(path: string, content: string): string {
     const format = this.fileFormatStates.get(path);
     const defaultLineEnding: LineEnding =
-      typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('win')
-        ? '\r\n'
-        : (content.includes('\r\n') ? '\r\n' : '\n');
+      typeof navigator !== "undefined" &&
+      navigator.platform.toLowerCase().includes("win")
+        ? "\r\n"
+        : content.includes("\r\n")
+          ? "\r\n"
+          : "\n";
     const targetLineEnding = format?.lineEnding ?? defaultLineEnding;
     let normalized = content;
 
-    if (targetLineEnding === '\r\n') {
-      normalized = normalized.replace(/\r?\n/g, '\r\n');
+    if (targetLineEnding === "\r\n") {
+      normalized = normalized.replace(/\r?\n/g, "\r\n");
     } else {
-      normalized = normalized.replace(/\r\n/g, '\n');
+      normalized = normalized.replace(/\r\n/g, "\n");
     }
 
     if (format?.hasBom) {
-      if (!normalized.startsWith('\uFEFF')) {
+      if (!normalized.startsWith("\uFEFF")) {
         normalized = `\uFEFF${normalized}`;
       }
-    } else if (normalized.startsWith('\uFEFF')) {
+    } else if (normalized.startsWith("\uFEFF")) {
       normalized = normalized.slice(1);
     }
 
@@ -138,7 +178,7 @@ export class TauriFileSystem implements IFileSystem {
     try {
       const selected = await open({
         multiple: false,
-        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
+        filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
       });
       const path = (selected as string) || null;
       if (path) {
@@ -146,7 +186,7 @@ export class TauriFileSystem implements IFileSystem {
       }
       return path;
     } catch (error) {
-      console.error('Failed to open file:', error);
+      console.error("Failed to open file:", error);
       return null;
     }
   }
@@ -167,7 +207,7 @@ export class TauriFileSystem implements IFileSystem {
       }
       return path;
     } catch (error) {
-      console.error('Failed to open directory:', error);
+      console.error("Failed to open directory:", error);
       return null;
     }
   }
@@ -226,7 +266,7 @@ export class TauriFileSystem implements IFileSystem {
     try {
       if (!path) {
         const savePath = await save({
-          filters: [{ name: 'Markdown', extensions: ['md'] }]
+          filters: [{ name: "Markdown", extensions: ["md"] }],
         });
         if (savePath) {
           const prepared = this.prepareContentForWrite(savePath, content);
@@ -244,7 +284,7 @@ export class TauriFileSystem implements IFileSystem {
       this.invalidateObjectUrl(path);
       return path;
     } catch (error) {
-      console.error('Failed to save file:', error);
+      console.error("Failed to save file:", error);
       throw error;
     }
   }
@@ -255,7 +295,7 @@ export class TauriFileSystem implements IFileSystem {
   async renameFile(oldPath: string, newName: string): Promise<string> {
     try {
       const dir = await dirname(oldPath);
-      const nameWithExt = newName.endsWith('.md') ? newName : `${newName}.md`;
+      const nameWithExt = newName.endsWith(".md") ? newName : `${newName}.md`;
       const newPath = await join(dir, nameWithExt);
       await rename(oldPath, newPath);
       const format = this.fileFormatStates.get(oldPath);
@@ -267,12 +307,16 @@ export class TauriFileSystem implements IFileSystem {
       this.invalidateObjectUrl(newPath);
       return newPath;
     } catch (error) {
-      console.error('Failed to rename file:', error);
+      console.error("Failed to rename file:", error);
       throw error;
     }
   }
 
-  async renameEntry(oldPath: string, newName: string, isDirectory: boolean): Promise<string> {
+  async renameEntry(
+    oldPath: string,
+    newName: string,
+    isDirectory: boolean,
+  ): Promise<string> {
     try {
       if (!isDirectory) {
         return await this.renameFile(oldPath, newName);
@@ -283,7 +327,7 @@ export class TauriFileSystem implements IFileSystem {
       await rename(oldPath, newPath);
       return newPath;
     } catch (error) {
-      console.error('Failed to rename entry:', error);
+      console.error("Failed to rename entry:", error);
       throw error;
     }
   }
@@ -305,7 +349,7 @@ export class TauriFileSystem implements IFileSystem {
       this.invalidateObjectUrl(destPath);
       return destPath;
     } catch (error) {
-      console.error('Failed to move file:', error);
+      console.error("Failed to move file:", error);
       throw error;
     }
   }
@@ -315,11 +359,11 @@ export class TauriFileSystem implements IFileSystem {
    */
   async deleteFile(path: string): Promise<void> {
     try {
-      await invoke('delete_path_recursively', { path });
+      await invoke("delete_path_recursively", { path });
       this.fileFormatStates.delete(path);
       this.invalidateObjectUrl(path);
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      console.error("Failed to delete file:", error);
       throw error;
     }
   }
@@ -329,9 +373,9 @@ export class TauriFileSystem implements IFileSystem {
    */
   async revealInExplorer(path: string): Promise<void> {
     try {
-      await invoke('reveal_in_explorer', { path });
+      await invoke("reveal_in_explorer", { path });
     } catch (error) {
-      console.error('Failed to reveal in explorer:', error);
+      console.error("Failed to reveal in explorer:", error);
       throw error;
     }
   }
@@ -355,7 +399,9 @@ export class TauriFileSystem implements IFileSystem {
     }
 
     const bytes = await readBinaryFile(path);
-    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: this.getMimeType(path) }));
+    const objectUrl = URL.createObjectURL(
+      new Blob([bytes], { type: this.getMimeType(path) }),
+    );
     this.objectUrls.set(path, objectUrl);
     return objectUrl;
   }
@@ -363,52 +409,73 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Recursively read directory and return file nodes
    */
-  async readDirectory(dirPath: string, rootPath: string = dirPath, inTrash: boolean = false): Promise<FileNode[]> {
+  async readDirectory(
+    dirPath: string,
+    rootPath: string = dirPath,
+    inTrash: boolean = false,
+  ): Promise<FileNode[]> {
     try {
       const entries = await readDir(dirPath);
       const nodes: FileNode[] = [];
-      const normalizedDirPath = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
-      const normalizedRootPath = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
+      const normalizedDirPath = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
+      const normalizedRootPath = rootPath
+        .replace(/\\/g, "/")
+        .replace(/\/+$/, "");
       const isAtRoot = normalizedDirPath === normalizedRootPath;
-      const trashFolder = sanitizeTrashFolder(useAppStore.getState().settings.trashFolder);
+      const trashFolder = sanitizeTrashFolder(
+        useAppStore.getState().settings.trashFolder,
+      );
 
       for (const entry of entries) {
         if (!entry.name) continue;
-        const isTrashDirectory = entry.isDirectory && isAtRoot && entry.name === trashFolder;
+        const isTrashDirectory =
+          entry.isDirectory && isAtRoot && entry.name === trashFolder;
         const nodeInTrash = inTrash || isTrashDirectory;
-        if (!this.showHiddenFiles && entry.name.startsWith('.') && !isTrashDirectory && !inTrash) continue;
+        if (
+          !this.showHiddenFiles &&
+          entry.name.startsWith(".") &&
+          !isTrashDirectory &&
+          !inTrash
+        )
+          continue;
 
         const fullPath = await join(dirPath, entry.name);
         const ext = entry.name.toLowerCase();
 
         if (entry.isDirectory) {
-          const children = await this.readDirectory(fullPath, rootPath, nodeInTrash);
+          const children = await this.readDirectory(
+            fullPath,
+            rootPath,
+            nodeInTrash,
+          );
           nodes.push({
             id: fullPath,
             name: entry.name,
-            type: 'folder',
+            type: "folder",
             path: fullPath,
             children,
-            isTrash: nodeInTrash
+            isTrash: nodeInTrash,
           });
-        }
-        else {
+        } else {
           const isKnownVisibleFile =
-            MARKDOWN_EXTENSIONS.some(e => ext.endsWith(e)) ||
-            (this.showImages && IMAGE_EXTENSIONS.some(e => ext.endsWith(e))) ||
-            DOCUMENT_EXTENSIONS.some(e => ext.endsWith(e)) ||
-            HTML_EXTENSIONS.some(e => ext.endsWith(e)) ||
-            (this.showConfigFiles && CONFIG_EXTENSIONS.some(e => ext.endsWith(e)));
-          const isGenericAttachment = !entry.name.startsWith('.');
-          const shouldIncludeFile = nodeInTrash || isKnownVisibleFile || isGenericAttachment;
+            MARKDOWN_EXTENSIONS.some((e) => ext.endsWith(e)) ||
+            (this.showImages &&
+              IMAGE_EXTENSIONS.some((e) => ext.endsWith(e))) ||
+            DOCUMENT_EXTENSIONS.some((e) => ext.endsWith(e)) ||
+            HTML_EXTENSIONS.some((e) => ext.endsWith(e)) ||
+            (this.showConfigFiles &&
+              CONFIG_EXTENSIONS.some((e) => ext.endsWith(e)));
+          const isGenericAttachment = !entry.name.startsWith(".");
+          const shouldIncludeFile =
+            nodeInTrash || isKnownVisibleFile || isGenericAttachment;
 
           if (!shouldIncludeFile) continue;
           nodes.push({
             id: fullPath,
             name: entry.name,
-            type: 'file',
+            type: "file",
             path: fullPath,
-            isTrash: nodeInTrash
+            isTrash: nodeInTrash,
           });
         }
       }
@@ -422,14 +489,14 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Create a new file
    */
-  async createFile(path: string, content: string = ''): Promise<string> {
+  async createFile(path: string, content: string = ""): Promise<string> {
     try {
       const prepared = this.prepareContentForWrite(path, content);
       await writeTextFile(path, prepared);
       this.captureFileFormat(path, prepared);
       return path;
     } catch (error) {
-      console.error('Failed to create file:', error);
+      console.error("Failed to create file:", error);
       throw error;
     }
   }
@@ -441,10 +508,10 @@ export class TauriFileSystem implements IFileSystem {
     try {
       await mkdir(path, { recursive: true });
     } catch (error) {
-      if (await exists(path) && await this.isDirectory(path)) {
+      if ((await exists(path)) && (await this.isDirectory(path))) {
         return;
       }
-      console.error('Failed to create directory:', error);
+      console.error("Failed to create directory:", error);
       throw error;
     }
   }
@@ -454,15 +521,20 @@ export class TauriFileSystem implements IFileSystem {
    */
   async copySampleNotes(targetDir: string): Promise<boolean> {
     try {
-      const result = await invoke<CopySampleNotesResult>('copy_sample_notes', { targetDir });
+      const result = await invoke<CopySampleNotesResult>("copy_sample_notes", {
+        targetDir,
+      });
 
       if (result.skippedFiles.length > 0) {
-        console.info('Skipped sample notes with local edits:', result.skippedFiles);
+        console.info(
+          "Skipped sample notes with local edits:",
+          result.skippedFiles,
+        );
       }
 
       return result.updated;
     } catch (error) {
-      console.error('Failed to copy sample notes:', error);
+      console.error("Failed to copy sample notes:", error);
       throw error;
     }
   }
@@ -470,7 +542,10 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Listen to file system events
    */
-  async watchFile(path: string, callback: (event: FileWatchEvent | null) => void): Promise<() => void> {
+  async watchFile(
+    path: string,
+    callback: (event: FileWatchEvent | null) => void,
+  ): Promise<() => void> {
     try {
       let previous = this.fileFormatStates.get(path)?.lastContent;
 
@@ -479,7 +554,7 @@ export class TauriFileSystem implements IFileSystem {
           const initialRaw = await readTextFile(path);
           previous = this.captureFileFormat(path, initialRaw);
         } catch {
-          previous = '';
+          previous = "";
         }
       }
 
@@ -495,34 +570,37 @@ export class TauriFileSystem implements IFileSystem {
 
           if (current !== previous) {
             previous = current;
-            callback({ path, type: 'modified' });
+            callback({ path, type: "modified" });
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+          const message =
+            error instanceof Error
+              ? error.message.toLowerCase()
+              : String(error).toLowerCase();
           const isMissingFile =
-            message.includes('not found') ||
-            message.includes('no such file') ||
-            message.includes('cannot find the path') ||
-            message.includes('路径') && message.includes('找不到');
+            message.includes("not found") ||
+            message.includes("no such file") ||
+            message.includes("cannot find the path") ||
+            (message.includes("路径") && message.includes("找不到"));
           if (isMissingFile) {
-            callback({ path, type: 'deleted' });
+            callback({ path, type: "deleted" });
             window.clearInterval(timer);
             return;
           }
           // Windows often returns transient sharing/access errors while the file is being deleted or replaced; skip one poll instead of surfacing "watch failed".
           const isTransientRead =
-            message.includes('access') ||
-            message.includes('denied') ||
-            message.includes('busy') ||
-            message.includes('sharing') ||
-            message.includes('being used') ||
-            message.includes('resource temporarily unavailable') ||
-            message.includes('interrupted') ||
-            message.includes('os error 32');
+            message.includes("access") ||
+            message.includes("denied") ||
+            message.includes("busy") ||
+            message.includes("sharing") ||
+            message.includes("being used") ||
+            message.includes("resource temporarily unavailable") ||
+            message.includes("interrupted") ||
+            message.includes("os error 32");
           if (isTransientRead) {
             return;
           }
-          callback({ path, type: 'error', error });
+          callback({ path, type: "error", error });
         }
       }, 1500);
 
@@ -530,7 +608,7 @@ export class TauriFileSystem implements IFileSystem {
         window.clearInterval(timer);
       };
     } catch (error) {
-      console.error('Failed to watch file:', error);
+      console.error("Failed to watch file:", error);
       return () => {};
     }
   }

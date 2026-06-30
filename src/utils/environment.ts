@@ -121,7 +121,9 @@ export function assertDevReleaseParity(): void {
     console.info(
       "4. 本地文件协议 — 浏览器用 file://，Tauri 用 tauri://，附件路径不同",
     );
-    console.info("5. CSP — 浏览器 dev 无 CSP 限制，release 有严格 CSP");
+    console.info(
+      "5. CSP — dev server 经 cspDevPlugin 注入与 release 一致的 CSP（额外放开 HMR 用的 ws:/inline）",
+    );
     console.groupEnd();
     console.info("💡 涉及渲染/字体/导出/文件读写时请用 npm run tauri:dev 验证");
     return;

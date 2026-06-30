@@ -14,14 +14,18 @@
  *   - 多字母 [IVXLCDM]{2,} / [ivxlcdm]{2,} (且能解析为正整数罗马数字) → 罗马
  *   - 单字母 [A-Z] / [a-z] → alpha
  *
+ * 同时处理紧凑数字 marker(`2.AIGC`,点号后无空格紧跟字母/CJK):编辑器把它当有序列表项,
+ * 但 markdown-it 需要分隔符后有空白。这里补一个空格(`2. AIGC`),start 由 markdown-it 原生处理,
+ * 无需 meta 回填。数字后跟数字(如 `1.2` 版本号)不会被改写。
+ *
  * 额外约束:
  *   - fenced code block (``` 或 ~~~) 内容会被跳过,不会改写。
  *   - indented code block 也会被跳过,避免把 4 空格缩进代码里的 `A. text` 污染成列表。
  */
 
-import type Token from 'markdown-it/lib/token.mjs';
+import type Token from "markdown-it/lib/token.mjs";
 
-export type AlphaRomanListType = 'A' | 'a' | 'I' | 'i';
+export type AlphaRomanListType = "A" | "a" | "I" | "i";
 
 export interface AlphaRomanListMetaEntry {
   type: AlphaRomanListType;
@@ -32,9 +36,16 @@ export type AlphaRomanListMeta = Map<number, AlphaRomanListMetaEntry>;
 
 // 匹配 alpha/roman 列表行。多字母 roman 优先,避免 `ii.` 被当成单字母 alpha。
 // 后跟空白或行尾,保证 `A.text` 这种无空格紧贴的不会误判为列表。
-const ALPHA_ROMAN_LIST_RE = /^([ \t]*)([IVXLCDM]{2,}|[ivxlcdm]{2,}|[A-Z]|[a-z])([.)])(?=\s|$)(.*)$/;
+const ALPHA_ROMAN_LIST_RE =
+  /^([ \t]*)([IVXLCDM]{2,}|[ivxlcdm]{2,}|[A-Z]|[a-z])([.)])(?=\s|$)(.*)$/;
 const DECIMAL_LIST_RE = /^([ \t]*)\d+[.)](?=\s|$)/;
 const BULLET_LIST_RE = /^([ \t]*)[-+*](?=\s|$)/;
+
+// 紧凑数字 marker:`2.AIGC`(点号/右括号后无空格,紧跟字母或 CJK 文字)。与编辑器侧
+// ORDERED_LIST_REGEX 对齐——编辑器把它当有序列表项,但 markdown-it 按 CommonMark 需要分隔符
+// 后有空白才认列表,导致预览退化成普通段落。这里在解析前补一个空格让两侧一致。
+// 注意:分隔符后必须是字母/CJK,数字(如 `1.2` 版本号)不算列表,避免误判。
+const TIGHT_DECIMAL_LIST_RE = /^([ \t]*)(\d+)([.)])([A-Za-z\u4e00-\u9fff].*)$/;
 
 // fenced code 起止行(允许 0~3 空格缩进,与 CommonMark 一致)。
 const FENCE_RE = /^([ ]{0,3})(`{3,}|~{3,})/;
@@ -52,11 +63,11 @@ const ROMAN_VALUES: Record<string, number> = {
 function getIndentColumns(line: string): number {
   let columns = 0;
   for (const char of line) {
-    if (char === ' ') {
+    if (char === " ") {
       columns += 1;
       continue;
     }
-    if (char === '\t') {
+    if (char === "\t") {
       columns += 4;
       continue;
     }
@@ -66,9 +77,12 @@ function getIndentColumns(line: string): number {
 }
 
 function isListLikeLine(line: string): boolean {
-  return ALPHA_ROMAN_LIST_RE.test(line)
-    || DECIMAL_LIST_RE.test(line)
-    || BULLET_LIST_RE.test(line);
+  return (
+    ALPHA_ROMAN_LIST_RE.test(line) ||
+    DECIMAL_LIST_RE.test(line) ||
+    TIGHT_DECIMAL_LIST_RE.test(line) ||
+    BULLET_LIST_RE.test(line)
+  );
 }
 
 /** 解析罗马数字字符串为正整数;无效返回 0。 */
@@ -89,22 +103,24 @@ function parseRoman(input: string): number {
 }
 
 /** 把 marker 文本分类为 alpha/roman + 对应的数值。无法分类返回 null。 */
-function classifyMarker(markerPart: string): { type: AlphaRomanListType; value: number } | null {
+function classifyMarker(
+  markerPart: string,
+): { type: AlphaRomanListType; value: number } | null {
   // 多字母 roman(必须能解析成正整数)
   if (markerPart.length >= 2 && /^[IVXLCDM]+$/.test(markerPart)) {
     const v = parseRoman(markerPart);
-    if (v > 0) return { type: 'I', value: v };
+    if (v > 0) return { type: "I", value: v };
   }
   if (markerPart.length >= 2 && /^[ivxlcdm]+$/.test(markerPart)) {
     const v = parseRoman(markerPart);
-    if (v > 0) return { type: 'i', value: v };
+    if (v > 0) return { type: "i", value: v };
   }
   // 单字母 alpha
   if (/^[A-Z]$/.test(markerPart)) {
-    return { type: 'A', value: markerPart.charCodeAt(0) - 64 };
+    return { type: "A", value: markerPart.charCodeAt(0) - 64 };
   }
   if (/^[a-z]$/.test(markerPart)) {
-    return { type: 'a', value: markerPart.charCodeAt(0) - 96 };
+    return { type: "a", value: markerPart.charCodeAt(0) - 96 };
   }
   return null;
 }
@@ -115,11 +131,14 @@ function classifyMarker(markerPart: string): { type: AlphaRomanListType; value: 
  * 返回 src 行数与输入一致,仅替换 marker 文本,所以 markdown-it 解析后 token.map 的行号
  * 仍可与 meta 的 0-based 行号对应。
  */
-export function preprocessAlphaRomanLists(src: string): { src: string; meta: AlphaRomanListMeta } {
-  const lines = src.split('\n');
+export function preprocessAlphaRomanLists(src: string): {
+  src: string;
+  meta: AlphaRomanListMeta;
+} {
+  const lines = src.split("\n");
   const meta: AlphaRomanListMeta = new Map();
   let inFence = false;
-  let fenceChar = '';
+  let fenceChar = "";
   let inIndentedCode = false;
   let activeListIndents: number[] = [];
   let pendingBlankListIndents: number[] = [];
@@ -138,12 +157,12 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
         fenceChar = char;
       } else if (char === fenceChar) {
         inFence = false;
-        fenceChar = '';
+        fenceChar = "";
       }
       continue;
     }
     if (inFence) continue;
-    if (trimmed === '') {
+    if (trimmed === "") {
       // 连续空行时 activeListIndents 已清空，勿用 [] 覆盖仍有效的 pending 上下文。
       if (activeListIndents.length > 0) {
         pendingBlankListIndents = [...activeListIndents];
@@ -156,13 +175,19 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
 
     const indentColumns = getIndentColumns(line);
     const lineIsListLike = isListLikeLine(line);
-    const hasBlankLineNestedListContext = lineIsListLike
-      && pendingBlankListIndents.some((indent) => indent + 4 === indentColumns);
+    const hasBlankLineNestedListContext =
+      lineIsListLike &&
+      pendingBlankListIndents.some((indent) => indent + 4 === indentColumns);
     pendingBlankListIndents = [];
-    activeListIndents = activeListIndents.filter((indent) => indent <= indentColumns);
-    const hasIndentedListContext = activeListIndents.includes(indentColumns)
-      || hasBlankLineNestedListContext
-      || (previousNonBlankWasList && previousNonBlankIndent !== null && previousNonBlankIndent <= indentColumns);
+    activeListIndents = activeListIndents.filter(
+      (indent) => indent <= indentColumns,
+    );
+    const hasIndentedListContext =
+      activeListIndents.includes(indentColumns) ||
+      hasBlankLineNestedListContext ||
+      (previousNonBlankWasList &&
+        previousNonBlankIndent !== null &&
+        previousNonBlankIndent <= indentColumns);
 
     if (inIndentedCode) {
       if (indentColumns >= 4 && !hasIndentedListContext) {
@@ -190,6 +215,13 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
         lines[i] = `${indent}${cls.value}${delimiter}${rest}`;
         meta.set(i, { type: cls.type, start: cls.value });
       }
+    } else {
+      // 紧凑数字 marker `2.AIGC` → `2. AIGC`,让 markdown-it 识别为有序列表(start 由它原生处理)。
+      const tight = line.match(TIGHT_DECIMAL_LIST_RE);
+      if (tight) {
+        const [, indent, digits, delimiter, rest] = tight;
+        lines[i] = `${indent}${digits}${delimiter} ${rest}`;
+      }
     }
 
     if (isListLikeLine(lines[i])) {
@@ -205,7 +237,7 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
     previousNonBlankIndent = indentColumns;
   }
 
-  return { src: lines.join('\n'), meta };
+  return { src: lines.join("\n"), meta };
 }
 
 /**
@@ -214,15 +246,18 @@ export function preprocessAlphaRomanLists(src: string): { src: string; meta: Alp
  * markdown-it 的 token 是平铺数组(不是树),遍历一次即可。同一个列表组若内部 marker 风格
  * 不一致,只取首行的风格(由 token.map[0] 决定)。
  */
-export function applyAlphaRomanListAttrs(tokens: Token[], meta: AlphaRomanListMeta): void {
+export function applyAlphaRomanListAttrs(
+  tokens: Token[],
+  meta: AlphaRomanListMeta,
+): void {
   if (meta.size === 0) return;
   for (const token of tokens) {
-    if (token.type !== 'ordered_list_open' || !token.map) continue;
+    if (token.type !== "ordered_list_open" || !token.map) continue;
     const entry = meta.get(token.map[0]);
     if (!entry) continue;
-    token.attrSet('type', entry.type);
+    token.attrSet("type", entry.type);
     if (entry.start !== 1) {
-      token.attrSet('start', String(entry.start));
+      token.attrSet("start", String(entry.start));
     }
   }
 }
