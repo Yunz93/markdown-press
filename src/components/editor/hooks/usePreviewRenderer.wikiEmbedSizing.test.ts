@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 describe("usePreviewRenderer wiki embed sizing", () => {
   it("stores bare numbers in data-wiki-embed-w/h for typed CSS attr(... px)", () => {
     const source = readFileSync(
-      resolve(import.meta.dirname, "usePreviewRenderer.ts"),
+      resolve(import.meta.dirname, "../preview/enhancePreviewHtml.ts"),
       "utf8",
     );
 
