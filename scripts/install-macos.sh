@@ -50,16 +50,13 @@ cleanup() {
 trap cleanup EXIT
 
 resolve_asset_url() {
-  REPO="${REPO}" ASSET_ARCH="${ASSET_ARCH}" RELEASE_TAG="${RELEASE_TAG:-}" python3 <<'PY'
+  python3 - "${REPO}" "${ASSET_ARCH}" "${RELEASE_TAG:-}" <<'PY'
 import json
-import os
 import sys
 import urllib.error
 import urllib.request
 
-repo = os.environ["REPO"]
-arch = os.environ["ASSET_ARCH"]
-release_tag = os.environ.get("RELEASE_TAG", "").strip()
+repo, arch, release_tag = sys.argv[1], sys.argv[2], sys.argv[3].strip()
 suffix = f"_{arch}.dmg"
 
 if release_tag:
