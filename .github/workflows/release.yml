@@ -89,6 +89,23 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
+            ### 0.9.6
+
+            #### 新功能
+
+            - macOS：一键安装脚本，自动下载 Release、移除隔离标记并安装到「应用程序」。
+            - macOS：Release 工作流支持 Developer ID 签名与 Apple 公证（配置 GitHub Secrets 后生效）。
+            - Mermaid：流程图、时序图等常用图表优先使用 beautiful-mermaid 渲染。
+
+            #### 修复与改进
+
+            - 自动保存：修复「设置 → 编辑器 → 自动保存间隔」不生效的问题（此前被硬编码为 500ms）。
+            - 编辑/预览：加固正式包语法高亮、编辑器/预览一致性及多项代码审查修复。
+            - 预览：多值 frontmatter 字段在预览中显示为横向标签。
+            - 导出：长图分享样式与附件图片修复；防止栅格化卡死阻塞分享对话框。
+            - 发布：公众号对话框布局优化；外链保留；样式预设同步到博客/公众号发布。
+            - 工程：大规模模块拆分；新增 Release 冒烟测试与正式包一致性门禁。
+
             ### 0.9.5
 
             #### 新功能
@@ -230,6 +247,23 @@ jobs:
           releaseName: Release ${{ github.ref_name }}
           releaseBody: |
             See the assets to download this version and install.
+
+            ### 0.9.6
+
+            #### 新功能
+
+            - macOS：一键安装脚本，自动下载 Release、移除隔离标记并安装到「应用程序」。
+            - macOS：Release 工作流支持 Developer ID 签名与 Apple 公证（配置 GitHub Secrets 后生效）。
+            - Mermaid：流程图、时序图等常用图表优先使用 beautiful-mermaid 渲染。
+
+            #### 修复与改进
+
+            - 自动保存：修复「设置 → 编辑器 → 自动保存间隔」不生效的问题（此前被硬编码为 500ms）。
+            - 编辑/预览：加固正式包语法高亮、编辑器/预览一致性及多项代码审查修复。
+            - 预览：多值 frontmatter 字段在预览中显示为横向标签。
+            - 导出：长图分享样式与附件图片修复；防止栅格化卡死阻塞分享对话框。
+            - 发布：公众号对话框布局优化；外链保留；样式预设同步到博客/公众号发布。
+            - 工程：大规模模块拆分；新增 Release 冒烟测试与正式包一致性门禁。
 
             ### 0.9.5
 
