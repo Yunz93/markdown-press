@@ -1,6 +1,7 @@
 import type { GoogleGenAI } from "@google/genai";
 import type { AIAnalysisResult, AIWikiGenerationResult } from "../types";
-import { resolveAISystemPrompt } from './aiPrompts';
+import { resolveAISystemPrompt } from "./aiPrompts";
+import { buildAnalyzeMarkdownPrompt } from "./ai/prompts";
 
 let genaiModulePromise: Promise<typeof import("@google/genai")> | null = null;
 
@@ -48,24 +49,26 @@ const REQUEST_TIMEOUT = 30000; // 30 seconds
  * Sleep utility for retry delays
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Check if the error is retryable (network errors, rate limits)
  */
 function isRetryableError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const message = 'message' in error && typeof (error as { message?: unknown }).message === 'string'
-    ? (error as { message: string }).message.toLowerCase()
-    : '';
+  if (!error || typeof error !== "object") return false;
+  const message =
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message.toLowerCase()
+      : "";
   return (
-    message.includes('network') ||
-    message.includes('timeout') ||
-    message.includes('rate limit') ||
-    message.includes('429') ||
-    message.includes('503') ||
-    message.includes('502')
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("rate limit") ||
+    message.includes("429") ||
+    message.includes("503") ||
+    message.includes("502")
   );
 }
 
@@ -73,7 +76,7 @@ export const analyzeContent = async (
   content: string,
   apiKey: string,
   modelName: string = "gemini-2.0-flash-exp",
-  systemPrompt?: string
+  systemPrompt?: string,
 ): Promise<AIAnalysisResult> => {
   if (!apiKey) {
     throw new Error("Gemini API key is required");
@@ -81,30 +84,10 @@ export const analyzeContent = async (
 
   const { Type } = await loadGenAIModule();
 
-  const prompt = `
-    You are editing Markdown content for publication quality.
-    Do all of the following:
-    1. Fix spelling and obvious grammar issues.
-    2. Improve Markdown structure and formatting without changing meaning.
-    3. Keep code blocks, links, and technical terms intact.
-    4. Generate a concise SEO summary (max 160 characters).
-    5. Suggest 5 relevant SEO tags.
-    6. Propose a better SEO title only if the current title is weak.
-
-    Return strict JSON with these fields:
-    - summary: string
-    - suggestedTags: string[]
-    - seoTitle: string
-    - optimizedMarkdown: string
-
-    Markdown content:
-    ${content}
-  `;
-
   return generateGeminiJson<AIAnalysisResult>({
     apiKey,
     modelName,
-    prompt,
+    prompt: buildAnalyzeMarkdownPrompt(content),
     systemPrompt,
     schema: {
       type: Type.OBJECT,
@@ -112,13 +95,13 @@ export const analyzeContent = async (
         summary: { type: Type.STRING },
         suggestedTags: {
           type: Type.ARRAY,
-          items: { type: Type.STRING }
+          items: { type: Type.STRING },
         },
         seoTitle: { type: Type.STRING },
-        optimizedMarkdown: { type: Type.STRING }
+        optimizedMarkdown: { type: Type.STRING },
       },
-      required: ["summary", "suggestedTags", "seoTitle", "optimizedMarkdown"]
-    }
+      required: ["summary", "suggestedTags", "seoTitle", "optimizedMarkdown"],
+    },
   });
 };
 
@@ -148,7 +131,7 @@ export async function generateGeminiJson<T>({
     try {
       // Create a promise that rejects after timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT);
+        setTimeout(() => reject(new Error("Request timeout")), REQUEST_TIMEOUT);
       });
 
       const responsePromise = ai.models.generateContent({
@@ -157,8 +140,8 @@ export async function generateGeminiJson<T>({
         config: {
           systemInstruction: resolveAISystemPrompt(systemPrompt),
           responseMimeType: "application/json",
-          responseSchema: schema
-        }
+          responseSchema: schema,
+        },
       });
 
       const response = await Promise.race([responsePromise, timeoutPromise]);
@@ -167,7 +150,6 @@ export async function generateGeminiJson<T>({
       if (!text) throw new Error("No response from AI");
 
       return JSON.parse(text) as T;
-
     } catch (error: unknown) {
       lastError = error instanceof Error ? error : new Error(String(error));
       console.error(`Gemini analysis attempt ${attempt + 1} failed:`, error);
@@ -185,14 +167,16 @@ export async function generateGeminiJson<T>({
 
   // Clear instance on failure
   clearAIInstance();
-  throw lastError || new Error("Failed to analyze content after multiple attempts");
+  throw (
+    lastError || new Error("Failed to analyze content after multiple attempts")
+  );
 }
 
 export async function generateGeminiWikiArticle(
   prompt: string,
   apiKey: string,
   modelName: string = "gemini-2.0-flash-exp",
-  systemPrompt?: string
+  systemPrompt?: string,
 ): Promise<AIWikiGenerationResult> {
   const { Type } = await loadGenAIModule();
   return generateGeminiJson<AIWikiGenerationResult>({
@@ -208,7 +192,7 @@ export async function generateGeminiWikiArticle(
         category: { type: Type.STRING },
         suggestedTags: {
           type: Type.ARRAY,
-          items: { type: Type.STRING }
+          items: { type: Type.STRING },
         },
         markdown: { type: Type.STRING },
         references: {
@@ -218,17 +202,25 @@ export async function generateGeminiWikiArticle(
             properties: {
               title: { type: Type.STRING },
               url: { type: Type.STRING },
-              note: { type: Type.STRING }
+              note: { type: Type.STRING },
             },
-            required: ["title"]
-          }
+            required: ["title"],
+          },
         },
         citations: {
           type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
+          items: { type: Type.STRING },
+        },
       },
-      required: ["title", "summary", "category", "suggestedTags", "markdown", "references", "citations"]
-    }
+      required: [
+        "title",
+        "summary",
+        "category",
+        "suggestedTags",
+        "markdown",
+        "references",
+        "citations",
+      ],
+    },
   });
 }
