@@ -283,15 +283,20 @@ export const SplitView: React.FC<SplitViewProps> = ({
     };
   }, [activeTabId, syncVisiblePanesToAnchor]);
 
-  // Handle view mode changes — always anchor on the editor position
+  // Handle view mode changes — keep the user where they were reading.
+  // Leaving preview-only mode anchors on the preview position; otherwise the editor position.
   useEffect(() => {
     const previousViewMode = previousViewModeRef.current;
     previousViewModeRef.current = viewMode;
 
     if (previousViewMode === viewMode) return;
 
-    const anchorPercentage = editorScrollPercentageRef.current;
+    const anchorPercentage =
+      previousViewMode === ViewMode.PREVIEW
+        ? previewScrollPercentageRef.current
+        : editorScrollPercentageRef.current;
 
+    editorScrollPercentageRef.current = anchorPercentage;
     previewScrollPercentageRef.current = anchorPercentage;
     syncVisiblePanesToAnchor(anchorPercentage);
   }, [syncVisiblePanesToAnchor, viewMode]);

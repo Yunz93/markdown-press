@@ -1,21 +1,21 @@
 /** @vitest-environment happy-dom */
 
-import React, { forwardRef, useEffect, useImperativeHandle } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, waitFor } from '@testing-library/react';
-import { useAppStore } from '../../store/appStore';
-import { ViewMode } from '../../types';
+import React, { forwardRef, useEffect, useImperativeHandle } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { useAppStore } from "../../store/appStore";
+import { ViewMode } from "../../types";
 
 const mockEditorSyncScrollTo = vi.fn();
 const mockPreviewSyncScrollTo = vi.fn();
 let editorOnScroll: ((percentage: number) => void) | undefined;
 let previewOnScroll: ((percentage: number) => void) | undefined;
 
-vi.mock('../stats/WritingStatsDisplay', () => ({
+vi.mock("../stats/WritingStatsDisplay", () => ({
   WritingStatsDisplay: () => null,
 }));
 
-vi.mock('./EditorPane', () => ({
+vi.mock("./EditorPane", () => ({
   EditorPane: forwardRef(function MockEditorPane(
     props: { onScroll?: (percentage: number) => void },
     ref,
@@ -34,7 +34,7 @@ vi.mock('./EditorPane', () => ({
   }),
 }));
 
-vi.mock('./PreviewPane', () => ({
+vi.mock("./PreviewPane", () => ({
   PreviewPane: forwardRef(function MockPreviewPane(
     props: {
       onScroll?: (percentage: number) => void;
@@ -65,20 +65,22 @@ vi.mock('./PreviewPane', () => ({
   }),
 }));
 
-import { SplitView } from './SplitView';
+import { SplitView } from "./SplitView";
 
-function seedSplitViewStore(overrides: Partial<ReturnType<typeof useAppStore.getState>> = {}) {
+function seedSplitViewStore(
+  overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
+) {
   useAppStore.setState({
     viewMode: ViewMode.SPLIT,
-    activeTabId: 'tab-a',
+    activeTabId: "tab-a",
     settings: {
-      language: 'en',
-      themeMode: 'light',
-      markdownStylePreset: 'nord',
+      language: "en",
+      themeMode: "light",
+      markdownStylePreset: "nord",
       fontSize: 16,
-      orderedListMode: 'strict',
-      previewFontFamily: 'system',
-      codeFontFamily: 'system',
+      orderedListMode: "strict",
+      previewFontFamily: "system",
+      codeFontFamily: "system",
     } as never,
     ...overrides,
   } as never);
@@ -96,17 +98,17 @@ function renderSplitView() {
   );
 }
 
-describe('SplitView scroll handshake', () => {
+describe("SplitView scroll handshake", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     editorOnScroll = undefined;
     previewOnScroll = undefined;
     seedSplitViewStore();
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
     });
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
   });
 
   afterEach(() => {
@@ -119,26 +121,28 @@ describe('SplitView scroll handshake', () => {
     } as never);
   });
 
-  it('syncs preview scroll immediately when the editor scrolls in split mode', async () => {
+  it("syncs preview scroll immediately when the editor scrolls in split mode", async () => {
     renderSplitView();
 
     await waitFor(() => {
-      expect(editorOnScroll).toBeTypeOf('function');
+      expect(editorOnScroll).toBeTypeOf("function");
     });
 
     act(() => {
       editorOnScroll?.(0.42);
     });
 
-    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.42, { immediate: true });
+    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.42, {
+      immediate: true,
+    });
   });
 
-  it('does not sync preview scroll when only the editor pane is visible', async () => {
+  it("does not sync preview scroll when only the editor pane is visible", async () => {
     seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
 
     await waitFor(() => {
-      expect(editorOnScroll).toBeTypeOf('function');
+      expect(editorOnScroll).toBeTypeOf("function");
     });
 
     act(() => {
@@ -148,22 +152,24 @@ describe('SplitView scroll handshake', () => {
     expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
   });
 
-  it('marks preview layout inactive in editor-only mode', async () => {
+  it("marks preview layout inactive in editor-only mode", async () => {
     seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
 
     await waitFor(() => {
-      const preview = document.querySelector('[data-testid="preview-pane"]') as HTMLElement;
-      expect(preview.dataset.layoutActive).toBe('false');
+      const preview = document.querySelector(
+        '[data-testid="preview-pane"]',
+      ) as HTMLElement;
+      expect(preview.dataset.layoutActive).toBe("false");
     });
   });
 
-  it('re-anchors both panes to the editor position when entering split mode', async () => {
+  it("re-anchors both panes to the editor position when entering split mode", async () => {
     seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
 
     await waitFor(() => {
-      expect(editorOnScroll).toBeTypeOf('function');
+      expect(editorOnScroll).toBeTypeOf("function");
     });
 
     act(() => {
@@ -178,16 +184,49 @@ describe('SplitView scroll handshake', () => {
     });
 
     await waitFor(() => {
-      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.25, { immediate: true });
-      expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.25, { immediate: true });
+      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.25, {
+        immediate: true,
+      });
+      expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.25, {
+        immediate: true,
+      });
     });
   });
 
-  it('restores per-tab scroll anchors when switching active tabs', async () => {
+  it("re-anchors both panes to the preview position when leaving preview-only mode", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
     renderSplitView();
 
     await waitFor(() => {
-      expect(editorOnScroll).toBeTypeOf('function');
+      expect(previewOnScroll).toBeTypeOf("function");
+    });
+
+    act(() => {
+      previewOnScroll?.(0.7);
+    });
+
+    mockEditorSyncScrollTo.mockClear();
+    mockPreviewSyncScrollTo.mockClear();
+
+    act(() => {
+      useAppStore.setState({ viewMode: ViewMode.SPLIT } as never);
+    });
+
+    await waitFor(() => {
+      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.7, {
+        immediate: true,
+      });
+      expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.7, {
+        immediate: true,
+      });
+    });
+  });
+
+  it("restores per-tab scroll anchors when switching active tabs", async () => {
+    renderSplitView();
+
+    await waitFor(() => {
+      expect(editorOnScroll).toBeTypeOf("function");
     });
 
     act(() => {
@@ -198,26 +237,30 @@ describe('SplitView scroll handshake', () => {
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ activeTabId: 'tab-b' } as never);
+      useAppStore.setState({ activeTabId: "tab-b" } as never);
     });
 
     await waitFor(() => {
-      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0, { immediate: true });
+      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0, {
+        immediate: true,
+      });
     });
 
     mockEditorSyncScrollTo.mockClear();
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ activeTabId: 'tab-a' } as never);
+      useAppStore.setState({ activeTabId: "tab-a" } as never);
     });
 
     await waitFor(() => {
-      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.6, { immediate: true });
+      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.6, {
+        immediate: true,
+      });
     });
   });
 
-  it('resyncs panes after the width transition completes', () => {
+  it("resyncs panes after the width transition completes", () => {
     vi.useFakeTimers();
     seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
@@ -237,16 +280,20 @@ describe('SplitView scroll handshake', () => {
       vi.advanceTimersByTime(260);
     });
 
-    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.33, { immediate: true });
-    expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.33, { immediate: true });
+    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.33, {
+      immediate: true,
+    });
+    expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.33, {
+      immediate: true,
+    });
   });
 
-  it('restores preview scroll anchor for tabs last viewed in preview-only mode', async () => {
+  it("restores preview scroll anchor for tabs last viewed in preview-only mode", async () => {
     seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
     renderSplitView();
 
     await waitFor(() => {
-      expect(previewOnScroll).toBeTypeOf('function');
+      expect(previewOnScroll).toBeTypeOf("function");
     });
 
     act(() => {
@@ -256,16 +303,21 @@ describe('SplitView scroll handshake', () => {
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ activeTabId: 'tab-b' } as never);
+      useAppStore.setState({ activeTabId: "tab-b" } as never);
     });
 
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ activeTabId: 'tab-a', viewMode: ViewMode.PREVIEW } as never);
+      useAppStore.setState({
+        activeTabId: "tab-a",
+        viewMode: ViewMode.PREVIEW,
+      } as never);
     });
 
-    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.18, { immediate: true });
+    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.18, {
+      immediate: true,
+    });
     expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
   });
 });

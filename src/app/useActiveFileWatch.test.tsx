@@ -91,7 +91,7 @@ describe("useActiveFileWatch", () => {
   });
 
   it("does not leave a watcher active after unmounting during async setup", async () => {
-    let resolveWatch: ((unwatch: () => void) => void) | null = null;
+    let resolveWatch: (unwatch: () => void) => void = () => {};
     const unwatch = vi.fn();
     const watchFile = vi.fn(
       () =>
@@ -118,7 +118,7 @@ describe("useActiveFileWatch", () => {
     const { unmount } = render(React.createElement(Harness));
     unmount();
 
-    resolveWatch?.(unwatch);
+    resolveWatch(unwatch);
 
     await waitFor(() => {
       expect(unwatch).toHaveBeenCalled();
