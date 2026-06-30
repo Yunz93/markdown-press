@@ -40,7 +40,7 @@ jobs:
         run: npm run smoke:release-workflow
 
       - name: Config parity and release parity gates
-        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts
+        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts
 
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -125,19 +125,19 @@ jobs:
 
             ### macOS 安装说明
 
-            由于本应用未经 Apple 签名公证，macOS 可能会提示"已损坏"或"无法验证开发者"。请按以下步骤操作：
+            **推荐：一键安装**
 
-            1. 下载 `.dmg` 文件并将应用拖入 Applications 文件夹
-            2. 打开终端（Terminal），执行以下命令：
-               ```
-               xattr -cr /Applications/M記.app
-               ```
-            3. 再次双击打开应用即可
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+            ```
 
-            > 如果你通过浏览器下载到 Downloads 文件夹但还未移动，请先运行：
-            > ```
-            > xattr -cr ~/Downloads/M記.app
-            > ```
+            脚本会自动下载对应架构的 `.dmg`、移除隔离标记并安装到「应用程序」。
+
+            也可手动下载 `.dmg` 拖入 Applications。若仍提示无法验证开发者，请执行：
+
+            ```
+            xattr -cr /Applications/M記.app
+            ```
 
             ### Windows 安装说明
 
@@ -178,7 +178,7 @@ jobs:
         run: npm run smoke:release-workflow
 
       - name: Config parity and release parity gates
-        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts
+        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts
 
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -262,19 +262,19 @@ jobs:
 
             ### macOS 安装说明
 
-            由于本应用未经 Apple 签名公证，macOS 可能会提示"已损坏"或"无法验证开发者"。请按以下步骤操作：
+            **推荐：一键安装**
 
-            1. 下载 `.dmg` 文件并将应用拖入 Applications 文件夹
-            2. 打开终端（Terminal），执行以下命令：
-               ```
-               xattr -cr /Applications/M記.app
-               ```
-            3. 再次双击打开应用即可
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+            ```
 
-            > 如果你通过浏览器下载到 Downloads 文件夹但还未移动，请先运行：
-            > ```
-            > xattr -cr ~/Downloads/M記.app
-            > ```
+            脚本会自动下载对应架构的 `.dmg`、移除隔离标记并安装到「应用程序」。
+
+            也可手动下载 `.dmg` 拖入 Applications。若仍提示无法验证开发者，请执行：
+
+            ```
+            xattr -cr /Applications/M記.app
+            ```
 
             ### Windows 安装说明
 

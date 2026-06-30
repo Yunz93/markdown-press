@@ -14,7 +14,19 @@
 
 ### macOS
 
-未签名应用可能被拦截。将 `M記.app` 放入「应用程序」后执行：
+**推荐：一键安装**（自动下载、移除隔离标记并安装到「应用程序」）
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+```
+
+指定版本（可选）：
+
+```bash
+RELEASE_TAG=v0.9.5 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+```
+
+也可在 [GitHub Releases](https://github.com/Yunz93/markdown-press/releases) 手动下载 `.dmg`。若系统提示无法验证开发者，将 `M記.app` 放入「应用程序」后执行：
 
 ```bash
 xattr -cr /Applications/M記.app
@@ -38,19 +50,19 @@ xattr -cr /Applications/M記.app
 
 默认键位；完整列表见 **Settings → Shortcuts**。
 
-| 快捷键 | 动作 |
-| --- | --- |
-| `Cmd/Ctrl + S` | 保存 |
-| `Cmd/Ctrl + 0` | 设置 |
-| `Cmd/Ctrl + 1` ~ `5` | 侧边栏 / Outline / 视图模式 / 主题 / AI 增强 |
-| `Cmd + Shift + F` | 当前文件搜索 |
-| `Cmd + Shift + S` | 侧边栏搜索 |
-| `Cmd + Shift + K` / `L` | 打开知识库 / 定位当前文件 |
-| `Cmd + Shift + H` | 导出 PDF |
-| `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹 |
-| `Cmd/Ctrl + W` | 关闭标签 |
-| `Cmd + Shift + -` | 清理未引用附件 |
-| `Escape` | 关闭搜索面板、弹窗或菜单 |
+| 快捷键                                  | 动作                                         |
+| --------------------------------------- | -------------------------------------------- |
+| `Cmd/Ctrl + S`                          | 保存                                         |
+| `Cmd/Ctrl + 0`                          | 设置                                         |
+| `Cmd/Ctrl + 1` ~ `5`                    | 侧边栏 / Outline / 视图模式 / 主题 / AI 增强 |
+| `Cmd + Shift + F`                       | 当前文件搜索                                 |
+| `Cmd + Shift + S`                       | 侧边栏搜索                                   |
+| `Cmd + Shift + K` / `L`                 | 打开知识库 / 定位当前文件                    |
+| `Cmd + Shift + H`                       | 导出 PDF                                     |
+| `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹                            |
+| `Cmd/Ctrl + W`                          | 关闭标签                                     |
+| `Cmd + Shift + -`                       | 清理未引用附件                               |
+| `Escape`                                | 关闭搜索面板、弹窗或菜单                     |
 
 ## 发布到 simple-blog
 

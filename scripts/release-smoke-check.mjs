@@ -91,6 +91,13 @@ function assertReleaseWorkflowConfig() {
     );
     process.exit(1);
   }
+
+  if (!workflow.includes("scripts/install-macos.sh")) {
+    console.error(
+      "release.yml must document the macOS one-line install script scripts/install-macos.sh.",
+    );
+    process.exit(1);
+  }
 }
 
 function assertReleaseDistOutput() {

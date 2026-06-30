@@ -90,7 +90,7 @@ git push origin v0.1.1
 
 CI automatically syncs the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` to the tag, then runs the Tauri build and uploads to GitHub Releases.
 
-The macOS GitHub Release currently uses `ad-hoc signing`, so CI can produce `.app` and `.dmg` artifacts without an Apple Developer certificate. For a seamless install experience without manual intervention, Apple Developer signing and notarization are required.
+macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`. Releases are still ad-hoc signed; seamless browser `.dmg` installs require Apple Developer signing and notarization.
 
 ## Release Smoke Test
 

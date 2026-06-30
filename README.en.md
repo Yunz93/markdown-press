@@ -14,7 +14,19 @@ Grab the installer for your platform from [GitHub Releases](https://github.com/Y
 
 ### macOS
 
-The app is not Apple-notarized, so Gatekeeper may block it. After moving **M記.app** to Applications, run:
+**Recommended: one-line install** (downloads, clears quarantine, and copies to Applications):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+```
+
+Pin a release (optional):
+
+```bash
+RELEASE_TAG=v0.9.5 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+```
+
+You can also download the `.dmg` from [GitHub Releases](https://github.com/Yunz93/markdown-press/releases). If Gatekeeper blocks the app, run:
 
 ```bash
 xattr -cr /Applications/M記.app
@@ -38,19 +50,19 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 
 Defaults below; the full list lives in **Settings → Shortcuts**.
 
-| Shortcut | Action |
-| --- | --- |
-| `Cmd/Ctrl + S` | Save |
-| `Cmd/Ctrl + 0` | Settings |
-| `Cmd/Ctrl + 1` ~ `5` | Sidebar / outline / view mode / theme / AI enhance |
-| `Cmd + Shift + F` | In-file search |
-| `Cmd + Shift + S` | Sidebar search |
-| `Cmd + Shift + K` / `L` | Open vault / locate current file |
-| `Cmd + Shift + H` | Export PDF |
-| `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | New note / new folder |
-| `Cmd/Ctrl + W` | Close tab |
-| `Cmd + Shift + -` | Clean unused attachments |
-| `Escape` | Close search panel, dialog, or menu |
+| Shortcut                                | Action                                             |
+| --------------------------------------- | -------------------------------------------------- |
+| `Cmd/Ctrl + S`                          | Save                                               |
+| `Cmd/Ctrl + 0`                          | Settings                                           |
+| `Cmd/Ctrl + 1` ~ `5`                    | Sidebar / outline / view mode / theme / AI enhance |
+| `Cmd + Shift + F`                       | In-file search                                     |
+| `Cmd + Shift + S`                       | Sidebar search                                     |
+| `Cmd + Shift + K` / `L`                 | Open vault / locate current file                   |
+| `Cmd + Shift + H`                       | Export PDF                                         |
+| `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | New note / new folder                              |
+| `Cmd/Ctrl + W`                          | Close tab                                          |
+| `Cmd + Shift + -`                       | Clean unused attachments                           |
+| `Escape`                                | Close search panel, dialog, or menu                |
 
 ## Publish to simple-blog
 
