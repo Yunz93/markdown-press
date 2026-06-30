@@ -1,66 +1,35 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  createFileSlice,
-  type FileState,
-  type FileActions,
-  initialFileState,
-} from "./fileStore";
-import {
-  createTabSlice,
-  type TabState,
-  type TabActions,
-  initialTabState,
-} from "./tabStore";
+import { createFileSlice, type FileState, type FileActions } from "./fileStore";
+import { createTabSlice, type TabState, type TabActions } from "./tabStore";
 import {
   createEditorSlice,
   type EditorState,
   type EditorActions,
-  initialEditorState,
   selectContent,
 } from "./editorStore";
 import {
   createUISlice,
   type UIState,
   type UIActions,
-  initialUIState,
   defaultSettings,
   normalizeLanguage,
   normalizeThemeMode,
 } from "./uiStore";
-import {
-  ViewMode,
-  type FileNode,
-  type AppSettings,
-  type Notification,
-} from "../types";
-import type { HeadingNode } from "../utils/outline";
-import {
-  DEFAULT_CODE_FONT_FAMILY,
-  DEFAULT_EDITOR_FONT_FAMILY,
-  DEFAULT_PREVIEW_FONT_FAMILY,
-  DEFAULT_UI_FONT_FAMILY,
-  FONT_DEFAULTS_VERSION,
-  LEGACY_DEFAULT_BUNDLED_FONT_FAMILY,
-  LEGACY_DEFAULT_CODE_FONT_FAMILY,
-  normalizeStoredCodeFontFamily,
-  normalizeStoredEditorFontFamily,
-  normalizeStoredPreviewFontFamily,
-  normalizeStoredUiFontFamily,
-} from "../utils/fontSettings";
-import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from "../utils/blogRepo";
 import { normalizeMetadataFields } from "../utils/metadataFields";
 import { normalizeTrashFolder } from "../utils/trashFolder";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
 import { normalizeMarkdownStylePreset } from "../utils/markdownStyle";
-import { normalizeShortcutConfigForPlatform } from "../utils/shortcuts";
 import {
-  DEFAULT_AI_SYSTEM_PROMPT,
-  DEFAULT_AI_SYSTEM_PROMPT_EN,
-  DEFAULT_WIKI_PROMPT_TEMPLATE,
-  DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-} from "../services/aiPrompts";
-import { SENSITIVE_SETTING_KEYS } from "../services/sensitiveSettingKeys";
+  resolveLocalizedPrompts,
+  resolvePersistedAISettings,
+  resolvePersistedBlogRepoUrl,
+  resolvePersistedBlogSiteUrl,
+  resolvePersistedFontSettings,
+  resolvePersistedShortcuts,
+  sanitizeSettingsForPersistence,
+  stripNonRuntimeSettings,
+} from "./persistMigrations";
 
 // Re-export types from slice stores
 export type {
@@ -75,6 +44,16 @@ export type {
 };
 // Re-export selector for convenience
 export { selectContent };
+// Re-export default settings for convenience
+export { defaultSettings };
+// Re-export persistence migration helpers (kept here for backwards-compatible
+// imports and unit tests).
+export {
+  resolveLocalizedPrompts,
+  resolvePersistedAISettings,
+  resolvePersistedFontSettings,
+  stripNonRuntimeSettings,
+} from "./persistMigrations";
 
 // Complete AppState combines all slices
 export interface AppState
@@ -87,429 +66,6 @@ export interface AppState
     TabActions,
     EditorActions,
     UIActions {}
-
-const REMOVED_SETTING_KEYS = ["exportStrikethroughMode"] as const;
-
-function clampPersistedNumber(
-  value: unknown,
-  min: number,
-  max: number,
-  fallback: number,
-): number {
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.min(max, Math.max(min, value))
-    : fallback;
-}
-
-function resolveFirstValidNumber(
-  settings: Record<string, unknown>,
-  keys: string[],
-  min: number,
-  max: number,
-  fallback: number,
-): number {
-  for (const key of keys) {
-    const v = settings[key];
-    if (typeof v === "number" && Number.isFinite(v)) {
-      return Math.min(max, Math.max(min, v));
-    }
-  }
-  return fallback;
-}
-
-function resolveFirstValidString(
-  settings: Record<string, unknown>,
-  keys: string[],
-): string {
-  for (const key of keys) {
-    const v = settings[key];
-    if (typeof v === "string" && v.trim()) return v;
-  }
-  return "";
-}
-
-type FontSettingNormalizer = (value: string | undefined) => string;
-
-function shouldMigrateLegacyDefaultFonts(
-  persistedSettings: Record<string, unknown>,
-): boolean {
-  const version = persistedSettings.fontDefaultsVersion;
-  return typeof version !== "number" || version < FONT_DEFAULTS_VERSION;
-}
-
-function resolvePersistedFontFamily(
-  value: unknown,
-  normalize: FontSettingNormalizer,
-  fallback: string,
-  migrateLegacyDefaults: boolean,
-): string {
-  if (typeof value !== "string" || !value.trim()) {
-    return fallback;
-  }
-
-  const normalized = normalize(value);
-  if (
-    migrateLegacyDefaults &&
-    (normalized === LEGACY_DEFAULT_BUNDLED_FONT_FAMILY ||
-      normalized === LEGACY_DEFAULT_CODE_FONT_FAMILY)
-  ) {
-    return fallback;
-  }
-
-  return normalized;
-}
-
-export function resolvePersistedFontSettings(
-  persistedSettings: Record<string, unknown>,
-): Pick<
-  AppSettings,
-  | "fontDefaultsVersion"
-  | "uiFontFamily"
-  | "uiFontSize"
-  | "editorFontFamily"
-  | "previewFontFamily"
-  | "codeFontFamily"
-  | "fontSize"
-> {
-  const migrateLegacyDefaults =
-    shouldMigrateLegacyDefaultFonts(persistedSettings);
-  const legacyContentFontFamily = resolvePersistedFontFamily(
-    resolveFirstValidString(persistedSettings, [
-      "chineseFontFamily",
-      "englishFontFamily",
-      "fontFamily",
-    ]),
-    normalizeStoredEditorFontFamily,
-    DEFAULT_EDITOR_FONT_FAMILY,
-    migrateLegacyDefaults,
-  );
-  const legacyContentFontSize = clampPersistedNumber(
-    persistedSettings.fontSize,
-    12,
-    32,
-    16,
-  );
-  const resolvedSharedFontSize = resolveFirstValidNumber(
-    persistedSettings,
-    [
-      "fontSize",
-      "editorFontSize",
-      "previewFontSize",
-      "codeFontSize",
-      "editorCodeFontSize",
-      "previewCodeFontSize",
-    ],
-    11,
-    32,
-    legacyContentFontSize,
-  );
-
-  return {
-    fontDefaultsVersion: FONT_DEFAULTS_VERSION,
-    uiFontFamily: resolvePersistedFontFamily(
-      persistedSettings.uiFontFamily,
-      normalizeStoredUiFontFamily,
-      DEFAULT_UI_FONT_FAMILY,
-      migrateLegacyDefaults,
-    ),
-    uiFontSize:
-      typeof persistedSettings.uiFontSize === "number" &&
-      Number.isFinite(persistedSettings.uiFontSize)
-        ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
-        : defaultSettings.uiFontSize,
-    editorFontFamily: resolvePersistedFontFamily(
-      persistedSettings.editorFontFamily,
-      normalizeStoredEditorFontFamily,
-      legacyContentFontFamily,
-      migrateLegacyDefaults,
-    ),
-    previewFontFamily: resolvePersistedFontFamily(
-      persistedSettings.previewFontFamily,
-      normalizeStoredPreviewFontFamily,
-      legacyContentFontFamily || DEFAULT_PREVIEW_FONT_FAMILY,
-      migrateLegacyDefaults,
-    ),
-    codeFontFamily: resolvePersistedFontFamily(
-      persistedSettings.codeFontFamily,
-      normalizeStoredCodeFontFamily,
-      DEFAULT_CODE_FONT_FAMILY,
-      migrateLegacyDefaults,
-    ),
-    fontSize: resolvedSharedFontSize,
-  };
-}
-
-export function stripNonRuntimeSettings(
-  settings: Record<string, unknown>,
-): Record<string, unknown> {
-  const sanitized = { ...settings };
-  [...SENSITIVE_SETTING_KEYS, ...REMOVED_SETTING_KEYS].forEach((key) => {
-    delete sanitized[key];
-  });
-  return sanitized;
-}
-
-function sanitizeSettingsForPersistence(settings: AppSettings): AppSettings {
-  return stripNonRuntimeSettings(
-    settings as unknown as Record<string, unknown>,
-  ) as unknown as AppSettings;
-}
-
-function resolvePersistedBlogRepoUrl(
-  persistedSettings: Record<string, unknown>,
-): string {
-  if (typeof persistedSettings.blogRepoUrl === "string") {
-    const normalized = normalizeBlogRepoUrl(persistedSettings.blogRepoUrl);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  if (typeof persistedSettings.simpleBlogPath === "string") {
-    const normalized = normalizeBlogRepoUrl(persistedSettings.simpleBlogPath);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return "";
-}
-
-function resolvePersistedBlogSiteUrl(
-  persistedSettings: Record<string, unknown>,
-): string {
-  if (typeof persistedSettings.blogSiteUrl === "string") {
-    return normalizeBlogSiteUrl(persistedSettings.blogSiteUrl);
-  }
-
-  return "";
-}
-
-function resolvePromptVariant(
-  localizedValue: unknown,
-  legacyValue: string,
-  defaultZh: string,
-  defaultEn: string,
-  language: "zh-CN" | "en",
-): string {
-  if (typeof localizedValue === "string" && localizedValue.trim()) {
-    return localizedValue;
-  }
-
-  const trimmedLegacyValue = legacyValue.trim();
-  if (
-    !trimmedLegacyValue ||
-    trimmedLegacyValue === defaultZh.trim() ||
-    trimmedLegacyValue === defaultEn.trim()
-  ) {
-    return language === "en" ? defaultEn : defaultZh;
-  }
-
-  return legacyValue;
-}
-
-export function resolveLocalizedPrompts(
-  persistedSettings: Record<string, unknown>,
-) {
-  const legacySystemPrompt =
-    typeof persistedSettings.aiSystemPrompt === "string"
-      ? persistedSettings.aiSystemPrompt
-      : "";
-  const legacyWikiPrompt =
-    typeof persistedSettings.wikiPromptTemplate === "string"
-      ? persistedSettings.wikiPromptTemplate
-      : "";
-
-  const aiSystemPromptZh = resolvePromptVariant(
-    persistedSettings.aiSystemPromptZh,
-    legacySystemPrompt,
-    DEFAULT_AI_SYSTEM_PROMPT,
-    DEFAULT_AI_SYSTEM_PROMPT_EN,
-    "zh-CN",
-  );
-  const aiSystemPromptEn = resolvePromptVariant(
-    persistedSettings.aiSystemPromptEn,
-    legacySystemPrompt,
-    DEFAULT_AI_SYSTEM_PROMPT,
-    DEFAULT_AI_SYSTEM_PROMPT_EN,
-    "en",
-  );
-  const wikiPromptTemplateZh = resolvePromptVariant(
-    persistedSettings.wikiPromptTemplateZh,
-    legacyWikiPrompt,
-    DEFAULT_WIKI_PROMPT_TEMPLATE,
-    DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-    "zh-CN",
-  );
-  const wikiPromptTemplateEn = resolvePromptVariant(
-    persistedSettings.wikiPromptTemplateEn,
-    legacyWikiPrompt,
-    DEFAULT_WIKI_PROMPT_TEMPLATE,
-    DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
-    "en",
-  );
-
-  return {
-    aiSystemPrompt: legacySystemPrompt,
-    aiSystemPromptZh,
-    aiSystemPromptEn,
-    wikiPromptTemplate: legacyWikiPrompt,
-    wikiPromptTemplateZh,
-    wikiPromptTemplateEn,
-  };
-}
-
-function looksLikeGeminiModel(value: unknown): boolean {
-  return typeof value === "string" && /^gemini(?:-|$)/i.test(value.trim());
-}
-
-function looksLikeOpenAIModel(value: unknown): boolean {
-  return (
-    typeof value === "string" &&
-    /^(gpt-|o[1-9]\b|o[1-9]-|codex\b)/i.test(value.trim())
-  );
-}
-
-function looksLikeDeepSeekModel(value: unknown): boolean {
-  return typeof value === "string" && /^deepseek(?:-|$)/i.test(value.trim());
-}
-
-export function resolvePersistedAISettings(
-  persistedSettings: Record<string, unknown>,
-) {
-  const persistedProvider =
-    typeof persistedSettings.aiProvider === "string"
-      ? persistedSettings.aiProvider
-      : "";
-  const persistedGeminiModel =
-    typeof persistedSettings.geminiModel === "string"
-      ? persistedSettings.geminiModel.trim()
-      : "";
-  const persistedCodexModel =
-    typeof persistedSettings.codexModel === "string"
-      ? persistedSettings.codexModel.trim()
-      : "";
-  const persistedDeepSeekModel =
-    typeof persistedSettings.deepseekModel === "string"
-      ? persistedSettings.deepseekModel.trim()
-      : "";
-
-  if (
-    persistedProvider === "codex" ||
-    persistedProvider === "gemini" ||
-    persistedProvider === "deepseek"
-  ) {
-    return {
-      aiProvider: persistedProvider,
-      codexModel:
-        persistedCodexModel ||
-        (persistedProvider === "codex" &&
-        looksLikeOpenAIModel(persistedGeminiModel)
-          ? persistedGeminiModel
-          : defaultSettings.codexModel),
-      geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
-      deepseekModel:
-        persistedDeepSeekModel ||
-        (persistedProvider === "deepseek" &&
-        looksLikeDeepSeekModel(persistedGeminiModel)
-          ? persistedGeminiModel
-          : defaultSettings.deepseekModel),
-    };
-  }
-
-  if (!persistedDeepSeekModel && looksLikeDeepSeekModel(persistedGeminiModel)) {
-    return {
-      aiProvider: "deepseek",
-      codexModel: persistedCodexModel || defaultSettings.codexModel,
-      geminiModel: defaultSettings.geminiModel,
-      deepseekModel: persistedGeminiModel || defaultSettings.deepseekModel,
-    };
-  }
-
-  if (!persistedCodexModel && looksLikeOpenAIModel(persistedGeminiModel)) {
-    return {
-      aiProvider: "codex",
-      codexModel:
-        persistedCodexModel ||
-        persistedGeminiModel ||
-        defaultSettings.codexModel,
-      geminiModel: looksLikeGeminiModel(persistedGeminiModel)
-        ? persistedGeminiModel
-        : defaultSettings.geminiModel,
-      deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
-    };
-  }
-
-  if (looksLikeGeminiModel(persistedGeminiModel)) {
-    return {
-      aiProvider: "gemini",
-      codexModel: persistedCodexModel || defaultSettings.codexModel,
-      geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
-      deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
-    };
-  }
-
-  return {
-    aiProvider: "deepseek",
-    codexModel: persistedCodexModel || defaultSettings.codexModel,
-    geminiModel: persistedGeminiModel || defaultSettings.geminiModel,
-    deepseekModel: persistedDeepSeekModel || defaultSettings.deepseekModel,
-  };
-}
-
-function resolvePersistedShortcuts(persistedSettings: Record<string, unknown>) {
-  const persistedShortcuts =
-    persistedSettings.shortcuts &&
-    typeof persistedSettings.shortcuts === "object"
-      ? (persistedSettings.shortcuts as Record<string, unknown>)
-      : {};
-
-  const mergedShortcuts = {
-    ...defaultSettings.shortcuts,
-    ...persistedShortcuts,
-  };
-
-  const defaultShortcutMigrations: Partial<
-    Record<keyof typeof mergedShortcuts, string[]>
-  > = {
-    aiAnalyze: ["Cmd+J", "Ctrl+J"],
-    toggleView: ["Ctrl+E", "Cmd+Shift+V", "Ctrl+Shift+V"],
-    search: ["Ctrl+F"],
-    sidebarSearch: ["Ctrl+Shift+F"],
-    settings: [
-      "Ctrl+,",
-      "Cmd+,",
-      "Command+,",
-      "Meta+,",
-      "Cmd+Shift+0",
-      "Ctrl+Shift+0",
-    ],
-    toggleOutline: ["Ctrl+O", "Cmd+Shift+O", "Ctrl+Shift+O"],
-    toggleSidebar: ["Ctrl+B", "Cmd+Shift+B", "Ctrl+Shift+B"],
-    toggleTheme: ["Ctrl+T", "Cmd+Shift+T", "Ctrl+Shift+T"],
-    openKnowledgeBase: ["Ctrl+Shift+O"],
-    exportPdf: ["Ctrl+Shift+E"],
-  };
-
-  (
-    Object.keys(defaultShortcutMigrations) as Array<
-      keyof typeof mergedShortcuts
-    >
-  ).forEach((key) => {
-    const persistedValue = persistedShortcuts[key];
-    const legacyValues = defaultShortcutMigrations[key] ?? [];
-
-    if (
-      persistedValue === undefined ||
-      (typeof persistedValue === "string" &&
-        legacyValues.includes(persistedValue))
-    ) {
-      mergedShortcuts[key] = defaultSettings.shortcuts[key];
-    }
-  });
-
-  return normalizeShortcutConfigForPlatform(mergedShortcuts);
-}
 
 /**
  * Create the combined store using slice pattern
@@ -578,88 +134,3 @@ export const useAppStore = create<AppState>()(
     },
   ),
 );
-
-// Re-export default settings for convenience
-export { defaultSettings };
-
-// Helper hook for accessing specific slices (optional optimization)
-export function useFileStore(): FileState & FileActions {
-  return useAppStore((state) => ({
-    ...initialFileState,
-    files: state.files,
-    currentFilePath: state.currentFilePath,
-    rootFolderPath: state.rootFolderPath,
-    setFiles: state.setFiles,
-    setCurrentFilePath: state.setCurrentFilePath,
-    setRootFolderPath: state.setRootFolderPath,
-    updateFileContent: state.updateFileContent,
-    addFile: state.addFile,
-    removeFile: state.removeFile,
-    updateFileName: state.updateFileName,
-    toggleFileTrash: state.toggleFileTrash,
-    deleteFileForever: state.deleteFileForever,
-  }));
-}
-
-export function useTabStore(): TabState & TabActions {
-  return useAppStore((state) => ({
-    ...initialTabState,
-    openTabs: state.openTabs,
-    activeTabId: state.activeTabId,
-    fileContents: state.fileContents,
-    lastSavedContent: state.lastSavedContent,
-    addTab: state.addTab,
-    closeTab: state.closeTab,
-    closeOtherTabs: state.closeOtherTabs,
-    setActiveTab: state.setActiveTab,
-    updateTabContent: state.updateTabContent,
-    getActiveContent: state.getActiveContent,
-    clearAllCache: state.clearAllCache,
-    markAsSaved: state.markAsSaved,
-    hasUnsavedChanges: state.hasUnsavedChanges,
-  }));
-}
-
-export function useEditorStore(): EditorState & EditorActions {
-  return useAppStore((state) => ({
-    ...initialEditorState,
-    viewMode: state.viewMode,
-    fileHistories: state.fileHistories,
-    setContent: state.setContent,
-    setContentForFile: state.setContentForFile,
-    setViewMode: state.setViewMode,
-    undo: state.undo,
-    redo: state.redo,
-    canUndo: state.canUndo,
-    canRedo: state.canRedo,
-    clearHistory: state.clearHistory,
-  }));
-}
-
-export function useUIStore(): UIState & UIActions {
-  return useAppStore((state) => ({
-    ...initialUIState,
-    isSidebarOpen: state.isSidebarOpen,
-    isSettingsOpen: state.isSettingsOpen,
-    isLoading: state.isLoading,
-    isSaving: state.isSaving,
-    isAnalyzing: state.isAnalyzing,
-    isPublishing: state.isPublishing,
-    settings: state.settings,
-    notification: state.notification,
-    outlineHeadings: state.outlineHeadings,
-    activeHeadingId: state.activeHeadingId,
-    setSidebarOpen: state.setSidebarOpen,
-    setSettingsOpen: state.setSettingsOpen,
-    setLoading: state.setLoading,
-    setSaving: state.setSaving,
-    setAnalyzing: state.setAnalyzing,
-    setPublishing: state.setPublishing,
-    setSettings: state.setSettings,
-    updateSettings: state.updateSettings,
-    showNotification: state.showNotification,
-    clearNotification: state.clearNotification,
-    setOutlineHeadings: state.setOutlineHeadings,
-    setActiveHeadingId: state.setActiveHeadingId,
-  }));
-}
