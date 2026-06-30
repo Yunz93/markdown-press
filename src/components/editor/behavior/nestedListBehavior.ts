@@ -31,8 +31,14 @@ import {
   ORDERED_LIST_REGEX,
   UNORDERED_LIST_REGEX,
   TASK_LIST_REGEX,
+  BLOCKQUOTE_REGEX,
+  isBlankLine as isBlankLineFromCore,
 } from "./core";
+import { formatRomanNumeral, parseRomanNumeral } from "./romanNumerals";
 
+// Keep these as literals (not re-exports of core consts): this module
+// participates in an import cycle with core, so a module-init re-export would
+// capture `undefined` in the temporal dead zone.
 export const LIST_INDENT_UNIT = "    ";
 export const LIST_INDENT_SIZE = 4;
 
@@ -135,62 +141,6 @@ function parseOrderedListMarker(
 /**
  * 解析罗马数字字符串为数值
  */
-function parseRomanNumeral(roman: string): number {
-  const values: Record<string, number> = {
-    i: 1,
-    v: 5,
-    x: 10,
-    l: 50,
-    c: 100,
-    d: 500,
-    m: 1000,
-  };
-  let total = 0;
-  let prev = 0;
-
-  for (let i = roman.length - 1; i >= 0; i--) {
-    const current = values[roman[i].toLowerCase()] || 0;
-    if (current < prev) {
-      total -= current;
-    } else {
-      total += current;
-      prev = current;
-    }
-  }
-
-  return total;
-}
-
-function formatRomanNumeral(value: number, uppercase: boolean): string {
-  if (value < 1 || value > 3999) {
-    return String(value);
-  }
-  const numerals: Array<[number, string]> = [
-    [1000, "M"],
-    [900, "CM"],
-    [500, "D"],
-    [400, "CD"],
-    [100, "C"],
-    [90, "XC"],
-    [50, "L"],
-    [40, "XL"],
-    [10, "X"],
-    [9, "IX"],
-    [5, "V"],
-    [4, "IV"],
-    [1, "I"],
-  ];
-  let n = value;
-  let s = "";
-  for (const [v, sym] of numerals) {
-    while (n >= v) {
-      s += sym;
-      n -= v;
-    }
-  }
-  return uppercase ? s : s.toLowerCase();
-}
-
 function inferOrderedMarkerStyleFromRawPart(
   markerPart: string,
 ): OrderedListMarkerStyle {
@@ -250,7 +200,6 @@ export function formatOrderedMarkerValue(
 function extractOrderedMarkerRawPartFromLineText(
   lineText: string,
 ): string | null {
-  const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
   let text = lineText;
   const quoteMatch = text.match(BLOCKQUOTE_REGEX);
   if (quoteMatch) {
@@ -272,8 +221,7 @@ export function parseListItem(
   startPos: number,
 ): ListItemInfo | null {
   // 支持引用块内列表："> - item" / "> 1. item"
-  // 这里不要依赖 behavior/quotes.ts 以避免循环依赖，使用与 core.ts 同形的正则。
-  const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
+  // 复用 core.ts 导出的 BLOCKQUOTE_REGEX，避免两处漂移。
   let quotePrefix = "";
   let text = lineText;
   const quoteMatch = text.match(BLOCKQUOTE_REGEX);
@@ -355,14 +303,8 @@ export function parseListItem(
   return null;
 }
 
-/**
- * 判断是否为空白行
- * 使用与 behavior/core.ts 一致的正则
- */
-function isBlankLine(lineText: string): boolean {
-  const EMPTY_LINE_REGEX = /^[ \t]*$/;
-  return EMPTY_LINE_REGEX.test(lineText);
-}
+// 判断是否为空白行：复用 core.ts 实现，保持行为一致。
+const isBlankLine = isBlankLineFromCore;
 
 /**
  * 光标所在行是否为同一 Markdown ListItem 内「第一项之后的行」（懒延续 / 多段正文）。

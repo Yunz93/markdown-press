@@ -1,60 +1,69 @@
-import type { ShortcutConfig } from '../types';
+import type { ShortcutConfig } from "../types";
 
 export function isMacPlatform(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+  if (typeof navigator === "undefined") return false;
+  return /Mac|iPhone|iPad|iPod/i.test(
+    navigator.platform || navigator.userAgent,
+  );
 }
 
-export function getPreferredShortcutModifierToken(): 'Cmd' | 'Ctrl' {
-  return isMacPlatform() ? 'Cmd' : 'Ctrl';
+export function getPreferredShortcutModifierToken(): "Cmd" | "Ctrl" {
+  return isMacPlatform() ? "Cmd" : "Ctrl";
 }
 
-export function getDisplayShortcutModifierLabel(): 'Cmd' | 'Ctrl' {
-  return isMacPlatform() ? 'Cmd' : 'Ctrl';
+export function getDisplayShortcutModifierLabel(): "Cmd" | "Ctrl" {
+  return isMacPlatform() ? "Cmd" : "Ctrl";
+}
+
+function isModifierToken(normalized: string): boolean {
+  return (
+    normalized === "ctrl" ||
+    normalized === "control" ||
+    normalized === "cmd" ||
+    normalized === "command" ||
+    normalized === "meta"
+  );
+}
+
+/** Rewrite every Ctrl/Cmd-family modifier token in `shortcut` to `replacement`. */
+function replaceModifierTokens(shortcut: string, replacement: string): string {
+  return shortcut
+    .split("+")
+    .map((part) =>
+      isModifierToken(part.trim().toLowerCase()) ? replacement : part.trim(),
+    )
+    .filter(Boolean)
+    .join("+");
 }
 
 export function normalizeShortcutForPlatform(shortcut: string): string {
-  const preferred = getPreferredShortcutModifierToken();
-  return shortcut
-    .split('+')
-    .map((part) => {
-      const normalized = part.trim().toLowerCase();
-      if (normalized === 'ctrl' || normalized === 'control' || normalized === 'cmd' || normalized === 'command' || normalized === 'meta') {
-        return preferred;
-      }
-      return part.trim();
-    })
-    .filter(Boolean)
-    .join('+');
+  return replaceModifierTokens(shortcut, getPreferredShortcutModifierToken());
 }
 
-export function normalizeShortcutConfigForPlatform(shortcuts: ShortcutConfig): ShortcutConfig {
+export function normalizeShortcutConfigForPlatform(
+  shortcuts: ShortcutConfig,
+): ShortcutConfig {
   return Object.fromEntries(
-    Object.entries(shortcuts).map(([key, value]) => [key, normalizeShortcutForPlatform(value)])
+    Object.entries(shortcuts).map(([key, value]) => [
+      key,
+      normalizeShortcutForPlatform(value),
+    ]),
   ) as unknown as ShortcutConfig;
 }
 
 export function formatShortcutForDisplay(shortcut: string): string {
-  const displayModifier = getDisplayShortcutModifierLabel();
-  return shortcut
-    .split('+')
-    .map((part) => {
-      const normalized = part.trim().toLowerCase();
-      if (normalized === 'ctrl' || normalized === 'control' || normalized === 'cmd' || normalized === 'command' || normalized === 'meta') {
-        return displayModifier;
-      }
-      return part.trim();
-    })
-    .filter(Boolean)
-    .join('+');
+  return replaceModifierTokens(shortcut, getDisplayShortcutModifierLabel());
 }
 
 /**
  * Maps a keydown to the non-modifier token used in stored shortcuts, aligned with
  * {@link ../hooks/useKeyboardShortcuts} matching rules.
  */
-function primaryShortcutTokenFromKeyEvent(key: string, code: string): string | null {
-  if (key === ' ') return null;
+function primaryShortcutTokenFromKeyEvent(
+  key: string,
+  code: string,
+): string | null {
+  if (key === " ") return null;
 
   if (key.length === 1) {
     if (/[a-zA-Z]/.test(key)) return key.toUpperCase();
@@ -63,41 +72,41 @@ function primaryShortcutTokenFromKeyEvent(key: string, code: string): string | n
   }
 
   if (/^F([1-9]|1[0-9]|2[0-4])$/i.test(key)) {
-    return `F${key.replace(/^F/i, '')}`;
+    return `F${key.replace(/^F/i, "")}`;
   }
 
   const knownMulti = new Set([
-    'Enter',
-    'Escape',
-    'Backspace',
-    'Tab',
-    'ArrowUp',
-    'ArrowDown',
-    'ArrowLeft',
-    'ArrowRight',
-    'PageUp',
-    'PageDown',
-    'Home',
-    'End',
-    'Insert',
-    'Delete',
-    'IntlBackslash',
+    "Enter",
+    "Escape",
+    "Backspace",
+    "Tab",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "PageUp",
+    "PageDown",
+    "Home",
+    "End",
+    "Insert",
+    "Delete",
+    "IntlBackslash",
   ]);
   if (knownMulti.has(key)) return key;
 
-  if (key === 'OS') return null;
+  if (key === "OS") return null;
 
-  if (code === 'Minus') return '-';
-  if (code === 'Equal') return '=';
-  if (code === 'BracketLeft') return '[';
-  if (code === 'BracketRight') return ']';
-  if (code === 'Backquote') return '`';
-  if (code === 'Backslash') return '\\';
-  if (code === 'Semicolon') return ';';
-  if (code === 'Quote') return "'";
-  if (code === 'Comma') return ',';
-  if (code === 'Period') return '.';
-  if (code === 'Slash') return '/';
+  if (code === "Minus") return "-";
+  if (code === "Equal") return "=";
+  if (code === "BracketLeft") return "[";
+  if (code === "BracketRight") return "]";
+  if (code === "Backquote") return "`";
+  if (code === "Backslash") return "\\";
+  if (code === "Semicolon") return ";";
+  if (code === "Quote") return "'";
+  if (code === "Comma") return ",";
+  if (code === "Period") return ".";
+  if (code === "Slash") return "/";
 
   return null;
 }
@@ -110,8 +119,9 @@ export function shortcutFromKeyboardEvent(event: KeyboardEvent): string | null {
   if (event.repeat) return null;
 
   const { key, code } = event;
-  if (key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return null;
-  if (key === 'Unidentified' || key === 'Dead') return null;
+  if (key === "Control" || key === "Shift" || key === "Alt" || key === "Meta")
+    return null;
+  if (key === "Unidentified" || key === "Dead") return null;
 
   const preferred = getPreferredShortcutModifierToken();
   const parts: string[] = [];
@@ -120,10 +130,10 @@ export function shortcutFromKeyboardEvent(event: KeyboardEvent): string | null {
     parts.push(preferred);
   }
   if (event.shiftKey) {
-    parts.push('Shift');
+    parts.push("Shift");
   }
   if (event.altKey) {
-    parts.push('Alt');
+    parts.push("Alt");
   }
 
   const hasAccel = event.metaKey || event.ctrlKey || event.altKey;
@@ -138,6 +148,6 @@ export function shortcutFromKeyboardEvent(event: KeyboardEvent): string | null {
     if (isAlnum) return null;
   }
 
-  const joined = [...parts, main].join('+');
+  const joined = [...parts, main].join("+");
   return normalizeShortcutForPlatform(joined);
 }

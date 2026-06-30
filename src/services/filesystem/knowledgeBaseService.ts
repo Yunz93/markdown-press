@@ -1,6 +1,11 @@
-import type { FileNode } from '../../types';
-import { sanitizeTrashFolder } from '../../utils/trashFolder';
-import { joinFsPath } from '../../utils/pathHelpers';
+import type { FileNode } from "../../types";
+import { sanitizeTrashFolder } from "../../utils/trashFolder";
+import { joinFsPath } from "../../utils/pathHelpers";
+import {
+  isMarkdownFile,
+  isPreviewOnlyFile,
+  shouldReadInitialFileContent,
+} from "../../utils/fileTypes";
 
 interface OpenKnowledgeBaseOptions {
   path?: string;
@@ -11,7 +16,10 @@ interface OpenKnowledgeBaseOptions {
 interface OpenKnowledgeBaseParams {
   addTab: (tabId: string, content?: string) => void;
   clearAllCache: () => void;
-  findPreferredFile: (fileNodes: FileNode[], filePath: string) => FileNode | undefined;
+  findPreferredFile: (
+    fileNodes: FileNode[],
+    filePath: string,
+  ) => FileNode | undefined;
   findInitialOpenableFile: (fileNodes: FileNode[]) => FileNode | null;
   fs: {
     copySampleNotes?: (targetDir: string) => Promise<boolean>;
@@ -26,7 +34,10 @@ interface OpenKnowledgeBaseParams {
   lastOpenedFilePath: string | null;
   options?: OpenKnowledgeBaseOptions;
   registerAllowedPath: (path: string, recursive: boolean) => Promise<void>;
-  registerAllowedPathIfExists: (path: string, recursive: boolean) => Promise<void>;
+  registerAllowedPathIfExists: (
+    path: string,
+    recursive: boolean,
+  ) => Promise<void>;
   setCurrentFilePath: (path: string | null) => void;
   setFiles: (files: FileNode[]) => void;
   setRootFolderPath: (path: string | null) => void;
@@ -41,27 +52,22 @@ interface OpenKnowledgeBaseResult {
   openedPreviewOnly: boolean;
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, context: string): Promise<T> {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  context: string,
+): Promise<T> {
   const timeoutPromise = new Promise<T>((_, reject) => {
-    setTimeout(() => reject(new Error(`${context} timed out after ${timeoutMs}ms`)), timeoutMs);
+    setTimeout(
+      () => reject(new Error(`${context} timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
   });
   return Promise.race([promise, timeoutPromise]);
 }
 
-function isMarkdownFile(name: string): boolean {
-  return /\.(md|markdown)$/i.test(name);
-}
-
-function isPreviewOnlyFile(name: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp|pdf|html?)$/i.test(name);
-}
-
-function shouldReadInitialFileContent(name: string): boolean {
-  return isMarkdownFile(name) || /\.html?$/i.test(name);
-}
-
 export async function openKnowledgeBaseWorkspace(
-  params: OpenKnowledgeBaseParams
+  params: OpenKnowledgeBaseParams,
 ): Promise<OpenKnowledgeBaseResult | null> {
   const {
     addTab,
@@ -83,23 +89,23 @@ export async function openKnowledgeBaseWorkspace(
     withErrorHandling,
   } = params;
 
-  const dirPath = options?.path || await fs.openDirectory();
+  const dirPath = options?.path || (await fs.openDirectory());
   if (!dirPath) return null;
 
   try {
     await withTimeout(
       registerAllowedPath(dirPath, true),
       5000,
-      'Register allowed path'
+      "Register allowed path",
     );
   } catch (error) {
-    console.warn('Failed to register allowed path (continuing):', error);
+    console.warn("Failed to register allowed path (continuing):", error);
   }
 
   if (options?.path && fs.fileExists) {
     const pathExists = await withErrorHandling(
       () => fs.fileExists!(dirPath),
-      'Failed to validate knowledge base path'
+      "Failed to validate knowledge base path",
     );
 
     if (!pathExists) {
@@ -112,10 +118,10 @@ export async function openKnowledgeBaseWorkspace(
     await withTimeout(
       registerAllowedPathIfExists(trashRootPath, true),
       3000,
-      'Register trash path'
+      "Register trash path",
     );
   } catch (error) {
-    console.warn('Failed to register trash path (continuing):', error);
+    console.warn("Failed to register trash path (continuing):", error);
   }
 
   const shouldInitializeSampleNotes =
@@ -129,7 +135,7 @@ export async function openKnowledgeBaseWorkspace(
 
   const fileNodes = await withErrorHandling(
     () => fs.readDirectory(dirPath),
-    'Failed to read knowledge base'
+    "Failed to read knowledge base",
   );
 
   clearAllCache();
@@ -140,7 +146,8 @@ export async function openKnowledgeBaseWorkspace(
   const preferredInitialFile = lastOpenedFilePath
     ? findPreferredFile(fileNodes, lastOpenedFilePath)
     : undefined;
-  const initialFile = preferredInitialFile ?? findInitialOpenableFile(fileNodes);
+  const initialFile =
+    preferredInitialFile ?? findInitialOpenableFile(fileNodes);
 
   let openedPreviewOnly = false;
   if (initialFile) {
@@ -148,7 +155,7 @@ export async function openKnowledgeBaseWorkspace(
       if (shouldReadInitialFileContent(initialFile.name)) {
         const initialContent = await withErrorHandling(
           () => fs.readFile(initialFile.path),
-          `Failed to read file: ${initialFile.name}`
+          `Failed to read file: ${initialFile.name}`,
         );
 
         addTab(initialFile.id, initialContent);
@@ -157,7 +164,9 @@ export async function openKnowledgeBaseWorkspace(
       }
 
       setCurrentFilePath(initialFile.path);
-      openedPreviewOnly = isPreviewOnlyFile(initialFile.name) && !isMarkdownFile(initialFile.name);
+      openedPreviewOnly =
+        isPreviewOnlyFile(initialFile.name) &&
+        !isMarkdownFile(initialFile.name);
     } catch (error) {
       handleInitialFileError(error);
     }

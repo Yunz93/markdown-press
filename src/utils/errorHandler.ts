@@ -2,13 +2,13 @@
  * Error codes for file system operations
  */
 export type FileSystemErrorCode =
-  | 'FILE_NOT_FOUND'
-  | 'PERMISSION_DENIED'
-  | 'DISK_FULL'
-  | 'INVALID_PATH'
-  | 'FILE_EXISTS'
-  | 'DIRECTORY_NOT_EMPTY'
-  | 'UNKNOWN';
+  | "FILE_NOT_FOUND"
+  | "PERMISSION_DENIED"
+  | "DISK_FULL"
+  | "INVALID_PATH"
+  | "FILE_EXISTS"
+  | "DIRECTORY_NOT_EMPTY"
+  | "UNKNOWN";
 
 /**
  * Custom error class for file system operations
@@ -19,11 +19,11 @@ export class FileSystemError extends Error {
 
   constructor(
     message: string,
-    code: FileSystemErrorCode = 'UNKNOWN',
-    path?: string
+    code: FileSystemErrorCode = "UNKNOWN",
+    path?: string,
   ) {
     super(message);
-    this.name = 'FileSystemError';
+    this.name = "FileSystemError";
     this.code = code;
     this.path = path;
 
@@ -38,18 +38,18 @@ export class FileSystemError extends Error {
    */
   toUserMessage(): string {
     switch (this.code) {
-      case 'FILE_NOT_FOUND':
+      case "FILE_NOT_FOUND":
         return `The file "${this.path}" was not found.`;
-      case 'PERMISSION_DENIED':
+      case "PERMISSION_DENIED":
         return `Permission denied. Please check file permissions.`;
-      case 'DISK_FULL':
-        return 'Disk is full. Please free up some space.';
-      case 'INVALID_PATH':
+      case "DISK_FULL":
+        return "Disk is full. Please free up some space.";
+      case "INVALID_PATH":
         return `Invalid path: "${this.path}"`;
-      case 'FILE_EXISTS':
+      case "FILE_EXISTS":
         return `A file with this name already exists.`;
-      case 'DIRECTORY_NOT_EMPTY':
-        return 'Cannot delete directory. It is not empty.';
+      case "DIRECTORY_NOT_EMPTY":
+        return "Cannot delete directory. It is not empty.";
       default:
         return this.message;
     }
@@ -68,7 +68,7 @@ export function isFileSystemError(error: unknown): error is FileSystemError {
  */
 export async function withErrorHandling<T>(
   operation: () => Promise<T>,
-  context: string
+  context: string,
 ): Promise<T> {
   try {
     return await operation();
@@ -79,38 +79,31 @@ export async function withErrorHandling<T>(
     }
 
     // Convert unknown errors to FileSystemError
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = error instanceof Error ? error.message : "Unknown error";
 
     // Detect specific error types from message
-    if (message.includes('permission') || message.includes('denied')) {
-      throw new FileSystemError(`${context}: Permission denied`, 'PERMISSION_DENIED');
+    if (message.includes("permission") || message.includes("denied")) {
+      throw new FileSystemError(
+        `${context}: Permission denied`,
+        "PERMISSION_DENIED",
+      );
     }
 
-    if (message.includes('not found') || message.includes('no such file')) {
-      throw new FileSystemError(`${context}: File not found`, 'FILE_NOT_FOUND');
+    if (message.includes("not found") || message.includes("no such file")) {
+      throw new FileSystemError(`${context}: File not found`, "FILE_NOT_FOUND");
     }
 
-    if (message.includes('disk full') || message.includes('no space left')) {
-      throw new FileSystemError(`${context}: Disk full`, 'DISK_FULL');
+    if (message.includes("disk full") || message.includes("no space left")) {
+      throw new FileSystemError(`${context}: Disk full`, "DISK_FULL");
     }
 
-    if (message.includes('invalid')) {
-      throw new FileSystemError(`${context}: Invalid path`, 'INVALID_PATH');
+    if (message.includes("invalid")) {
+      throw new FileSystemError(`${context}: Invalid path`, "INVALID_PATH");
     }
 
     // Default to unknown error
-    throw new FileSystemError(`${context}: ${message}`, 'UNKNOWN');
+    throw new FileSystemError(`${context}: ${message}`, "UNKNOWN");
   }
-}
-
-/**
- * Handle Tauri-specific errors
- */
-export function handleTauriError<T>(
-  operation: () => Promise<T>,
-  context: string
-): Promise<T> {
-  return withErrorHandling(operation, context);
 }
 
 /**
@@ -123,7 +116,7 @@ export function createErrorHandler(context: string) {
 
     safeExecute: async <T>(
       operation: () => Promise<T>,
-      fallback?: T
+      fallback?: T,
     ): Promise<T | undefined> => {
       try {
         return await operation();

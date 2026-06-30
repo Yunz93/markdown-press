@@ -65,6 +65,26 @@ export function isHtmlDocument(fileName: string): boolean {
   return /\.html?$/i.test(fileName);
 }
 
+export type PreviewFileType =
+  | "markdown"
+  | "image"
+  | "video"
+  | "pdf"
+  | "html"
+  | "unsupported";
+
+export function getPreviewFileType(
+  filePath: string | null | undefined,
+): PreviewFileType {
+  if (!filePath) return "markdown";
+  if (isImageAttachment(filePath)) return "image";
+  if (isVideoAttachment(filePath)) return "video";
+  if (isPdfAttachment(filePath)) return "pdf";
+  if (isHtmlDocument(filePath)) return "html";
+  if (isMarkdownNote(filePath)) return "markdown";
+  return "unsupported";
+}
+
 export function hasWikiEmbedsInHtml(html: string): boolean {
   if (!html) return false;
   // Do not match exact attribute/class strings: DOMPurify may reorder class tokens

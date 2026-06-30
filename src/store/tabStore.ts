@@ -16,6 +16,12 @@ export interface TabActions {
   closeTab: (fileId: string) => void;
   closeOtherTabs: (fileId: string) => void;
   setActiveTab: (fileId: string) => void;
+  /**
+   * Update a file's content WITHOUT recording undo history. `fileContents`
+   * is the single source of truth for editor content (FileNode no longer
+   * carries a `content` field). Use editor `setContent`/`setContentForFile`
+   * when the change should be undoable.
+   */
   updateTabContent: (fileId: string, content: string) => void;
   getActiveContent: () => string | undefined;
   clearAllCache: () => void;

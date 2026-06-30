@@ -27,6 +27,7 @@ import { OutlinePanel } from "./components/outline/OutlinePanel";
 import { ContentSearch } from "./components/search/ContentSearch";
 import { TabBar } from "./components/tabs/TabBar";
 import { useExportActions } from "./hooks/useExportActions";
+import { usePublishActions } from "./hooks/usePublishActions";
 import { ViewMode } from "./types";
 import { focusEditorRangeByOffset } from "./utils/editorSelectionBridge";
 import { requestPreviewHeadingScroll } from "./utils/previewNavigationBridge";
@@ -34,6 +35,7 @@ import { getResolvedUiFontFamily } from "./utils/fontSettings";
 import { logEnvironment, assertDevReleaseParity } from "./utils/environment";
 import { useI18n } from "./hooks/useI18n";
 import { getPathBasename, findFileInTree } from "./app/appShellUtils";
+import { isPreviewOnlyFile } from "./utils/fileTypes";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
@@ -52,22 +54,6 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KnowledgeBaseOnboarding } from "./components/KnowledgeBaseOnboarding";
 import { KnowledgeBaseLoadingScreen } from "./components/KnowledgeBaseLoadingScreen";
 import { AppDialogs } from "./components/AppDialogs";
-
-function isImageFile(name: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(name);
-}
-
-function isPdfFile(name: string): boolean {
-  return /\.pdf$/i.test(name);
-}
-
-function isHtmlFile(name: string): boolean {
-  return /\.html?$/i.test(name);
-}
-
-function isPreviewOnlyFile(name: string): boolean {
-  return isImageFile(name) || isPdfFile(name) || isHtmlFile(name);
-}
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
@@ -94,7 +80,6 @@ const App: React.FC = () => {
     isPublishing,
     settings,
     fileContents,
-    outlineHeadings,
     activeHeadingId,
     closeTab,
     setContent,
@@ -125,7 +110,7 @@ const App: React.FC = () => {
   const { handleAIAnalyze, handleGenerateWikiFromSelection } = useAIAnalyze();
   const fileOps = useFileOperations();
 
-  useOutline();
+  const { headings: outlineHeadings } = useOutline();
   useUndoRedo();
 
   useThemeSync(settings.themeMode);
@@ -156,12 +141,10 @@ const App: React.FC = () => {
   });
 
   const { forceSave } = useAutoSave({ debounceMs: 500, enabled: true });
-  const {
-    handleExportToPdf,
-    buildLongImageSharePayload,
-    handlePublishSimpleBlog,
-    handlePublishWechatDraft,
-  } = useExportActions(forceSave, highlighter);
+  const { handleExportToPdf, buildLongImageSharePayload } =
+    useExportActions(highlighter);
+  const { handlePublishSimpleBlog, handlePublishWechatDraft } =
+    usePublishActions(forceSave);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 

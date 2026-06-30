@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::url_encode::percent_encode_component;
+
 pub(super) async fn publish_remote_simple_blog(
     request: &PublishSimpleBlogRequest,
 ) -> Result<PublishSimpleBlogResult, String> {
@@ -348,19 +350,6 @@ fn encode_raw_path(path: &Path) -> String {
         })
         .collect::<Vec<_>>()
         .join("/")
-}
-
-fn percent_encode_component(value: &str) -> String {
-    let mut encoded = String::new();
-    for byte in value.as_bytes() {
-        let ch = *byte as char;
-        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '~') {
-            encoded.push(ch);
-        } else {
-            encoded.push_str(&format!("%{:02X}", byte));
-        }
-    }
-    encoded
 }
 
 fn normalize_optional_token(raw: Option<&str>) -> Option<String> {

@@ -33,6 +33,8 @@ import {
 } from "./hooks";
 import {
   getLocalPreviewLinkTarget,
+  getPreviewFileType,
+  isImageAttachment,
   isLocalPreviewLinkHref,
 } from "./preview/previewMedia";
 import { mountPdfPreview } from "../../utils/pdfPreview";
@@ -55,9 +57,14 @@ import { applyPreviewHeadingAttributes } from "../../utils/previewHeadingAttribu
 import { parseFrontmatter } from "../../utils/frontmatter";
 import { openExternalUrl } from "../../utils/externalLinks";
 import { isWindowsPlatform } from "../../utils/platform";
-import type { FileNode, Frontmatter } from "../../types";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
+import {
+  getFrontmatterDisplayItems,
+  isExternalLink,
+  isValidExternalUrl,
+  type FrontmatterValue,
+} from "./preview/previewPaneHelpers";
 
 interface PreviewPaneProps {
   highlighter?: ShikiHighlighter | null;
@@ -76,78 +83,6 @@ export interface PreviewPaneHandle {
   getScrollPosition: () => { top: number; left: number };
   restoreScrollPosition: (position: { top: number; left: number }) => void;
   scrollToTop: () => void;
-}
-
-function syncPreviewContainerScroll(
-  element: HTMLElement,
-  percentage: number,
-): void {
-  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-  if (maxScrollTop <= 0) return;
-  element.scrollTop = maxScrollTop * Math.min(Math.max(percentage, 0), 1);
-}
-
-// Helper functions
-function isExternalLink(href: string): boolean {
-  return /^(https?:|mailto:|tel:)/i.test(href.trim());
-}
-
-function isValidExternalUrl(href: string): boolean {
-  try {
-    const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-function isImageAttachment(fileName: string): boolean {
-  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(fileName);
-}
-
-function isMarkdownNote(fileName: string): boolean {
-  return /\.(md|markdown)$/i.test(fileName);
-}
-
-function isPdfAttachment(fileName: string): boolean {
-  return /\.pdf$/i.test(fileName);
-}
-
-function isVideoAttachment(fileName: string): boolean {
-  return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
-}
-
-function isHtmlDocument(fileName: string): boolean {
-  return /\.html?$/i.test(fileName);
-}
-
-function getPreviewFileType(
-  filePath: string | null | undefined,
-): "markdown" | "image" | "video" | "pdf" | "html" | "unsupported" {
-  if (!filePath) return "markdown";
-  if (isImageAttachment(filePath)) return "image";
-  if (isVideoAttachment(filePath)) return "video";
-  if (isPdfAttachment(filePath)) return "pdf";
-  if (isHtmlDocument(filePath)) return "html";
-  if (isMarkdownNote(filePath)) return "markdown";
-  return "unsupported";
-}
-
-type FrontmatterValue = Frontmatter[keyof Frontmatter];
-
-function getFrontmatterDisplayItems(value: FrontmatterValue): string[] {
-  if (Array.isArray(value)) {
-    const items = value
-      .map((item) => String(item ?? "").trim())
-      .filter(Boolean);
-    return items.length > 0 ? items : [""];
-  }
-
-  if (value === null || value === undefined) {
-    return [""];
-  }
-
-  return [String(value)];
 }
 
 export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
