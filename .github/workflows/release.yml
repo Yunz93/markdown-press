@@ -87,6 +87,18 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
+            ### 0.9.7
+
+            #### 新功能
+
+            - UI：支持 Cmd/Ctrl + +/- 调整界面显示缩放。
+
+            #### 修复与改进
+
+            - 文件树：外部删除文件后同步更新侧边栏。
+            - 导出：长图分享样式与预览对齐，并正确传递有序列表模式。
+            - macOS：修复一键安装脚本（不依赖 GitHub API 解析下载地址；修复 REPO 只读赋值问题）。
+
             ### 0.9.6
 
             #### 新功能
@@ -245,6 +257,18 @@ jobs:
           releaseName: Release ${{ github.ref_name }}
           releaseBody: |
             See the assets to download this version and install.
+
+            ### 0.9.7
+
+            #### 新功能
+
+            - UI：支持 Cmd/Ctrl + +/- 调整界面显示缩放。
+
+            #### 修复与改进
+
+            - 文件树：外部删除文件后同步更新侧边栏。
+            - 导出：长图分享样式与预览对齐，并正确传递有序列表模式。
+            - macOS：修复一键安装脚本（不依赖 GitHub API 解析下载地址；修复 REPO 只读赋值问题）。
 
             ### 0.9.6
 

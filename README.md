@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 指定版本（可选）：
 
 ```bash
-RELEASE_TAG=v0.9.6 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+RELEASE_TAG=v0.9.7 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `M記.app` 放入「应用程序」后执行：
