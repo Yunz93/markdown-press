@@ -105,6 +105,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     const showNotification = useAppStore((state) => state.showNotification);
     const activeTabId = useAppStore((state) => state.activeTabId);
     const content = useAppStore(selectContent);
+    const fileContents = useAppStore((state) => state.fileContents);
     const previewContent = useDeferredValue(content);
     const previewFontFamily = useMemo(
       () => getResolvedPreviewFontFamily(settings),
@@ -188,7 +189,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       themeMode: settings.themeMode as "light" | "dark",
       files,
       rootFolderPath,
-      fileContents: {},
+      fileContents,
       activeTabId,
       readFile,
       enabled: previewRenderActive,
@@ -272,6 +273,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       scroll.syncScrollTo(element, syncedPercentage);
     }, [scroll, syncedPercentage]);
 
+    // Per-tab scroll restoration is handled by SplitView via syncedPercentage /
+    // imperative syncScrollTo; avoid resetting preview scroll on every tab switch.
     useLayoutEffect(() => {
       const element = previewRef.current;
       if (!element || !previewRenderActive) return;
@@ -293,13 +296,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       ro.observe(element);
       return () => ro.disconnect();
     }, [scroll, previewRenderActive]);
-
-    useEffect(() => {
-      const element = previewRef.current;
-      if (!element) return;
-      element.scrollTo({ top: 0, left: 0 });
-      scroll.cancelScrollSync();
-    }, [activeTabId, scroll.cancelScrollSync]);
 
     // Handle scroll events
     const handleScroll = useCallback(
@@ -358,8 +354,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     }, [
       activeTabId,
       flattenedHeadings,
-      renderer.enhancedBodyHtml,
       isMarkdownPreview,
+      markdownPreviewMarkup,
       previewRenderActive,
     ]);
 
@@ -784,7 +780,13 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
             attachmentContext,
             embedTarget,
           );
-          if (!resolvedAttachment) return;
+          if (!resolvedAttachment) {
+            showNotification(
+              t("notifications_linkedFileNotFound", { target: embedTarget }),
+              "error",
+            );
+            return;
+          }
           if (!isImageAttachment(resolvedAttachment.name)) {
             await handleRevealInExplorer(resolvedAttachment.path);
           }
@@ -831,6 +833,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         handleRevealInExplorer,
         navigation,
         rootFolderPath,
+        showNotification,
+        t,
       ],
     );
 

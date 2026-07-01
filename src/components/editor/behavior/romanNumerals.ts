@@ -27,6 +27,17 @@ export function parseRomanNumeral(roman: string): number {
     }
   }
 
+  if (total <= 0) {
+    return 0;
+  }
+
+  const isUpper =
+    roman === roman.toUpperCase() && roman.toLowerCase() !== roman;
+  const roundTrip = formatRomanNumeral(total, isUpper);
+  if (roundTrip.toLowerCase() !== roman.toLowerCase()) {
+    return 0;
+  }
+
   return total;
 }
 

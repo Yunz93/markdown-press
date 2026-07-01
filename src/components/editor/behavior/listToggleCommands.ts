@@ -10,13 +10,27 @@ import { type StateCommand } from "@codemirror/state";
 import {
   updateSelectedLines as updateSelectedLinesWithSelectionMap,
   getLeadingIndent,
+  parseStructuredLine,
 } from "./core";
+import { buildQuotePrefix } from "./quotes";
 import {
   type ListItemInfo,
   parseListItem,
   getSelectedListItems,
   formatListItem,
 } from "./nestedListBehavior";
+
+function plainTextFromListItem(item: ListItemInfo): string {
+  return `${item.quotePrefix ?? ""}${item.content}`;
+}
+
+function listLineFromPlainText(lineText: string, marker: string): string {
+  const parsed = parseStructuredLine(lineText);
+  const quotePrefix = parsed.quote ? buildQuotePrefix(parsed.quote) : "";
+  const contentSource = parsed.quote ? parsed.quote.content : lineText;
+  const indent = getLeadingIndent(contentSource);
+  return `${quotePrefix}${indent}${marker}${contentSource.slice(indent.length)}`;
+}
 
 export const toggleUnorderedList: StateCommand = ({
   state,
@@ -35,8 +49,8 @@ export const toggleUnorderedList: StateCommand = ({
       const item = parseListItem(lineText, lineNumber, 0);
 
       if (allUnordered && item?.type === "unordered") {
-        // 取消列表
-        return item.content;
+        // 取消列表，保留引用前缀
+        return plainTextFromListItem(item);
       }
 
       if (item) {
@@ -49,9 +63,8 @@ export const toggleUnorderedList: StateCommand = ({
         return formatListItem(newItem);
       }
 
-      // 普通文本转为列表
-      const indent = getLeadingIndent(lineText);
-      return `${indent}- ${lineText.slice(indent.length)}`;
+      // 普通文本转为列表（含引用块内文本）
+      return listLineFromPlainText(lineText, "- ");
     },
   );
 };
@@ -73,8 +86,8 @@ export const toggleOrderedList = (options?: {
         const item = parseListItem(lineText, lineNumber, 0);
 
         if (allOrdered && item?.type === "ordered") {
-          // 取消列表
-          return item.content;
+          // 取消列表，保留引用前缀
+          return plainTextFromListItem(item);
         }
 
         if (item) {
@@ -89,9 +102,8 @@ export const toggleOrderedList = (options?: {
           return formatListItem(newItem);
         }
 
-        // 普通文本转为列表
-        const indent = getLeadingIndent(lineText);
-        return `${indent}1. ${lineText.slice(indent.length)}`;
+        // 普通文本转为列表（含引用块内文本）
+        return listLineFromPlainText(lineText, "1. ");
       },
       options?.strictMode ? { normalizeOrderedNumbers: "document" } : undefined,
     );
@@ -141,9 +153,8 @@ export const toggleTaskList: StateCommand = ({ state, dispatch }): boolean => {
         return formatListItem(newItem);
       }
 
-      // 普通文本转为任务列表
-      const indent = getLeadingIndent(lineText);
-      return `${indent}- [ ] ${lineText.slice(indent.length)}`;
+      // 普通文本转为任务列表（含引用块内文本）
+      return listLineFromPlainText(lineText, "- [ ] ");
     },
   );
 };

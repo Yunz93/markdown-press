@@ -20,10 +20,12 @@ const resolvedAttachmentCache = new Map<
   Promise<ResolvedAttachmentTarget | null>
 >();
 const fileExistenceCache = new Map<string, Promise<boolean>>();
+const attachmentContextCache = new Map<string, AttachmentResolverContext>();
 
 export function clearAttachmentResolverCache(): void {
   resolvedAttachmentCache.clear();
   fileExistenceCache.clear();
+  attachmentContextCache.clear();
 }
 
 function hasUriScheme(value: string): boolean {
@@ -50,6 +52,16 @@ function buildCacheKey(
   return `${context.cacheNamespace}::${rawTarget.trim()}`;
 }
 
+function invalidateResolvedCacheForPath(path: string): void {
+  for (const [key, pending] of [...resolvedAttachmentCache.entries()]) {
+    void pending.then((result) => {
+      if (result?.path === path) {
+        resolvedAttachmentCache.delete(key);
+      }
+    });
+  }
+}
+
 async function cachedFileExists(path: string): Promise<boolean> {
   let pending = fileExistenceCache.get(path);
   if (pending) {
@@ -62,6 +74,7 @@ async function cachedFileExists(path: string): Promise<boolean> {
     .then((exists) => {
       if (!exists) {
         fileExistenceCache.delete(path);
+        invalidateResolvedCacheForPath(path);
       }
       return exists;
     });
@@ -129,12 +142,67 @@ export function createAttachmentResolverContext(
 
   visit(files);
 
-  return {
-    cacheNamespace: `${rootFolderPath ?? ""}::${currentFilePath ?? ""}::${filePaths.sort().join("|")}`,
+  const namespaceKey = `${rootFolderPath ?? ""}::${currentFilePath ?? ""}::${filePaths.sort().join("|")}`;
+  const cached = attachmentContextCache.get(namespaceKey);
+  if (cached) {
+    return cached;
+  }
+
+  const context: AttachmentResolverContext = {
+    cacheNamespace: namespaceKey,
     currentFilePath,
     rootFolderPath,
     files,
   };
+  attachmentContextCache.set(namespaceKey, context);
+  return context;
+}
+
+async function resolveAttachmentTargetUncached(
+  context: AttachmentResolverContext,
+  normalizedTarget: string,
+): Promise<ResolvedAttachmentTarget | null> {
+  const matchedFile = resolveWikiLinkFile(
+    context.files,
+    normalizedTarget,
+    context.rootFolderPath,
+    context.currentFilePath,
+  );
+
+  if (matchedFile) {
+    return {
+      path: matchedFile.path,
+      name: matchedFile.name,
+    };
+  }
+
+  try {
+    const candidates = await buildAttachmentPathCandidates(
+      normalizedTarget,
+      context,
+    );
+
+    for (const normalizedCandidate of candidates) {
+      if (await cachedFileExists(normalizedCandidate)) {
+        const fileName =
+          normalizedCandidate.split(/[\\/]/).pop() ||
+          normalizedTarget.split("/").pop() ||
+          normalizedTarget;
+        return {
+          path: normalizedCandidate,
+          name: fileName,
+        };
+      }
+    }
+  } catch (error) {
+    console.error(
+      "Failed to resolve attachment target:",
+      normalizedTarget,
+      error,
+    );
+  }
+
+  return null;
 }
 
 export async function resolveAttachmentTarget(
@@ -150,50 +218,14 @@ export async function resolveAttachmentTarget(
     return pending;
   }
 
-  pending = (async () => {
-    const matchedFile = resolveWikiLinkFile(
-      context.files,
-      normalizedTarget,
-      context.rootFolderPath,
-      context.currentFilePath,
-    );
-
-    if (matchedFile) {
-      return {
-        path: matchedFile.path,
-        name: matchedFile.name,
-      };
-    }
-
-    try {
-      const candidates = await buildAttachmentPathCandidates(
-        normalizedTarget,
-        context,
-      );
-
-      for (const normalizedCandidate of candidates) {
-        if (await cachedFileExists(normalizedCandidate)) {
-          const fileName =
-            normalizedCandidate.split(/[\\/]/).pop() ||
-            normalizedTarget.split("/").pop() ||
-            normalizedTarget;
-          return {
-            path: normalizedCandidate,
-            name: fileName,
-          };
-        }
+  pending = resolveAttachmentTargetUncached(context, normalizedTarget).then(
+    (result) => {
+      if (result !== null) {
+        resolvedAttachmentCache.set(cacheKey, Promise.resolve(result));
       }
-    } catch (error) {
-      console.error(
-        "Failed to resolve attachment target:",
-        normalizedTarget,
-        error,
-      );
-    }
+      return result;
+    },
+  );
 
-    return null;
-  })();
-
-  resolvedAttachmentCache.set(cacheKey, pending);
   return pending;
 }
