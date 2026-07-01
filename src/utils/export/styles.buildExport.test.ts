@@ -106,4 +106,36 @@ describe("buildExportStyles", () => {
     );
     expect(css.match(/var\(--mp-doc-[^)]+\)/g) ?? []).toEqual([]);
   });
+
+  it("matches preview attachment image decoration in export CSS", () => {
+    const lightCss = buildExportStyles("light");
+    const darkCss = buildExportStyles("dark");
+
+    expect(lightCss).toMatch(
+      /\.export-document \.markdown-body \.preview-attachment-image\s*\{[^}]*border-radius:\s*1rem/m,
+    );
+    expect(lightCss).toMatch(
+      /\.export-document \.markdown-body \.preview-attachment-image\s*\{[^}]*box-shadow:\s*0 16px 40px/m,
+    );
+    expect(darkCss).toMatch(
+      /\.export-document \.markdown-body \.preview-attachment-image\s*\{[^}]*box-shadow:\s*0 20px 44px rgba\(0,\s*0,\s*0,\s*0\.3\)/m,
+    );
+    expect(lightCss).toMatch(
+      /img\.preview-attachment-image\[data-wiki-embed-w\][\s\S]*?attr\(data-wiki-embed-w px,\s*100%\)/m,
+    );
+  });
+
+  it("matches preview Shiki line-height and wrapper styles in export CSS", () => {
+    const css = buildExportStyles("light");
+
+    expect(css).toMatch(
+      /\.export-document \.markdown-body pre\.shiki \.line[\s\S]*?line-height:\s*1\.75/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body \.mp-shiki-block\s*\{/,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body pre\.shiki[\s\S]*?clip-path:\s*inset\(0 round 1rem\)/m,
+    );
+  });
 });

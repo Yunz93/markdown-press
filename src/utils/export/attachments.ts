@@ -65,11 +65,13 @@ export async function enhanceExportAttachmentEmbeds(
     if (width) {
       image.style.width = `${width}px`;
       image.setAttribute("width", width);
+      image.setAttribute("data-wiki-embed-w", width);
     }
     if (height) {
       image.style.height = `${height}px`;
       image.style.objectFit = "contain";
       image.setAttribute("height", height);
+      image.setAttribute("data-wiki-embed-h", height);
     }
 
     embed.replaceWith(image);

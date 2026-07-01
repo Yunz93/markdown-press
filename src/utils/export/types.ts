@@ -1,7 +1,10 @@
-import type { FileNode } from "../../types";
+import type {
+  FileNode,
+  MarkdownStylePreset,
+  OrderedListMode,
+} from "../../types";
 import type { FontSettings } from "../fontSettings";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
-import type { MarkdownStylePreset } from "../../types";
 
 /** Vault file tree context for resolving wiki embeds and attachment paths during export. */
 export type ExportAttachmentContext = {
@@ -21,6 +24,7 @@ export interface ExportOptions {
   includeProperties?: boolean;
   highlighter?: ShikiHighlighter | null;
   markdownStylePreset?: MarkdownStylePreset;
+  orderedListMode?: OrderedListMode;
 }
 
 export interface SaveExportOptions {

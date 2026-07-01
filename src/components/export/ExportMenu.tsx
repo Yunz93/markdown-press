@@ -61,6 +61,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
             codeFontSize: Math.max(12, settings.fontSize - 2),
             highlighter,
             markdownStylePreset: settings.markdownStylePreset,
+            orderedListMode: settings.orderedListMode,
           });
           const savedPath = await exportToPdf(
             html,
@@ -110,6 +111,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
       codeFontFamily,
       settings.fontSize,
       settings.markdownStylePreset,
+      settings.orderedListMode,
       showNotification,
       highlighter,
       t,
