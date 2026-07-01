@@ -78,13 +78,15 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   // Reset save state when file changes
   useEffect(() => {
     lastSavedContentRef.current = content;
+    isSavingRef.current = false;
+    setSaving(false);
     saveStateRef.current = {
       status: "idle",
       lastSavedAt: null,
       error: null,
       retryCount: 0,
     };
-  }, [activeTabId]);
+  }, [activeTabId, setSaving]);
 
   // Execute save operation with retry logic
   const executeSave = useCallback(
@@ -106,15 +108,15 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           })
         : currentContent;
 
-      // Check if content has changed
-      if (preparedContent === lastSavedContentRef.current) {
-        return true; // No changes to save
-      }
-
       const contentToSave =
         options?.trigger === "auto"
           ? preparedContent
           : refreshDocumentUpdateTime(preparedContent);
+
+      // Check if content has changed (compare post-transform payload for manual saves)
+      if (contentToSave === lastSavedContentRef.current) {
+        return true; // No changes to save
+      }
 
       // Prevent concurrent saves
       if (isSavingRef.current) {
@@ -132,12 +134,12 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         }, "Auto-save failed");
 
         const latestContent = contentRef.current;
+        const userEditedDuringSave = latestContent !== currentContent;
 
-        if (latestContent === contentToSave) {
-          if (contentToSave !== currentContent) {
-            contentRef.current = contentToSave;
-            updateTabContent(activeTabId, contentToSave);
-          }
+        // Adopt formatted/timestamp-normalized output when the user did not keep typing.
+        if (!userEditedDuringSave && contentToSave !== currentContent) {
+          contentRef.current = contentToSave;
+          updateTabContent(activeTabId, contentToSave);
         }
 
         markAsSaved(activeTabId, contentToSave);
@@ -151,8 +153,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         isSavingRef.current = false;
         setSaving(false);
 
-        if (latestContent !== contentToSave) {
-          void executeSave(0, options);
+        if (userEditedDuringSave) {
+          void executeSave(0, { trigger: "auto" });
         }
 
         return true;
@@ -216,6 +218,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       showNotification,
       maxRetries,
       retryDelayMs,
+      settings.orderedListMode,
     ],
   );
 

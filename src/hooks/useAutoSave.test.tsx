@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import React from "react";
-import { render, act } from "@testing-library/react";
+import { render, act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../store/appStore";
 import { useAutoSave } from "./useAutoSave";
@@ -34,12 +34,40 @@ function Harness({ debounceMs }: { debounceMs?: number }) {
   return null;
 }
 
+function setupDocumentWithUpdateTime() {
+  const doc = [
+    "---",
+    "date modified: 2020-01-01 00:00:00",
+    "---",
+    "",
+    "Body",
+  ].join("\n");
+
+  const base = useAppStore.getState();
+  useAppStore.setState({
+    files: [],
+    openTabs: [NOTE_ID],
+    activeTabId: NOTE_ID,
+    currentFilePath: NOTE_ID,
+    fileContents: { [NOTE_ID]: doc },
+    lastSavedContent: { [NOTE_ID]: doc },
+    isSaving: false,
+    settings: { ...base.settings, autoSaveInterval: 60_000 },
+  });
+
+  return doc;
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
   writeFile.mockClear();
+  writeFile.mockImplementation(async () => {});
 });
 
 afterEach(() => {
+  cleanup();
+  vi.clearAllTimers();
   vi.useRealTimers();
   useAppStore.setState({
     files: [],
@@ -48,6 +76,7 @@ afterEach(() => {
     activeTabId: null,
     fileContents: {},
     lastSavedContent: {},
+    isSaving: false,
   });
 });
 
@@ -88,5 +117,80 @@ describe("useAutoSave", () => {
       await vi.advanceTimersByTimeAsync(300);
     });
     expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited");
+  });
+
+  it("manual save with update-time refresh does not loop or stay in saving state", async () => {
+    vi.setSystemTime(new Date("2026-05-11T12:34:56.000Z"));
+
+    setupDocumentWithUpdateTime();
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    writeFile.mockClear();
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "manual" });
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().isSaving).toBe(false);
+
+    const savedContent = writeFile.mock.calls[0]?.[1] as string;
+    expect(savedContent).toMatch(
+      /date modified: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"/,
+    );
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBe(savedContent);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().isSaving).toBe(false);
+  });
+
+  it("queues a single auto follow-up save when the user edits during manual save", async () => {
+    setupStore(60_000);
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "pending save");
+    });
+
+    let resolveWrite: (() => void) | undefined;
+    writeFile.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveWrite = resolve;
+        }),
+    );
+
+    await act(async () => {
+      const pending = saveHook!.forceSave(undefined, { trigger: "manual" });
+      await Promise.resolve();
+      act(() => {
+        useAppStore.getState().updateTabContent(NOTE_ID, "edited during save");
+      });
+      resolveWrite?.();
+      await pending;
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(2);
+    expect(writeFile).toHaveBeenNthCalledWith(1, NOTE_ID, "pending save");
+    expect(writeFile).toHaveBeenNthCalledWith(2, NOTE_ID, "edited during save");
+    expect(useAppStore.getState().isSaving).toBe(false);
   });
 });
