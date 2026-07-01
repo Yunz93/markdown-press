@@ -1,8 +1,19 @@
-import type { FileNode } from '../types';
-import { getFileSystem } from '../types/filesystem';
-import { createAttachmentResolverContext, resolveAttachmentTarget } from './attachmentResolver';
-import { extractAttachmentTargets, flattenFiles, isMarkdownFile } from './markdownLinkUtils';
-import { joinFsPath, normalizeSlashes, sanitizeResourceFolder } from './pathHelpers';
+import type { FileNode } from "../types";
+import { getFileSystem } from "../types/filesystem";
+import {
+  createAttachmentResolverContext,
+  resolveAttachmentTarget,
+} from "./attachmentResolver";
+import {
+  extractAttachmentTargets,
+  flattenFiles,
+  isMarkdownFile,
+} from "./markdownLinkUtils";
+import {
+  joinFsPath,
+  normalizeSlashes,
+  sanitizeResourceFolder,
+} from "./pathHelpers";
 
 interface FindUnusedAttachmentsOptions {
   files: FileNode[];
@@ -16,16 +27,20 @@ export interface UnusedAttachmentScanResult {
   resourceFolderName: string;
   attachmentFiles: FileNode[];
   unusedAttachments: FileNode[];
+  scanIncomplete?: boolean;
 }
 
 function isInsideFolder(path: string, folderPath: string): boolean {
   const normalizedPath = normalizeSlashes(path);
   const normalizedFolderPath = normalizeSlashes(folderPath);
-  return normalizedPath === normalizedFolderPath || normalizedPath.startsWith(`${normalizedFolderPath}/`);
+  return (
+    normalizedPath === normalizedFolderPath ||
+    normalizedPath.startsWith(`${normalizedFolderPath}/`)
+  );
 }
 
 export async function findUnusedAttachments(
-  options: FindUnusedAttachmentsOptions
+  options: FindUnusedAttachmentsOptions,
 ): Promise<UnusedAttachmentScanResult> {
   const {
     files,
@@ -33,7 +48,8 @@ export async function findUnusedAttachments(
     resourceFolder,
     fileContentOverrides = {},
   } = options;
-  const resourceFolderName = sanitizeResourceFolder(resourceFolder) || 'resources';
+  const resourceFolderName =
+    sanitizeResourceFolder(resourceFolder) || "resources";
   const resourceRootPath = joinFsPath(rootFolderPath, resourceFolderName);
   const normalizedResourceRootPath = normalizeSlashes(resourceRootPath);
   const fs = await getFileSystem();
@@ -41,13 +57,16 @@ export async function findUnusedAttachments(
   let attachmentFiles: FileNode[] = [];
 
   try {
-    attachmentFiles = flattenFiles(await fs.readDirectory(resourceRootPath, rootFolderPath));
+    attachmentFiles = flattenFiles(
+      await fs.readDirectory(resourceRootPath, rootFolderPath),
+    );
   } catch {
     return {
       resourceRootPath,
       resourceFolderName,
       attachmentFiles: [],
       unusedAttachments: [],
+      scanIncomplete: true,
     };
   }
 
@@ -64,20 +83,31 @@ export async function findUnusedAttachments(
   const usedAttachmentPaths = new Set<string>();
 
   for (const file of markdownFiles) {
-    let content = fileContentOverrides[file.path] ?? fileContentOverrides[file.id];
+    let content =
+      fileContentOverrides[file.path] ?? fileContentOverrides[file.id];
 
     if (content === undefined) {
       try {
         content = await fs.readFile(file.path);
       } catch {
-        continue;
+        return {
+          resourceRootPath,
+          resourceFolderName,
+          attachmentFiles,
+          unusedAttachments: [],
+          scanIncomplete: true,
+        };
       }
     }
 
     const targets = extractAttachmentTargets(content);
     if (targets.length === 0) continue;
 
-    const resolverContext = createAttachmentResolverContext(files, rootFolderPath, file.path);
+    const resolverContext = createAttachmentResolverContext(
+      files,
+      rootFolderPath,
+      file.path,
+    );
 
     for (const target of targets) {
       const resolved = await resolveAttachmentTarget(resolverContext, target);
@@ -94,6 +124,8 @@ export async function findUnusedAttachments(
     resourceRootPath,
     resourceFolderName,
     attachmentFiles,
-    unusedAttachments: attachmentFiles.filter((file) => !usedAttachmentPaths.has(normalizeSlashes(file.path))),
+    unusedAttachments: attachmentFiles.filter(
+      (file) => !usedAttachmentPaths.has(normalizeSlashes(file.path)),
+    ),
   };
 }

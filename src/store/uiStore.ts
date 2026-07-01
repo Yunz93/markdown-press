@@ -21,8 +21,6 @@ import { normalizeWikiFolder } from "../utils/wikiGeneration";
 import { normalizeTrashFolder } from "../utils/trashFolder";
 import { getPreferredShortcutModifierToken } from "../utils/shortcuts";
 
-let notificationTimer: ReturnType<typeof setTimeout> | null = null;
-
 function normalizeThemeMode(themeMode: unknown): AppSettings["themeMode"] {
   return themeMode === "dark" ? "dark" : "light";
 }
@@ -191,6 +189,8 @@ export function createUISlice(
   set: (fn: (state: UIState) => Partial<UIState>) => void,
   get: () => UIState & UIActions,
 ): UIState & UIActions {
+  let notificationTimer: ReturnType<typeof setTimeout> | null = null;
+
   return {
     ...initialUIState,
 

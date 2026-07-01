@@ -137,6 +137,22 @@ describe("SplitView scroll handshake", () => {
     });
   });
 
+  it("syncs editor scroll immediately when the preview scrolls in split mode", async () => {
+    renderSplitView();
+
+    await waitFor(() => {
+      expect(previewOnScroll).toBeTypeOf("function");
+    });
+
+    act(() => {
+      previewOnScroll?.(0.55);
+    });
+
+    expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.55, {
+      immediate: true,
+    });
+  });
+
   it("does not sync preview scroll when only the editor pane is visible", async () => {
     seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();

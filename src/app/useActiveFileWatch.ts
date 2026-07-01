@@ -59,8 +59,18 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
       const watcher = await watchFile(currentFilePath, async (event) => {
         if (disposed) return;
         if (event?.type === "deleted") {
+          const state = useAppStore.getState();
+          if (state.hasUnsavedChanges(activeTabId)) {
+            showNotification(
+              t("notifications_fileDeletedOnDiskUnsaved"),
+              "error",
+            );
+            void refreshFileTree();
+            return;
+          }
           closeTab(activeTabId);
           void refreshFileTree();
+          showNotification(t("notifications_fileDeletedOnDisk"), "error");
           return;
         }
         if (event?.type === "error") {
@@ -96,7 +106,7 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
             return;
           }
 
-          stateBeforeUpdate.updateTabContent(activeTabId, latestContent);
+          stateBeforeUpdate.setContentForFile(activeTabId, latestContent, true);
           stateBeforeUpdate.markAsSaved(activeTabId);
           showNotification(t("notifications_fileReloaded"), "success");
         } catch (error) {

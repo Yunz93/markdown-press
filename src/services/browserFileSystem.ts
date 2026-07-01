@@ -263,6 +263,9 @@ export class BrowserFileSystem implements IFileSystem {
    */
   async renameFile(oldPath: string, newName: string): Promise<string> {
     try {
+      const normalizedName = newName.endsWith(".md")
+        ? newName
+        : `${newName}.md`;
       // Read old content
       const content = await this.readFile(oldPath);
 
@@ -274,8 +277,8 @@ export class BrowserFileSystem implements IFileSystem {
           oldRelativePath.lastIndexOf("/"),
         );
         const newRelativePath = parentPath
-          ? `${parentPath}/${newName}`
-          : newName;
+          ? `${parentPath}/${normalizedName}`
+          : normalizedName;
 
         // Create new file
         const newHandle = await this.getFileHandle(
@@ -440,16 +443,14 @@ export class BrowserFileSystem implements IFileSystem {
             rootPath,
             nodeInTrash,
           );
-          if (children.length > 0 || nodeInTrash) {
-            nodes.push({
-              id: fullPath,
-              name,
-              type: "folder",
-              path: fullPath,
-              children,
-              isTrash: nodeInTrash,
-            });
-          }
+          nodes.push({
+            id: fullPath,
+            name,
+            type: "folder",
+            path: fullPath,
+            children,
+            isTrash: nodeInTrash,
+          });
         }
       }
 

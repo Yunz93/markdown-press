@@ -49,7 +49,12 @@ async fn publish_remote_simple_blog_via_github_api(
     publish_log("loading branch ref");
     let branch_ref: GitHubRefResponse = github_api_get(
         &client,
-        &format!("/repos/{}/{}/git/ref/heads/{}", owner, repo, branch),
+        &format!(
+            "/repos/{}/{}/git/ref/heads/{}",
+            owner,
+            repo,
+            percent_encode_component(branch)
+        ),
     )
     .await?;
     let current_commit_sha = branch_ref.object.sha;
@@ -146,7 +151,12 @@ async fn publish_remote_simple_blog_via_github_api(
     publish_log(format!("updating branch ref {}", branch));
     let _: GitHubRefResponse = github_api_patch(
         &client,
-        &format!("/repos/{}/{}/git/refs/heads/{}", owner, repo, branch),
+        &format!(
+            "/repos/{}/{}/git/refs/heads/{}",
+            owner,
+            repo,
+            percent_encode_component(branch)
+        ),
         &GitHubUpdateRefRequest {
             sha: create_commit.sha.clone(),
             force: false,
@@ -508,12 +518,9 @@ async fn build_github_tree_entries(
     let desired_path_set: BTreeSet<&str> = desired_paths.iter().map(String::as_str).collect();
     let asset_directory_relative_path =
         sanitize_relative_path(&request.asset_directory_relative_path)?;
-    let asset_directory_prefix = format!(
-        "{}/",
-        asset_directory_relative_path
-            .to_string_lossy()
-            .replace('\\', "/")
-    );
+    let asset_directory = asset_directory_relative_path
+        .to_string_lossy()
+        .replace('\\', "/");
     let mut entries = Vec::new();
 
     for file in files {
@@ -542,7 +549,9 @@ async fn build_github_tree_entries(
     }
 
     for path in current_files.keys() {
-        if path.starts_with(&asset_directory_prefix) && !desired_path_set.contains(path.as_str()) {
+        if path_is_under_asset_directory(path, &asset_directory)
+            && !desired_path_set.contains(path.as_str())
+        {
             entries.push(GitHubTreeEntry {
                 path: path.clone(),
                 mode: "100644".to_string(),
@@ -553,6 +562,19 @@ async fn build_github_tree_entries(
     }
 
     Ok(entries)
+}
+
+fn path_is_under_asset_directory(path: &str, asset_directory: &str) -> bool {
+    let asset_directory = asset_directory.trim_end_matches('/');
+    if asset_directory.is_empty() {
+        return false;
+    }
+    if path == asset_directory {
+        return true;
+    }
+    path.strip_prefix(asset_directory)
+        .map(|rest| rest.starts_with('/'))
+        .unwrap_or(false)
 }
 
 fn git_blob_sha(bytes: &[u8]) -> String {

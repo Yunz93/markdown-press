@@ -456,6 +456,8 @@ export default {
   settings_updatesInstallFailed: "安装更新失败：{error}",
 
   notifications_fileDeletedOnDisk: "文件已在本地被删除。",
+  notifications_fileDeletedOnDiskUnsaved:
+    "文件已在本地被删除，但当前标签页仍有未保存内容。请在关闭标签页前复制您的工作内容。",
   notifications_watchFileFailed: "监听本地文件变更失败。",
   notifications_watchDirectoryFailed: "监听知识库目录变更失败。",
   notifications_fileChangedOnDisk:
@@ -563,6 +565,8 @@ export default {
   notifications_folderMoved: "文件夹已移动",
   notifications_fileMoved: "文件已移动",
   notifications_linksUpdated: "已更新 {count} 个文件中的链接",
+  notifications_linksSkippedUnsaved:
+    "有 {count} 个文件因存在未保存更改而跳过了链接更新。",
   notifications_linkUpdateFailed: "部分链接更新失败",
   notifications_failedMoveFolder: "移动文件夹失败",
   notifications_failedMoveFile: "移动文件失败",

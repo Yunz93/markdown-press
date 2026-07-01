@@ -800,12 +800,12 @@ export const handleListShiftTab = (options?: {
 
       for (const item of items) {
         if (getIndentColumnWidth(item.indent) === 0) {
-          return replaceCurrentLine(
-            state,
-            dispatch,
-            `${item.quotePrefix ?? ""}${item.content}`,
-            item.quotePrefix?.length ?? 0,
-          );
+          updates.push({
+            item,
+            newItem: item,
+            newText: `${item.quotePrefix ?? ""}${item.content}`,
+          });
+          continue;
         }
 
         const newItem = getOutdentedOrderedItem(

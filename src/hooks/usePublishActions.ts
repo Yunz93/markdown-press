@@ -68,6 +68,11 @@ export function usePublishActions(
       let timeoutId: number | null = null;
       const publishPromise = invoke<T>(command, payload);
       publishInFlightRef.current = publishPromise;
+      void publishPromise.finally(() => {
+        if (publishInFlightRef.current === publishPromise) {
+          publishInFlightRef.current = null;
+        }
+      });
 
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = window.setTimeout(() => {
@@ -81,9 +86,6 @@ export function usePublishActions(
       } finally {
         if (timeoutId !== null) {
           window.clearTimeout(timeoutId);
-        }
-        if (publishInFlightRef.current === publishPromise) {
-          publishInFlightRef.current = null;
         }
       }
     },
@@ -120,9 +122,7 @@ export function usePublishActions(
         }
 
         stateAfterWrite.updateTabContent(fileId, linkedContent);
-        if (stateAfterWrite.fileContents[fileId] === linkedContent) {
-          stateAfterWrite.markAsSaved(fileId);
-        }
+        stateAfterWrite.markAsSaved(fileId, linkedContent);
         return true;
       } catch (error) {
         console.error("Failed to backfill publish metadata:", error);
@@ -214,6 +214,13 @@ export function usePublishActions(
     }
 
     setPublishing(true);
+    let publishCheckpointContent: string | null = null;
+    const rollbackPublishCheckpoint = async () => {
+      if (publishCheckpointContent === null) return;
+      setContentForFile(targetTabId, publishCheckpointContent);
+      await forceSave(publishCheckpointContent, { trigger: "system" });
+    };
+
     try {
       const { frontmatter, body } = parseFrontmatter(currentContent);
       const merged: Frontmatter = {
@@ -222,6 +229,7 @@ export function usePublishActions(
       };
       const nextContent = `${generateFrontmatter(merged)}${body}`;
       const previousContent = currentContent;
+      publishCheckpointContent = previousContent;
 
       setContentForFile(targetTabId, nextContent);
       const saved = await forceSave(nextContent, { trigger: "system" });
@@ -251,6 +259,7 @@ export function usePublishActions(
       );
 
       if (!hostingResult.ok) {
+        await rollbackPublishCheckpoint();
         if (hostingResult.reason === "hosting_not_configured") {
           showNotification(
             t(
@@ -280,6 +289,7 @@ export function usePublishActions(
           trigger: "system",
         });
         if (!savedHosting) {
+          await rollbackPublishCheckpoint();
           setContentForFile(targetTabId, beforeHostingContent);
           showNotification(
             t(
@@ -332,6 +342,7 @@ export function usePublishActions(
       );
 
       if (!publishedUrl) {
+        await rollbackPublishCheckpoint();
         showNotification(
           t(hydratedSettings.language, "notifications_publishUrlBuildFailed"),
           "error",
@@ -346,6 +357,7 @@ export function usePublishActions(
         "notifications_publishBackfillFailed",
       );
       if (!linkUpdated) {
+        await rollbackPublishCheckpoint();
         return;
       }
 
@@ -364,6 +376,10 @@ export function usePublishActions(
       }
     } catch (error) {
       console.error("Failed to publish blog:", error);
+      if (publishCheckpointContent !== null && targetTabId) {
+        setContentForFile(targetTabId, publishCheckpointContent);
+        await forceSave(publishCheckpointContent, { trigger: "system" });
+      }
       const message =
         error instanceof Error
           ? localizeKnownError(hydratedSettings.language, error.message)

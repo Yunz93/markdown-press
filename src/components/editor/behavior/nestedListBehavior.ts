@@ -117,21 +117,21 @@ function parseOrderedListMarker(
     return { value: parseInt(arabicMatch[1], 10), delimiter: arabicMatch[2] };
   }
 
+  // 罗马数字: i., ii), iv., etc.（须在单字符字母之前，否则 i. 会被误判为第 9 项）
+  const romanMatch = markerText.match(/^([ivxlcdm]+)([.)])$/i);
+  if (romanMatch) {
+    const romanValue = parseRomanNumeral(romanMatch[1]);
+    if (romanValue > 0) {
+      return { value: romanValue, delimiter: romanMatch[2] };
+    }
+  }
+
   // 小写字母: a., b), etc. (a=1, b=2, ...)
   const lowerAlphaMatch = markerText.match(/^([a-z])([.)])$/i);
   if (lowerAlphaMatch) {
     const charCode = lowerAlphaMatch[1].toLowerCase().charCodeAt(0) - 96; // 'a' = 97, so 97-96=1
     if (charCode >= 1 && charCode <= 26) {
       return { value: charCode, delimiter: lowerAlphaMatch[2] };
-    }
-  }
-
-  // 罗马数字: i., ii), iv., etc.
-  const romanMatch = markerText.match(/^([ivxlcdm]+)([.)])$/i);
-  if (romanMatch) {
-    const romanValue = parseRomanNumeral(romanMatch[1]);
-    if (romanValue > 0) {
-      return { value: romanValue, delimiter: romanMatch[2] };
     }
   }
 
@@ -585,7 +585,6 @@ function findParentCounterKey(
     const item = parseListItem(line.text, i, line.from);
 
     if (!item) {
-      if (isBlankLine(line.text)) return "root";
       continue;
     }
 
@@ -699,7 +698,9 @@ export function getStrictOrderedListNormalizationChanges(
 
     const markerColumn = (item.quotePrefix?.length ?? 0) + item.indent.length;
     const slice = line.text.slice(markerColumn);
-    const headMatch = slice.match(/^((?:\d+|[a-z]|[ivxlcdm]+)([.)])) /i);
+    const headMatch = slice.match(
+      /^(\d+|[a-z]|[ivxlcdm]+)([.)])(?:\s+(.*)|([A-Za-z\u4e00-\u9fff].*)|())$/i,
+    );
     if (!headMatch) continue;
 
     const style =
@@ -708,12 +709,20 @@ export function getStrictOrderedListNormalizationChanges(
       "decimal";
     const delim = item.delimiter ?? ".";
     const desired = formatOrderedMarkerValue(correctNumber, style, delim);
-    if (headMatch[1] === desired) continue;
+    const currentMarker = `${headMatch[1]}${headMatch[2]}`;
+    if (currentMarker === desired) continue;
 
-    const newText = `${line.text.slice(0, markerColumn)}${slice.replace(
-      /^(\d+|[a-z]|[ivxlcdm]+)([.)]) /i,
-      `${desired} `,
-    )}`;
+    const spacedContent = headMatch[3];
+    const tightContent = headMatch[4];
+    const emptyContent = headMatch[5];
+    const markerSeparator =
+      spacedContent !== undefined
+        ? " "
+        : tightContent !== undefined || emptyContent !== undefined
+          ? ""
+          : " ";
+    const rest = spacedContent ?? tightContent ?? emptyContent ?? "";
+    const newText = `${line.text.slice(0, markerColumn)}${desired}${markerSeparator}${rest}`;
 
     if (newText !== line.text) {
       changes.push({
@@ -828,7 +837,7 @@ export function findPreviousSiblingItem(
 ): ListItemInfo | null {
   for (let i = lineNumber - 1; i >= 1; i--) {
     const line = state.doc.line(i);
-    if (isBlankLine(line.text)) break;
+    if (isBlankLine(line.text)) continue;
 
     const item = parseListItem(line.text, i, line.from);
     if (!item) continue;
@@ -855,7 +864,7 @@ export function findNextSiblingItem(
 ): ListItemInfo | null {
   for (let i = lineNumber + 1; i <= state.doc.lines; i++) {
     const line = state.doc.line(i);
-    if (isBlankLine(line.text)) break;
+    if (isBlankLine(line.text)) continue;
 
     const item = parseListItem(line.text, i, line.from);
     if (!item) continue;

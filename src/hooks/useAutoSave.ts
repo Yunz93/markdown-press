@@ -4,6 +4,7 @@ import { getFileSystem } from "../types/filesystem";
 import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
 import { t } from "../utils/i18n";
+import { findFileInTree } from "../utils/fileTree";
 import {
   formatMarkdownForSave,
   isMarkdownDocumentPath,
@@ -214,17 +215,22 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   const executeSave = useCallback(
     async (retryCount = 0, options?: ForceSaveOptions): Promise<boolean> => {
       const currentContent = contentRef.current;
-      const currentPath = pathRef.current;
       const tabId = activeTabId;
+      const stateAtStart = useAppStore.getState();
+      const resolvedNode = tabId
+        ? findFileInTree(stateAtStart.files, tabId)
+        : undefined;
+      const savePath = resolvedNode?.path ?? pathRef.current;
 
-      if (!currentPath || !tabId) return false;
-      if (!isMarkdownDocumentPath(currentPath)) return false;
+      if (!savePath || !tabId) return false;
+      if (resolvedNode && resolvedNode.id !== tabId) return false;
+      if (!isMarkdownDocumentPath(savePath)) return false;
       if (!isTabContentLoaded(tabId)) return false;
 
       const shouldFormatBeforeSave =
         options?.trigger === "manual" &&
         options.formatBeforeSave === true &&
-        isMarkdownDocumentPath(currentPath);
+        isMarkdownDocumentPath(savePath);
 
       const preparedContent = shouldFormatBeforeSave
         ? formatMarkdownForSave(currentContent, {
@@ -259,10 +265,15 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       try {
         await withErrorHandling(async () => {
           const fs = await getFileSystem();
-          await fs.writeFile(currentPath, contentToSave);
+          await fs.writeFile(savePath, contentToSave);
         }, "Auto-save failed");
 
-        if (isSaveContextStale(generation, tabId, currentPath)) {
+        if (isSaveContextStale(generation, tabId, savePath)) {
+          const latestState = useAppStore.getState();
+          if (latestState.openTabs.includes(tabId)) {
+            markAsSaved(tabId, contentToSave);
+            lastSavedContentRef.current = contentToSave;
+          }
           isSavingRef.current = false;
           setSaving(false);
           notifySaveIdle();
@@ -296,7 +307,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       } catch (error) {
         console.error(`Auto-save failed (attempt ${retryCount + 1}):`, error);
 
-        if (isSaveContextStale(generation, tabId, currentPath)) {
+        if (isSaveContextStale(generation, tabId, savePath)) {
           isSavingRef.current = false;
           setSaving(false);
           notifySaveIdle();
@@ -312,7 +323,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
             setTimeout(resolve, retryDelayMs * Math.pow(2, retryCount)),
           );
 
-          if (isSaveContextStale(generation, tabId, currentPath)) {
+          if (isSaveContextStale(generation, tabId, savePath)) {
             isSavingRef.current = false;
             setSaving(false);
             notifySaveIdle();
@@ -449,6 +460,32 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     [executeSave, waitForSaveIdle],
   );
 
+  const saveOpenTabIfDirty = useCallback(
+    async (tabId: string): Promise<boolean> => {
+      const state = useAppStore.getState();
+      if (!state.hasUnsavedChanges(tabId)) {
+        return true;
+      }
+
+      const content = state.fileContents[tabId];
+      const node = findFileInTree(state.files, tabId);
+      if (content === undefined || !node || node.type !== "file") {
+        return false;
+      }
+
+      try {
+        const fs = await getFileSystem();
+        await fs.writeFile(node.path, content);
+        state.markAsSaved(tabId, content);
+        return true;
+      } catch (error) {
+        console.error(`Failed to save tab ${tabId}:`, error);
+        return false;
+      }
+    },
+    [],
+  );
+
   // Get save state
   const getSaveState = useCallback(
     (): SaveState => ({ ...saveStateRef.current }),
@@ -477,6 +514,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   return {
     isSaving,
     forceSave,
+    saveOpenTabIfDirty,
     getSaveState,
     restoreDraft,
     clearDraft,

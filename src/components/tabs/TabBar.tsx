@@ -12,6 +12,8 @@ import { buildFileMap, findFileInTree } from "../../utils/fileTree";
 
 interface TabBarProps {
   onToggleSidebar: () => void;
+  onBeforeCloseTab?: (fileId: string) => Promise<void>;
+  onBeforeCloseOtherTabs?: (keepFileId: string) => Promise<void>;
 }
 
 interface TabContextMenuState {
@@ -102,7 +104,7 @@ const TabContextMenu: React.FC<{
 };
 
 export const TabBar: React.FC<TabBarProps> = React.memo(
-  ({ onToggleSidebar }) => {
+  ({ onToggleSidebar, onBeforeCloseTab, onBeforeCloseOtherTabs }) => {
     const { t } = useI18n();
     void onToggleSidebar;
     const {
@@ -110,9 +112,9 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
       openTabs,
       activeTabId,
       setActiveTab,
+      activateTab,
       closeTab,
       closeOtherTabs,
-      setCurrentFilePath,
     } = useAppStore();
     const [contextMenu, setContextMenu] = useState<TabContextMenuState | null>(
       null,
@@ -125,19 +127,23 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
       (fileId: string) => {
         const file = fileMap.get(fileId);
         if (file) {
-          setActiveTab(fileId);
-          setCurrentFilePath(file.path);
+          activateTab(fileId, file.path);
         }
       },
-      [fileMap, setActiveTab, setCurrentFilePath],
+      [activateTab, fileMap],
     );
 
     const handleCloseTab = useCallback(
       (e: React.MouseEvent, fileId: string) => {
         e.stopPropagation();
-        closeTab(fileId);
+        void (async () => {
+          await onBeforeCloseTab?.(fileId);
+          if (useAppStore.getState().openTabs.includes(fileId)) {
+            closeTab(fileId);
+          }
+        })();
       },
-      [closeTab],
+      [closeTab, onBeforeCloseTab],
     );
 
     const handleTabContextMenu = useCallback(
@@ -151,13 +157,16 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
 
     const handleCloseOtherTabs = useCallback(
       (fileId: string) => {
-        const file = fileMap.get(fileId);
-        closeOtherTabs(fileId);
-        if (file) {
-          setCurrentFilePath(file.path);
-        }
+        void (async () => {
+          await onBeforeCloseOtherTabs?.(fileId);
+          const file = fileMap.get(fileId);
+          closeOtherTabs(fileId);
+          if (file) {
+            activateTab(fileId, file.path);
+          }
+        })();
       },
-      [closeOtherTabs, fileMap, setCurrentFilePath],
+      [activateTab, closeOtherTabs, fileMap, onBeforeCloseOtherTabs],
     );
 
     const handleTabStripKeyDown = useCallback(

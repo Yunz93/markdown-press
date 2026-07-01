@@ -16,6 +16,7 @@ export interface TabActions {
   closeTab: (fileId: string) => void;
   closeOtherTabs: (fileId: string) => void;
   setActiveTab: (fileId: string) => void;
+  activateTab: (fileId: string, filePath: string | null) => void;
   /**
    * Update a file's content WITHOUT recording undo history. `fileContents`
    * is the single source of truth for editor content (FileNode no longer
@@ -83,6 +84,14 @@ export function createTabSlice(
         delete newFileContents[fileId];
         delete newLastSavedContent[fileId];
 
+        const newFileHistories = {
+          ...(state as { fileHistories?: Record<string, unknown> })
+            .fileHistories,
+        };
+        if (newFileHistories && fileId in newFileHistories) {
+          delete newFileHistories[fileId];
+        }
+
         // If closing the active tab, activate adjacent tab
         let newActiveTabId = state.activeTabId;
         if (state.activeTabId === fileId) {
@@ -97,6 +106,7 @@ export function createTabSlice(
           activeTabId: newActiveTabId,
           fileContents: newFileContents,
           lastSavedContent: newLastSavedContent,
+          fileHistories: newFileHistories,
         };
       }),
 
@@ -112,12 +122,21 @@ export function createTabSlice(
           state.lastSavedContent[fileId] === undefined
             ? {}
             : { [fileId]: state.lastSavedContent[fileId] };
+        const nextFileHistories =
+          (state as { fileHistories?: Record<string, unknown> })
+            .fileHistories?.[fileId] !== undefined
+            ? {
+                [fileId]: (state as { fileHistories: Record<string, unknown> })
+                  .fileHistories[fileId],
+              }
+            : {};
 
         return {
           openTabs: [fileId],
           activeTabId: fileId,
           fileContents: nextFileContents,
           lastSavedContent: nextLastSavedContent,
+          fileHistories: nextFileHistories,
         };
       }),
 
@@ -125,6 +144,13 @@ export function createTabSlice(
       set((state) => ({
         activeTabId: fileId,
         openTabs: moveTabToFront(state.openTabs, fileId),
+      })),
+
+    activateTab: (fileId, filePath) =>
+      set((state) => ({
+        activeTabId: fileId,
+        openTabs: moveTabToFront(state.openTabs, fileId),
+        currentFilePath: filePath,
       })),
 
     updateTabContent: (fileId, content) =>

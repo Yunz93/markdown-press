@@ -66,6 +66,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const [visualMode, setVisualMode] = useState<ViewMode>(viewMode);
   const editorScrollPercentageRef = useRef(0);
   const previewScrollPercentageRef = useRef(0);
+  const scrollSyncSourceRef = useRef<"editor" | "preview" | null>(null);
   const transitionResyncTimerRef = useRef<number | null>(null);
   const transitionCleanupRef = useRef<(() => void) | null>(null);
   const scrollPositionsRef = useRef<
@@ -162,12 +163,27 @@ export const SplitView: React.FC<SplitViewProps> = ({
       previewScrollPercentageRef.current = percentage;
     }
     if (mode === ViewMode.SPLIT) {
+      scrollSyncSourceRef.current = "editor";
       previewPaneRef.current?.syncScrollTo(percentage, { immediate: true });
     }
   }, []);
 
   const handlePreviewScroll = useCallback((percentage: number) => {
+    if (scrollSyncSourceRef.current === "editor") {
+      scrollSyncSourceRef.current = null;
+      previewScrollPercentageRef.current = percentage;
+      return;
+    }
+
     previewScrollPercentageRef.current = percentage;
+    const mode = useAppStore.getState().viewMode;
+    if (mode !== ViewMode.EDITOR) {
+      editorScrollPercentageRef.current = percentage;
+    }
+    if (mode === ViewMode.SPLIT) {
+      scrollSyncSourceRef.current = "preview";
+      editorPaneRef.current?.syncScrollTo(percentage, { immediate: true });
+    }
   }, []);
 
   const cleanupTransition = useCallback(() => {

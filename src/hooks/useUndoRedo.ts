@@ -1,55 +1,55 @@
-import { useCallback, useEffect } from 'react';
-import { useAppStore, selectContent } from '../store/appStore';
+import { useCallback, useEffect } from "react";
+import { useAppStore, selectContent } from "../store/appStore";
 
 /**
  * Hook for undo/redo functionality
  * Integrates with the store's history state
  */
 export function useUndoRedo() {
-  const {
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    activeTabId
-  } = useAppStore();
+  const { undo, redo, canUndo, canRedo, activeTabId, fileHistories } =
+    useAppStore();
 
   // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.defaultPrevented) return;
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
 
-    const activeElement = document.activeElement as HTMLElement | null;
-    if (activeElement?.closest('.cm-editor')) return;
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (activeElement?.closest(".cm-editor")) return;
 
-    const isMod = e.ctrlKey || e.metaKey;
+      const isMod = e.ctrlKey || e.metaKey;
 
-    if (!isMod || !activeTabId) return;
+      if (!isMod || !activeTabId) return;
 
-    // Undo: Ctrl+Z or Cmd+Z (not Shift+Z for redo)
-    if (e.key === 'z' && !e.shiftKey) {
-      if (canUndo()) {
-        e.preventDefault();
-        undo();
+      // Undo: Ctrl+Z or Cmd+Z (not Shift+Z for redo)
+      if (e.key === "z" && !e.shiftKey) {
+        if (canUndo()) {
+          e.preventDefault();
+          undo();
+        }
       }
-    }
-    // Redo: Ctrl+Shift+Z or Cmd+Shift+Z, or Ctrl+Y
-    else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
-      if (canRedo()) {
-        e.preventDefault();
-        redo();
+      // Redo: Ctrl+Shift+Z or Cmd+Shift+Z, or Ctrl+Y
+      else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        if (canRedo()) {
+          e.preventDefault();
+          redo();
+        }
       }
-    }
-  }, [undo, redo, canUndo, canRedo, activeTabId]);
+    },
+    [undo, redo, canUndo, canRedo, activeTabId],
+  );
 
   // Set up global keyboard listener
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  const history = activeTabId ? fileHistories[activeTabId] : undefined;
+
   return {
-    canUndo: canUndo(),
-    canRedo: canRedo(),
+    canUndo: Boolean(history && history.past.length > 0),
+    canRedo: Boolean(history && history.future.length > 0),
     undo,
     redo,
   };

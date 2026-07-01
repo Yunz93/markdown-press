@@ -24,3 +24,35 @@ pub fn percent_encode_path(path: &str) -> String {
         .collect::<Vec<_>>()
         .join("/")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn percent_encode_component_escapes_spaces_and_unicode() {
+        assert_eq!(percent_encode_component("hello world"), "hello%20world");
+        assert_eq!(percent_encode_component("café"), "caf%C3%A9");
+    }
+
+    #[test]
+    fn percent_encode_component_preserves_unreserved_characters() {
+        assert_eq!(
+            percent_encode_component("A-z_0.~"),
+            "A-z_0.~"
+        );
+    }
+
+    #[test]
+    fn percent_encode_path_preserves_slashes() {
+        assert_eq!(
+            percent_encode_path("posts/my file/image.png"),
+            "posts/my%20file/image.png"
+        );
+    }
+
+    #[test]
+    fn percent_encode_component_encodes_branch_names() {
+        assert_eq!(percent_encode_component("feature/my-branch"), "feature%2Fmy-branch");
+    }
+}

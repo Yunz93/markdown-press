@@ -1,4 +1,5 @@
 import type { FileNode } from "../types";
+import { getPathBasename, getPathDirname } from "./pathHelpers";
 
 function collectTreePaths(nodes: FileNode[], paths: string[] = []): string[] {
   for (const node of nodes) {
@@ -14,6 +15,18 @@ export function buildFileTreeSignature(nodes: FileNode[]): string {
   return collectTreePaths(nodes).sort().join("\n");
 }
 
+function collectFilePaths(nodes: FileNode[], paths: string[] = []): string[] {
+  for (const node of nodes) {
+    if (node.type === "file") {
+      paths.push(node.path);
+    }
+    if (node.children) {
+      collectFilePaths(node.children, paths);
+    }
+  }
+  return paths;
+}
+
 export function collectRemovedOpenTabIds(
   previousTree: FileNode[],
   nextTree: FileNode[],
@@ -25,6 +38,56 @@ export function collectRemovedOpenTabIds(
     if (!node || node.type !== "file") return false;
     return !nextPaths.has(node.path);
   });
+}
+
+/**
+ * Detect likely external renames for open tabs by pairing removed paths with newly added file paths.
+ */
+export function detectOpenTabPathRemaps(
+  previousTree: FileNode[],
+  nextTree: FileNode[],
+  openTabs: string[],
+): Record<string, string> {
+  const prevFilePaths = new Set(collectFilePaths(previousTree));
+  const nextFilePaths = collectFilePaths(nextTree);
+  const addedPaths = nextFilePaths.filter((path) => !prevFilePaths.has(path));
+  const removedTabIds = collectRemovedOpenTabIds(
+    previousTree,
+    nextTree,
+    openTabs,
+  );
+
+  if (removedTabIds.length === 0 || addedPaths.length === 0) {
+    return {};
+  }
+
+  const remaps: Record<string, string> = {};
+  const usedAdded = new Set<string>();
+
+  for (const tabId of removedTabIds) {
+    const node = findFileInTree(previousTree, tabId);
+    if (!node) continue;
+
+    const sameNameMatch = addedPaths.find((path) => {
+      if (usedAdded.has(path)) return false;
+      return (
+        getPathBasename(path) === node.name &&
+        getPathDirname(path) === getPathDirname(node.path)
+      );
+    });
+    if (sameNameMatch) {
+      remaps[tabId] = sameNameMatch;
+      usedAdded.add(sameNameMatch);
+    }
+  }
+
+  const unmappedRemoved = removedTabIds.filter((id) => !remaps[id]);
+  const unusedAdded = addedPaths.filter((path) => !usedAdded.has(path));
+  if (unmappedRemoved.length === 1 && unusedAdded.length === 1) {
+    remaps[unmappedRemoved[0]] = unusedAdded[0];
+  }
+
+  return remaps;
 }
 
 /**
