@@ -65,6 +65,7 @@ Defaults below; the full list lives in **Settings → Shortcuts**.
 | `Cmd + Shift + H`                       | Export PDF                                         |
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | New note / new folder                              |
 | `Cmd/Ctrl + W`                          | Close tab                                          |
+| `Cmd/Ctrl + +` / `Cmd/Ctrl + -`         | Zoom UI text in / out                              |
 | `Cmd + Shift + -`                       | Clean unused attachments                           |
 | `Escape`                                | Close search panel, dialog, or menu                |
 

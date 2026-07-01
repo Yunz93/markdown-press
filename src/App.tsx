@@ -11,6 +11,7 @@ import { useFileSystem } from "./hooks/useFileSystem";
 import { useViewMode } from "./hooks/useViewMode";
 import { useSettings } from "./hooks/useSettings";
 import { useGlobalKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useUiFontSizeKeyboardShortcuts } from "./hooks/useUiFontSizeKeyboardShortcuts";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
@@ -229,6 +230,7 @@ const App: React.FC = () => {
     : false;
 
   // Global keyboard shortcuts
+  useUiFontSizeKeyboardShortcuts();
   useGlobalKeyboardShortcuts(
     async () => {
       if (currentFilePath) {

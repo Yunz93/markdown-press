@@ -14,6 +14,7 @@ import {
   normalizeStoredUiFontFamily,
 } from "../utils/fontSettings";
 import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from "../utils/blogRepo";
+import { clampUiFontSize } from "../utils/uiFontSize";
 import { normalizeShortcutConfigForPlatform } from "../utils/shortcuts";
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
@@ -150,7 +151,7 @@ export function resolvePersistedFontSettings(
     uiFontSize:
       typeof persistedSettings.uiFontSize === "number" &&
       Number.isFinite(persistedSettings.uiFontSize)
-        ? Math.min(22, Math.max(12, persistedSettings.uiFontSize))
+        ? clampUiFontSize(persistedSettings.uiFontSize)
         : defaultSettings.uiFontSize,
     editorFontFamily: resolvePersistedFontFamily(
       persistedSettings.editorFontFamily,
