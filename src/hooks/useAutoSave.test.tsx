@@ -193,4 +193,168 @@ describe("useAutoSave", () => {
     expect(writeFile).toHaveBeenNthCalledWith(2, NOTE_ID, "edited during save");
     expect(useAppStore.getState().isSaving).toBe(false);
   });
+
+  it("auto-saves after switching back to a tab with unsaved edits", async () => {
+    const NOTE_B = "/vault/other.md";
+    const base = useAppStore.getState();
+
+    useAppStore.setState({
+      files: [],
+      openTabs: [NOTE_ID, NOTE_B],
+      activeTabId: NOTE_ID,
+      currentFilePath: NOTE_ID,
+      fileContents: {
+        [NOTE_ID]: "edited locally",
+        [NOTE_B]: "other",
+      },
+      lastSavedContent: {
+        [NOTE_ID]: "original",
+        [NOTE_B]: "other",
+      },
+      settings: { ...base.settings, autoSaveInterval: 1000 },
+    });
+
+    render(<Harness debounceMs={1000} />);
+
+    act(() => {
+      useAppStore.getState().setActiveTab(NOTE_B);
+    });
+
+    act(() => {
+      useAppStore.getState().setActiveTab(NOTE_ID);
+    });
+
+    writeFile.mockClear();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited locally");
+  });
+
+  it("does not apply stale in-flight saves after switching tabs", async () => {
+    const NOTE_B = "/vault/other.md";
+    const base = useAppStore.getState();
+
+    useAppStore.setState({
+      files: [],
+      openTabs: [NOTE_ID, NOTE_B],
+      activeTabId: NOTE_ID,
+      currentFilePath: NOTE_ID,
+      fileContents: {
+        [NOTE_ID]: "tab-a",
+        [NOTE_B]: "tab-b",
+      },
+      lastSavedContent: {
+        [NOTE_ID]: "tab-a",
+        [NOTE_B]: "tab-b",
+      },
+      settings: { ...base.settings, autoSaveInterval: 60_000 },
+    });
+
+    let saveHook: ReturnType<typeof useAutoSave>;
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    let resolveWrite: (() => void) | undefined;
+    writeFile.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveWrite = resolve;
+        }),
+    );
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "tab-a-edited");
+    });
+
+    const pendingSave = act(async () => {
+      const promise = saveHook!.forceSave(undefined, { trigger: "manual" });
+      await Promise.resolve();
+      act(() => {
+        useAppStore.getState().setActiveTab(NOTE_B);
+        useAppStore.getState().setCurrentFilePath(NOTE_B);
+      });
+      resolveWrite?.();
+      await promise;
+    });
+
+    await pendingSave;
+
+    expect(useAppStore.getState().lastSavedContent[NOTE_B]).toBe("tab-b");
+    expect(useAppStore.getState().fileContents[NOTE_B]).toBe("tab-b");
+    expect(useAppStore.getState().lastSavedContent[NOTE_ID]).toBe("tab-a");
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBe("tab-a-edited");
+  });
+
+  it("drains a queued manual save after an in-flight save completes", async () => {
+    setupStore(60_000);
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "first");
+    });
+
+    let resolveFirst: (() => void) | undefined;
+    writeFile.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+
+    const firstSave = saveHook!.forceSave(undefined, { trigger: "manual" });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "second");
+    });
+
+    const secondSave = saveHook!.forceSave(undefined, { trigger: "manual" });
+
+    await act(async () => {
+      resolveFirst?.();
+      await firstSave;
+      await secondSave;
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(2);
+    expect(writeFile).toHaveBeenNthCalledWith(1, NOTE_ID, "first");
+    expect(writeFile).toHaveBeenNthCalledWith(2, NOTE_ID, "second");
+  });
+
+  it("skips auto-save while tab content is still loading", async () => {
+    const base = useAppStore.getState();
+    useAppStore.setState({
+      files: [],
+      openTabs: [NOTE_ID],
+      activeTabId: NOTE_ID,
+      currentFilePath: NOTE_ID,
+      fileContents: {},
+      lastSavedContent: {},
+      settings: { ...base.settings, autoSaveInterval: 300 },
+    });
+
+    render(<Harness debounceMs={300} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(writeFile).not.toHaveBeenCalled();
+  });
 });

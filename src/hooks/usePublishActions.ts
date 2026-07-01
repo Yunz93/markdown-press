@@ -110,13 +110,16 @@ export function usePublishActions(
         return true;
       }
 
-      stateBeforeWrite.updateTabContent(fileId, linkedContent);
-
       try {
         const fs = await getFileSystem();
         await fs.writeFile(filePath, linkedContent);
 
         const stateAfterWrite = useAppStore.getState();
+        if (!stateAfterWrite.openTabs.includes(fileId)) {
+          return true;
+        }
+
+        stateAfterWrite.updateTabContent(fileId, linkedContent);
         if (stateAfterWrite.fileContents[fileId] === linkedContent) {
           stateAfterWrite.markAsSaved(fileId);
         }
@@ -134,8 +137,9 @@ export function usePublishActions(
 
   const handlePublishSimpleBlog = useCallback(async () => {
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+    const targetTabId = activeTabId;
 
-    if (!activeTabId) {
+    if (!targetTabId) {
       showNotification(
         t(hydratedSettings.language, "notifications_noFileToPublish"),
         "error",
@@ -191,7 +195,7 @@ export function usePublishActions(
       return;
     }
 
-    const currentContent = useAppStore.getState().fileContents[activeTabId];
+    const currentContent = useAppStore.getState().fileContents[targetTabId];
     if (!currentContent) {
       showNotification(
         t(hydratedSettings.language, "notifications_noContentToPublish"),
@@ -200,7 +204,7 @@ export function usePublishActions(
       return;
     }
 
-    const activeFile = findFileInTree(files, activeTabId);
+    const activeFile = findFileInTree(files, targetTabId);
     if (!activeFile) {
       showNotification(
         t(hydratedSettings.language, "notifications_noFileToPublish"),
@@ -217,10 +221,12 @@ export function usePublishActions(
         is_publish: true,
       };
       const nextContent = `${generateFrontmatter(merged)}${body}`;
+      const previousContent = currentContent;
 
-      setContentForFile(activeTabId, nextContent);
-      const saved = await forceSave(nextContent);
+      setContentForFile(targetTabId, nextContent);
+      const saved = await forceSave(nextContent, { trigger: "system" });
       if (!saved) {
+        setContentForFile(targetTabId, previousContent);
         showNotification(
           t(hydratedSettings.language, "notifications_saveBeforePublishFailed"),
           "error",
@@ -230,7 +236,7 @@ export function usePublishActions(
 
       const storeState = useAppStore.getState();
       const contentToPublish =
-        storeState.fileContents[activeTabId] ?? nextContent;
+        storeState.fileContents[targetTabId] ?? nextContent;
       const latestFiles = storeState.files;
       const latestRootFolderPath = storeState.rootFolderPath;
 
@@ -266,9 +272,15 @@ export function usePublishActions(
 
       let markdownForPublish = hostingResult.markdown;
       if (markdownForPublish !== contentToPublish) {
-        setContentForFile(activeTabId, markdownForPublish);
-        const savedHosting = await forceSave(markdownForPublish);
+        const beforeHostingContent =
+          useAppStore.getState().fileContents[targetTabId] ?? contentToPublish;
+
+        setContentForFile(targetTabId, markdownForPublish);
+        const savedHosting = await forceSave(markdownForPublish, {
+          trigger: "system",
+        });
         if (!savedHosting) {
+          setContentForFile(targetTabId, beforeHostingContent);
           showNotification(
             t(
               hydratedSettings.language,
@@ -279,7 +291,7 @@ export function usePublishActions(
           return;
         }
         markdownForPublish =
-          useAppStore.getState().fileContents[activeTabId] ??
+          useAppStore.getState().fileContents[targetTabId] ??
           markdownForPublish;
       }
 
@@ -328,7 +340,7 @@ export function usePublishActions(
       }
 
       const linkUpdated = await backfillFrontmatter(
-        activeTabId,
+        targetTabId,
         activeFile.path,
         { link: publishedUrl },
         "notifications_publishBackfillFailed",
@@ -374,8 +386,9 @@ export function usePublishActions(
   const handlePublishWechatDraft = useCallback(
     async (input: WechatDraftPublishInput) => {
       const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      const targetTabId = activeTabId;
 
-      if (!activeTabId) {
+      if (!targetTabId) {
         showNotification(
           t(hydratedSettings.language, "notifications_noFileToPublish"),
           "error",
@@ -415,7 +428,7 @@ export function usePublishActions(
         return false;
       }
 
-      const currentContent = useAppStore.getState().fileContents[activeTabId];
+      const currentContent = useAppStore.getState().fileContents[targetTabId];
       if (!currentContent) {
         showNotification(
           t(hydratedSettings.language, "notifications_noContentToPublish"),
@@ -424,7 +437,7 @@ export function usePublishActions(
         return false;
       }
 
-      const activeFile = findFileInTree(files, activeTabId);
+      const activeFile = findFileInTree(files, targetTabId);
       if (!activeFile) {
         showNotification(
           t(hydratedSettings.language, "notifications_noFileToPublish"),
@@ -435,7 +448,7 @@ export function usePublishActions(
 
       setPublishing(true);
       try {
-        const saved = await forceSave();
+        const saved = await forceSave(undefined, { trigger: "system" });
         if (!saved) {
           showNotification(
             t(
@@ -449,7 +462,7 @@ export function usePublishActions(
 
         const storeState = useAppStore.getState();
         const latestContent =
-          storeState.fileContents[activeTabId] ?? currentContent;
+          storeState.fileContents[targetTabId] ?? currentContent;
         const prepared = await prepareWechatDraftPublish({
           files: storeState.files,
           rootFolderPath: storeState.rootFolderPath,
@@ -488,7 +501,7 @@ export function usePublishActions(
         );
 
         const backfilled = await backfillFrontmatter(
-          activeTabId,
+          targetTabId,
           activeFile.path,
           {
             wechat_draft_media_id: result.mediaId,

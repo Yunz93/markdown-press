@@ -274,9 +274,20 @@ const App: React.FC = () => {
         void fileOps.handleNewFolder(undefined, t("app_untitledFolder"));
       },
       onCloseTab: () => {
-        if (activeTabId) {
-          closeTab(activeTabId);
-        }
+        if (!activeTabId) return;
+
+        const tabToClose = activeTabId;
+        void (async () => {
+          const state = useAppStore.getState();
+          if (state.hasUnsavedChanges(tabToClose)) {
+            await forceSave(undefined, { trigger: "system" });
+          }
+
+          const latestState = useAppStore.getState();
+          if (latestState.openTabs.includes(tabToClose)) {
+            closeTab(tabToClose);
+          }
+        })();
       },
       onOpenKnowledgeBase: () => {
         void handleSwitchKnowledgeBase();
