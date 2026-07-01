@@ -1,6 +1,13 @@
 import { useEffect } from "react";
 import { useAppStore } from "../store/appStore";
-import { collectRemovedOpenTabIds } from "../utils/fileTree";
+import {
+  collectRemovedOpenTabIds,
+  detectOpenTabPathRemaps,
+} from "../utils/fileTree";
+import {
+  buildTabPathRemapState,
+  migrateDraftBackupKeys,
+} from "../utils/pathRemap";
 import type { DirectoryWatchEvent } from "../types/filesystem";
 import type { TranslationKey } from "../utils/i18n";
 
@@ -35,18 +42,50 @@ export function useKnowledgeBaseWatch(
         }
 
         const state = useAppStore.getState();
-        const removedTabIds = collectRemovedOpenTabIds(
+        const pathRemaps = detectOpenTabPathRemaps(
           state.files,
           event.tree,
           state.openTabs,
         );
-
-        state.setFiles(event.tree);
-
-        if (removedTabIds.length > 0) {
-          removedTabIds.forEach((tabId) => state.closeTab(tabId));
-          showNotification(t("notifications_fileDeletedOnDisk"), "error");
+        if (Object.keys(pathRemaps).length > 0) {
+          useAppStore.setState((current) =>
+            buildTabPathRemapState(current, pathRemaps),
+          );
+          migrateDraftBackupKeys(pathRemaps);
         }
+
+        const latestState = useAppStore.getState();
+        const removedTabIds = collectRemovedOpenTabIds(
+          latestState.files,
+          event.tree,
+          latestState.openTabs,
+        ).filter((tabId) => !pathRemaps[tabId]);
+
+        latestState.setFiles(event.tree);
+
+        if (removedTabIds.length === 0) {
+          return;
+        }
+
+        const tabsWithUnsavedChanges: string[] = [];
+        removedTabIds.forEach((tabId) => {
+          const current = useAppStore.getState();
+          if (current.hasUnsavedChanges(tabId)) {
+            tabsWithUnsavedChanges.push(tabId);
+            return;
+          }
+          current.closeTab(tabId);
+        });
+
+        if (tabsWithUnsavedChanges.length > 0) {
+          showNotification(
+            t("notifications_fileDeletedOnDiskUnsaved"),
+            "error",
+          );
+          return;
+        }
+
+        showNotification(t("notifications_fileDeletedOnDisk"), "error");
       });
 
       if (disposed) {

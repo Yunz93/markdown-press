@@ -221,7 +221,7 @@ export function useFileSystem() {
     clearAllCache,
     showNotification,
     addTab,
-    setActiveTab,
+    activateTab,
     setViewMode,
     settings,
   } = useAppStore();
@@ -314,8 +314,7 @@ export function useFileSystem() {
       try {
         const existingState = useAppStore.getState();
         if (existingState.openTabs.includes(path)) {
-          setActiveTab(path);
-          setCurrentFilePath(path);
+          activateTab(path, path);
           return path;
         }
 
@@ -356,8 +355,7 @@ export function useFileSystem() {
       }
     },
     [
-      setActiveTab,
-      setCurrentFilePath,
+      activateTab,
       setFiles,
       addTab,
       showNotification,

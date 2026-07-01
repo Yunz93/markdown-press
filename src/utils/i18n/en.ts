@@ -489,6 +489,8 @@ export default {
   settings_updatesInstallFailed: "Failed to install the update: {error}",
 
   notifications_fileDeletedOnDisk: "The file was deleted on disk.",
+  notifications_fileDeletedOnDiskUnsaved:
+    "The file was deleted on disk, but this tab still has unsaved changes. Copy your work before closing the tab.",
   notifications_watchFileFailed: "Failed to watch file changes on disk.",
   notifications_watchDirectoryFailed:
     "Failed to watch knowledge base directory changes on disk.",
@@ -617,6 +619,8 @@ export default {
   notifications_folderMoved: "Folder moved",
   notifications_fileMoved: "File moved",
   notifications_linksUpdated: "Updated links in {count} files",
+  notifications_linksSkippedUnsaved:
+    "Skipped link updates in {count} files with unsaved changes.",
   notifications_linkUpdateFailed: "Failed to update some links",
   notifications_failedMoveFolder: "Failed to move folder",
   notifications_failedMoveFile: "Failed to move file",

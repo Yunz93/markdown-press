@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("useKnowledgeBaseWatch", () => {
-  it("syncs the file tree and closes tabs when files are removed on disk", async () => {
+  it("syncs the file tree and closes tabs when saved files are removed on disk", async () => {
     const watched = {
       callback: null as ((event: DirectoryWatchEvent) => void) | null,
     };
@@ -92,6 +92,67 @@ describe("useKnowledgeBaseWatch", () => {
       expect(useAppStore.getState().openTabs).toEqual([otherNote.id]);
       expect(showNotification).toHaveBeenCalledWith(
         "notifications_fileDeletedOnDisk",
+        "error",
+      );
+    });
+  });
+
+  it("keeps tabs with unsaved changes when files are removed on disk", async () => {
+    const watched = {
+      callback: null as ((event: DirectoryWatchEvent) => void) | null,
+    };
+    const showNotification = vi.fn();
+    const watchDirectory = vi.fn(
+      async (
+        _dirPath: string,
+        callback: (event: DirectoryWatchEvent) => void,
+      ) => {
+        watched.callback = callback;
+        return vi.fn();
+      },
+    );
+
+    useAppStore.setState({
+      files: [note, otherNote],
+      rootFolderPath: "/vault",
+      openTabs: [note.id, otherNote.id],
+      activeTabId: note.id,
+      fileContents: {
+        [note.id]: "# Note\n",
+        [otherNote.id]: "# Other\nunsaved",
+      },
+      lastSavedContent: {
+        [note.id]: "# Note\n",
+        [otherNote.id]: "# Other\n",
+      },
+    });
+
+    function Harness() {
+      useKnowledgeBaseWatch({
+        rootFolderPath: "/vault",
+        watchDirectory,
+        showNotification,
+        t: (key) => key,
+      });
+
+      return null;
+    }
+
+    render(React.createElement(Harness));
+
+    await waitFor(() => {
+      expect(watched.callback).not.toBeNull();
+    });
+
+    const emitDirectoryEvent = watched.callback as (
+      event: DirectoryWatchEvent,
+    ) => void;
+    emitDirectoryEvent({ type: "changed", tree: [note] });
+
+    await waitFor(() => {
+      expect(useAppStore.getState().openTabs).toContain(otherNote.id);
+      expect(showNotification).toHaveBeenCalledWith(
+        "notifications_fileDeletedOnDiskUnsaved",
         "error",
       );
     });

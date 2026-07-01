@@ -215,9 +215,6 @@ export async function hydrateSensitiveSettingsIntoStore(
   const backendReady = await ensureSecureSettingsBackendReady();
 
   if (hasLoadedSecureSettingsFromBackend) {
-    if (secureSettingsCache) {
-      useAppStore.getState().updateSettings(secureSettingsCache);
-    }
     return useAppStore.getState().settings;
   }
 

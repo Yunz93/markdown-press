@@ -23,7 +23,10 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
   const codeFontFamily = buildCodeExportFontFamily(settings);
 
   const handleExportToPdf = useCallback(async () => {
-    if (!activeTabId || !content) {
+    if (
+      !activeTabId ||
+      useAppStore.getState().fileContents[activeTabId] === undefined
+    ) {
       showNotification(
         t(settings.language, "notifications_noFileToExport"),
         "error",
@@ -102,7 +105,10 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
 
   const buildLongImageSharePayload =
     useCallback(async (): Promise<LongImageSharePayload | null> => {
-      if (!activeTabId || !content) {
+      if (
+        !activeTabId ||
+        useAppStore.getState().fileContents[activeTabId] === undefined
+      ) {
         showNotification(
           t(settings.language, "notifications_noFileToExport"),
           "error",

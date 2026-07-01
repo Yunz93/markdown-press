@@ -233,7 +233,7 @@ describe("useAutoSave", () => {
     expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited locally");
   });
 
-  it("does not apply stale in-flight saves after switching tabs", async () => {
+  it("marks the original tab saved when an in-flight save completes after switching tabs", async () => {
     const NOTE_B = "/vault/other.md";
     const base = useAppStore.getState();
 
@@ -288,7 +288,9 @@ describe("useAutoSave", () => {
 
     expect(useAppStore.getState().lastSavedContent[NOTE_B]).toBe("tab-b");
     expect(useAppStore.getState().fileContents[NOTE_B]).toBe("tab-b");
-    expect(useAppStore.getState().lastSavedContent[NOTE_ID]).toBe("tab-a");
+    expect(useAppStore.getState().lastSavedContent[NOTE_ID]).toBe(
+      "tab-a-edited",
+    );
     expect(useAppStore.getState().fileContents[NOTE_ID]).toBe("tab-a-edited");
   });
 

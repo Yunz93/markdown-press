@@ -1,4 +1,5 @@
 import type { FileNode } from "../types";
+import { remapPathBoundarySafe } from "../utils/pathRemap";
 
 /**
  * File store state interface
@@ -59,9 +60,11 @@ export function createFileSlice(
           return { files: [...state.files, file] };
         }
 
+        let parentFound = false;
         const addToTree = (nodes: FileNode[]): FileNode[] =>
           nodes.map((node) => {
             if (node.path === parentPath) {
+              parentFound = true;
               return { ...node, children: [...(node.children || []), file] };
             }
             if (node.children) {
@@ -69,7 +72,19 @@ export function createFileSlice(
             }
             return node;
           });
-        return { files: addToTree(state.files) };
+
+        if (!parentPath || parentPath === state.rootFolderPath) {
+          return { files: [...state.files, file] };
+        }
+
+        const nextFiles = addToTree(state.files);
+        if (!parentFound) {
+          const alreadyPresent = state.files.some(
+            (node) => node.id === file.id,
+          );
+          return alreadyPresent ? state : { files: [...state.files, file] };
+        }
+        return { files: nextFiles };
       });
     },
 
@@ -94,14 +109,16 @@ export function createFileSlice(
           oldBasePath: string,
           nextBasePath: string,
         ): FileNode => {
-          const nextPath =
-            node.path === oldBasePath
-              ? nextBasePath
-              : node.path.replace(oldBasePath, nextBasePath);
-          const nextId =
-            node.id === oldBasePath
-              ? nextBasePath
-              : node.id.replace(oldBasePath, nextBasePath);
+          const nextPath = remapPathBoundarySafe(
+            node.path,
+            oldBasePath,
+            nextBasePath,
+          );
+          const nextId = remapPathBoundarySafe(
+            node.id,
+            oldBasePath,
+            nextBasePath,
+          );
 
           return {
             ...node,

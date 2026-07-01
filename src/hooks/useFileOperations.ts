@@ -10,6 +10,10 @@ import { findAndRewriteAffectedFiles } from "../utils/linkRewriter";
 import { parseMetadataTemplateValue } from "../utils/metadataFields";
 import { findFileInTree } from "../utils/fileTree";
 import {
+  buildTabPathRemapState,
+  migrateDraftBackupKeys,
+} from "../utils/pathRemap";
+import {
   isHtmlFile,
   isMarkdownFile,
   isPreviewOnlyFile,
@@ -49,19 +53,6 @@ function buildMovedPathMap(
 
   visit(sourceNode);
   return pathMap;
-}
-
-function remapRecordKeys<T>(
-  record: Record<string, T>,
-  remapPath: (path: string) => string,
-): Record<string, T> {
-  const nextRecord: Record<string, T> = {};
-
-  for (const [key, value] of Object.entries(record)) {
-    nextRecord[remapPath(key)] = value;
-  }
-
-  return nextRecord;
 }
 
 function collectAffectedOpenTabIds(
@@ -282,32 +273,8 @@ export function useFileOperations() {
 
   const remapPathReferencesAfterMove = useCallback(
     (pathMap: Record<string, string>) => {
-      useAppStore.setState((state) => {
-        const remapPath = (path: string): string => pathMap[path] ?? path;
-
-        const remappedOpenTabs = state.openTabs.map(remapPath);
-        const nextOpenTabs = remappedOpenTabs.filter(
-          (tabId, index) => remappedOpenTabs.indexOf(tabId) === index,
-        );
-        const nextActiveTabId = state.activeTabId
-          ? remapPath(state.activeTabId)
-          : null;
-        const validatedActiveTabId =
-          nextActiveTabId && nextOpenTabs.includes(nextActiveTabId)
-            ? nextActiveTabId
-            : (nextOpenTabs[0] ?? null);
-
-        return {
-          openTabs: nextOpenTabs,
-          activeTabId: validatedActiveTabId,
-          currentFilePath: state.currentFilePath
-            ? remapPath(state.currentFilePath)
-            : null,
-          fileContents: remapRecordKeys(state.fileContents, remapPath),
-          lastSavedContent: remapRecordKeys(state.lastSavedContent, remapPath),
-          fileHistories: remapRecordKeys(state.fileHistories, remapPath),
-        };
-      });
+      useAppStore.setState((state) => buildTabPathRemapState(state, pathMap));
+      migrateDraftBackupKeys(pathMap);
     },
     [],
   );
@@ -330,10 +297,12 @@ export function useFileOperations() {
         if (result.modifiedFiles.length === 0) return;
 
         const appliedMods: typeof result.modifiedFiles = [];
+        const skippedUnsaved: string[] = [];
 
         for (const mod of result.modifiedFiles) {
           const stateNow = useAppStore.getState();
           if (stateNow.hasUnsavedChanges(mod.path)) {
+            skippedUnsaved.push(mod.path);
             continue;
           }
 
@@ -341,7 +310,17 @@ export function useFileOperations() {
           appliedMods.push(mod);
         }
 
-        if (appliedMods.length === 0) return;
+        if (appliedMods.length === 0) {
+          if (skippedUnsaved.length > 0) {
+            showNotification(
+              t(settings.language, "notifications_linksSkippedUnsaved", {
+                count: String(skippedUnsaved.length),
+              }),
+              "error",
+            );
+          }
+          return;
+        }
 
         useAppStore.setState((s) => {
           const nextContents = { ...s.fileContents };

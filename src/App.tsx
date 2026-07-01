@@ -143,7 +143,7 @@ const App: React.FC = () => {
     t,
   });
 
-  const { forceSave } = useAutoSave({ enabled: true });
+  const { forceSave, saveOpenTabIfDirty } = useAutoSave({ enabled: true });
   const { handleExportToPdf, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
@@ -231,6 +231,31 @@ const App: React.FC = () => {
     showNotification,
     t,
   });
+
+  const handleBeforeCloseTab = useCallback(
+    async (tabId: string) => {
+      const state = useAppStore.getState();
+      if (tabId === state.activeTabId) {
+        if (state.hasUnsavedChanges(tabId)) {
+          await forceSave(undefined, { trigger: "system" });
+        }
+        return;
+      }
+      await saveOpenTabIfDirty(tabId);
+    },
+    [forceSave, saveOpenTabIfDirty],
+  );
+
+  const handleBeforeCloseOtherTabs = useCallback(
+    async (keepFileId: string) => {
+      const tabs = useAppStore.getState().openTabs;
+      for (const tabId of tabs) {
+        if (tabId === keepFileId) continue;
+        await handleBeforeCloseTab(tabId);
+      }
+    },
+    [handleBeforeCloseTab],
+  );
 
   const activeFile = activeTabId
     ? findFileInTree(files, activeTabId)
@@ -592,7 +617,11 @@ const App: React.FC = () => {
               isPreviewOnlyFile={isPreviewOnlyActiveFile}
             />
 
-            <TabBar onToggleSidebar={() => setSidebarOpen(true)} />
+            <TabBar
+              onToggleSidebar={() => setSidebarOpen(true)}
+              onBeforeCloseTab={handleBeforeCloseTab}
+              onBeforeCloseOtherTabs={handleBeforeCloseOtherTabs}
+            />
 
             <div className="flex-1 min-w-0 flex overflow-hidden relative">
               <SplitView

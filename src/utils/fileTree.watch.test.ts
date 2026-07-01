@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { FileNode } from "../types";
-import { buildFileTreeSignature, collectRemovedOpenTabIds } from "./fileTree";
+import {
+  buildFileTreeSignature,
+  collectRemovedOpenTabIds,
+  detectOpenTabPathRemaps,
+} from "./fileTree";
 
 const folder: FileNode = {
   id: "/vault/docs",
@@ -24,6 +28,13 @@ const note: FileNode = {
   type: "file",
 };
 
+const renamedNote: FileNode = {
+  id: "/vault/renamed.md",
+  name: "renamed.md",
+  path: "/vault/renamed.md",
+  type: "file",
+};
+
 describe("buildFileTreeSignature", () => {
   it("changes when a file is removed from the tree", () => {
     const before = buildFileTreeSignature([folder, note]);
@@ -42,5 +53,13 @@ describe("collectRemovedOpenTabIds", () => {
     );
 
     expect(removed).toEqual([note.id, "/vault/docs/guide.md"]);
+  });
+});
+
+describe("detectOpenTabPathRemaps", () => {
+  it("pairs a single removed open tab with a single added file path", () => {
+    const remaps = detectOpenTabPathRemaps([note], [renamedNote], [note.id]);
+
+    expect(remaps).toEqual({ [note.id]: renamedNote.path });
   });
 });
