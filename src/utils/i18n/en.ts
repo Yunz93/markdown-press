@@ -484,6 +484,8 @@ export default {
 
   notifications_fileDeletedOnDisk: "The file was deleted on disk.",
   notifications_watchFileFailed: "Failed to watch file changes on disk.",
+  notifications_watchDirectoryFailed:
+    "Failed to watch knowledge base directory changes on disk.",
   notifications_fileChangedOnDisk:
     "The file changed on disk. Save or discard local edits before reloading.",
   notifications_fileReloaded: "Reloaded the file from disk.",

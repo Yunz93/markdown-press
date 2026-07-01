@@ -1,9 +1,13 @@
-import type { FileNode } from '../types';
+import type { FileNode } from "../types";
 
 export type FileWatchEvent =
-  | { path: string; type: 'modified' }
-  | { path: string; type: 'deleted' }
-  | { path: string; type: 'error'; error: unknown };
+  | { path: string; type: "modified" }
+  | { path: string; type: "deleted" }
+  | { path: string; type: "error"; error: unknown };
+
+export type DirectoryWatchEvent =
+  | { type: "changed"; tree: FileNode[] }
+  | { type: "error"; error: unknown };
 
 /**
  * Unified file system interface
@@ -20,7 +24,11 @@ export interface IFileSystem {
   getFileObjectUrl?(path: string): Promise<string>;
   saveFile(path: string | null, content: string): Promise<string | null>;
   renameFile(oldPath: string, newName: string): Promise<string>;
-  renameEntry?(oldPath: string, newName: string, isDirectory: boolean): Promise<string>;
+  renameEntry?(
+    oldPath: string,
+    newName: string,
+    isDirectory: boolean,
+  ): Promise<string>;
   deleteFile(path: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
   readDirectory(dirPath: string, rootPath?: string): Promise<FileNode[]>;
@@ -28,7 +36,14 @@ export interface IFileSystem {
   createDirectory(path: string): Promise<void>;
   revealInExplorer?(path: string): Promise<void>;
   moveFile?(sourcePath: string, targetPath: string): Promise<string>;
-  watchFile?(path: string, callback: (event: FileWatchEvent | null) => void): Promise<() => void>;
+  watchFile?(
+    path: string,
+    callback: (event: FileWatchEvent | null) => void,
+  ): Promise<() => void>;
+  watchDirectory?(
+    dirPath: string,
+    callback: (event: DirectoryWatchEvent) => void,
+  ): Promise<() => void>;
   /**
    * Copy sample notes from bundled resources to target directory
    * Only available in Tauri environment
@@ -41,13 +56,13 @@ export interface IFileSystem {
  * Supports both Tauri 1.x (__TAURI__) and Tauri 2.x (__TAURI_INTERNALS__)
  */
 export function isTauriEnvironment(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
 
   // Check for Tauri 2.x
-  if ('__TAURI_INTERNALS__' in window) return true;
+  if ("__TAURI_INTERNALS__" in window) return true;
 
   // Check for Tauri 1.x
-  if ('__TAURI__' in window) return true;
+  if ("__TAURI__" in window) return true;
 
   // Check for Tauri APIs directly
   if ((window as any).__TAURI_INTERNALS__?.plugins) return true;
@@ -64,15 +79,15 @@ async function isTauriCoreReady(): Promise<boolean> {
 
   try {
     // Try to import and invoke a simple Tauri command to verify core is ready
-    const { invoke } = await import('@tauri-apps/api/core');
+    const { invoke } = await import("@tauri-apps/api/core");
     // Ping the backend to verify connection is established
-    await invoke('ping');
+    await invoke("ping");
     return true;
   } catch {
     // If ping doesn't exist or fails, check if we can at least import core
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      return typeof invoke === 'function';
+      const { invoke } = await import("@tauri-apps/api/core");
+      return typeof invoke === "function";
     } catch {
       return false;
     }
@@ -116,7 +131,7 @@ export async function waitForTauri(maxWaitMs: number = 5000): Promise<boolean> {
  * Check if File System Access API is supported
  */
 export function isFileSystemAccessSupported(): boolean {
-  return 'showOpenFilePicker' in window && 'showDirectoryPicker' in window;
+  return "showOpenFilePicker" in window && "showDirectoryPicker" in window;
 }
 
 /**
@@ -126,17 +141,17 @@ export function isFileSystemAccessSupported(): boolean {
 export async function getFileSystem(): Promise<IFileSystem> {
   // Check Tauri first
   if (isTauriEnvironment()) {
-    const { TauriFileSystem } = await import('../services/tauriFileSystem');
+    const { TauriFileSystem } = await import("../services/tauriFileSystem");
     return TauriFileSystem.getInstance();
   }
 
   // Then check for File System Access API (browser)
   if (isFileSystemAccessSupported()) {
-    const { BrowserFileSystem } = await import('../services/browserFileSystem');
+    const { BrowserFileSystem } = await import("../services/browserFileSystem");
     return BrowserFileSystem.getInstance();
   }
 
   throw new Error(
-    'No supported file system available. Please use Tauri or a browser with File System Access API support.'
+    "No supported file system available. Please use Tauri or a browser with File System Access API support.",
   );
 }

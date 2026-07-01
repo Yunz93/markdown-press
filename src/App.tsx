@@ -39,6 +39,7 @@ import { isPreviewOnlyFile } from "./utils/fileTypes";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
+import { useKnowledgeBaseWatch } from "./app/useKnowledgeBaseWatch";
 import { useAppUpdater } from "./app/useAppUpdater";
 import { useWorkspaceLayout } from "./app/useWorkspaceLayout";
 import { useAttachmentCleanup } from "./app/useAttachmentCleanup";
@@ -102,6 +103,7 @@ const App: React.FC = () => {
     moveToTrash,
     refreshFileTree,
     watchFile,
+    watchDirectory,
   } = useFileSystem();
   const { setViewMode } = useViewMode();
   const { toggleTheme } = useSettings();
@@ -205,7 +207,15 @@ const App: React.FC = () => {
     readFile,
     setCurrentFilePath,
     showNotification,
+    closeTab,
+    refreshFileTree,
     watchFile,
+    t,
+  });
+  useKnowledgeBaseWatch({
+    rootFolderPath,
+    watchDirectory,
+    showNotification,
     t,
   });
   const { handleCleanupUnusedAttachments } = useAttachmentCleanup({

@@ -12,6 +12,8 @@ interface UseActiveFileWatchOptions {
   readFile: (file: FileNode) => Promise<string>;
   setCurrentFilePath: (path: string | null) => void;
   showNotification: (message: string, type: "success" | "error") => void;
+  closeTab: (fileId: string) => void;
+  refreshFileTree: () => Promise<void>;
   watchFile: (
     path: string,
     callback: (event: FileWatchEvent | null) => void,
@@ -27,6 +29,8 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
     readFile,
     setCurrentFilePath,
     showNotification,
+    closeTab,
+    refreshFileTree,
     watchFile,
     t,
   } = options;
@@ -55,7 +59,8 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
       const watcher = await watchFile(currentFilePath, async (event) => {
         if (disposed) return;
         if (event?.type === "deleted") {
-          showNotification(t("notifications_fileDeletedOnDisk"), "error");
+          closeTab(activeTabId);
+          void refreshFileTree();
           return;
         }
         if (event?.type === "error") {
@@ -111,5 +116,14 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
         unwatch = null;
       }
     };
-  }, [activeTabId, currentFilePath, readFile, showNotification, watchFile, t]);
+  }, [
+    activeTabId,
+    currentFilePath,
+    closeTab,
+    readFile,
+    refreshFileTree,
+    showNotification,
+    watchFile,
+    t,
+  ]);
 }

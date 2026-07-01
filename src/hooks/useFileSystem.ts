@@ -4,7 +4,7 @@ import { useAppStore } from "../store/appStore";
 import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
 import { ViewMode } from "../types";
 import type { FileNode } from "../types";
-import type { FileWatchEvent } from "../types/filesystem";
+import type { FileWatchEvent, DirectoryWatchEvent } from "../types/filesystem";
 import { localizeKnownError, t } from "../utils/i18n";
 import {
   DEFAULT_TRASH_FOLDER,
@@ -933,6 +933,25 @@ export function useFileSystem() {
     [],
   );
 
+  const watchDirectory = useCallback(
+    async (
+      dirPath: string,
+      callback: (event: DirectoryWatchEvent) => void,
+    ): Promise<(() => void) | null> => {
+      try {
+        const fs = await getFileSystem();
+        if (typeof fs.watchDirectory === "function") {
+          return await fs.watchDirectory(dirPath, callback);
+        }
+        return null;
+      } catch (error) {
+        console.error("Failed to watch directory:", error);
+        return null;
+      }
+    },
+    [],
+  );
+
   return {
     files,
     refreshFileTree,
@@ -955,5 +974,6 @@ export function useFileSystem() {
     revealInExplorer,
     hasUnsavedChanges,
     watchFile,
+    watchDirectory,
   };
 }
