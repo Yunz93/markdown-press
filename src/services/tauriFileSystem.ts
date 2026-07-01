@@ -13,9 +13,14 @@ import {
 import { basename, dirname, join } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileNode } from "../types";
-import type { FileWatchEvent, IFileSystem } from "../types/filesystem";
+import type {
+  FileWatchEvent,
+  DirectoryWatchEvent,
+  IFileSystem,
+} from "../types/filesystem";
 import { useAppStore } from "../store/appStore";
 import { sanitizeTrashFolder } from "../utils/trashFolder";
+import { buildFileTreeSignature } from "../utils/fileTree";
 
 /**
  * Supported file extensions
@@ -609,6 +614,48 @@ export class TauriFileSystem implements IFileSystem {
       };
     } catch (error) {
       console.error("Failed to watch file:", error);
+      return () => {};
+    }
+  }
+
+  /**
+   * Poll the knowledge base directory and emit when the visible tree changes.
+   */
+  async watchDirectory(
+    dirPath: string,
+    callback: (event: DirectoryWatchEvent) => void,
+  ): Promise<() => void> {
+    try {
+      let previousSignature = "";
+
+      try {
+        const initialTree = await this.readDirectory(dirPath);
+        previousSignature = buildFileTreeSignature(initialTree);
+      } catch {
+        previousSignature = "";
+      }
+
+      const timer = window.setInterval(async () => {
+        try {
+          const currentTree = await this.readDirectory(dirPath);
+          const signature = buildFileTreeSignature(currentTree);
+
+          if (signature === previousSignature) {
+            return;
+          }
+
+          previousSignature = signature;
+          callback({ type: "changed", tree: currentTree });
+        } catch (error) {
+          callback({ type: "error", error });
+        }
+      }, 2000);
+
+      return () => {
+        window.clearInterval(timer);
+      };
+    } catch (error) {
+      console.error("Failed to watch directory:", error);
       return () => {};
     }
   }

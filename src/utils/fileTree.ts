@@ -1,5 +1,32 @@
 import type { FileNode } from "../types";
 
+function collectTreePaths(nodes: FileNode[], paths: string[] = []): string[] {
+  for (const node of nodes) {
+    paths.push(node.path);
+    if (node.children) {
+      collectTreePaths(node.children, paths);
+    }
+  }
+  return paths;
+}
+
+export function buildFileTreeSignature(nodes: FileNode[]): string {
+  return collectTreePaths(nodes).sort().join("\n");
+}
+
+export function collectRemovedOpenTabIds(
+  previousTree: FileNode[],
+  nextTree: FileNode[],
+  openTabs: string[],
+): string[] {
+  const nextPaths = new Set(collectTreePaths(nextTree));
+  return openTabs.filter((tabId) => {
+    const node = findFileInTree(previousTree, tabId);
+    if (!node || node.type !== "file") return false;
+    return !nextPaths.has(node.path);
+  });
+}
+
 /**
  * Recursively find a node in a file tree by its `id`.
  * Shared implementation used across hooks and components.

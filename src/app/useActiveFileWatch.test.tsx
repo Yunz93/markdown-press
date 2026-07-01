@@ -34,6 +34,8 @@ describe("useActiveFileWatch", () => {
     };
     const readFile = vi.fn(async () => "# Changed outside\n");
     const showNotification = vi.fn();
+    const closeTab = vi.fn();
+    const refreshFileTree = vi.fn(async () => {});
     const watchFile = vi.fn(
       async (
         _path: string,
@@ -61,6 +63,8 @@ describe("useActiveFileWatch", () => {
         readFile,
         setCurrentFilePath: useAppStore.getState().setCurrentFilePath,
         showNotification,
+        closeTab,
+        refreshFileTree,
         watchFile,
         t: (key) => key,
       });
@@ -108,6 +112,8 @@ describe("useActiveFileWatch", () => {
         readFile: vi.fn(),
         setCurrentFilePath: useAppStore.getState().setCurrentFilePath,
         showNotification: vi.fn(),
+        closeTab: vi.fn(),
+        refreshFileTree: vi.fn(async () => {}),
         watchFile,
         t: (key) => key,
       });
@@ -122,6 +128,63 @@ describe("useActiveFileWatch", () => {
 
     await waitFor(() => {
       expect(unwatch).toHaveBeenCalled();
+    });
+  });
+
+  it("closes the active tab when the file is deleted on disk", async () => {
+    const watched = {
+      callback: null as ((event: FileWatchEvent | null) => void) | null,
+    };
+    const closeTab = vi.fn();
+    const refreshFileTree = vi.fn(async () => {});
+    const watchFile = vi.fn(
+      async (
+        _path: string,
+        callback: (event: FileWatchEvent | null) => void,
+      ) => {
+        watched.callback = callback;
+        return vi.fn();
+      },
+    );
+
+    useAppStore.setState({
+      files: [note],
+      currentFilePath: note.path,
+      openTabs: [note.id],
+      activeTabId: note.id,
+    });
+
+    function Harness() {
+      useActiveFileWatch({
+        activeTabId: note.id,
+        currentFilePath: note.path,
+        files: [note],
+        readFile: vi.fn(),
+        setCurrentFilePath: useAppStore.getState().setCurrentFilePath,
+        showNotification: vi.fn(),
+        closeTab,
+        refreshFileTree,
+        watchFile,
+        t: (key) => key,
+      });
+
+      return null;
+    }
+
+    render(React.createElement(Harness));
+
+    await waitFor(() => {
+      expect(watched.callback).not.toBeNull();
+    });
+
+    const emitWatchedEvent = watched.callback as (
+      event: FileWatchEvent | null,
+    ) => void;
+    emitWatchedEvent({ path: note.path, type: "deleted" });
+
+    await waitFor(() => {
+      expect(closeTab).toHaveBeenCalledWith(note.id);
+      expect(refreshFileTree).toHaveBeenCalled();
     });
   });
 });

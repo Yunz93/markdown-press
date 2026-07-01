@@ -453,6 +453,7 @@ export default {
 
   notifications_fileDeletedOnDisk: "文件已在本地被删除。",
   notifications_watchFileFailed: "监听本地文件变更失败。",
+  notifications_watchDirectoryFailed: "监听知识库目录变更失败。",
   notifications_fileChangedOnDisk:
     "本地文件已变化，请先保存或放弃当前修改后再重新加载。",
   notifications_fileReloaded: "已从本地重新加载文件。",
