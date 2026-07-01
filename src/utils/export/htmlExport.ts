@@ -36,6 +36,7 @@ export async function exportToHtml(
     includeProperties = true,
     highlighter,
     markdownStylePreset = "nord",
+    orderedListMode,
   } = options;
 
   const { frontmatter, body } = parseFrontmatter(content);
@@ -43,6 +44,7 @@ export async function exportToHtml(
     highlighter,
     markdownStylePreset,
     themeMode: theme,
+    orderedListMode,
   });
   const katexRenderMode = getKatexRenderMode();
 

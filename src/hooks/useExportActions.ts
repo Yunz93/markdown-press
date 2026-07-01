@@ -53,6 +53,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         includeProperties: false,
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
+        orderedListMode: settings.orderedListMode,
       });
       const savedPath = await exportToPdf(
         htmlContent,
@@ -94,6 +95,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     highlighter,
     settings.fontSize,
     settings.markdownStylePreset,
+    settings.orderedListMode,
     settings.themeMode,
     showNotification,
   ]);
@@ -129,6 +131,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         includeProperties: false,
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
+        orderedListMode: settings.orderedListMode,
       });
 
       return {
@@ -146,6 +149,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       settings.fontSize,
       settings.language,
       settings.markdownStylePreset,
+      settings.orderedListMode,
       settings.themeMode,
       showNotification,
     ]);

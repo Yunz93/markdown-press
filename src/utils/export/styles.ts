@@ -74,6 +74,10 @@ export function buildExportStyles(
   const normalizedStylePreset =
     normalizeMarkdownStylePreset(markdownStylePreset);
   const tokens = getMarkdownStyleTokens(normalizedStylePreset, theme);
+  const attachmentImageShadow =
+    theme === "dark"
+      ? "0 20px 44px rgba(0, 0, 0, 0.3)"
+      : `0 16px 40px ${tokens.accentSoft}`;
   const markdownStyleCssVariables = Object.entries(
     getMarkdownStyleCssVariables(normalizedStylePreset, theme),
   )
@@ -504,23 +508,54 @@ ${exportDelStrikeBlock}
       white-space: pre;
     }
 
-    .export-document .markdown-body pre.shiki {
+    .export-document .markdown-body .mp-shiki-block {
+      margin: 1.95em 0;
+      border: 1px solid var(--mp-doc-code-border);
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: ${
+        theme === "dark"
+          ? "inset 0 1px 0 rgba(255, 255, 255, 0.03)"
+          : "inset 0 1px 0 rgba(255, 255, 255, 0.55)"
+      };
+    }
+
+    .export-document .markdown-body .mp-shiki-block > pre.shiki {
+      margin: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      padding: 1rem 1.1rem;
+    }
+
+    .export-document .markdown-body pre.shiki,
+    .export-document .markdown-body .shiki {
       margin: 0;
       padding: 1rem 1.1rem;
       overflow-x: auto;
-      border-radius: inherit;
+      border-radius: 1rem !important;
+      -webkit-clip-path: inset(0 round 1rem);
+      clip-path: inset(0 round 1rem);
+      overflow: hidden;
       background: transparent !important;
     }
 
-    .export-document .markdown-body pre.shiki code {
+    .export-document .markdown-body pre.shiki code,
+    .export-document .markdown-body .shiki code {
       display: block;
       padding: 0;
       color: inherit;
-      background: transparent;
+      background: transparent !important;
+      white-space: normal;
+      overflow-x: auto;
     }
 
-    .export-document .markdown-body pre.shiki .line {
+    .export-document .markdown-body pre.shiki .line,
+    .export-document .markdown-body .shiki .line {
       display: block;
+      white-space: pre;
+      padding-top: 0.08rem;
+      padding-bottom: 0.08rem;
     }
 
     .export-document .markdown-body pre,
@@ -528,7 +563,7 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body pre.shiki,
     .export-document .markdown-body pre.shiki code,
     .export-document .markdown-body pre.shiki .line {
-      line-height: 1.15;
+      line-height: 1.75;
     }
 
     .export-document .markdown-body table th,
@@ -644,6 +679,29 @@ ${exportDelStrikeBlock}
     .export-document svg {
       max-width: 100%;
       height: auto;
+    }
+
+    .export-document .markdown-body .preview-attachment-image {
+      display: block;
+      max-width: 100%;
+      margin: 1rem 0;
+      border-radius: 1rem;
+      box-shadow: ${attachmentImageShadow};
+    }
+
+    .export-document .markdown-body .preview-attachment-image:not([width]) {
+      width: auto;
+    }
+
+    .export-document .markdown-body img.preview-attachment-image[data-wiki-embed-w] {
+      width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
+      max-width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
+    }
+
+    .export-document .markdown-body img.preview-attachment-image[data-wiki-embed-h] {
+      height: attr(data-wiki-embed-h px, auto) !important;
+      max-height: attr(data-wiki-embed-h px, none) !important;
+      object-fit: contain;
     }
 
     @media print {
