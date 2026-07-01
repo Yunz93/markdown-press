@@ -1,22 +1,22 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppSettings, ShortcutConfig } from '../../../types';
-import { useI18n } from '../../../hooks/useI18n';
-import type { TranslationKey } from '../../../utils/i18n';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import type { AppSettings, ShortcutConfig } from "../../../types";
+import { useI18n } from "../../../hooks/useI18n";
+import type { TranslationKey } from "../../../utils/i18n";
 import {
   formatShortcutForDisplay,
   shortcutFromKeyboardEvent,
-} from '../../../utils/shortcuts';
-import { setShortcutCaptureActive } from '../../../utils/shortcutCaptureGate';
-import type { SettingsTabProps } from '../types';
+} from "../../../utils/shortcuts";
+import { setShortcutCaptureActive } from "../../../utils/shortcutCaptureGate";
+import type { SettingsTabProps } from "../types";
 
-type ShortcutGroupId = 'workspace' | 'editing' | 'search' | 'panels';
+type ShortcutGroupId = "workspace" | "editing" | "search" | "panels";
 
 interface ShortcutItemConfig {
   id: string;
   label: string;
   description: string;
   editable?: boolean;
-  settingKey?: keyof AppSettings['shortcuts'];
+  settingKey?: keyof AppSettings["shortcuts"];
   shortcuts?: string[];
 }
 
@@ -27,75 +27,205 @@ interface ShortcutGroupConfig {
   items: ShortcutItemConfig[];
 }
 
-function getShortcutGroups(t: (key: TranslationKey, params?: Record<string, string | number>) => string): ShortcutGroupConfig[] {
+function getShortcutGroups(
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): ShortcutGroupConfig[] {
   return [
     {
-      id: 'workspace',
-      label: t('settings_workspace'),
-      description: t('settings_workspaceDesc'),
+      id: "workspace",
+      label: t("settings_workspace"),
+      description: t("settings_workspaceDesc"),
       items: [
-        { id: 'save', label: t('settings_saveFile'), description: t('settings_saveFileDesc'), editable: true, settingKey: 'save' },
-        { id: 'toggleView', label: t('settings_toggleView'), description: t('settings_toggleViewDesc'), editable: true, settingKey: 'toggleView' },
-        { id: 'toggleOutline', label: t('settings_toggleOutline'), description: t('settings_toggleOutlineDesc'), editable: true, settingKey: 'toggleOutline' },
-        { id: 'toggleSidebar', label: t('settings_toggleSidebar'), description: t('settings_toggleSidebarDesc'), editable: true, settingKey: 'toggleSidebar' },
-        { id: 'openKnowledgeBase', label: t('settings_openKnowledgeBase'), description: t('settings_openKnowledgeBaseDesc'), editable: true, settingKey: 'openKnowledgeBase' },
-        { id: 'locateCurrentFile', label: t('settings_locateCurrentFile'), description: t('settings_locateCurrentFileDesc'), editable: true, settingKey: 'locateCurrentFile' },
-        { id: 'openSettings', label: t('settings_openSettings'), description: t('settings_openSettingsDesc'), editable: true, settingKey: 'settings' },
+        {
+          id: "save",
+          label: t("settings_saveFile"),
+          description: t("settings_saveFileDesc"),
+          editable: true,
+          settingKey: "save",
+        },
+        {
+          id: "toggleView",
+          label: t("settings_toggleView"),
+          description: t("settings_toggleViewDesc"),
+          editable: true,
+          settingKey: "toggleView",
+        },
+        {
+          id: "toggleOutline",
+          label: t("settings_toggleOutline"),
+          description: t("settings_toggleOutlineDesc"),
+          editable: true,
+          settingKey: "toggleOutline",
+        },
+        {
+          id: "toggleSidebar",
+          label: t("settings_toggleSidebar"),
+          description: t("settings_toggleSidebarDesc"),
+          editable: true,
+          settingKey: "toggleSidebar",
+        },
+        {
+          id: "openKnowledgeBase",
+          label: t("settings_openKnowledgeBase"),
+          description: t("settings_openKnowledgeBaseDesc"),
+          editable: true,
+          settingKey: "openKnowledgeBase",
+        },
+        {
+          id: "locateCurrentFile",
+          label: t("settings_locateCurrentFile"),
+          description: t("settings_locateCurrentFileDesc"),
+          editable: true,
+          settingKey: "locateCurrentFile",
+        },
+        {
+          id: "openSettings",
+          label: t("settings_openSettings"),
+          description: t("settings_openSettingsDesc"),
+          editable: true,
+          settingKey: "settings",
+        },
+        {
+          id: "zoomUiIn",
+          label: t("settings_zoomUiIn"),
+          description: t("settings_zoomUiInDesc"),
+          shortcuts: ["Cmd+=", "Cmd+Shift+="],
+        },
+        {
+          id: "zoomUiOut",
+          label: t("settings_zoomUiOut"),
+          description: t("settings_zoomUiOutDesc"),
+          shortcuts: ["Cmd+-"],
+        },
       ],
     },
     {
-      id: 'editing',
-      label: t('settings_editing'),
-      description: t('settings_editingDesc'),
+      id: "editing",
+      label: t("settings_editing"),
+      description: t("settings_editingDesc"),
       items: [
-        { id: 'newNote', label: t('settings_newNote'), description: t('settings_newNoteDesc'), editable: true, settingKey: 'newNote' },
-        { id: 'newFolder', label: t('settings_newFolder'), description: t('settings_newFolderDesc'), editable: true, settingKey: 'newFolder' },
-        { id: 'closeTab', label: t('settings_closeTab'), description: t('settings_closeTabDesc'), editable: true, settingKey: 'closeTab' },
-        { id: 'aiAnalyze', label: t('settings_aiEnhance'), description: t('settings_aiEnhanceDesc'), editable: true, settingKey: 'aiAnalyze' },
-        { id: 'undo', label: t('settings_undo'), description: t('settings_undoDesc'), shortcuts: ['Ctrl+Z'] },
-        { id: 'redo', label: t('settings_redo'), description: t('settings_redoDesc'), shortcuts: ['Ctrl+Shift+Z'] },
+        {
+          id: "newNote",
+          label: t("settings_newNote"),
+          description: t("settings_newNoteDesc"),
+          editable: true,
+          settingKey: "newNote",
+        },
+        {
+          id: "newFolder",
+          label: t("settings_newFolder"),
+          description: t("settings_newFolderDesc"),
+          editable: true,
+          settingKey: "newFolder",
+        },
+        {
+          id: "closeTab",
+          label: t("settings_closeTab"),
+          description: t("settings_closeTabDesc"),
+          editable: true,
+          settingKey: "closeTab",
+        },
+        {
+          id: "aiAnalyze",
+          label: t("settings_aiEnhance"),
+          description: t("settings_aiEnhanceDesc"),
+          editable: true,
+          settingKey: "aiAnalyze",
+        },
+        {
+          id: "undo",
+          label: t("settings_undo"),
+          description: t("settings_undoDesc"),
+          shortcuts: ["Ctrl+Z"],
+        },
+        {
+          id: "redo",
+          label: t("settings_redo"),
+          description: t("settings_redoDesc"),
+          shortcuts: ["Ctrl+Shift+Z"],
+        },
       ],
     },
     {
-      id: 'search',
-      label: t('settings_search'),
-      description: t('settings_searchDesc'),
+      id: "search",
+      label: t("settings_search"),
+      description: t("settings_searchDesc"),
       items: [
-        { id: 'search', label: t('settings_openSearch'), description: t('settings_openSearchDesc'), editable: true, settingKey: 'search' },
-        { id: 'sidebarSearch', label: t('settings_sidebarSearch'), description: t('settings_sidebarSearchDesc'), editable: true, settingKey: 'sidebarSearch' },
-        { id: 'nextMatch', label: t('settings_nextMatch'), description: t('settings_nextMatchDesc'), shortcuts: ['Enter'] },
-        { id: 'previousMatch', label: t('settings_previousMatch'), description: t('settings_previousMatchDesc'), shortcuts: ['Shift+Enter'] },
+        {
+          id: "search",
+          label: t("settings_openSearch"),
+          description: t("settings_openSearchDesc"),
+          editable: true,
+          settingKey: "search",
+        },
+        {
+          id: "sidebarSearch",
+          label: t("settings_sidebarSearch"),
+          description: t("settings_sidebarSearchDesc"),
+          editable: true,
+          settingKey: "sidebarSearch",
+        },
+        {
+          id: "nextMatch",
+          label: t("settings_nextMatch"),
+          description: t("settings_nextMatchDesc"),
+          shortcuts: ["Enter"],
+        },
+        {
+          id: "previousMatch",
+          label: t("settings_previousMatch"),
+          description: t("settings_previousMatchDesc"),
+          shortcuts: ["Shift+Enter"],
+        },
       ],
     },
     {
-      id: 'panels',
-      label: t('settings_panelsAndDialogs'),
-      description: t('settings_panelsAndDialogsDesc'),
+      id: "panels",
+      label: t("settings_panelsAndDialogs"),
+      description: t("settings_panelsAndDialogsDesc"),
       items: [
-        { id: 'closePanel', label: t('settings_closeActivePanel'), description: t('settings_closeActivePanelDesc'), shortcuts: ['Escape'] },
-        { id: 'exportPdf', label: t('settings_exportPdf'), description: t('settings_exportPdfDesc'), editable: true, settingKey: 'exportPdf' },
-        { id: 'cleanupUnusedAttachments', label: t('settings_cleanupUnusedAttachments'), description: t('settings_cleanupUnusedAttachmentsDesc'), shortcuts: ['Cmd+Shift+-'] },
+        {
+          id: "closePanel",
+          label: t("settings_closeActivePanel"),
+          description: t("settings_closeActivePanelDesc"),
+          shortcuts: ["Escape"],
+        },
+        {
+          id: "exportPdf",
+          label: t("settings_exportPdf"),
+          description: t("settings_exportPdfDesc"),
+          editable: true,
+          settingKey: "exportPdf",
+        },
+        {
+          id: "cleanupUnusedAttachments",
+          label: t("settings_cleanupUnusedAttachments"),
+          description: t("settings_cleanupUnusedAttachmentsDesc"),
+          shortcuts: ["Cmd+Shift+-"],
+        },
       ],
     },
   ];
 }
 
-function getShortcutLabels(t: (key: TranslationKey, params?: Record<string, string | number>) => string): Record<string, string> {
+function getShortcutLabels(
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): Record<string, string> {
   return {
-    save: t('settings_saveFile'),
-    toggleView: t('settings_toggleView'),
-    aiAnalyze: t('settings_aiEnhance'),
-    search: t('settings_search'),
-    sidebarSearch: t('settings_sidebarSearch'),
-    locateCurrentFile: t('settings_locateCurrentFile'),
-    settings: t('settings_openSettings'),
-    toggleOutline: t('settings_toggleOutline'),
-    toggleSidebar: t('settings_toggleSidebar'),
-    newNote: t('settings_newNote'),
-    newFolder: t('settings_newFolder'),
-    closeTab: t('settings_closeTab'),
-    openKnowledgeBase: t('settings_openKnowledgeBase'),
-    exportPdf: t('settings_exportPdf'),
+    save: t("settings_saveFile"),
+    toggleView: t("settings_toggleView"),
+    aiAnalyze: t("settings_aiEnhance"),
+    search: t("settings_search"),
+    sidebarSearch: t("settings_sidebarSearch"),
+    locateCurrentFile: t("settings_locateCurrentFile"),
+    settings: t("settings_openSettings"),
+    toggleOutline: t("settings_toggleOutline"),
+    toggleSidebar: t("settings_toggleSidebar"),
+    newNote: t("settings_newNote"),
+    newFolder: t("settings_newFolder"),
+    closeTab: t("settings_closeTab"),
+    openKnowledgeBase: t("settings_openKnowledgeBase"),
+    exportPdf: t("settings_exportPdf"),
   };
 }
 
@@ -106,13 +236,17 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
   const { t } = useI18n();
   const shortcutLabels = getShortcutLabels(t);
   const shortcutGroups = getShortcutGroups(t);
-  const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<Record<ShortcutGroupId, boolean>>({
+  const [expandedShortcutGroups, setExpandedShortcutGroups] = useState<
+    Record<ShortcutGroupId, boolean>
+  >({
     workspace: true,
     editing: true,
     search: true,
     panels: true,
   });
-  const [recordingKey, setRecordingKey] = useState<keyof ShortcutConfig | null>(null);
+  const [recordingKey, setRecordingKey] = useState<keyof ShortcutConfig | null>(
+    null,
+  );
   const shortcutsRef = useRef(settings.shortcuts);
   shortcutsRef.current = settings.shortcuts;
 
@@ -134,7 +268,7 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setShortcutCaptureActive(false);
         setRecordingKey(null);
         return;
@@ -145,27 +279,37 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
 
       setShortcutCaptureActive(false);
       onUpdateSettings({
-        shortcuts: { ...shortcutsRef.current, [capturedSettingKey]: serialized },
+        shortcuts: {
+          ...shortcutsRef.current,
+          [capturedSettingKey]: serialized,
+        },
       });
       setRecordingKey(null);
     };
 
-    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
     return () => {
-      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener("keydown", onKeyDown, true);
       setShortcutCaptureActive(false);
     };
   }, [recordingKey, onUpdateSettings]);
 
   const toggleShortcutGroup = (groupId: ShortcutGroupId) => {
-    setExpandedShortcutGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+    setExpandedShortcutGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
   };
 
   return (
     <div className="space-y-6 animate-fade-in-02s">
       <div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{t('settings_shortcutsTitle')}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">{t('settings_shortcutsIntro')}</p>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          {t("settings_shortcutsTitle")}
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          {t("settings_shortcutsIntro")}
+        </p>
 
         <div className="space-y-3">
           {shortcutGroups.map((group) => {
@@ -183,16 +327,23 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{group.label}</h4>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {group.label}
+                      </h4>
                       <span className="inline-flex items-center rounded-full bg-white/80 dark:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
                         {group.items.length}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{group.description}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {group.description}
+                    </p>
                   </div>
                   <svg
-                    className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
                   >
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
@@ -202,9 +353,15 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                   <div className="border-t border-gray-200/70 dark:border-white/10 px-4 py-3">
                     <div className="space-y-2.5">
                       {group.items.map((item) => {
-                        const editableValue = item.settingKey ? settings.shortcuts[item.settingKey] : '';
-                        const itemShortcuts = item.editable ? [editableValue] : (item.shortcuts ?? []);
-                        const isRecording = Boolean(item.settingKey && recordingKey === item.settingKey);
+                        const editableValue = item.settingKey
+                          ? settings.shortcuts[item.settingKey]
+                          : "";
+                        const itemShortcuts = item.editable
+                          ? [editableValue]
+                          : (item.shortcuts ?? []);
+                        const isRecording = Boolean(
+                          item.settingKey && recordingKey === item.settingKey,
+                        );
 
                         return (
                           <div
@@ -213,33 +370,46 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                           >
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{item.label}</span>
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                  {item.label}
+                                </span>
                                 {item.editable && (
                                   <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                    {t('settings_shortcutRecordHint')}
+                                    {t("settings_shortcutRecordHint")}
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{item.description}</p>
+                              <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                {item.description}
+                              </p>
                             </div>
 
                             {item.editable && item.settingKey ? (
                               <div className="flex shrink-0 flex-col items-end gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => toggleRecorder(item.settingKey!)}
+                                  onClick={() =>
+                                    toggleRecorder(item.settingKey!)
+                                  }
                                   aria-pressed={isRecording}
-                                  aria-label={shortcutLabels[item.settingKey] || item.label}
+                                  aria-label={
+                                    shortcutLabels[item.settingKey] ||
+                                    item.label
+                                  }
                                   className={`min-w-[7.5rem] rounded-lg border px-2.5 py-1.5 text-center font-mono text-xs outline-none transition-colors ${
                                     isRecording
-                                      ? 'border-accent-DEFAULT bg-accent-DEFAULT/10 text-gray-900 dark:text-white ring-2 ring-accent-DEFAULT/30'
-                                      : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-200 hover:border-accent-DEFAULT/60 focus-visible:border-accent-DEFAULT'
+                                      ? "border-accent-DEFAULT bg-accent-DEFAULT/10 text-gray-900 dark:text-white ring-2 ring-accent-DEFAULT/30"
+                                      : "border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-200 hover:border-accent-DEFAULT/60 focus-visible:border-accent-DEFAULT"
                                   }`}
                                 >
-                                  {isRecording ? t('settings_shortcutListening') : formatShortcutForDisplay(editableValue)}
+                                  {isRecording
+                                    ? t("settings_shortcutListening")
+                                    : formatShortcutForDisplay(editableValue)}
                                 </button>
                                 {isRecording && (
-                                  <span className="text-[10px] text-gray-400 dark:text-gray-500">{t('settings_shortcutEscToCancel')}</span>
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                    {t("settings_shortcutEscToCancel")}
+                                  </span>
                                 )}
                               </div>
                             ) : (

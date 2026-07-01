@@ -175,7 +175,11 @@ export default {
   settings_systemDefaultFontOption: "系统默认字体",
   settings_uiFontSize: "UI 字体大小",
   settings_uiFontSizeDesc:
-    "调整侧边栏、工具栏、设置面板等界面文字大小，不影响编辑器和预览正文。",
+    "调整侧边栏、工具栏、设置面板等界面文字大小，不影响编辑器和预览正文。可用 Cmd/Ctrl + +/- 快速调整。",
+  settings_zoomUiIn: "放大界面",
+  settings_zoomUiInDesc: "增大侧边栏、工具栏、设置面板等界面文字大小。",
+  settings_zoomUiOut: "缩小界面",
+  settings_zoomUiOutDesc: "减小侧边栏、工具栏、设置面板等界面文字大小。",
   settings_uiFontCurrentOption: "当前自定义配置",
   settings_uiFontPreview: "界面字体预览：Markdown Press 设置、侧边栏与工具栏",
   settings_editorFont: "编辑区字体",
