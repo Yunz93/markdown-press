@@ -23,9 +23,49 @@ interface SaveState {
   retryCount: number;
 }
 
-interface ForceSaveOptions {
+export interface ForceSaveOptions {
   formatBeforeSave?: boolean;
   trigger?: "auto" | "manual" | "system";
+}
+
+function triggerPriority(
+  trigger: ForceSaveOptions["trigger"] | undefined,
+): number {
+  switch (trigger) {
+    case "system":
+      return 3;
+    case "manual":
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+function mergePendingSaveOptions(
+  existing: ForceSaveOptions | undefined,
+  incoming: ForceSaveOptions | undefined,
+): ForceSaveOptions {
+  if (!existing) {
+    return incoming ?? { trigger: "auto" };
+  }
+  if (!incoming) {
+    return existing;
+  }
+
+  const winner =
+    triggerPriority(incoming.trigger) >= triggerPriority(existing.trigger)
+      ? incoming
+      : existing;
+
+  return {
+    formatBeforeSave: winner.formatBeforeSave ?? existing.formatBeforeSave,
+    trigger: winner.trigger ?? existing.trigger,
+  };
+}
+
+function isTabContentLoaded(fileId: string | null): boolean {
+  if (!fileId) return false;
+  return useAppStore.getState().fileContents[fileId] !== undefined;
 }
 
 /**
@@ -65,6 +105,73 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   });
   const lastSavedContentRef = useRef<string>("");
   const isSavingRef = useRef(false);
+  const saveGenerationRef = useRef(0);
+  const pendingSaveRef = useRef<ForceSaveOptions | null>(null);
+  const saveIdleResolversRef = useRef<Array<() => void>>([]);
+
+  const notifySaveIdle = useCallback(() => {
+    const resolvers = saveIdleResolversRef.current;
+    saveIdleResolversRef.current = [];
+    resolvers.forEach((resolve) => resolve());
+  }, []);
+
+  const waitForSaveIdle = useCallback((): Promise<void> => {
+    if (!isSavingRef.current) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      saveIdleResolversRef.current.push(resolve);
+    });
+  }, []);
+
+  const isSaveContextStale = useCallback(
+    (generation: number, tabId: string, path: string): boolean => {
+      if (generation !== saveGenerationRef.current) {
+        return true;
+      }
+
+      const state = useAppStore.getState();
+      if (!state.openTabs.includes(tabId)) {
+        return true;
+      }
+
+      if (pathRef.current !== path) {
+        return true;
+      }
+
+      return false;
+    },
+    [],
+  );
+
+  const scheduleFollowUpSave = useCallback((options?: ForceSaveOptions) => {
+    void executeSaveRef.current(0, options ?? { trigger: "auto" });
+  }, []);
+
+  const drainPendingSave = useCallback(
+    (userEditedDuringSave: boolean) => {
+      if (userEditedDuringSave) {
+        const pending = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        scheduleFollowUpSave(
+          pending?.trigger === "manual" || pending?.trigger === "system"
+            ? pending
+            : { trigger: "auto" },
+        );
+        return;
+      }
+
+      if (!pendingSaveRef.current) {
+        return;
+      }
+
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      scheduleFollowUpSave(pending);
+    },
+    [scheduleFollowUpSave],
+  );
 
   // Keep refs updated
   useEffect(() => {
@@ -77,25 +184,42 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
   // Reset save state when file changes
   useEffect(() => {
-    lastSavedContentRef.current = content;
+    saveGenerationRef.current += 1;
+    pendingSaveRef.current = null;
+
+    const state = useAppStore.getState();
+    const baseline = activeTabId
+      ? (state.lastSavedContent[activeTabId] ??
+        state.fileContents[activeTabId] ??
+        "")
+      : "";
+
+    lastSavedContentRef.current = baseline;
     isSavingRef.current = false;
     setSaving(false);
+    notifySaveIdle();
     saveStateRef.current = {
       status: "idle",
       lastSavedAt: null,
       error: null,
       retryCount: 0,
     };
-  }, [activeTabId, setSaving]);
+  }, [activeTabId, notifySaveIdle, setSaving]);
+
+  const executeSaveRef = useRef<
+    (retryCount?: number, options?: ForceSaveOptions) => Promise<boolean>
+  >(async () => false);
 
   // Execute save operation with retry logic
   const executeSave = useCallback(
     async (retryCount = 0, options?: ForceSaveOptions): Promise<boolean> => {
       const currentContent = contentRef.current;
       const currentPath = pathRef.current;
+      const tabId = activeTabId;
 
-      if (!currentPath || !activeTabId) return false;
+      if (!currentPath || !tabId) return false;
       if (!isMarkdownDocumentPath(currentPath)) return false;
+      if (!isTabContentLoaded(tabId)) return false;
 
       const shouldFormatBeforeSave =
         options?.trigger === "manual" &&
@@ -118,11 +242,16 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         return true; // No changes to save
       }
 
-      // Prevent concurrent saves
+      // Prevent concurrent saves; queue a follow-up instead of dropping work
       if (isSavingRef.current) {
+        pendingSaveRef.current = mergePendingSaveOptions(
+          pendingSaveRef.current ?? undefined,
+          options,
+        );
         return false;
       }
 
+      const generation = saveGenerationRef.current;
       isSavingRef.current = true;
       setSaving(true);
       saveStateRef.current.status = "saving";
@@ -133,16 +262,24 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           await fs.writeFile(currentPath, contentToSave);
         }, "Auto-save failed");
 
+        if (isSaveContextStale(generation, tabId, currentPath)) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          drainPendingSave(false);
+          return true;
+        }
+
         const latestContent = contentRef.current;
         const userEditedDuringSave = latestContent !== currentContent;
 
         // Adopt formatted/timestamp-normalized output when the user did not keep typing.
         if (!userEditedDuringSave && contentToSave !== currentContent) {
           contentRef.current = contentToSave;
-          updateTabContent(activeTabId, contentToSave);
+          updateTabContent(tabId, contentToSave);
         }
 
-        markAsSaved(activeTabId, contentToSave);
+        markAsSaved(tabId, contentToSave);
         lastSavedContentRef.current = contentToSave;
         saveStateRef.current = {
           status: "saved",
@@ -152,14 +289,19 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         };
         isSavingRef.current = false;
         setSaving(false);
-
-        if (userEditedDuringSave) {
-          void executeSave(0, { trigger: "auto" });
-        }
+        notifySaveIdle();
+        drainPendingSave(userEditedDuringSave);
 
         return true;
       } catch (error) {
         console.error(`Auto-save failed (attempt ${retryCount + 1}):`, error);
+
+        if (isSaveContextStale(generation, tabId, currentPath)) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          return false;
+        }
 
         // Check if we should retry
         if (retryCount < maxRetries) {
@@ -169,6 +311,13 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           await new Promise((resolve) =>
             setTimeout(resolve, retryDelayMs * Math.pow(2, retryCount)),
           );
+
+          if (isSaveContextStale(generation, tabId, currentPath)) {
+            isSavingRef.current = false;
+            setSaving(false);
+            notifySaveIdle();
+            return false;
+          }
 
           isSavingRef.current = false;
           return executeSave(retryCount + 1, options);
@@ -190,10 +339,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         };
         isSavingRef.current = false;
         setSaving(false);
+        notifySaveIdle();
 
         // Save to local storage as backup
         try {
-          localStorage.setItem(`draft_${activeTabId}`, contentToSave);
+          localStorage.setItem(`draft_${tabId}`, contentToSave);
           showNotification(
             t(settings.language, "notifications_saveBackupCreated"),
             "error",
@@ -212,6 +362,9 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     },
     [
       activeTabId,
+      drainPendingSave,
+      isSaveContextStale,
+      notifySaveIdle,
       setSaving,
       updateTabContent,
       markAsSaved,
@@ -219,12 +372,16 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       maxRetries,
       retryDelayMs,
       settings.orderedListMode,
+      settings.language,
     ],
   );
+
+  executeSaveRef.current = executeSave;
 
   // Debounced auto-save effect
   useEffect(() => {
     if (!enabled || !activeTabId || !currentFilePath) return;
+    if (!isTabContentLoaded(activeTabId)) return;
 
     // Clear existing timer
     if (timerRef.current) {
@@ -264,9 +421,32 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         contentRef.current = contentOverride;
       }
 
-      return executeSave(0, options);
+      const trigger = options?.trigger ?? "manual";
+      if (
+        isSavingRef.current &&
+        (trigger === "system" || trigger === "manual")
+      ) {
+        await waitForSaveIdle();
+      }
+
+      const result = await executeSave(0, options);
+
+      if (
+        !result &&
+        pendingSaveRef.current &&
+        (trigger === "system" || trigger === "manual")
+      ) {
+        await waitForSaveIdle();
+        if (pendingSaveRef.current) {
+          const pending = pendingSaveRef.current;
+          pendingSaveRef.current = null;
+          return executeSave(0, pending);
+        }
+      }
+
+      return result;
     },
-    [executeSave],
+    [executeSave, waitForSaveIdle],
   );
 
   // Get save state

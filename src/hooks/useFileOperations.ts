@@ -329,14 +329,27 @@ export function useFileOperations() {
 
         if (result.modifiedFiles.length === 0) return;
 
+        const appliedMods: typeof result.modifiedFiles = [];
+
         for (const mod of result.modifiedFiles) {
+          const stateNow = useAppStore.getState();
+          if (stateNow.hasUnsavedChanges(mod.path)) {
+            continue;
+          }
+
           await fs.writeFile(mod.path, mod.newContent);
+          appliedMods.push(mod);
         }
+
+        if (appliedMods.length === 0) return;
 
         useAppStore.setState((s) => {
           const nextContents = { ...s.fileContents };
           const nextSaved = { ...s.lastSavedContent };
-          for (const mod of result.modifiedFiles) {
+          for (const mod of appliedMods) {
+            if (s.hasUnsavedChanges(mod.path)) {
+              continue;
+            }
             if (mod.path in nextContents) {
               nextContents[mod.path] = mod.newContent;
             }
@@ -351,7 +364,7 @@ export function useFileOperations() {
 
         showNotification(
           t(settings.language, "notifications_linksUpdated", {
-            count: String(result.modifiedFiles.length),
+            count: String(appliedMods.length),
           }),
           "success",
         );
