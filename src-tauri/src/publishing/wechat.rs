@@ -1,5 +1,9 @@
 use super::*;
 
+use std::net::{IpAddr, ToSocketAddrs};
+
+const MAX_WECHAT_REMOTE_DOWNLOAD_BYTES: usize = 10 * 1024 * 1024;
+
 pub(super) async fn publish_remote_wechat_draft(
     request: &PublishWechatDraftRequest,
 ) -> Result<PublishWechatDraftResult, String> {
@@ -217,6 +221,8 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
     remote_url: &str,
     context: &str,
 ) -> Result<T, String> {
+    validate_wechat_remote_image_url(remote_url)?;
+
     let response = client.get(remote_url).send().await.map_err(|e| {
         format!(
             "Failed to download remote {} {}: {}",
@@ -229,6 +235,15 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
             "Failed to download remote {} {}: HTTP {}",
             context, remote_url, status
         ));
+    }
+
+    if let Some(content_length) = response.content_length() {
+        if content_length as usize > MAX_WECHAT_REMOTE_DOWNLOAD_BYTES {
+            return Err(format!(
+                "Remote {} exceeds maximum download size of {} bytes: {}",
+                context, MAX_WECHAT_REMOTE_DOWNLOAD_BYTES, remote_url
+            ));
+        }
     }
 
     let downloaded_url = response.url().clone();
@@ -247,6 +262,12 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
             )
         })?
         .to_vec();
+    if bytes.len() > MAX_WECHAT_REMOTE_DOWNLOAD_BYTES {
+        return Err(format!(
+            "Remote {} exceeds maximum download size of {} bytes: {}",
+            context, MAX_WECHAT_REMOTE_DOWNLOAD_BYTES, remote_url
+        ));
+    }
     let file_name = downloaded_url
         .path_segments()
         .and_then(|segments| segments.last())
@@ -259,6 +280,58 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
         .unwrap_or_else(|| guess_mime_type_from_name(&file_name));
 
     wechat_api_upload_bytes(client, url, context, file_name, mime_type, bytes).await
+}
+
+fn validate_wechat_remote_image_url(remote_url: &str) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(remote_url.trim())
+        .map_err(|e| format!("Invalid remote image URL {}: {}", remote_url, e))?;
+    if parsed.scheme() != "https" {
+        return Err(format!(
+            "Remote image URL must use HTTPS: {}",
+            remote_url
+        ));
+    }
+
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("Remote image URL is missing a host: {}", remote_url))?;
+    let host_lower = host.to_ascii_lowercase();
+    if host_lower == "localhost" || host_lower.ends_with(".localhost") {
+        return Err(format!("Remote image URL host is not allowed: {}", remote_url));
+    }
+
+    if host.parse::<IpAddr>().map(is_blocked_ip).unwrap_or(false) {
+        return Err(format!("Remote image URL host is not allowed: {}", remote_url));
+    }
+
+    let port = parsed.port_or_known_default().unwrap_or(443);
+    let socket_addrs = (host, port)
+        .to_socket_addrs()
+        .map_err(|e| format!("Failed to resolve remote image URL host {}: {}", host, e))?;
+    for addr in socket_addrs {
+        if is_blocked_ip(addr.ip()) {
+            return Err(format!(
+                "Remote image URL resolves to a blocked address: {}",
+                remote_url
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn is_blocked_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.octets()[0] == 0
+        }
+        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unique_local() || v6.is_unspecified(),
+    }
 }
 
 async fn upload_wechat_article_image(

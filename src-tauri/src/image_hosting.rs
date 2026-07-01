@@ -5,6 +5,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::url_encode::{percent_encode_component, percent_encode_path};
@@ -123,6 +124,36 @@ fn normalize_path_prefix(prefix: &str) -> String {
     } else {
         format!("{}/", trimmed)
     }
+}
+
+/// Reject path traversal and path separators; keep only the final path segment name.
+fn sanitize_upload_filename(filename: &str) -> Result<String, String> {
+    if filename.trim().is_empty() {
+        return Err("Upload filename cannot be empty.".to_string());
+    }
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err(format!("Invalid upload filename: {}", filename));
+    }
+
+    let sanitized = Path::new(filename)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .ok_or_else(|| format!("Invalid upload filename: {}", filename))?;
+
+    Ok(sanitized.to_string())
+}
+
+fn validate_https_upload_url(upload_url: &str) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(upload_url.trim())
+        .map_err(|e| format!("Invalid custom provider upload URL: {}", e))?;
+    if parsed.scheme() != "https" {
+        return Err("Custom provider upload URL must use HTTPS.".to_string());
+    }
+    if parsed.host().is_none() {
+        return Err("Custom provider upload URL is missing a host.".to_string());
+    }
+    Ok(())
 }
 
 // ─── GitHub Provider ─────────────────────────────────────────────────────────
@@ -254,8 +285,9 @@ async fn upload_to_github(
         .split_once('/')
         .ok_or_else(|| "GitHub repo must be in 'owner/repo' format.".to_string())?;
 
+    let safe_filename = sanitize_upload_filename(filename)?;
     let prefix = normalize_path_prefix(&config.path);
-    let file_path = format!("{}{}", prefix, filename);
+    let file_path = format!("{}{}", prefix, safe_filename);
     let branch = if config.branch.is_empty() { "main" } else { &config.branch };
 
     let client = create_upload_client()?;
@@ -276,7 +308,7 @@ async fn upload_to_github(
     );
 
     let mut body = serde_json::json!({
-        "message": format!("upload: {}", filename),
+        "message": format!("upload: {}", safe_filename),
         "content": BASE64_STANDARD.encode(image_bytes),
         "branch": branch,
     });
@@ -298,13 +330,7 @@ async fn upload_to_github(
         let status = response.status();
         let text = response.text().await.unwrap_or_default();
         let hint = if status.as_u16() == 404 {
-            let token_len = config.token.len();
-            format!(
-                " [repo={}/{}, branch={}, token={}...({} chars)]",
-                owner, repo, branch,
-                if token_len > 4 { &config.token[..4] } else { "?" },
-                token_len
-            )
+            format!(" [repo={}/{}, branch={}]", owner, repo, branch)
         } else {
             String::new()
         };
@@ -348,9 +374,10 @@ async fn upload_to_s3(
         return Err("S3 endpoint, bucket, accessKeyId, and secretAccessKey are required.".to_string());
     }
 
+    let safe_filename = sanitize_upload_filename(filename)?;
     let prefix = normalize_path_prefix(&config.path_prefix);
-    let object_key = format!("{}{}", prefix, filename);
-    let content_type = content_type_for_filename(filename);
+    let object_key = format!("{}{}", prefix, safe_filename);
+    let content_type = content_type_for_filename(&safe_filename);
 
     let endpoint = config.endpoint.trim_end_matches('/');
     let host = endpoint
@@ -441,9 +468,10 @@ async fn upload_to_aliyun_oss(
         return Err("Aliyun OSS endpoint, bucket, accessKeyId, and accessKeySecret are required.".to_string());
     }
 
+    let safe_filename = sanitize_upload_filename(filename)?;
     let prefix = normalize_path_prefix(&config.path_prefix);
-    let object_key = format!("{}{}", prefix, filename);
-    let content_type = content_type_for_filename(filename);
+    let object_key = format!("{}{}", prefix, safe_filename);
+    let content_type = content_type_for_filename(&safe_filename);
 
     let endpoint = config.endpoint.trim_end_matches('/');
     let host = format!("{}.{}", config.bucket, endpoint);
@@ -505,8 +533,9 @@ async fn upload_to_qiniu(
         return Err("Qiniu bucket, accessKey, secretKey, and domain are required.".to_string());
     }
 
+    let safe_filename = sanitize_upload_filename(filename)?;
     let prefix = normalize_path_prefix(&config.path_prefix);
-    let object_key = format!("{}{}", prefix, filename);
+    let object_key = format!("{}{}", prefix, safe_filename);
 
     let deadline = now_unix_secs() + 3600;
     let policy = serde_json::json!({
@@ -518,11 +547,11 @@ async fn upload_to_qiniu(
     let encoded_sign = URL_SAFE_NO_PAD.encode(&sign);
     let upload_token = format!("{}:{}:{}", config.access_key, encoded_sign, encoded_policy);
 
-    let upload_host = qiniu_upload_host(&config.zone);
-    let content_type = content_type_for_filename(filename);
+    let upload_host = qiniu_upload_host(&config.zone)?;
+    let content_type = content_type_for_filename(&safe_filename);
 
     let file_part = reqwest::multipart::Part::bytes(image_bytes.to_vec())
-        .file_name(filename.to_string())
+        .file_name(safe_filename.clone())
         .mime_str(content_type)
         .map_err(|e| format!("Failed to create multipart file part: {}", e))?;
 
@@ -552,15 +581,15 @@ async fn upload_to_qiniu(
     Ok(ImageUploadResponse { url })
 }
 
-fn qiniu_upload_host(zone: &str) -> &'static str {
+fn qiniu_upload_host(zone: &str) -> Result<&'static str, String> {
     match zone {
-        "z0" => "https://up-z0.qiniup.com",
-        "z1" => "https://up-z1.qiniup.com",
-        "z2" => "https://up-z2.qiniup.com",
-        "na0" => "https://up-na0.qiniup.com",
-        "as0" => "https://up-as0.qiniup.com",
-        "cn-east-2" => "https://up-cn-east-2.qiniup.com",
-        _ => "https://up-z0.qiniup.com",
+        "z0" => Ok("https://up-z0.qiniup.com"),
+        "z1" => Ok("https://up-z1.qiniup.com"),
+        "z2" => Ok("https://up-z2.qiniup.com"),
+        "na0" => Ok("https://up-na0.qiniup.com"),
+        "as0" => Ok("https://up-as0.qiniup.com"),
+        "cn-east-2" => Ok("https://up-cn-east-2.qiniup.com"),
+        other => Err(format!("Unknown Qiniu zone: {}", other)),
     }
 }
 
@@ -577,15 +606,23 @@ async fn upload_to_custom(
     if config.upload_url.is_empty() {
         return Err("Custom provider upload URL is required.".to_string());
     }
+    validate_https_upload_url(&config.upload_url)?;
 
     let headers: std::collections::HashMap<String, String> =
-        serde_json::from_str(&config.headers).unwrap_or_default();
+        if config.headers.trim().is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            serde_json::from_str(&config.headers).map_err(|e| {
+                format!("Invalid custom provider headers JSON: {}", e)
+            })?
+        };
 
-    let content_type = content_type_for_filename(filename);
+    let safe_filename = sanitize_upload_filename(filename)?;
+    let content_type = content_type_for_filename(&safe_filename);
     let field_name = if config.file_field_name.is_empty() { "file" } else { &config.file_field_name };
 
     let file_part = reqwest::multipart::Part::bytes(image_bytes.to_vec())
-        .file_name(filename.to_string())
+        .file_name(safe_filename)
         .mime_str(content_type)
         .map_err(|e| format!("Failed to create multipart part: {}", e))?;
 

@@ -132,11 +132,16 @@ fn queue_opened_file_paths(app: &tauri::AppHandle, paths: Vec<String>) {
         return;
     }
 
-    if let Ok(mut queued_paths) = app.state::<OpenedFilesState>().paths.lock() {
-        for path in &paths {
-            if !queued_paths.contains(path) {
-                queued_paths.push(path.clone());
+    match app.state::<OpenedFilesState>().paths.lock() {
+        Ok(mut queued_paths) => {
+            for path in &paths {
+                if !queued_paths.contains(path) {
+                    queued_paths.push(path.clone());
+                }
             }
+        }
+        Err(error) => {
+            log::error!("Failed to acquire opened files lock: {}", error);
         }
     }
 
@@ -153,7 +158,7 @@ fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), St
         .duration_since(UNIX_EPOCH)
         .map_err(|_| "Failed to read system time.".to_string())?
         .as_millis();
-    let label = format!("file-{}", now_ms);
+    let label = format!("file-{}-{}", now_ms, uuid::Uuid::new_v4());
 
     let encoded = urlencoding::encode(&normalized);
     let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
@@ -168,6 +173,8 @@ fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), St
     Ok(())
 }
 
+const MAX_UPLOAD_IMAGE_BYTES: usize = 20 * 1024 * 1024;
+
 #[tauri::command]
 async fn upload_image_to_hosting(
     provider: String,
@@ -175,9 +182,27 @@ async fn upload_image_to_hosting(
     image_base64: String,
     filename: String,
 ) -> Result<image_hosting::ImageUploadResponse, String> {
+    let trimmed = image_base64.trim();
+    let estimated_decoded_len = trimmed
+        .len()
+        .saturating_mul(3)
+        .saturating_div(4);
+    if estimated_decoded_len > MAX_UPLOAD_IMAGE_BYTES {
+        return Err(format!(
+            "Image data exceeds maximum upload size of {} bytes.",
+            MAX_UPLOAD_IMAGE_BYTES
+        ));
+    }
+
     let image_bytes = BASE64_STANDARD
-        .decode(image_base64.trim())
+        .decode(trimmed)
         .map_err(|e| format!("Failed to decode image data: {}", e))?;
+    if image_bytes.len() > MAX_UPLOAD_IMAGE_BYTES {
+        return Err(format!(
+            "Image data exceeds maximum upload size of {} bytes.",
+            MAX_UPLOAD_IMAGE_BYTES
+        ));
+    }
     image_hosting::upload_image(&provider, &config_json, &image_bytes, &filename).await
 }
 

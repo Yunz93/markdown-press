@@ -3,7 +3,8 @@ use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
@@ -115,55 +116,111 @@ fn secure_settings_key_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(config_dir.join(SECURE_SETTINGS_KEY_FILE_NAME))
 }
 
+fn secure_settings_lock_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(secure_settings_file_path(app)?.with_extension("json.lock"))
+}
+
+#[cfg(unix)]
+fn with_secure_settings_lock<R>(
+    app: &tauri::AppHandle,
+    operation: impl FnOnce() -> Result<R, String>,
+) -> Result<R, String> {
+    use std::os::unix::io::AsRawFd;
+
+    let lock_path = secure_settings_lock_path(app)?;
+    let lock_file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .map_err(|e| {
+            format!(
+                "Failed to open secure settings lock file {}: {}",
+                lock_path.display(),
+                e
+            )
+        })?;
+    let lock_result = unsafe { libc::flock(lock_file.as_raw_fd(), libc::LOCK_EX) };
+    if lock_result != 0 {
+        return Err(format!(
+            "Failed to lock secure settings file {}: {}",
+            lock_path.display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let result = operation();
+    let _ = unsafe { libc::flock(lock_file.as_raw_fd(), libc::LOCK_UN) };
+    result
+}
+
+#[cfg(not(unix))]
+fn with_secure_settings_lock<R>(
+    _app: &tauri::AppHandle,
+    operation: impl FnOnce() -> Result<R, String>,
+) -> Result<R, String> {
+    operation()
+}
+
+fn read_secure_settings_key(path: &Path) -> Result<[u8; 32], String> {
+    let encoded = fs::read_to_string(path).map_err(|e| {
+        format!(
+            "Failed to read secure settings key {}: {}",
+            path.display(),
+            e
+        )
+    })?;
+    let decoded = BASE64_STANDARD.decode(encoded.trim()).map_err(|e| {
+        format!(
+            "Failed to decode secure settings key {}: {}",
+            path.display(),
+            e
+        )
+    })?;
+    decoded.try_into().map_err(|_| {
+        format!(
+            "Secure settings key {} has invalid length; expected 32 bytes.",
+            path.display()
+        )
+    })
+}
+
 fn load_or_create_secure_settings_key(app: &tauri::AppHandle) -> Result<[u8; 32], String> {
     let path = secure_settings_key_path(app)?;
 
     if path.exists() {
-        let encoded = fs::read_to_string(&path).map_err(|e| {
-            format!(
-                "Failed to read secure settings key {}: {}",
-                path.display(),
-                e
-            )
-        })?;
-        let decoded = BASE64_STANDARD.decode(encoded.trim()).map_err(|e| {
-            format!(
-                "Failed to decode secure settings key {}: {}",
-                path.display(),
-                e
-            )
-        })?;
-        let key: [u8; 32] = decoded.try_into().map_err(|_| {
-            format!(
-                "Secure settings key {} has invalid length; expected 32 bytes.",
-                path.display()
-            )
-        })?;
-        return Ok(key);
+        return read_secure_settings_key(&path);
     }
 
     let mut key = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut key);
     let encoded = BASE64_STANDARD.encode(key);
-    let temp_path = path.with_extension("key.tmp");
 
-    fs::write(&temp_path, encoded).map_err(|e| {
-        format!(
-            "Failed to write secure settings key {}: {}",
-            temp_path.display(),
-            e
-        )
-    })?;
-    set_private_permissions(&temp_path)?;
-    fs::rename(&temp_path, &path).map_err(|e| {
-        format!(
-            "Failed to replace secure settings key {}: {}",
+    match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            file.write_all(encoded.as_bytes()).map_err(|e| {
+                format!(
+                    "Failed to write secure settings key {}: {}",
+                    path.display(),
+                    e
+                )
+            })?;
+            set_private_permissions(&path)?;
+            Ok(key)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            read_secure_settings_key(&path)
+        }
+        Err(error) => Err(format!(
+            "Failed to create secure settings key {}: {}",
             path.display(),
-            e
-        )
-    })?;
-
-    Ok(key)
+            error
+        )),
+    }
 }
 
 fn encrypt_secure_settings(
@@ -330,29 +387,33 @@ fn write_secure_secret(
     key: &str,
     value: Option<&str>,
 ) -> Result<(), String> {
-    let mut settings = read_secure_settings_file(app)?;
-    let normalized = normalize_secret_value(value);
+    with_secure_settings_lock(app, || {
+        let mut settings = read_secure_settings_file(app)?;
+        let normalized = normalize_secret_value(value);
 
-    match key {
-        SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token = normalized,
-        SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret = normalized,
-        SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
-        SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
-        SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key = normalized,
-        SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token = normalized,
-        SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
-            settings.image_hosting_s3_secret_access_key = normalized
+        match key {
+            SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token = normalized,
+            SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret = normalized,
+            SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
+            SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
+            SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key = normalized,
+            SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => {
+                settings.image_hosting_github_token = normalized
+            }
+            SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
+                settings.image_hosting_s3_secret_access_key = normalized
+            }
+            SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => {
+                settings.image_hosting_oss_access_key_secret = normalized
+            }
+            SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => {
+                settings.image_hosting_qiniu_secret_key = normalized
+            }
+            _ => return Err(format!("Unsupported secure setting key: {}", key)),
         }
-        SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => {
-            settings.image_hosting_oss_access_key_secret = normalized
-        }
-        SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => {
-            settings.image_hosting_qiniu_secret_key = normalized
-        }
-        _ => return Err(format!("Unsupported secure setting key: {}", key)),
-    }
 
-    write_secure_settings_file(app, &settings)
+        write_secure_settings_file(app, &settings)
+    })
 }
 
 fn resolve_secret_key(key: &str) -> Option<&'static str> {

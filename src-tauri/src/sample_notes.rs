@@ -171,8 +171,20 @@ fn write_sample_notes_state(target: &Path, state: &SampleNotesState) -> Result<(
     let state_path = target.join(SAMPLE_NOTES_STATE_FILE);
     let content = serde_json::to_string_pretty(state)
         .map_err(|e| format!("Failed to serialize sample notes state: {}", e))?;
-    fs::write(&state_path, content)
-        .map_err(|e| format!("Failed to write sample notes state {:?}: {}", state_path, e))
+    let temp_path = state_path.with_extension("json.tmp");
+
+    fs::write(&temp_path, content).map_err(|e| {
+        format!(
+            "Failed to write sample notes state temp file {:?}: {}",
+            temp_path, e
+        )
+    })?;
+    fs::rename(&temp_path, &state_path).map_err(|e| {
+        format!(
+            "Failed to replace sample notes state {:?}: {}",
+            state_path, e
+        )
+    })
 }
 
 fn decide_copy_action(
