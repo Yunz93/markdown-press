@@ -1,6 +1,7 @@
 export const UI_FONT_SIZE_MIN = 12;
 export const UI_FONT_SIZE_MAX = 22;
 export const UI_FONT_SIZE_STEP = 1;
+export const DEFAULT_UI_FONT_SIZE = 16;
 
 export function clampUiFontSize(size: number): number {
   if (!Number.isFinite(size)) {
@@ -15,6 +16,32 @@ export function clampUiFontSize(size: number): number {
 
 export function stepUiFontSize(current: number, delta: number): number {
   return clampUiFontSize(current + delta * UI_FONT_SIZE_STEP);
+}
+
+export function getUiFontScale(uiFontSize: number): number {
+  return clampUiFontSize(uiFontSize) / DEFAULT_UI_FONT_SIZE;
+}
+
+export function getUiFontScalePercent(uiFontSize: number): number {
+  return Math.round(getUiFontScale(uiFontSize) * 100);
+}
+
+export function getScaledEditorFontSize(
+  baseFontSize: number,
+  uiFontSize: number,
+): number {
+  if (!Number.isFinite(baseFontSize)) {
+    return DEFAULT_UI_FONT_SIZE;
+  }
+
+  return Math.max(1, Math.round(baseFontSize * getUiFontScale(uiFontSize)));
+}
+
+export function getScaledCodeFontSize(
+  baseFontSize: number,
+  uiFontSize: number,
+): number {
+  return Math.max(12, getScaledEditorFontSize(baseFontSize, uiFontSize) - 2);
 }
 
 function hasPrimaryModifier(event: KeyboardEvent): boolean {

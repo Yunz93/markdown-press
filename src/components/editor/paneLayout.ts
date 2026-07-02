@@ -9,7 +9,7 @@ export interface PaneLayoutMetrics {
   sheetRadius: number;
 }
 
-export type PaneDensity = 'comfortable' | 'compact';
+export type PaneDensity = "comfortable" | "compact";
 
 const SMALL_BREAKPOINT = 360;
 const MEDIUM_BREAKPOINT = 920;
@@ -63,25 +63,44 @@ function interpolate(from: number, to: number, progress: number): number {
 function interpolateMetrics(
   from: PaneLayoutMetrics,
   to: PaneLayoutMetrics,
-  progress: number
+  progress: number,
 ): PaneLayoutMetrics {
   const t = clamp01(progress);
 
   return {
-    backdropPaddingX: interpolate(from.backdropPaddingX, to.backdropPaddingX, t),
-    backdropPaddingY: interpolate(from.backdropPaddingY, to.backdropPaddingY, t),
+    backdropPaddingX: interpolate(
+      from.backdropPaddingX,
+      to.backdropPaddingX,
+      t,
+    ),
+    backdropPaddingY: interpolate(
+      from.backdropPaddingY,
+      to.backdropPaddingY,
+      t,
+    ),
     frameMaxWidth: interpolate(from.frameMaxWidth, to.frameMaxWidth, t),
     sheetMaxWidth: interpolate(from.sheetMaxWidth, to.sheetMaxWidth, t),
     contentPaddingX: interpolate(from.contentPaddingX, to.contentPaddingX, t),
-    contentPaddingTop: interpolate(from.contentPaddingTop, to.contentPaddingTop, t),
-    contentPaddingBottom: interpolate(from.contentPaddingBottom, to.contentPaddingBottom, t),
+    contentPaddingTop: interpolate(
+      from.contentPaddingTop,
+      to.contentPaddingTop,
+      t,
+    ),
+    contentPaddingBottom: interpolate(
+      from.contentPaddingBottom,
+      to.contentPaddingBottom,
+      t,
+    ),
     sheetRadius: interpolate(from.sheetRadius, to.sheetRadius, t),
   };
 }
 
-export function getPaneLayoutMetrics(width: number, density: PaneDensity): PaneLayoutMetrics {
+export function getPaneLayoutMetrics(
+  width: number,
+  density: PaneDensity,
+): PaneLayoutMetrics {
   const safeWidth = Math.max(width || 0, SMALL_BREAKPOINT);
-  const densityScale = density === 'compact' ? 0.82 : 1;
+  const densityScale = density === "compact" ? 0.82 : 1;
 
   let metrics: PaneLayoutMetrics = SMALL_METRICS;
 
@@ -91,13 +110,13 @@ export function getPaneLayoutMetrics(width: number, density: PaneDensity): PaneL
     metrics = interpolateMetrics(
       MEDIUM_METRICS,
       LARGE_METRICS,
-      (safeWidth - MEDIUM_BREAKPOINT) / (LARGE_BREAKPOINT - MEDIUM_BREAKPOINT)
+      (safeWidth - MEDIUM_BREAKPOINT) / (LARGE_BREAKPOINT - MEDIUM_BREAKPOINT),
     );
   } else {
     metrics = interpolateMetrics(
       SMALL_METRICS,
       MEDIUM_METRICS,
-      (safeWidth - SMALL_BREAKPOINT) / (MEDIUM_BREAKPOINT - SMALL_BREAKPOINT)
+      (safeWidth - SMALL_BREAKPOINT) / (MEDIUM_BREAKPOINT - SMALL_BREAKPOINT),
     );
   }
 
@@ -109,6 +128,28 @@ export function getPaneLayoutMetrics(width: number, density: PaneDensity): PaneL
     contentPaddingX: scale(metrics.contentPaddingX, densityScale),
     contentPaddingTop: scale(metrics.contentPaddingTop, densityScale),
     contentPaddingBottom: scale(metrics.contentPaddingBottom, densityScale),
-    sheetRadius: scale(metrics.sheetRadius, density === 'compact' ? 0.92 : 1),
+    sheetRadius: scale(metrics.sheetRadius, density === "compact" ? 0.92 : 1),
+  };
+}
+
+export function scalePaneLayoutMetrics(
+  metrics: PaneLayoutMetrics,
+  scaleFactor: number,
+): PaneLayoutMetrics {
+  if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) {
+    return metrics;
+  }
+
+  const scaleValue = (value: number) => value * scaleFactor;
+
+  return {
+    backdropPaddingX: scaleValue(metrics.backdropPaddingX),
+    backdropPaddingY: scaleValue(metrics.backdropPaddingY),
+    frameMaxWidth: scaleValue(metrics.frameMaxWidth),
+    sheetMaxWidth: scaleValue(metrics.sheetMaxWidth),
+    contentPaddingX: scaleValue(metrics.contentPaddingX),
+    contentPaddingTop: scaleValue(metrics.contentPaddingTop),
+    contentPaddingBottom: scaleValue(metrics.contentPaddingBottom),
+    sheetRadius: scaleValue(metrics.sheetRadius),
   };
 }

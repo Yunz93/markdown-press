@@ -40,6 +40,7 @@ export interface UIState {
   isPublishing: boolean;
   settings: AppSettings;
   notification: Notification | null;
+  uiZoomHintPercent: number | null;
   activeHeadingId: string | null;
 }
 
@@ -58,6 +59,7 @@ export interface UIActions {
   ) => void;
   showNotification: (msg: string, type?: "success" | "error" | "info") => void;
   clearNotification: () => void;
+  showUiZoomHint: (percent: number) => void;
   setActiveHeadingId: (id: string | null) => void;
 }
 
@@ -179,6 +181,7 @@ export const initialUIState: UIState = {
   isPublishing: false,
   settings: defaultSettings,
   notification: null,
+  uiZoomHintPercent: null,
   activeHeadingId: null,
 };
 
@@ -190,6 +193,7 @@ export function createUISlice(
   get: () => UIState & UIActions,
 ): UIState & UIActions {
   let notificationTimer: ReturnType<typeof setTimeout> | null = null;
+  let uiZoomHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   return {
     ...initialUIState,
@@ -264,6 +268,18 @@ export function createUISlice(
       }
 
       set(() => ({ notification: null }));
+    },
+
+    showUiZoomHint: (percent) => {
+      if (uiZoomHintTimer) {
+        clearTimeout(uiZoomHintTimer);
+      }
+
+      set(() => ({ uiZoomHintPercent: percent }));
+      uiZoomHintTimer = setTimeout(() => {
+        uiZoomHintTimer = null;
+        set(() => ({ uiZoomHintPercent: null }));
+      }, 1200);
     },
 
     setActiveHeadingId: (id) => set(() => ({ activeHeadingId: id })),

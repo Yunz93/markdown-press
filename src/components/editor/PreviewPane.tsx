@@ -19,13 +19,22 @@ import React, {
   useDeferredValue,
 } from "react";
 import { useAppStore, selectContent } from "../../store/appStore";
-import { getPaneLayoutMetrics, type PaneDensity } from "./paneLayout";
+import {
+  getPaneLayoutMetrics,
+  scalePaneLayoutMetrics,
+  type PaneDensity,
+} from "./paneLayout";
 import { useFileOperations } from "../../hooks/useFileOperations";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import {
   getResolvedCodeFontFamily,
   getResolvedPreviewFontFamily,
 } from "../../utils/fontSettings";
+import {
+  getScaledCodeFontSize,
+  getScaledEditorFontSize,
+  getUiFontScale,
+} from "../../utils/uiFontSize";
 import {
   usePreviewRenderer,
   usePreviewScroll,
@@ -144,9 +153,22 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     );
     const metricsRef = useRef(layoutMetrics);
 
+    const uiFontScale = getUiFontScale(settings.uiFontSize);
+    const scaledPreviewFontSize = getScaledEditorFontSize(
+      settings.fontSize,
+      settings.uiFontSize,
+    );
+    const scaledCodeFontSize = getScaledCodeFontSize(
+      settings.fontSize,
+      settings.uiFontSize,
+    );
+
     // Optimized resize handling
     const observeResize = useThrottledResize((width) => {
-      const newMetrics = getPaneLayoutMetrics(width, density);
+      const newMetrics = scalePaneLayoutMetrics(
+        getPaneLayoutMetrics(width, density),
+        uiFontScale,
+      );
       metricsRef.current = newMetrics;
       setLayoutMetrics(newMetrics);
     }, 16);
@@ -165,11 +187,17 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           "--pane-content-bottom": `${layoutMetrics.contentPaddingBottom}px`,
           "--preview-content-bottom": `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
           "--preview-font-family": previewFontFamily,
-          "--preview-font-size": `${settings.fontSize}px`,
+          "--preview-font-size": `${scaledPreviewFontSize}px`,
           "--preview-code-font-family": codeFontFamily,
-          "--preview-code-font-size": `${Math.max(12, settings.fontSize - 2)}px`,
+          "--preview-code-font-size": `${scaledCodeFontSize}px`,
         }) as React.CSSProperties,
-      [layoutMetrics, previewFontFamily, settings.fontSize, codeFontFamily],
+      [
+        layoutMetrics,
+        previewFontFamily,
+        scaledPreviewFontSize,
+        scaledCodeFontSize,
+        codeFontFamily,
+      ],
     );
 
     // Optimized pane resize tracking
