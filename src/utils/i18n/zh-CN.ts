@@ -175,7 +175,7 @@ export default {
   settings_systemDefaultFontOption: "系统默认字体",
   settings_uiFontSize: "UI 字体大小",
   settings_uiFontSizeDesc:
-    "调整侧边栏、工具栏、设置面板等界面文字大小，不影响编辑器和预览正文。可用 Cmd/Ctrl + +/- 快速调整。",
+    "调整界面、编辑区与预览区的显示比例。可用 Cmd/Ctrl + +/- 快速调整，并显示当前缩放百分比。",
   settings_zoomUiIn: "放大界面",
   settings_zoomUiInDesc: "增大侧边栏、工具栏、设置面板等界面文字大小。",
   settings_zoomUiOut: "缩小界面",

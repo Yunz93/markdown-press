@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   clampUiFontSize,
+  DEFAULT_UI_FONT_SIZE,
+  getScaledCodeFontSize,
+  getScaledEditorFontSize,
+  getUiFontScale,
+  getUiFontScalePercent,
   getUiFontSizeZoomDelta,
   stepUiFontSize,
   UI_FONT_SIZE_MAX,
@@ -33,6 +38,14 @@ describe("uiFontSize utils", () => {
     expect(stepUiFontSize(16, -1)).toBe(15);
     expect(stepUiFontSize(UI_FONT_SIZE_MIN, -1)).toBe(UI_FONT_SIZE_MIN);
     expect(stepUiFontSize(UI_FONT_SIZE_MAX, 1)).toBe(UI_FONT_SIZE_MAX);
+  });
+
+  it("derives ui scale percent from the default size", () => {
+    expect(getUiFontScale(DEFAULT_UI_FONT_SIZE)).toBe(1);
+    expect(getUiFontScalePercent(DEFAULT_UI_FONT_SIZE)).toBe(100);
+    expect(getUiFontScalePercent(18)).toBe(113);
+    expect(getScaledEditorFontSize(16, 18)).toBe(18);
+    expect(getScaledCodeFontSize(16, 18)).toBe(16);
   });
 
   it("detects zoom in shortcuts with primary modifier", () => {

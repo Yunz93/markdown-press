@@ -12,6 +12,8 @@ import { useViewMode } from "./hooks/useViewMode";
 import { useSettings } from "./hooks/useSettings";
 import { useGlobalKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useUiFontSizeKeyboardShortcuts } from "./hooks/useUiFontSizeKeyboardShortcuts";
+import { getScaledEditorFontSize } from "./utils/uiFontSize";
+import { UiZoomHint } from "./components/ui/UiZoomHint";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
@@ -118,15 +120,19 @@ const App: React.FC = () => {
 
   useThemeSync(settings.themeMode);
   useLayoutEffect(() => {
+    const scaledFontSize = getScaledEditorFontSize(
+      settings.fontSize,
+      settings.uiFontSize,
+    );
     document.documentElement.style.setProperty(
       "--editor-font-size",
-      `${settings.fontSize}px`,
+      `${scaledFontSize}px`,
     );
     document.documentElement.style.setProperty(
       "--editor-font-family",
       getResolvedEditorFontFamily(settings),
     );
-  }, [settings.fontSize, settings.editorFontFamily]);
+  }, [settings.fontSize, settings.uiFontSize, settings.editorFontFamily]);
   useAppBootstrap({
     settings,
     settingsHydrated,
@@ -677,6 +683,7 @@ const App: React.FC = () => {
           }}
           onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
         />
+        <UiZoomHint />
       </div>
     </ErrorBoundary>
   );
