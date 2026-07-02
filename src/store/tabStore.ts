@@ -126,8 +126,11 @@ export function createTabSlice(
           (state as { fileHistories?: Record<string, unknown> })
             .fileHistories?.[fileId] !== undefined
             ? {
-                [fileId]: (state as { fileHistories: Record<string, unknown> })
-                  .fileHistories[fileId],
+                [fileId]: (
+                  state as unknown as {
+                    fileHistories: Record<string, unknown>;
+                  }
+                ).fileHistories[fileId],
               }
             : {};
 

@@ -25,6 +25,7 @@ export const useSearch = () => {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [replacement, setReplacement] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [resultsTruncated, setResultsTruncated] = useState(false);
 
   // Refs for debounced search
