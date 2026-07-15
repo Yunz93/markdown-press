@@ -1,5 +1,5 @@
-import { getFileSystem, isTauriEnvironment } from '../types/filesystem';
-import { normalizeRemoteImageUrl } from './remoteImageUrl';
+import { getFileSystem, isTauriEnvironment } from "../types/filesystem";
+import { normalizeRemoteImageUrl } from "./remoteImageUrl";
 
 const resolvedPreviewImageCache = new Map<string, string>();
 const previewImageLoadCache = new Map<string, Promise<string>>();
@@ -9,7 +9,7 @@ const createdBlobUrls = new Set<string>();
 let unloadCleanupRegistered = false;
 
 function getCacheKey(src: string, sourceFilePath?: string): string {
-  return `${sourceFilePath ?? ''}::${src}`;
+  return `${sourceFilePath ?? ""}::${src}`;
 }
 
 function hasUrlScheme(value: string): boolean {
@@ -21,24 +21,28 @@ function isAbsoluteFilePath(value: string): boolean {
 }
 
 function isBrowserVirtualPath(value: string): boolean {
-  return /^browser(?:-dir)?-\d+(?:\/|$)/.test(value) || /^browser-\d+-/.test(value);
+  return (
+    /^browser(?:-dir)?-\d+(?:\/|$)/.test(value) || /^browser-\d+-/.test(value)
+  );
 }
 
 function decodeFileUrlPath(fileUrl: string): string {
   try {
     const url = new URL(fileUrl);
     const decodedPath = decodeURIComponent(url.pathname);
-    return /^\/[a-zA-Z]:\//.test(decodedPath) ? decodedPath.slice(1) : decodedPath;
+    return /^\/[a-zA-Z]:\//.test(decodedPath)
+      ? decodedPath.slice(1)
+      : decodedPath;
   } catch {
-    return fileUrl.replace(/^file:\/\//i, '');
+    return fileUrl.replace(/^file:\/\//i, "");
   }
 }
 
 function splitPathRoot(path: string): { root: string; segments: string[] } {
-  const normalized = path.replace(/\\/g, '/');
+  const normalized = path.replace(/\\/g, "/");
 
   if (isBrowserVirtualPath(normalized)) {
-    const [root, ...rest] = normalized.split('/');
+    const [root, ...rest] = normalized.split("/");
     return { root, segments: rest };
   }
 
@@ -46,47 +50,53 @@ function splitPathRoot(path: string): { root: string; segments: string[] } {
   if (windowsMatch) {
     return {
       root: windowsMatch[1],
-      segments: (windowsMatch[2] ?? '').split('/').filter(Boolean),
+      segments: (windowsMatch[2] ?? "").split("/").filter(Boolean),
     };
   }
 
-  if (normalized.startsWith('/')) {
+  if (normalized.startsWith("/")) {
     return {
-      root: '/',
-      segments: normalized.slice(1).split('/').filter(Boolean),
+      root: "/",
+      segments: normalized.slice(1).split("/").filter(Boolean),
     };
   }
 
   return {
-    root: '',
-    segments: normalized.split('/').filter(Boolean),
+    root: "",
+    segments: normalized.split("/").filter(Boolean),
   };
 }
 
 function joinNormalizedPath(root: string, segments: string[]): string {
-  if (root === '/') {
-    return `/${segments.join('/')}`;
+  if (root === "/") {
+    return `/${segments.join("/")}`;
   }
 
   if (!root) {
-    return segments.join('/');
+    return segments.join("/");
   }
 
-  return segments.length > 0 ? `${root}/${segments.join('/')}` : root;
+  return segments.length > 0 ? `${root}/${segments.join("/")}` : root;
 }
 
-function resolveRelativeLocalPath(sourceFilePath: string, targetPath: string): string {
+function resolveRelativeLocalPath(
+  sourceFilePath: string,
+  targetPath: string,
+): string {
   const source = splitPathRoot(sourceFilePath);
-  const target = targetPath.replace(/\\/g, '/');
-  const isAbsoluteTarget = target.startsWith('/') || /^[a-zA-Z]:\//.test(target) || isBrowserVirtualPath(target);
+  const target = targetPath.replace(/\\/g, "/");
+  const isAbsoluteTarget =
+    target.startsWith("/") ||
+    /^[a-zA-Z]:\//.test(target) ||
+    isBrowserVirtualPath(target);
   const baseSegments = isAbsoluteTarget ? [] : source.segments.slice(0, -1);
   const { root: targetRoot, segments: targetSegments } = splitPathRoot(target);
   const root = targetRoot || source.root;
   const segments = isAbsoluteTarget ? [] : baseSegments;
 
   for (const segment of targetSegments) {
-    if (!segment || segment === '.') continue;
-    if (segment === '..') {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
       if (segments.length > 0) {
         segments.pop();
       }
@@ -99,14 +109,18 @@ function resolveRelativeLocalPath(sourceFilePath: string, targetPath: string): s
 }
 
 function registerUnloadCleanup() {
-  if (unloadCleanupRegistered || typeof window === 'undefined') {
+  if (unloadCleanupRegistered || typeof window === "undefined") {
     return;
   }
 
-  window.addEventListener('beforeunload', () => {
-    createdBlobUrls.forEach((url) => URL.revokeObjectURL(url));
-    createdBlobUrls.clear();
-  }, { once: true });
+  window.addEventListener(
+    "beforeunload",
+    () => {
+      createdBlobUrls.forEach((url) => URL.revokeObjectURL(url));
+      createdBlobUrls.clear();
+    },
+    { once: true },
+  );
 
   unloadCleanupRegistered = true;
 }
@@ -119,37 +133,45 @@ function registerUnloadCleanup() {
  * in long, image-heavy preview documents. Browser virtual paths still need
  * object URLs because there is no asset protocol.
  */
-export async function resolvePreviewSource(src: string, sourceFilePath?: string): Promise<string> {
+export async function resolvePreviewSource(
+  src: string,
+  sourceFilePath?: string,
+): Promise<string> {
   const trimmedSrc = src.trim();
-  if (!trimmedSrc || trimmedSrc.startsWith('data:') || trimmedSrc.startsWith('blob:')) {
+  if (
+    !trimmedSrc ||
+    trimmedSrc.startsWith("data:") ||
+    trimmedSrc.startsWith("blob:")
+  ) {
     return trimmedSrc;
   }
 
-  const localSourceCandidate = trimmedSrc.startsWith('file://')
+  const localSourceCandidate = trimmedSrc.startsWith("file://")
     ? decodeFileUrlPath(trimmedSrc)
-    : (
-      isAbsoluteFilePath(trimmedSrc)
-      || isBrowserVirtualPath(trimmedSrc)
-      || (!hasUrlScheme(trimmedSrc) && sourceFilePath)
-        ? (sourceFilePath && !hasUrlScheme(trimmedSrc) && !isAbsoluteFilePath(trimmedSrc) && !isBrowserVirtualPath(trimmedSrc)
-          ? resolveRelativeLocalPath(sourceFilePath, trimmedSrc)
-          : trimmedSrc)
-        : ''
-    );
+    : isAbsoluteFilePath(trimmedSrc) ||
+        isBrowserVirtualPath(trimmedSrc) ||
+        (!hasUrlScheme(trimmedSrc) && sourceFilePath)
+      ? sourceFilePath &&
+        !hasUrlScheme(trimmedSrc) &&
+        !isAbsoluteFilePath(trimmedSrc) &&
+        !isBrowserVirtualPath(trimmedSrc)
+        ? resolveRelativeLocalPath(sourceFilePath, trimmedSrc)
+        : trimmedSrc
+      : "";
 
   // Tauri: use the asset protocol instead of reading bytes into memory.
   if (isTauriEnvironment()) {
-    if (trimmedSrc.startsWith('asset:') || trimmedSrc.startsWith('tauri:')) {
+    if (trimmedSrc.startsWith("asset:") || trimmedSrc.startsWith("tauri:")) {
       return trimmedSrc;
     }
 
-    const { convertFileSrc } = await import('@tauri-apps/api/core');
-    const { dirname, join, normalize } = await import('@tauri-apps/api/path');
+    const { convertFileSrc } = await import("@tauri-apps/api/core");
+    const { dirname, join, normalize } = await import("@tauri-apps/api/path");
 
-    let absolutePath = '';
+    let absolutePath = "";
     if (localSourceCandidate && !isBrowserVirtualPath(localSourceCandidate)) {
       absolutePath = localSourceCandidate;
-    } else if (trimmedSrc.startsWith('file://')) {
+    } else if (trimmedSrc.startsWith("file://")) {
       absolutePath = decodeFileUrlPath(trimmedSrc);
     } else if (isAbsoluteFilePath(trimmedSrc)) {
       absolutePath = trimmedSrc;
@@ -165,7 +187,7 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
   if (localSourceCandidate) {
     try {
       const fs = await getFileSystem();
-      if (typeof fs.getFileObjectUrl === 'function') {
+      if (typeof fs.getFileObjectUrl === "function") {
         return await fs.getFileObjectUrl(localSourceCandidate);
       }
     } catch {
@@ -173,7 +195,11 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
     }
   }
 
-  if (!hasUrlScheme(trimmedSrc) && sourceFilePath && typeof window !== 'undefined') {
+  if (
+    !hasUrlScheme(trimmedSrc) &&
+    sourceFilePath &&
+    typeof window !== "undefined"
+  ) {
     try {
       return new URL(trimmedSrc, window.location.href).toString();
     } catch {
@@ -183,17 +209,17 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
 
   return normalizeRemoteImageUrl(
     trimmedSrc,
-    typeof window !== 'undefined' ? window.location.protocol : undefined
+    typeof window !== "undefined" ? window.location.protocol : undefined,
   );
 }
 
 /** True when displaying the image requires reading file bytes (browser FS Access). */
 export function previewSourceNeedsMaterialization(src: string): boolean {
   const trimmed = src.trim();
-  if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+  if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
     return false;
   }
-  if (hasUrlScheme(trimmed) && !trimmed.startsWith('file://')) {
+  if (hasUrlScheme(trimmed) && !trimmed.startsWith("file://")) {
     return false;
   }
   if (isTauriEnvironment()) {
@@ -203,7 +229,7 @@ export function previewSourceNeedsMaterialization(src: string): boolean {
 }
 
 async function fetchBlobUrl(src: string): Promise<string> {
-  if (src.startsWith('data:') || src.startsWith('blob:')) {
+  if (src.startsWith("data:") || src.startsWith("blob:")) {
     return src;
   }
 
@@ -216,10 +242,10 @@ async function fetchBlobUrl(src: string): Promise<string> {
     registerUnloadCleanup();
 
     const response = await fetch(src, {
-      cache: 'force-cache',
-      credentials: 'omit',
-      mode: /^https?:\/\//i.test(src) ? 'cors' : 'same-origin',
-      referrerPolicy: 'no-referrer',
+      cache: "force-cache",
+      credentials: "omit",
+      mode: /^https?:\/\//i.test(src) ? "cors" : "same-origin",
+      referrerPolicy: "no-referrer",
     });
 
     if (!response.ok) {
@@ -238,36 +264,48 @@ async function fetchBlobUrl(src: string): Promise<string> {
   return cached;
 }
 
-export function getCachedPreviewImageSrc(src: string, sourceFilePath?: string): string | null {
-  return resolvedPreviewImageCache.get(getCacheKey(src, sourceFilePath)) ?? null;
+export function getCachedPreviewImageSrc(
+  src: string,
+  sourceFilePath?: string,
+): string | null {
+  return (
+    resolvedPreviewImageCache.get(getCacheKey(src, sourceFilePath)) ?? null
+  );
 }
 
-export function hydrateCachedPreviewImageSources(html: string, sourceFilePath?: string): string {
-  if (!html.includes('<img') || typeof DOMParser === 'undefined') {
+export function hydrateCachedPreviewImageSources(
+  html: string,
+  sourceFilePath?: string,
+): string {
+  if (!html.includes("<img") || typeof DOMParser === "undefined") {
     return html;
   }
 
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const parsed = new DOMParser().parseFromString(html, "text/html");
   let hasChanges = false;
 
-  parsed.querySelectorAll('img').forEach((image) => {
-    const originalSrc = image.getAttribute('data-original-src') || image.getAttribute('src');
+  parsed.querySelectorAll("img").forEach((image) => {
+    const originalSrc =
+      image.getAttribute("data-original-src") || image.getAttribute("src");
     if (!originalSrc) return;
 
     const cachedSrc = getCachedPreviewImageSrc(originalSrc, sourceFilePath);
-    if (!cachedSrc || cachedSrc === image.getAttribute('src')) {
+    if (!cachedSrc || cachedSrc === image.getAttribute("src")) {
       return;
     }
 
-    image.setAttribute('data-original-src', originalSrc);
-    image.setAttribute('src', cachedSrc);
+    image.setAttribute("data-original-src", originalSrc);
+    image.setAttribute("src", cachedSrc);
     hasChanges = true;
   });
 
   return hasChanges ? parsed.body.innerHTML : html;
 }
 
-export async function warmPreviewImage(src: string, sourceFilePath?: string): Promise<string> {
+export async function warmPreviewImage(
+  src: string,
+  sourceFilePath?: string,
+): Promise<string> {
   const cacheKey = getCacheKey(src, sourceFilePath);
   const cached = resolvedPreviewImageCache.get(cacheKey);
   if (cached) {
@@ -287,7 +325,7 @@ export async function warmPreviewImage(src: string, sourceFilePath?: string): Pr
     }
 
     // Already an in-memory object/data URL — cache and return without re-fetching.
-    if (resolvedSrc.startsWith('blob:') || resolvedSrc.startsWith('data:')) {
+    if (resolvedSrc.startsWith("blob:") || resolvedSrc.startsWith("data:")) {
       resolvedPreviewImageCache.set(cacheKey, resolvedSrc);
       return resolvedSrc;
     }
@@ -325,7 +363,7 @@ export function mountLazyPreviewImageWarming(
   container: HTMLElement,
   options: LazyPreviewImageWarmOptions = {},
 ): () => void {
-  if (typeof IntersectionObserver === 'undefined') {
+  if (typeof IntersectionObserver === "undefined") {
     return () => {};
   }
 
@@ -345,32 +383,37 @@ export function mountLazyPreviewImageWarming(
       void (async () => {
         try {
           const originalSrc =
-            image.getAttribute('data-original-src')?.trim()
-            || image.getAttribute('data-preview-pending-src')?.trim();
+            image.getAttribute("data-original-src")?.trim() ||
+            image.getAttribute("data-preview-pending-src")?.trim();
           if (!originalSrc) return;
 
           const warmedSrc = await warmPreviewImage(originalSrc, sourceFilePath);
           if (cancelled || !image.isConnected) return;
 
-          image.setAttribute('src', warmedSrc);
-          image.setAttribute('data-original-src', originalSrc);
-          image.setAttribute('data-preview-warmed', 'true');
-          image.removeAttribute('data-preview-pending-src');
-          image.setAttribute('decoding', 'async');
-          image.setAttribute('loading', 'lazy');
-          image.setAttribute('fetchpriority', 'auto');
+          image.setAttribute("src", warmedSrc);
+          image.setAttribute("data-original-src", originalSrc);
+          image.setAttribute("data-preview-warmed", "true");
+          image.removeAttribute("data-preview-pending-src");
+          image.setAttribute("decoding", "async");
+          image.setAttribute("loading", "lazy");
+          image.setAttribute("fetchpriority", "auto");
         } catch (error) {
-          console.warn('Failed to lazily warm preview image:', error);
+          console.warn("Failed to lazily warm preview image:", error);
           if (cancelled || !image.isConnected) return;
 
-          const pendingSrc = image.getAttribute('data-preview-pending-src')?.trim();
-          if (pendingSrc && !image.getAttribute('src')) {
+          const pendingSrc = image
+            .getAttribute("data-preview-pending-src")
+            ?.trim();
+          if (pendingSrc && !image.getAttribute("src")) {
             try {
-              const fallbackSrc = await resolvePreviewSource(pendingSrc, sourceFilePath);
+              const fallbackSrc = await resolvePreviewSource(
+                pendingSrc,
+                sourceFilePath,
+              );
               if (!cancelled && image.isConnected) {
-                image.setAttribute('src', fallbackSrc);
-                image.setAttribute('data-preview-warmed', 'true');
-                image.removeAttribute('data-preview-pending-src');
+                image.setAttribute("src", fallbackSrc);
+                image.setAttribute("data-preview-warmed", "true");
+                image.removeAttribute("data-preview-pending-src");
               }
             } catch {
               // Leave the placeholder; the image stays unloaded.
@@ -385,7 +428,11 @@ export function mountLazyPreviewImageWarming(
   };
 
   const enqueue = (image: HTMLImageElement) => {
-    if (cancelled || queued.has(image) || image.getAttribute('data-preview-warmed') === 'true') {
+    if (
+      cancelled ||
+      queued.has(image) ||
+      image.getAttribute("data-preview-warmed") === "true"
+    ) {
       return;
     }
     queued.add(image);
@@ -405,7 +452,7 @@ export function mountLazyPreviewImageWarming(
     },
     {
       root: options.root ?? null,
-      rootMargin: options.rootMargin ?? '320px 0px',
+      rootMargin: options.rootMargin ?? "320px 0px",
       threshold: 0.01,
     },
   );
