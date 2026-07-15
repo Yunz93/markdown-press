@@ -186,16 +186,17 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         <div
           ref={itemRef}
           className={`
-          group flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm font-medium border border-transparent
+          group relative flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm border border-transparent
           ${
             isActive
-              ? "border-gray-200/70 bg-white/72 text-gray-900 shadow-sm dark:border-white/10 dark:bg-[#1a2230] dark:text-white"
-              : "text-gray-600 hover:bg-black/[0.04] hover:text-black dark:text-slate-400 dark:hover:bg-[#121923] dark:hover:text-white"
+              ? "bg-accent-DEFAULT/14 text-gray-900 font-semibold shadow-sm ring-1 ring-inset ring-accent-DEFAULT/35 dark:bg-accent-DEFAULT/22 dark:text-white dark:ring-accent-DEFAULT/45"
+              : "font-medium text-gray-600 hover:bg-black/[0.04] hover:text-black dark:text-slate-400 dark:hover:bg-[#121923] dark:hover:text-white"
           }
           ${isDragOver ? "bg-accent-DEFAULT/20 border-accent-DEFAULT dark:bg-accent-DEFAULT/20 dark:border-accent-DEFAULT" : ""}
           ${isDragging ? "opacity-60" : ""}
         `}
           style={{ paddingLeft: `${level * 8 + 12}px` }}
+          aria-selected={isActive}
           draggable={!node.isTrash}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
@@ -206,6 +207,12 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
           onContextMenu={handleRightClick}
           title={displayName}
         >
+          {isActive && (
+            <span
+              aria-hidden
+              className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-accent-DEFAULT"
+            />
+          )}
           <span
             className={`mr-2.5 transition-colors ${isActive ? "text-accent-DEFAULT" : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"}`}
           >
