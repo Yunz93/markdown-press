@@ -65,6 +65,8 @@ import {
   isValidExternalUrl,
   type FrontmatterValue,
 } from "./preview/previewPaneHelpers";
+import { useLargeDocDebouncedValue } from "./preview/useLargeDocDebouncedValue";
+import { usePreviewScrollSpy } from "./preview/usePreviewScrollSpy";
 
 interface PreviewPaneProps {
   highlighter?: ShikiHighlighter | null;
@@ -106,7 +108,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     const activeTabId = useAppStore((state) => state.activeTabId);
     const content = useAppStore(selectContent);
     const fileContents = useAppStore((state) => state.fileContents);
-    const previewContent = useDeferredValue(content);
+    // Large documents: debounce before deferring so each keystroke does not
+    // re-run the full markdown render pipeline.
+    const debouncedContent = useLargeDocDebouncedValue(content, activeTabId);
+    const previewContent = useDeferredValue(debouncedContent);
     const previewFontFamily = useMemo(
       () => getResolvedPreviewFontFamily(settings),
       [settings.previewFontFamily],
@@ -303,6 +308,12 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         scroll.handleScroll(event.currentTarget);
       },
       [scroll],
+    );
+
+    // Keep the outline highlight following the reading position
+    usePreviewScrollSpy(
+      previewRef,
+      isMarkdownPreview && previewRenderActive && hasActiveFile,
     );
 
     // Cancel sync on user scroll intent
