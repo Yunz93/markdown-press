@@ -1,13 +1,18 @@
 import { useCallback, useRef } from "react";
 import { useAppStore } from "../store/appStore";
-import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
+import {
+  hydrateSensitiveSettingsIntoStore,
+  persistSecureSetting,
+} from "../services/secureSettingsService";
 import {
   updateFrontmatter,
 } from "../utils/frontmatter";
 import { type Frontmatter } from "../types";
 import {
+  applySimpleBlogPublishInput,
   buildSimpleBlogPostUrl,
   prepareSimpleBlogPublish,
+  type SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
 import {
   prepareWechatDraftPublish,
@@ -149,284 +154,301 @@ export function usePublishActions(
     [settings.language],
   );
 
-  const handlePublishSimpleBlog = useCallback(async () => {
-    const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
-    const targetTabId = activeTabId;
+  const handlePublishSimpleBlog = useCallback(
+    async (input: SimpleBlogPublishInput) => {
+      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      const targetTabId = activeTabId;
+      const language = hydratedSettings.language;
 
-    if (!targetTabId) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_noFileToPublish"),
-        "error",
-      );
-      return;
-    }
-
-    if (!isTauriEnvironment()) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_desktopPublishOnly"),
-        "error",
-      );
-      return;
-    }
-
-    if (!hydratedSettings.blogRepoUrl.trim()) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_setBlogRepoFirst"),
-        "error",
-      );
-      return;
-    }
-
-    if (!isValidBlogRepoUrl(hydratedSettings.blogRepoUrl)) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_setValidBlogRepoFirst"),
-        "error",
-      );
-      return;
-    }
-
-    if (!hydratedSettings.blogSiteUrl.trim()) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_setBlogSiteFirst"),
-        "error",
-      );
-      return;
-    }
-
-    if (!isValidBlogSiteUrl(hydratedSettings.blogSiteUrl)) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_setValidBlogSiteFirst"),
-        "error",
-      );
-      return;
-    }
-
-    if (!hydratedSettings.blogGithubToken?.trim()) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_setGithubTokenFirst"),
-        "error",
-      );
-      return;
-    }
-
-    const currentContent = useAppStore.getState().fileContents[targetTabId];
-    if (!currentContent) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_noContentToPublish"),
-        "error",
-      );
-      return;
-    }
-
-    const activeFile = findFileInTree(files, targetTabId);
-    if (!activeFile) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_noFileToPublish"),
-        "error",
-      );
-      return;
-    }
-
-    if (!isMarkdownFile(activeFile.name)) {
-      showNotification(
-        t(hydratedSettings.language, "notifications_exportMarkdownOnly"),
-        "error",
-      );
-      return;
-    }
-
-    setPublishing(true);
-    let publishCheckpointContent: string | null = null;
-    const rollbackPublishCheckpoint = async () => {
-      if (publishCheckpointContent === null) return;
-      setContentForFile(targetTabId, publishCheckpointContent);
-      await forceSave(publishCheckpointContent, { trigger: "system" });
-    };
-
-    try {
-      // Keep the local note unpublished until the remote publish succeeds.
-      // `prepareSimpleBlogPublish` still stamps `is_publish: true` onto the
-      // uploaded markdown payload so the remote post is marked correctly.
-      publishCheckpointContent = currentContent;
-
-      const saved = await forceSave(currentContent, { trigger: "system" });
-      if (!saved) {
+      if (!targetTabId) {
         showNotification(
-          t(hydratedSettings.language, "notifications_saveBeforePublishFailed"),
+          t(language, "notifications_noFileToPublish"),
           "error",
         );
-        return;
+        return false;
       }
 
-      const storeState = useAppStore.getState();
-      const contentToPublish =
-        storeState.fileContents[targetTabId] ?? currentContent;
-      const latestFiles = storeState.files;
-      const latestRootFolderPath = storeState.rootFolderPath;
+      if (!isTauriEnvironment()) {
+        showNotification(
+          t(language, "notifications_desktopPublishOnly"),
+          "error",
+        );
+        return false;
+      }
 
-      const hostingResult = await replaceLocalImagesWithHostingForPublish(
-        contentToPublish,
-        {
+      const normalizedBlogRepoUrl = normalizeBlogRepoUrl(input.blogRepoUrl);
+      const normalizedBlogSiteUrl = normalizeBlogSiteUrl(input.blogSiteUrl);
+      const blogGithubToken = input.blogGithubToken.trim();
+
+      if (!normalizedBlogRepoUrl || !isValidBlogRepoUrl(normalizedBlogRepoUrl)) {
+        showNotification(
+          t(language, "notifications_setValidBlogRepoFirst"),
+          "error",
+        );
+        return false;
+      }
+
+      if (!normalizedBlogSiteUrl || !isValidBlogSiteUrl(normalizedBlogSiteUrl)) {
+        showNotification(
+          t(language, "notifications_setValidBlogSiteFirst"),
+          "error",
+        );
+        return false;
+      }
+
+      if (!blogGithubToken) {
+        showNotification(
+          t(language, "notifications_setGithubTokenFirst"),
+          "error",
+        );
+        return false;
+      }
+
+      if (!input.title.trim()) {
+        showNotification(
+          t(language, "notifications_noContentToPublish"),
+          "error",
+        );
+        return false;
+      }
+
+      const currentContent = useAppStore.getState().fileContents[targetTabId];
+      if (!currentContent) {
+        showNotification(
+          t(language, "notifications_noContentToPublish"),
+          "error",
+        );
+        return false;
+      }
+
+      const activeFile = findFileInTree(files, targetTabId);
+      if (!activeFile) {
+        showNotification(
+          t(language, "notifications_noFileToPublish"),
+          "error",
+        );
+        return false;
+      }
+
+      if (!isMarkdownFile(activeFile.name)) {
+        showNotification(
+          t(language, "notifications_exportMarkdownOnly"),
+          "error",
+        );
+        return false;
+      }
+
+      useAppStore.getState().updateSettings({
+        blogRepoUrl: normalizedBlogRepoUrl,
+        blogSiteUrl: normalizedBlogSiteUrl,
+        blogGithubToken,
+      });
+
+      try {
+        await persistSecureSetting("blogGithubToken", blogGithubToken);
+      } catch (error) {
+        console.error("Failed to persist GitHub token before publish:", error);
+        showNotification(
+          t(language, "notifications_setGithubTokenFirst"),
+          "error",
+        );
+        return false;
+      }
+
+      const publishSettings = {
+        ...useAppStore.getState().settings,
+        blogRepoUrl: normalizedBlogRepoUrl,
+        blogSiteUrl: normalizedBlogSiteUrl,
+        blogGithubToken,
+      };
+
+      setPublishing(true);
+      let publishCheckpointContent: string | null = null;
+
+      try {
+        // Keep the local note unpublished until the remote publish succeeds.
+        // `prepareSimpleBlogPublish` still stamps `is_publish: true` onto the
+        // uploaded markdown payload so the remote post is marked correctly.
+        publishCheckpointContent = currentContent;
+
+        const contentWithMeta = applySimpleBlogPublishInput(
+          currentContent,
+          input,
+        );
+        setContentForFile(targetTabId, contentWithMeta);
+
+        const saved = await forceSave(contentWithMeta, { trigger: "system" });
+        if (!saved) {
+          showNotification(
+            t(language, "notifications_saveBeforePublishFailed"),
+            "error",
+          );
+          return false;
+        }
+
+        const storeState = useAppStore.getState();
+        const contentToPublish =
+          storeState.fileContents[targetTabId] ?? contentWithMeta;
+        const latestFiles = storeState.files;
+        const latestRootFolderPath = storeState.rootFolderPath;
+
+        const hostingResult = await replaceLocalImagesWithHostingForPublish(
+          contentToPublish,
+          {
+            files: latestFiles,
+            rootFolderPath: latestRootFolderPath,
+            currentFilePath: activeFile.path,
+            settings: publishSettings,
+          },
+        );
+
+        if (!hostingResult.ok) {
+          if (hostingResult.reason === "hosting_not_configured") {
+            showNotification(
+              t(language, "notifications_imageHostingNotConfigured"),
+              "error",
+            );
+          } else {
+            showNotification(
+              t(language, "notifications_imageUploadFailed", {
+                error: hostingResult.message,
+              }),
+              "error",
+            );
+          }
+          return false;
+        }
+
+        let markdownForPublish = hostingResult.markdown;
+        if (markdownForPublish !== contentToPublish) {
+          const beforeHostingContent =
+            useAppStore.getState().fileContents[targetTabId] ?? contentToPublish;
+
+          setContentForFile(targetTabId, markdownForPublish);
+          const savedHosting = await forceSave(markdownForPublish, {
+            trigger: "system",
+          });
+          if (!savedHosting) {
+            setContentForFile(targetTabId, beforeHostingContent);
+            showNotification(
+              t(language, "notifications_saveBeforePublishFailed"),
+              "error",
+            );
+            return false;
+          }
+          markdownForPublish =
+            useAppStore.getState().fileContents[targetTabId] ??
+            markdownForPublish;
+        }
+
+        const prepared = await prepareSimpleBlogPublish({
           files: latestFiles,
+          blogSiteUrl: normalizedBlogSiteUrl,
           rootFolderPath: latestRootFolderPath,
           currentFilePath: activeFile.path,
-          settings: hydratedSettings,
-        },
-      );
+          markdownContent: markdownForPublish,
+          markdownStylePreset: storeState.settings.markdownStylePreset,
+        });
 
-      if (!hostingResult.ok) {
-        if (hostingResult.reason === "hosting_not_configured") {
+        if (prepared.unresolvedImages.length > 0) {
+          console.warn(
+            "[publish] unresolved local images:",
+            prepared.unresolvedImages,
+          );
+        }
+
+        await invokePublishWithTimeout<{ deploymentUrl?: string | null }>(
+          "publish_simple_blog",
+          {
+            request: {
+              blogRepoUrl: normalizedBlogRepoUrl,
+              blogGithubToken,
+              postRelativePath: prepared.postRelativePath,
+              assetDirectoryRelativePath: prepared.assetDirectoryRelativePath,
+              markdownContent: prepared.markdownContent,
+              assets: prepared.assets,
+            },
+          },
+        );
+
+        const publishedUrl = buildSimpleBlogPostUrl(
+          normalizedBlogSiteUrl,
+          prepared.markdownContent,
+          prepared.postRelativePath,
+        );
+
+        // Remote publish succeeded — now write local publish markers.
+        await backfillFrontmatter(
+          targetTabId,
+          activeFile.path,
+          publishedUrl
+            ? { is_publish: true, link: publishedUrl }
+            : { is_publish: true },
+          "notifications_publishBackfillFailed",
+        );
+
+        if (!publishedUrl) {
           showNotification(
-            t(
-              hydratedSettings.language,
-              "notifications_imageHostingNotConfigured",
-            ),
-            "error",
+            t(language, "notifications_publishUrlBuildFailed"),
+            "warning",
+          );
+          return true;
+        }
+
+        if (prepared.unresolvedImages.length > 0) {
+          // The publish itself succeeded; missing images are a warning, not an error.
+          showNotification(
+            t(language, "notifications_publishSuccessWithMissingImages", {
+              count: String(prepared.unresolvedImages.length),
+            }),
+            "warning",
           );
         } else {
           showNotification(
-            t(hydratedSettings.language, "notifications_imageUploadFailed", {
-              error: hostingResult.message,
-            }),
-            "error",
+            t(language, "notifications_publishSuccess"),
+            "success",
           );
         }
-        return;
-      }
-
-      let markdownForPublish = hostingResult.markdown;
-      if (markdownForPublish !== contentToPublish) {
-        const beforeHostingContent =
-          useAppStore.getState().fileContents[targetTabId] ?? contentToPublish;
-
-        setContentForFile(targetTabId, markdownForPublish);
-        const savedHosting = await forceSave(markdownForPublish, {
-          trigger: "system",
-        });
-        if (!savedHosting) {
-          setContentForFile(targetTabId, beforeHostingContent);
+        return true;
+      } catch (error) {
+        console.error("Failed to publish blog:", error);
+        if (error instanceof PublishTimeoutError) {
+          // Backend may still succeed remotely. Local note stays unpublished
+          // until the user re-publishes or we confirm; avoid forging success.
           showNotification(
-            t(
-              hydratedSettings.language,
-              "notifications_saveBeforePublishFailed",
-            ),
-            "error",
+            t(language, "notifications_publishResultUnknown"),
+            "warning",
           );
-          return;
+          return false;
         }
-        markdownForPublish =
-          useAppStore.getState().fileContents[targetTabId] ??
-          markdownForPublish;
-      }
-
-      const prepared = await prepareSimpleBlogPublish({
-        files: latestFiles,
-        blogSiteUrl: normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
-        rootFolderPath: latestRootFolderPath,
-        currentFilePath: activeFile.path,
-        markdownContent: markdownForPublish,
-        markdownStylePreset: storeState.settings.markdownStylePreset,
-      });
-
-      if (prepared.unresolvedImages.length > 0) {
-        console.warn(
-          "[publish] unresolved local images:",
-          prepared.unresolvedImages,
-        );
-      }
-
-      await invokePublishWithTimeout<{ deploymentUrl?: string | null }>(
-        "publish_simple_blog",
-        {
-          request: {
-            blogRepoUrl: normalizeBlogRepoUrl(hydratedSettings.blogRepoUrl),
-            blogGithubToken: hydratedSettings.blogGithubToken?.trim() || null,
-            postRelativePath: prepared.postRelativePath,
-            assetDirectoryRelativePath: prepared.assetDirectoryRelativePath,
-            markdownContent: prepared.markdownContent,
-            assets: prepared.assets,
-          },
-        },
-      );
-
-      const publishedUrl = buildSimpleBlogPostUrl(
-        normalizeBlogSiteUrl(hydratedSettings.blogSiteUrl),
-        prepared.markdownContent,
-        prepared.postRelativePath,
-      );
-
-      // Remote publish succeeded — now write local publish markers.
-      await backfillFrontmatter(
-        targetTabId,
-        activeFile.path,
-        publishedUrl
-          ? { is_publish: true, link: publishedUrl }
-          : { is_publish: true },
-        "notifications_publishBackfillFailed",
-      );
-
-      if (!publishedUrl) {
-        showNotification(
-          t(hydratedSettings.language, "notifications_publishUrlBuildFailed"),
-          "warning",
-        );
-        return;
-      }
-
-      if (prepared.unresolvedImages.length > 0) {
-        // The publish itself succeeded; missing images are a warning, not an error.
-        showNotification(
-          t(
-            hydratedSettings.language,
-            "notifications_publishSuccessWithMissingImages",
-            {
-              count: String(prepared.unresolvedImages.length),
-            },
-          ),
-          "warning",
-        );
-      } else {
-        showNotification(
-          t(hydratedSettings.language, "notifications_publishSuccess"),
-          "success",
-        );
-      }
-    } catch (error) {
-      console.error("Failed to publish blog:", error);
-      if (error instanceof PublishTimeoutError) {
-        // Backend may still succeed remotely. Local note stays unpublished
-        // until the user re-publishes or we confirm; avoid forging success.
-        showNotification(
-          t(hydratedSettings.language, "notifications_publishResultUnknown"),
-          "warning",
-        );
-        return;
-      }
-      if (publishCheckpointContent !== null && targetTabId) {
-        const latest = useAppStore.getState().fileContents[targetTabId];
-        if (latest !== publishCheckpointContent) {
-          setContentForFile(targetTabId, publishCheckpointContent);
-          await forceSave(publishCheckpointContent, { trigger: "system" });
+        if (publishCheckpointContent !== null && targetTabId) {
+          const latest = useAppStore.getState().fileContents[targetTabId];
+          if (latest !== publishCheckpointContent) {
+            setContentForFile(targetTabId, publishCheckpointContent);
+            await forceSave(publishCheckpointContent, { trigger: "system" });
+          }
         }
+        const message =
+          error instanceof Error
+            ? localizeKnownError(language, error.message)
+            : t(language, "notifications_publishFailed");
+        showNotification(message, "error");
+        return false;
+      } finally {
+        setPublishing(false);
       }
-      const message =
-        error instanceof Error
-          ? localizeKnownError(hydratedSettings.language, error.message)
-          : t(hydratedSettings.language, "notifications_publishFailed");
-      showNotification(message, "error");
-    } finally {
-      setPublishing(false);
-    }
-  }, [
-    activeTabId,
-    backfillFrontmatter,
-    files,
-    forceSave,
-    invokePublishWithTimeout,
-    setContentForFile,
-    setPublishing,
-    showNotification,
-  ]);
+    },
+    [
+      activeTabId,
+      backfillFrontmatter,
+      files,
+      forceSave,
+      invokePublishWithTimeout,
+      setContentForFile,
+      setPublishing,
+      showNotification,
+    ],
+  );
 
   const handlePublishWechatDraft = useCallback(
     async (input: WechatDraftPublishInput) => {
