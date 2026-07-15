@@ -182,6 +182,7 @@ export const defaultSettings: AppSettings = {
   lastKnowledgeBasePath: "",
   lastOpenedFilePath: "",
   themeMode: "dark",
+  themeFollowSystem: false,
   metadataFields: DEFAULT_METADATA_FIELDS,
   autoSaveInterval: 60000,
   autoCheckForUpdates: true,
@@ -233,6 +234,7 @@ export function createUISlice(
           ...settings,
           language: normalizeLanguage(settings.language),
           themeMode: normalizeThemeMode(settings.themeMode),
+          themeFollowSystem: settings.themeFollowSystem === true,
           markdownStylePreset: normalizeMarkdownStylePreset(
             settings.markdownStylePreset,
           ),

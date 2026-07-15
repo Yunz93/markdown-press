@@ -18,6 +18,7 @@ import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useStoreHydration } from "./hooks/useStoreHydration";
 import { useShikiHighlighter } from "./hooks/useShikiHighlighter";
 import { useThemeSync } from "./hooks/useThemeSync";
+import { useSystemThemeFollow } from "./hooks/useSystemThemeFollow";
 import { useAIAnalyze } from "./hooks/useAIAnalyze";
 import { useFileOperations } from "./hooks/useFileOperations";
 import { Sidebar } from "./components/sidebar/Sidebar";
@@ -116,6 +117,7 @@ const App: React.FC = () => {
   const { headings: outlineHeadings } = useOutline();
   useUndoRedo();
 
+  useSystemThemeFollow();
   useThemeSync(settings.themeMode);
   useLayoutEffect(() => {
     document.documentElement.style.setProperty(

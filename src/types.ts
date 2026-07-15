@@ -204,6 +204,8 @@ export interface AppSettings {
   lastKnowledgeBasePath?: string;
   lastOpenedFilePath?: string;
   themeMode: ThemeMode;
+  /** When true, themeMode follows the OS light/dark preference automatically. */
+  themeFollowSystem: boolean;
   metadataFields: MetadataField[];
   autoSaveInterval: number; // Auto-save interval in milliseconds
   autoCheckForUpdates: boolean;

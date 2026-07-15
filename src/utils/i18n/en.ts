@@ -236,6 +236,12 @@ export default {
   settings_interface: "Interface",
   settings_languageLabel: "Display language",
   settings_interfaceDesc: "Choose the language used by the app interface.",
+  settings_themeLabel: "Appearance",
+  settings_themeLight: "Light",
+  settings_themeDark: "Dark",
+  settings_themeSystem: "Follow system",
+  settings_themeDesc:
+    "Pick a light or dark theme, or follow the operating system appearance automatically.",
   settings_uiFont: "UI font",
   settings_uiFontDesc:
     "Applies only to the app UI. The default uses the system font, and you can switch to the bundled font or another system font.",
@@ -284,6 +290,11 @@ export default {
     "Expand the tree and scroll to the currently open file.",
   settings_openSettings: "Open Settings",
   settings_openSettingsDesc: "Open the settings panel.",
+  settings_toggleTheme: "Toggle Theme",
+  settings_toggleThemeDesc:
+    "Switch between light and dark themes (turns off system following).",
+  settings_shortcutConflict:
+    'Already used by "{label}". Choose a different combination.',
   settings_editing: "Editing",
   settings_editingDesc: "Shortcuts for writing and editing content.",
   settings_newNote: "New Note",
