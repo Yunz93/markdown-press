@@ -165,10 +165,23 @@
 .preview-pane-document.markdown-body table,
 .preview-pane-document.markdown-body blockquote,
 .preview-pane-document.markdown-body .preview-note-embed,
-.preview-pane-document.markdown-body img,
 .preview-pane-document.markdown-body iframe {
   content-visibility: visible;
   contain-intrinsic-size: auto;
+}
+
+/* Skip offscreen image layout/paint work in long documents. Pending browser
+   images reserve approximate space until object URLs are materialized. */
+.preview-pane-document.markdown-body img {
+  content-visibility: auto;
+  contain-intrinsic-size: 720px 405px;
+}
+
+.preview-pane-document.markdown-body img[data-preview-warmed="pending"]:not([src]),
+.preview-pane-document.markdown-body img[data-preview-pending-src]:not([src]) {
+  min-height: 12rem;
+  background: color-mix(in srgb, var(--mp-doc-accent, #0f172a) 6%, transparent);
+  border-radius: 1rem;
 }
 
 .preview-pane-document.preview-pane-document-windows.markdown-body pre,
@@ -176,10 +189,14 @@
 .preview-pane-document.preview-pane-document-windows.markdown-body blockquote,
 .preview-pane-document.preview-pane-document-windows.markdown-body
   .preview-note-embed,
-.preview-pane-document.preview-pane-document-windows.markdown-body img,
 .preview-pane-document.preview-pane-document-windows.markdown-body iframe {
   content-visibility: visible;
   contain-intrinsic-size: auto;
+}
+
+.preview-pane-document.preview-pane-document-windows.markdown-body img {
+  content-visibility: auto;
+  contain-intrinsic-size: 720px 405px;
 }
 
 .preview-pane-document.markdown-body p,

@@ -231,10 +231,21 @@ export function configurePreviewImageElement(
   image: HTMLImageElement,
   src: string,
   originalSrc: string,
+  options?: { warmed?: boolean },
 ): void {
-  image.setAttribute("src", src);
+  const warmed = options?.warmed !== false;
+  if (src) {
+    image.setAttribute("src", src);
+  } else {
+    image.removeAttribute("src");
+  }
   image.setAttribute("data-original-src", originalSrc);
-  image.setAttribute("data-preview-warmed", "true");
+  image.setAttribute("data-preview-warmed", warmed ? "true" : "pending");
+  if (!warmed) {
+    image.setAttribute("data-preview-pending-src", originalSrc);
+  } else {
+    image.removeAttribute("data-preview-pending-src");
+  }
   image.setAttribute("decoding", "async");
   image.setAttribute("loading", "lazy");
   image.setAttribute("fetchpriority", "auto");

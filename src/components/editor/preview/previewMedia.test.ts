@@ -47,9 +47,22 @@ describe('configurePreviewImageElement', () => {
 
     expect(image.getAttribute('src')).toBe('resolved.png');
     expect(image.getAttribute('data-original-src')).toBe('poster.png');
+    expect(image.getAttribute('data-preview-warmed')).toBe('true');
     expect(image.getAttribute('decoding')).toBe('async');
     expect(image.getAttribute('loading')).toBe('lazy');
     expect(image.getAttribute('fetchpriority')).toBe('auto');
+  });
+
+  it('marks pending images without a display src for viewport warming', () => {
+    const image = document.createElement('img');
+
+    configurePreviewImageElement(image, '', '/vault/photo.png', { warmed: false });
+
+    expect(image.hasAttribute('src')).toBe(false);
+    expect(image.getAttribute('data-original-src')).toBe('/vault/photo.png');
+    expect(image.getAttribute('data-preview-pending-src')).toBe('/vault/photo.png');
+    expect(image.getAttribute('data-preview-warmed')).toBe('pending');
+    expect(image.getAttribute('loading')).toBe('lazy');
   });
 });
 

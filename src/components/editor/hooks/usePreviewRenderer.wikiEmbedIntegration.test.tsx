@@ -18,6 +18,9 @@ const mockedWarmPreviewImage = vi.fn<(src: string, sourceFilePath?: string) => P
 vi.mock('../../../utils/previewImageCache', () => ({
   resolvePreviewSource: (src: string, sourceFilePath?: string) => mockedResolvePreviewSource(src, sourceFilePath),
   warmPreviewImage: (src: string, sourceFilePath?: string) => mockedWarmPreviewImage(src, sourceFilePath),
+  getCachedPreviewImageSrc: vi.fn(() => null),
+  previewSourceNeedsMaterialization: vi.fn(() => false),
+  mountLazyPreviewImageWarming: vi.fn(() => () => {}),
   hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
 }));
 
@@ -82,7 +85,7 @@ describe('usePreviewRenderer wiki embed integration', () => {
     mockedWarmPreviewImage.mockImplementation(async (src: string) => `warmed:${src}`);
   });
 
-  it('replaces sized wiki image embeds with warmed preview images and bare width attributes', async () => {
+  it('replaces sized wiki image embeds with resolved preview images and bare width attributes', async () => {
     mockedResolveAttachmentTarget.mockResolvedValue({
       path: '/vault/99-Attachments/img/test.jpg',
       name: 'test.jpg',
@@ -96,7 +99,7 @@ describe('usePreviewRenderer wiki embed integration', () => {
       expect(image).toBeTruthy();
       expect(image?.getAttribute('data-wiki-embed-w')).toBe('200');
       expect(image?.getAttribute('data-wiki-embed-w')).not.toContain('px');
-      expect(image?.getAttribute('src')).toBe('warmed:/vault/99-Attachments/img/test.jpg');
+      expect(image?.getAttribute('src')).toBe('resolved:/vault/99-Attachments/img/test.jpg');
       expect(image?.getAttribute('data-original-src')).toBe('/vault/99-Attachments/img/test.jpg');
       expect(out.querySelector('[data-wiki-embed]')).toBeNull();
     });

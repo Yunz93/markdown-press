@@ -19,6 +19,9 @@ const mockedWarmPreviewImage = vi.fn<(src: string, sourceFilePath?: string) => P
 vi.mock('../../../utils/previewImageCache', () => ({
   resolvePreviewSource: (src: string, sourceFilePath?: string) => mockedResolvePreviewSource(src, sourceFilePath),
   warmPreviewImage: (src: string, sourceFilePath?: string) => mockedWarmPreviewImage(src, sourceFilePath),
+  getCachedPreviewImageSrc: vi.fn(() => null),
+  previewSourceNeedsMaterialization: vi.fn(() => false),
+  mountLazyPreviewImageWarming: vi.fn(() => () => {}),
   hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
 }));
 

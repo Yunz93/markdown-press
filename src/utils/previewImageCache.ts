@@ -111,6 +111,14 @@ function registerUnloadCleanup() {
   unloadCleanupRegistered = true;
 }
 
+/**
+ * Resolve a URL suitable for `<img src>` / media elements.
+ *
+ * In Tauri, prefer `convertFileSrc` (protocol URL) over reading the full file
+ * into a Blob — materializing every image up front is the main cause of jank
+ * in long, image-heavy preview documents. Browser virtual paths still need
+ * object URLs because there is no asset protocol.
+ */
 export async function resolvePreviewSource(src: string, sourceFilePath?: string): Promise<string> {
   const trimmedSrc = src.trim();
   if (!trimmedSrc || trimmedSrc.startsWith('data:') || trimmedSrc.startsWith('blob:')) {
@@ -129,17 +137,7 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
         : ''
     );
 
-  if (localSourceCandidate) {
-    try {
-      const fs = await getFileSystem();
-      if (typeof fs.getFileObjectUrl === 'function') {
-        return await fs.getFileObjectUrl(localSourceCandidate);
-      }
-    } catch {
-      // Fall through to environment-specific URL resolution.
-    }
-  }
-
+  // Tauri: use the asset protocol instead of reading bytes into memory.
   if (isTauriEnvironment()) {
     if (trimmedSrc.startsWith('asset:') || trimmedSrc.startsWith('tauri:')) {
       return trimmedSrc;
@@ -149,7 +147,9 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
     const { dirname, join, normalize } = await import('@tauri-apps/api/path');
 
     let absolutePath = '';
-    if (trimmedSrc.startsWith('file://')) {
+    if (localSourceCandidate && !isBrowserVirtualPath(localSourceCandidate)) {
+      absolutePath = localSourceCandidate;
+    } else if (trimmedSrc.startsWith('file://')) {
       absolutePath = decodeFileUrlPath(trimmedSrc);
     } else if (isAbsoluteFilePath(trimmedSrc)) {
       absolutePath = trimmedSrc;
@@ -160,6 +160,17 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
     }
 
     return convertFileSrc(await normalize(absolutePath));
+  }
+
+  if (localSourceCandidate) {
+    try {
+      const fs = await getFileSystem();
+      if (typeof fs.getFileObjectUrl === 'function') {
+        return await fs.getFileObjectUrl(localSourceCandidate);
+      }
+    } catch {
+      // Fall through to environment-specific URL resolution.
+    }
   }
 
   if (!hasUrlScheme(trimmedSrc) && sourceFilePath && typeof window !== 'undefined') {
@@ -174,6 +185,21 @@ export async function resolvePreviewSource(src: string, sourceFilePath?: string)
     trimmedSrc,
     typeof window !== 'undefined' ? window.location.protocol : undefined
   );
+}
+
+/** True when displaying the image requires reading file bytes (browser FS Access). */
+export function previewSourceNeedsMaterialization(src: string): boolean {
+  const trimmed = src.trim();
+  if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return false;
+  }
+  if (hasUrlScheme(trimmed) && !trimmed.startsWith('file://')) {
+    return false;
+  }
+  if (isTauriEnvironment()) {
+    return false;
+  }
+  return true;
 }
 
 async function fetchBlobUrl(src: string): Promise<string> {
@@ -260,6 +286,12 @@ export async function warmPreviewImage(src: string, sourceFilePath?: string): Pr
       return src;
     }
 
+    // Already an in-memory object/data URL — cache and return without re-fetching.
+    if (resolvedSrc.startsWith('blob:') || resolvedSrc.startsWith('data:')) {
+      resolvedPreviewImageCache.set(cacheKey, resolvedSrc);
+      return resolvedSrc;
+    }
+
     try {
       const cachedSrc = await fetchBlobUrl(resolvedSrc);
       resolvedPreviewImageCache.set(cacheKey, cachedSrc);
@@ -274,4 +306,118 @@ export async function warmPreviewImage(src: string, sourceFilePath?: string): Pr
 
   previewImageLoadCache.set(cacheKey, pending);
   return pending;
+}
+
+export interface LazyPreviewImageWarmOptions {
+  sourceFilePath?: string | null;
+  /** IntersectionObserver root (usually the preview scroll container). */
+  root?: Element | null;
+  rootMargin?: string;
+  concurrency?: number;
+}
+
+/**
+ * Resolve / warm preview images only as they approach the viewport.
+ * Used for browser local files that need object-URL materialization, and to
+ * optionally upgrade display URLs into the blob cache without blocking first paint.
+ */
+export function mountLazyPreviewImageWarming(
+  container: HTMLElement,
+  options: LazyPreviewImageWarmOptions = {},
+): () => void {
+  if (typeof IntersectionObserver === 'undefined') {
+    return () => {};
+  }
+
+  const sourceFilePath = options.sourceFilePath || undefined;
+  const concurrency = Math.max(1, options.concurrency ?? 2);
+  const queue: HTMLImageElement[] = [];
+  const queued = new WeakSet<HTMLImageElement>();
+  let active = 0;
+  let cancelled = false;
+
+  const pump = () => {
+    while (!cancelled && active < concurrency && queue.length > 0) {
+      const image = queue.shift();
+      if (!image || !image.isConnected) continue;
+
+      active += 1;
+      void (async () => {
+        try {
+          const originalSrc =
+            image.getAttribute('data-original-src')?.trim()
+            || image.getAttribute('data-preview-pending-src')?.trim();
+          if (!originalSrc) return;
+
+          const warmedSrc = await warmPreviewImage(originalSrc, sourceFilePath);
+          if (cancelled || !image.isConnected) return;
+
+          image.setAttribute('src', warmedSrc);
+          image.setAttribute('data-original-src', originalSrc);
+          image.setAttribute('data-preview-warmed', 'true');
+          image.removeAttribute('data-preview-pending-src');
+          image.setAttribute('decoding', 'async');
+          image.setAttribute('loading', 'lazy');
+          image.setAttribute('fetchpriority', 'auto');
+        } catch (error) {
+          console.warn('Failed to lazily warm preview image:', error);
+          if (cancelled || !image.isConnected) return;
+
+          const pendingSrc = image.getAttribute('data-preview-pending-src')?.trim();
+          if (pendingSrc && !image.getAttribute('src')) {
+            try {
+              const fallbackSrc = await resolvePreviewSource(pendingSrc, sourceFilePath);
+              if (!cancelled && image.isConnected) {
+                image.setAttribute('src', fallbackSrc);
+                image.setAttribute('data-preview-warmed', 'true');
+                image.removeAttribute('data-preview-pending-src');
+              }
+            } catch {
+              // Leave the placeholder; the image stays unloaded.
+            }
+          }
+        } finally {
+          active -= 1;
+          pump();
+        }
+      })();
+    }
+  };
+
+  const enqueue = (image: HTMLImageElement) => {
+    if (cancelled || queued.has(image) || image.getAttribute('data-preview-warmed') === 'true') {
+      return;
+    }
+    queued.add(image);
+    queue.push(image);
+    pump();
+  };
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const image = entry.target;
+        if (!(image instanceof HTMLImageElement)) continue;
+        observer.unobserve(image);
+        enqueue(image);
+      }
+    },
+    {
+      root: options.root ?? null,
+      rootMargin: options.rootMargin ?? '320px 0px',
+      threshold: 0.01,
+    },
+  );
+
+  const pendingImages = container.querySelectorAll<HTMLImageElement>(
+    'img[data-preview-warmed="pending"], img[data-preview-pending-src]',
+  );
+  pendingImages.forEach((image) => observer.observe(image));
+
+  return () => {
+    cancelled = true;
+    queue.length = 0;
+    observer.disconnect();
+  };
 }
