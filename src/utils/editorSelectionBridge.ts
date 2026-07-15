@@ -1,6 +1,7 @@
-import type { EditorView } from '@codemirror/view';
+import type { EditorView } from "@codemirror/view";
 
 let activeEditorView: EditorView | null = null;
+let activeEditorFlush: (() => void) | null = null;
 
 interface FocusOptions {
   alignTopRatio?: number;
@@ -25,6 +26,26 @@ export function getActiveEditorView(): EditorView | null {
   return activeEditorView;
 }
 
+/**
+ * Register the active editor's "flush pending content change" callback.
+ * Editor keystrokes are pushed to the store on a short debounce; save paths
+ * call `flushActiveEditorPendingChanges` first so the very latest keystrokes
+ * are never lost when saving right after typing.
+ */
+export function registerActiveEditorFlush(flush: (() => void) | null): void {
+  activeEditorFlush = flush;
+}
+
+export function clearActiveEditorFlush(flush: () => void): void {
+  if (activeEditorFlush === flush) {
+    activeEditorFlush = null;
+  }
+}
+
+export function flushActiveEditorPendingChanges(): void {
+  activeEditorFlush?.();
+}
+
 export function insertTextAtCursor(text: string): boolean {
   if (!activeEditorView) return false;
   const view = activeEditorView;
@@ -41,7 +62,7 @@ export function insertTextAtCursor(text: string): boolean {
 export function focusEditorRangeByOffset(
   start: number,
   end: number = start,
-  options?: FocusOptions
+  options?: FocusOptions,
 ): boolean {
   if (!activeEditorView) return false;
 
@@ -61,7 +82,10 @@ export function focusEditorRangeByOffset(
 
   const alignTopRatio = clamp(options?.alignTopRatio ?? 0.3, 0, 1);
   const lineTop = view.lineBlockAt(anchor).top;
-  const targetScrollTop = Math.max(0, lineTop - view.scrollDOM.clientHeight * alignTopRatio);
+  const targetScrollTop = Math.max(
+    0,
+    lineTop - view.scrollDOM.clientHeight * alignTopRatio,
+  );
   view.scrollDOM.scrollTop = targetScrollTop;
 
   return true;

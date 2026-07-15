@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
+import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 import { getFileSystem } from "../types/filesystem";
 import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
@@ -430,6 +431,15 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       if (contentOverride !== undefined) {
         contentRef.current = contentOverride;
+      } else {
+        // Editor keystrokes reach the store on a short debounce; flush them
+        // now and read the store directly (contentRef only updates on the
+        // next render) so the save never misses trailing keystrokes.
+        flushActiveEditorPendingChanges();
+        const latestContent = useAppStore.getState().getActiveContent();
+        if (latestContent !== undefined) {
+          contentRef.current = latestContent;
+        }
       }
 
       const trigger = options?.trigger ?? "manual";
