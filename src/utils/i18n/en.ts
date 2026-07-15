@@ -135,6 +135,66 @@ export default {
 
   tab_closeOtherTabs: "Close Other Tabs",
   tab_closeTab: "Close tab",
+  tab_closeBlockedUnsaved:
+    "Save failed. The tab was kept open to avoid losing unsaved changes.",
+  notifications_moveToTrashSaveFailed:
+    "Could not move to trash: saving unsaved changes failed, the file was kept.",
+  draft_restoreTitle: "Unsaved backup found",
+  draft_restoreMessage:
+    'A backup of "{name}" was kept after a failed save and differs from the file on disk. Restore the backup? Choosing "Discard backup" deletes it and keeps the version on disk.',
+  draft_restoreConfirm: "Restore backup",
+  draft_restoreDiscard: "Discard backup",
+  ai_reviewTitle: "AI enhancement result",
+  ai_reviewDescription:
+    "Review the content below. Applying replaces the current note (undoable).",
+  ai_reviewLengthChange: "Characters {before} → {after}",
+  ai_reviewApply: "Apply",
+  ai_reviewDiscard: "Discard",
+  errorBoundary_title: "Something went wrong",
+  errorBoundary_fallbackMessage:
+    "An unexpected error occurred in this component.",
+  errorBoundary_retry: "Try Again",
+  imageHosting_title: "Image Hosting",
+  imageHosting_provider: "Provider",
+  imageHosting_providerNone: "None (local)",
+  imageHosting_providerS3: "S3 Compatible (AWS / R2 / MinIO)",
+  imageHosting_providerAliyunOss: "Aliyun OSS",
+  imageHosting_providerQiniu: "Qiniu",
+  imageHosting_providerCustom: "Custom API",
+  imageHosting_onPaste: "On Paste",
+  imageHosting_uploadToHosting: "Upload to hosting",
+  imageHosting_saveLocally: "Save locally",
+  imageHosting_keepLocalCopy: "Keep local copy after upload",
+  imageHosting_keepLocalCopyDesc: "Also save to local resources folder",
+  imageHosting_repository: "Repository",
+  imageHosting_repositoryDesc:
+    "Use owner/repo or paste https://github.com/owner/repo",
+  imageHosting_branch: "Branch",
+  imageHosting_path: "Path",
+  imageHosting_customDomainOptional: "Custom domain (optional)",
+  imageHosting_githubCdnDesc: "CDN domain to replace raw.githubusercontent.com",
+  imageHosting_s3Compatible: "S3 Compatible",
+  imageHosting_pathPrefix: "Path prefix",
+  imageHosting_zone: "Zone",
+  imageHosting_domain: "Domain",
+  imageHosting_qiniuDomainDesc: "Qiniu requires a bound domain to access files",
+  imageHosting_uploadUrl: "Upload URL",
+  imageHosting_method: "Method",
+  imageHosting_fileFieldName: "File field name",
+  imageHosting_headersJson: "Headers (JSON)",
+  imageHosting_responseUrlJsonPath: "Response URL JSON path",
+  imageHosting_responseUrlJsonPathDesc:
+    "JSON path to extract URL, e.g. data.url",
+  imageHosting_testing: "Testing...",
+  imageHosting_testSuccess: "Success",
+  imageHosting_testFailed: "Failed",
+  imageHosting_testConnection: "Test Connection",
+  imageHosting_qiniuZoneZ0: "East China",
+  imageHosting_qiniuZoneZ1: "North China",
+  imageHosting_qiniuZoneZ2: "South China",
+  imageHosting_qiniuZoneNa0: "North America",
+  imageHosting_qiniuZoneAs0: "Southeast Asia",
+  imageHosting_qiniuZoneCnEast2: "East China (Zhejiang 2)",
 
   search_find: "Find",
   search_searchPlaceholder: "Search...",
@@ -150,6 +210,7 @@ export default {
   search_searching: "Searching...",
   search_matchCount: "{current} / {total} matches",
   search_noMatches: "No matches found",
+  search_resultsTruncated: "Too many matches; showing the first {count}",
 
   export_title: "Export",
   export_format: "Format",
@@ -176,6 +237,12 @@ export default {
   settings_interface: "Interface",
   settings_languageLabel: "Display language",
   settings_interfaceDesc: "Choose the language used by the app interface.",
+  settings_themeLabel: "Appearance",
+  settings_themeLight: "Light",
+  settings_themeDark: "Dark",
+  settings_themeSystem: "Follow system",
+  settings_themeDesc:
+    "Pick a light or dark theme, or follow the operating system appearance automatically.",
   settings_uiFont: "UI font",
   settings_uiFontDesc:
     "Applies only to the app UI. The default uses the system font, and you can switch to the bundled font or another system font.",
@@ -224,6 +291,11 @@ export default {
     "Expand the tree and scroll to the currently open file.",
   settings_openSettings: "Open Settings",
   settings_openSettingsDesc: "Open the settings panel.",
+  settings_toggleTheme: "Toggle Theme",
+  settings_toggleThemeDesc:
+    "Switch between light and dark themes (turns off system following).",
+  settings_shortcutConflict:
+    'Already used by "{label}". Choose a different combination.',
   settings_editing: "Editing",
   settings_editingDesc: "Shortcuts for writing and editing content.",
   settings_newNote: "New Note",
@@ -533,6 +605,10 @@ export default {
     "Failed to save the note before publishing.",
   notifications_publishTimeout:
     "Publishing timed out. Check your GitHub connection and token permissions, then try again.",
+  notifications_exportQualityReduced:
+    "The document is very long, so the export resolution was reduced automatically to avoid a crash.",
+  notifications_publishResultUnknown:
+    "Timed out waiting for the publish result: it may still have succeeded remotely. Verify the remote state before retrying; local state was not rolled back.",
   notifications_publishInProgress:
     "A publish is already in progress. Wait for it to finish before trying again.",
   notifications_publishBackfillFailed:
@@ -548,6 +624,8 @@ export default {
   notifications_updateInstallFailed: "Failed to install the update: {error}",
   notifications_unresolvedImages:
     "{count} local image(s) could not be found and will be skipped during publish. Please check the image paths.",
+  notifications_publishSuccessWithMissingImages:
+    "Published to the blog, but {count} local image(s) could not be found and were skipped. Please check the image paths.",
   notifications_publishFailed: "Failed to publish blog",
   notifications_wechatDraftSuccess:
     "Published to the WeChat draft box and updated the note draft marker.",

@@ -71,6 +71,14 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
               files,
               rootFolderPath,
             },
+            {
+              onScaleDegraded: () => {
+                showNotification(
+                  t("notifications_exportQualityReduced"),
+                  "warning",
+                );
+              },
+            },
           );
           if (savedPath !== null) {
             showNotification(t("export_pdfExported"), "success");

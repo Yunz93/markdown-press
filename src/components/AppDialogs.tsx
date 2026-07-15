@@ -1,6 +1,10 @@
 import React from "react";
 import { SettingsModal } from "./settings/SettingsModal";
-import { PromptDialog } from "./ui/Dialog";
+import { ConfirmDialog, PromptDialog } from "./ui/Dialog";
+import { AiResultReviewDialog } from "./ai/AiResultReviewDialog";
+import { useAppStore } from "../store/appStore";
+import { useI18n } from "../hooks/useI18n";
+import { clearDraftBackup } from "../utils/draftBackup";
 import { PublishTargetDialog } from "./publish/PublishTargetDialog";
 import { WechatDraftDialog } from "./publish/WechatDraftDialog";
 import { ShareLongImageDialog } from "./share/ShareLongImageDialog";
@@ -62,6 +66,29 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onSubmitWechatDraft,
   onCloseShareLongImage,
 }) => {
+  const { t: tr } = useI18n();
+  const pendingDraftRestore = useAppStore((state) => state.pendingDraftRestore);
+  const setPendingDraftRestore = useAppStore(
+    (state) => state.setPendingDraftRestore,
+  );
+  const setContentForFile = useAppStore((state) => state.setContentForFile);
+
+  const handleRestoreDraft = () => {
+    if (!pendingDraftRestore) return;
+    setContentForFile(
+      pendingDraftRestore.fileId,
+      pendingDraftRestore.draftContent,
+    );
+    clearDraftBackup(pendingDraftRestore.fileId);
+    setPendingDraftRestore(null);
+  };
+
+  const handleDiscardDraft = () => {
+    if (!pendingDraftRestore) return;
+    clearDraftBackup(pendingDraftRestore.fileId);
+    setPendingDraftRestore(null);
+  };
+
   return (
     <>
       <SettingsModal
@@ -106,12 +133,31 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         attachmentContext={attachmentContext}
       />
 
+      <AiResultReviewDialog />
+
+      <ConfirmDialog
+        isOpen={pendingDraftRestore !== null}
+        onClose={handleDiscardDraft}
+        onConfirm={handleRestoreDraft}
+        title={tr("draft_restoreTitle")}
+        message={tr("draft_restoreMessage", {
+          name: pendingDraftRestore?.fileName ?? "",
+        })}
+        confirmText={tr("draft_restoreConfirm")}
+        cancelText={tr("draft_restoreDiscard")}
+        variant="warning"
+      />
+
       {notification && (
         <div
           className={`ui-scaled fixed top-6 right-6 px-4 py-3 rounded-xl shadow-xl z-[250] animate-fade-in border glass ${
             notification.type === "success"
               ? "text-green-600 border-green-100 dark:border-green-900"
-              : "text-red-500 border-red-100 dark:border-red-900"
+              : notification.type === "info"
+                ? "text-blue-600 border-blue-100 dark:text-blue-400 dark:border-blue-900"
+                : notification.type === "warning"
+                  ? "text-amber-600 border-amber-100 dark:text-amber-400 dark:border-amber-900"
+                  : "text-red-500 border-red-100 dark:border-red-900"
           }`}
           role="status"
           aria-live="polite"

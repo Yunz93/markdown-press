@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useAppStore, selectContent } from "../../store/appStore";
 import { focusEditorRangeByOffset } from "../../utils/editorSelectionBridge";
 import { useI18n } from "../../hooks/useI18n";
+import { isLargeFile } from "../../utils/performance";
 
 interface ContentSearchProps {
   onClose: () => void;
@@ -12,6 +13,25 @@ interface SearchMatch {
   length: number;
   line: number;
   column: number;
+}
+
+const MAX_MATCHES = 5000;
+
+function buildSearchRegex(
+  text: string,
+  options: { caseSensitive: boolean; useRegex: boolean; wholeWord: boolean },
+): RegExp | null {
+  let pattern = options.useRegex
+    ? text
+    : text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (options.wholeWord) {
+    pattern = `\\b${pattern}\\b`;
+  }
+  try {
+    return new RegExp(pattern, options.caseSensitive ? "g" : "gi");
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -27,7 +47,9 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
+  const [resultsTruncated, setResultsTruncated] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,69 +60,66 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
 
   // Find all matches
   const findMatches = useCallback(
-    (text: string): SearchMatch[] => {
-      if (!text || !content) return [];
+    (text: string): { matches: SearchMatch[]; truncated: boolean } => {
+      if (!text || !content) return { matches: [], truncated: false };
+
+      const regex = buildSearchRegex(text, {
+        caseSensitive,
+        useRegex,
+        wholeWord,
+      });
+      if (!regex) return { matches: [], truncated: false };
 
       const matches: SearchMatch[] = [];
-      const searchContent = caseSensitive ? content : content.toLowerCase();
-      const searchTerm = caseSensitive ? text : text.toLowerCase();
-
-      if (useRegex) {
-        try {
-          const flags = caseSensitive ? "g" : "gi";
-          const regex = new RegExp(text, flags);
-          let match;
-          while ((match = regex.exec(searchContent)) !== null) {
-            const line = searchContent
-              .substring(0, match.index)
-              .split("\n").length;
-            const lineStart =
-              searchContent.lastIndexOf("\n", match.index - 1) + 1;
-            const column = match.index - lineStart + 1;
-
-            matches.push({
-              index: match.index,
-              length: match[0].length,
-              line,
-              column,
-            });
-          }
-        } catch {
-          return [];
+      let truncated = false;
+      let match;
+      while ((match = regex.exec(content)) !== null) {
+        // Zero-length regex matches (e.g. `a*`) would loop forever.
+        if (match[0].length === 0) {
+          regex.lastIndex += 1;
+          continue;
         }
-      } else {
-        let index = 0;
-        while ((index = searchContent.indexOf(searchTerm, index)) !== -1) {
-          const line = searchContent.substring(0, index).split("\n").length;
-          const lineStart = searchContent.lastIndexOf("\n", index - 1) + 1;
-          const column = index - lineStart + 1;
 
-          matches.push({
-            index,
-            length: searchTerm.length,
-            line,
-            column,
-          });
-          index += searchTerm.length;
+        const line = content.substring(0, match.index).split("\n").length;
+        const lineStart = content.lastIndexOf("\n", match.index - 1) + 1;
+        const column = match.index - lineStart + 1;
+
+        matches.push({
+          index: match.index,
+          length: match[0].length,
+          line,
+          column,
+        });
+
+        if (matches.length >= MAX_MATCHES) {
+          truncated = true;
+          break;
         }
       }
 
-      return matches;
+      return { matches, truncated };
     },
-    [content, caseSensitive, useRegex],
+    [content, caseSensitive, useRegex, wholeWord],
   );
 
-  // Update matches when search text changes
+  // Update matches when search text changes (debounced; larger delay for big docs)
   useEffect(() => {
-    if (searchText) {
-      const newMatches = findMatches(searchText);
-      setMatches(newMatches);
-      setCurrentMatchIndex(0);
-    } else {
+    if (!searchText) {
       setMatches([]);
       setCurrentMatchIndex(0);
+      setResultsTruncated(false);
+      return;
     }
-  }, [searchText, findMatches]);
+
+    const delay = isLargeFile(content) ? 300 : 120;
+    const timer = window.setTimeout(() => {
+      const { matches: newMatches, truncated } = findMatches(searchText);
+      setMatches(newMatches);
+      setResultsTruncated(truncated);
+      setCurrentMatchIndex(0);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [searchText, findMatches, content]);
 
   // Navigate to next match
   const goToNextMatch = useCallback(() => {
@@ -139,34 +158,19 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   const replaceAllMatches = useCallback(() => {
     if (matches.length === 0 || !activeTabId) return;
 
-    let newContent = content;
+    const regex = buildSearchRegex(searchText, {
+      caseSensitive,
+      useRegex,
+      wholeWord,
+    });
+    if (!regex) return;
 
-    if (useRegex) {
-      try {
-        const flags = caseSensitive ? "g" : "gi";
-        const regex = new RegExp(searchText, flags);
-        newContent = content.replace(regex, replaceText);
-      } catch {
-        return;
-      }
-    } else {
-      const searchLower = caseSensitive ? searchText : searchText.toLowerCase();
-      const contentLower = caseSensitive ? content : content.toLowerCase();
-
-      let result = "";
-      let lastIndex = 0;
-
-      let index = 0;
-      while ((index = contentLower.indexOf(searchLower, index)) !== -1) {
-        result += content.substring(lastIndex, index) + replaceText;
-        lastIndex = index + searchLower.length;
-        index = lastIndex;
-      }
-      result += content.substring(lastIndex);
-      newContent = result;
-    }
-
-    setContent(newContent);
+    // When not in regex mode the replacement text must be literal, so escape
+    // `$` which String.replace would otherwise treat as a pattern reference.
+    const literalReplacement = useRegex
+      ? replaceText
+      : replaceText.replace(/\$/g, "$$$$");
+    setContent(content.replace(regex, literalReplacement));
   }, [
     matches,
     content,
@@ -174,6 +178,7 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
     replaceText,
     caseSensitive,
     useRegex,
+    wholeWord,
     setContent,
     activeTabId,
   ]);
@@ -269,7 +274,7 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder={t("search_searchPlaceholder")}
-              className="w-full pl-3 pr-20 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full pl-3 pr-24 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <button
@@ -292,6 +297,19 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
                   <line x1="5.5" y1="16" x2="10.5" y2="16" />
                   <path d="M16 8h4a2 2 0 0 1 0 4h-4v8" />
                 </svg>
+              </button>
+              <button
+                onClick={() => setWholeWord(!wholeWord)}
+                className={`p-1 rounded transition-colors text-[11px] font-semibold leading-none ${
+                  wholeWord
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                }`}
+                title={t("search_wholeWord")}
+              >
+                <span className="inline-block w-3.5 text-center underline decoration-dotted underline-offset-2">
+                  W
+                </span>
               </button>
               <button
                 onClick={() => setUseRegex(!useRegex)}
@@ -363,6 +381,11 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
                   total: matches.length,
                 })
               : t("search_noMatches"))}
+          {resultsTruncated && (
+            <span className="ml-2 text-amber-600 dark:text-amber-400">
+              {t("search_resultsTruncated", { count: MAX_MATCHES })}
+            </span>
+          )}
         </div>
 
         {/* Replace inputs */}

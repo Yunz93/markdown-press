@@ -41,6 +41,7 @@ import { mountPdfPreview } from "../../utils/pdfPreview";
 import { debounce, throttle } from "../../utils/throttle";
 import { useThrottledResize } from "../../utils/performance";
 import {
+  mountLazyPreviewImageWarming,
   resolvePreviewSource,
   warmPreviewImage,
 } from "../../utils/previewImageCache";
@@ -65,6 +66,8 @@ import {
   isValidExternalUrl,
   type FrontmatterValue,
 } from "./preview/previewPaneHelpers";
+import { useLargeDocDebouncedValue } from "./preview/useLargeDocDebouncedValue";
+import { usePreviewScrollSpy } from "./preview/usePreviewScrollSpy";
 
 interface PreviewPaneProps {
   highlighter?: ShikiHighlighter | null;
@@ -106,7 +109,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     const activeTabId = useAppStore((state) => state.activeTabId);
     const content = useAppStore(selectContent);
     const fileContents = useAppStore((state) => state.fileContents);
-    const previewContent = useDeferredValue(content);
+    // Large documents: debounce before deferring so each keystroke does not
+    // re-run the full markdown render pipeline.
+    const debouncedContent = useLargeDocDebouncedValue(content, activeTabId);
+    const previewContent = useDeferredValue(debouncedContent);
     const previewFontFamily = useMemo(
       () => getResolvedPreviewFontFamily(settings),
       [settings.previewFontFamily],
@@ -303,6 +309,12 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         scroll.handleScroll(event.currentTarget);
       },
       [scroll],
+    );
+
+    // Keep the outline highlight following the reading position
+    usePreviewScrollSpy(
+      previewRef,
+      isMarkdownPreview && previewRenderActive && hasActiveFile,
     );
 
     // Cancel sync on user scroll intent
@@ -542,6 +554,26 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       previewLayoutActive,
       previewRenderActive,
       runMermaidInPreview,
+    ]);
+
+    // Lazily materialize preview images as they approach the viewport so
+    // image-heavy notes do not read every attachment into memory up front.
+    useEffect(() => {
+      const container = previewRef.current;
+      if (!container || !previewRenderActive || !isMarkdownPreview) return;
+
+      return mountLazyPreviewImageWarming(container, {
+        sourceFilePath: currentFilePath,
+        root: container,
+        rootMargin: "360px 0px",
+        concurrency: 2,
+      });
+    }, [
+      currentFilePath,
+      isMarkdownPreview,
+      previewRenderActive,
+      renderer.enhancedBodyHtml,
+      renderer.parsedContent.bodyHTML,
     ]);
 
     // Cleanup on unmount

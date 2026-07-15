@@ -64,6 +64,8 @@ export interface UseCodeMirrorReturn {
   setWordWrap: (enabled: boolean) => void;
   setPlaceholder: (text: string) => void;
   setOrderedListMode: (mode: OrderedListMode) => void;
+  /** Push any debounced content change to onChange immediately. */
+  flushPendingContentChange: () => void;
 }
 
 export function useCodeMirror(
@@ -472,5 +474,6 @@ export function useCodeMirror(
     setWordWrap,
     setPlaceholder,
     setOrderedListMode,
+    flushPendingContentChange,
   };
 }

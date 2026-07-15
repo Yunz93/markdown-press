@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.9.7"
+version = "0.9.10"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -15,7 +15,7 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.5.4", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 base64 = "0.22"
@@ -29,7 +29,7 @@ sha1 = "0.10"
 sha2 = "0.10"
 log = "0.4"
 dirs = "6"
-tauri = { version = "2.10.0", features = [] }
+tauri = { version = "2.11.5", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"

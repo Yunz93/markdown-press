@@ -141,7 +141,9 @@ describe("useAutoSave", () => {
     expect(writeFile).toHaveBeenCalledTimes(1);
     expect(useAppStore.getState().isSaving).toBe(false);
 
-    const savedContent = writeFile.mock.calls[0]?.[1] as string;
+    const savedContent = (
+      writeFile.mock.calls[0] as unknown as [string, string]
+    )[1];
     expect(savedContent).toMatch(
       /date modified: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"/,
     );

@@ -1,6 +1,7 @@
 import { saveExportFile } from "./core";
 import type { ExportAttachmentContext } from "./attachments";
 import {
+  EXPORT_REQUESTED_RENDER_SCALE,
   buildHtml2CanvasRasterOptions,
   computeSafePdfRenderScale,
   disposeExportRasterHost,
@@ -8,6 +9,7 @@ import {
   prepareExportRenderTargetForRasterization,
   restoreExportRasterHostStyles,
   revealExportRasterHostForCapture,
+  withExportTimeout,
   yieldToEventLoopForRasterCapture,
 } from "./exportRasterHost";
 import { waitForNextPaint } from "./images";
@@ -15,11 +17,42 @@ import { waitForNextPaint } from "./images";
 /** Re-exported for backward compatibility with tests and external imports. */
 export { computeSafePdfRenderScale } from "./exportRasterHost";
 
+export const EXPORT_PDF_PREPARE_TIMEOUT_MS = 45_000;
+export const EXPORT_PDF_RENDER_TIMEOUT_MS = 180_000;
+
+/** Applied scale below this share of the requested scale is worth surfacing to the user. */
+const SCALE_DEGRADATION_NOTIFY_RATIO = 0.6;
+
+export interface ExportRenderScaleDegradation {
+  requestedScale: number;
+  appliedScale: number;
+}
+
+export interface ExportToPdfOptions {
+  /**
+   * Called when the render scale had to be reduced far below the requested
+   * quality to keep the output canvas within platform limits (very long
+   * documents). Lets the UI tell the user the PDF will look less sharp.
+   */
+  onScaleDegraded?: (info: ExportRenderScaleDegradation) => void;
+}
+
+export function notifyIfExportScaleDegraded(
+  appliedScale: number,
+  onScaleDegraded?: (info: ExportRenderScaleDegradation) => void,
+  requestedScale: number = EXPORT_REQUESTED_RENDER_SCALE,
+): void {
+  if (!onScaleDegraded) return;
+  if (appliedScale >= requestedScale * SCALE_DEGRADATION_NOTIFY_RATIO) return;
+  onScaleDegraded({ requestedScale, appliedScale });
+}
+
 export async function exportToPdf(
   htmlContent: string,
   filename: string,
   sourceFilePath?: string,
   attachmentContext?: ExportAttachmentContext | null,
+  options?: ExportToPdfOptions,
 ): Promise<string | null> {
   const { default: html2pdf } = await import("html2pdf.js");
   type Html2PdfWorker = InstanceType<typeof html2pdf.Worker>;
@@ -34,17 +67,22 @@ export async function exportToPdf(
     mountExportHtmlForRasterization(htmlContent);
 
   try {
-    await prepareExportRenderTargetForRasterization(
-      renderTarget,
-      theme,
-      sourceFilePath,
-      attachmentContext,
+    await withExportTimeout(
+      prepareExportRenderTargetForRasterization(
+        renderTarget,
+        theme,
+        sourceFilePath,
+        attachmentContext,
+      ),
+      EXPORT_PDF_PREPARE_TIMEOUT_MS,
+      "PDF export timed out while preparing HTML",
     );
 
     const safeScale = computeSafePdfRenderScale(
       renderTarget.scrollWidth,
       renderTarget.scrollHeight,
     );
+    notifyIfExportScaleDegraded(safeScale, options?.onScaleDegraded);
 
     const pdfOptions: Html2PdfSetOptions & Html2PdfPagebreakOptions = {
       margin: [12, 12, 12, 12],
@@ -78,7 +116,11 @@ export async function exportToPdf(
 
     let pdfArrayBuffer: ArrayBuffer;
     try {
-      pdfArrayBuffer = await worker.outputPdf("arraybuffer");
+      pdfArrayBuffer = await withExportTimeout(
+        worker.outputPdf("arraybuffer"),
+        EXPORT_PDF_RENDER_TIMEOUT_MS,
+        "PDF export timed out while rendering",
+      );
     } finally {
       restoreExportRasterHostStyles(host, hostStyleSnapshot);
     }

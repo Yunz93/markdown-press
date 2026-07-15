@@ -95,6 +95,20 @@ describe("preview spacing CSS", () => {
     expect(css).toMatch(/\.preview-pane-document-compact\b/);
   });
 
+  it("resets nested Mermaid svg sizing and preserves embed body text color", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "src/styles/preview.css"),
+      "utf8",
+    );
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.mermaid svg svg\s*\{[^}]*max-width:\s*none !important;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.preview-note-embed-body\.markdown-body\s*\{[^}]*color:\s*var\(--mp-doc-text,\s*#312e81\) !important;/m,
+    );
+  });
+
   it("uses a tighter heading scale than github-markdown defaults", () => {
     const css = readFileSync(
       resolve(process.cwd(), "src/styles/preview.css"),

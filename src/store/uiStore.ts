@@ -32,6 +32,18 @@ function normalizeLanguage(language: unknown): AppSettings["language"] {
 /**
  * UI store state interface
  */
+export interface PendingDraftRestore {
+  fileId: string;
+  fileName: string;
+  draftContent: string;
+}
+
+export interface PendingAiResult {
+  fileId: string;
+  previousContent: string;
+  newContent: string;
+}
+
 export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
@@ -41,6 +53,10 @@ export interface UIState {
   settings: AppSettings;
   notification: Notification | null;
   activeHeadingId: string | null;
+  /** Draft backup found for a just-opened file, awaiting a restore/discard decision. */
+  pendingDraftRestore: PendingDraftRestore | null;
+  /** AI enhancement output awaiting an apply/discard decision. */
+  pendingAiResult: PendingAiResult | null;
 }
 
 /**
@@ -56,9 +72,14 @@ export interface UIActions {
   updateSettings: (
     updates: Partial<AppSettings> | ((state: UIState) => Partial<AppSettings>),
   ) => void;
-  showNotification: (msg: string, type?: "success" | "error" | "info") => void;
+  showNotification: (
+    msg: string,
+    type?: "success" | "error" | "info" | "warning",
+  ) => void;
   clearNotification: () => void;
   setActiveHeadingId: (id: string | null) => void;
+  setPendingDraftRestore: (pending: PendingDraftRestore | null) => void;
+  setPendingAiResult: (pending: PendingAiResult | null) => void;
 }
 
 /**
@@ -161,6 +182,7 @@ export const defaultSettings: AppSettings = {
   lastKnowledgeBasePath: "",
   lastOpenedFilePath: "",
   themeMode: "dark",
+  themeFollowSystem: false,
   metadataFields: DEFAULT_METADATA_FIELDS,
   autoSaveInterval: 60000,
   autoCheckForUpdates: true,
@@ -179,6 +201,8 @@ export const initialUIState: UIState = {
   isPublishing: false,
   settings: defaultSettings,
   notification: null,
+  pendingDraftRestore: null,
+  pendingAiResult: null,
   activeHeadingId: null,
 };
 
@@ -210,6 +234,7 @@ export function createUISlice(
           ...settings,
           language: normalizeLanguage(settings.language),
           themeMode: normalizeThemeMode(settings.themeMode),
+          themeFollowSystem: settings.themeFollowSystem === true,
           markdownStylePreset: normalizeMarkdownStylePreset(
             settings.markdownStylePreset,
           ),
@@ -267,6 +292,11 @@ export function createUISlice(
     },
 
     setActiveHeadingId: (id) => set(() => ({ activeHeadingId: id })),
+
+    setPendingDraftRestore: (pending) =>
+      set(() => ({ pendingDraftRestore: pending })),
+
+    setPendingAiResult: (pending) => set(() => ({ pendingAiResult: pending })),
   };
 }
 
