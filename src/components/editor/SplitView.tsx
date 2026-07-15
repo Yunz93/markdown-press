@@ -17,6 +17,7 @@ import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
 import { getMarkdownStyleCssVariables } from "../../utils/markdownStyle";
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
+import { getUiFontScale } from "../../utils/uiFontSize";
 import { ErrorBoundary } from "../ErrorBoundary";
 
 const PANE_TRANSITION_MS = 200;
@@ -52,8 +53,9 @@ export const SplitView: React.FC<SplitViewProps> = ({
   onToggleOutline,
 }) => {
   const { t } = useI18n();
-  const MIN_SPLIT_PANE_WIDTH = 360;
   const settings = useAppStore((state) => state.settings);
+  const uiFontScale = getUiFontScale(settings.uiFontSize);
+  const MIN_SPLIT_PANE_WIDTH = 360 * uiFontScale;
   const viewMode = useAppStore((state) => state.viewMode);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const [splitRatio, setSplitRatio] = useState(50);
@@ -105,7 +107,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
       );
       setSplitRatio(clampedRatio);
     },
-    [isResizing],
+    [isResizing, MIN_SPLIT_PANE_WIDTH],
   );
 
   const handleMouseUp = useCallback(() => {

@@ -17,6 +17,7 @@ describe("useUiFontSizeKeyboardShortcuts", () => {
     cleanup();
     useAppStore.setState({
       settings: defaultSettings,
+      uiZoomHintPercent: null,
     });
   });
 
@@ -31,6 +32,7 @@ describe("useUiFontSizeKeyboardShortcuts", () => {
     });
 
     expect(useAppStore.getState().settings.uiFontSize).toBe(17);
+    expect(useAppStore.getState().uiZoomHintPercent).toBe(106);
   });
 
   it("decreases ui font size on Cmd/Ctrl + minus", () => {
@@ -50,6 +52,7 @@ describe("useUiFontSizeKeyboardShortcuts", () => {
     });
 
     expect(useAppStore.getState().settings.uiFontSize).toBe(17);
+    expect(useAppStore.getState().uiZoomHintPercent).toBe(106);
   });
 
   it("resets ui font size on Cmd/Ctrl+Shift+0", () => {
@@ -91,5 +94,6 @@ describe("useUiFontSizeKeyboardShortcuts", () => {
     });
 
     expect(useAppStore.getState().settings.uiFontSize).toBe(12);
+    expect(useAppStore.getState().uiZoomHintPercent).toBeNull();
   });
 });

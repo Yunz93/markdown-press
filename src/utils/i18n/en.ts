@@ -266,7 +266,7 @@ export default {
   settings_systemDefaultFontOption: "System default font",
   settings_uiFontSize: "UI font size",
   settings_uiFontSizeDesc:
-    "Adjusts the text size for the sidebar, toolbar, settings, and other UI chrome without changing editor or preview content. Use Cmd/Ctrl + +/- to adjust quickly.",
+    "Adjusts display scale for the interface, editor, and preview. Use Cmd/Ctrl + +/- for quick changes with an on-screen percentage hint.",
   settings_zoomUiIn: "Zoom UI in",
   settings_zoomUiInDesc:
     "Increase the text size of the sidebar, toolbar, settings, and other UI chrome.",

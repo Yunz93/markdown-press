@@ -20,7 +20,11 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore, selectContent } from "../../store/appStore";
-import { getPaneLayoutMetrics, type PaneDensity } from "./paneLayout";
+import {
+  getPaneLayoutMetrics,
+  scalePaneLayoutMetrics,
+  type PaneDensity,
+} from "./paneLayout";
 import {
   clearActiveEditorFlush,
   clearActiveEditorView,
@@ -33,6 +37,11 @@ import {
   getResolvedCodeFontFamily,
   getResolvedEditorFontFamily,
 } from "../../utils/fontSettings";
+import {
+  getScaledCodeFontSize,
+  getScaledEditorFontSize,
+  getUiFontScale,
+} from "../../utils/uiFontSize";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import {
   useCodeMirror,
@@ -233,9 +242,22 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
     // Pane layout state
     const [paneWidth, setPaneWidth] = useState(0);
+    const uiFontScale = getUiFontScale(settings.uiFontSize);
+    const scaledEditorFontSize = getScaledEditorFontSize(
+      settings.fontSize,
+      settings.uiFontSize,
+    );
+    const scaledCodeFontSize = getScaledCodeFontSize(
+      settings.fontSize,
+      settings.uiFontSize,
+    );
     const layoutMetrics = useMemo(
-      () => getPaneLayoutMetrics(paneWidth, density),
-      [paneWidth, density],
+      () =>
+        scalePaneLayoutMetrics(
+          getPaneLayoutMetrics(paneWidth, density),
+          uiFontScale,
+        ),
+      [paneWidth, density, uiFontScale],
     );
     const [selectionMenu, setSelectionMenu] = useState<{
       x: number;
@@ -590,12 +612,18 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--pane-content-bottom": `${layoutMetrics.contentPaddingBottom}px`,
           "--editor-content-bottom": `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
           "--editor-font-family": editorFontFamily,
-          "--editor-font-size": `${settings.fontSize}px`,
+          "--editor-font-size": `${scaledEditorFontSize}px`,
           "--editor-code-font-family": codeFontFamily,
-          "--editor-code-font-size": `${Math.max(12, settings.fontSize - 2)}px`,
+          "--editor-code-font-size": `${scaledCodeFontSize}px`,
           "--editor-line-height": String(EDITOR_LINE_HEIGHT),
         }) as React.CSSProperties,
-      [layoutMetrics, editorFontFamily, settings.fontSize, codeFontFamily],
+      [
+        layoutMetrics,
+        editorFontFamily,
+        scaledEditorFontSize,
+        scaledCodeFontSize,
+        codeFontFamily,
+      ],
     );
 
     // Hover preview state
