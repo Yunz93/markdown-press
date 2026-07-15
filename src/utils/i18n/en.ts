@@ -135,6 +135,8 @@ export default {
 
   tab_closeOtherTabs: "Close Other Tabs",
   tab_closeTab: "Close tab",
+  tab_closeBlockedUnsaved:
+    "Save failed. The tab was kept open to avoid losing unsaved changes.",
 
   search_find: "Find",
   search_searchPlaceholder: "Search...",

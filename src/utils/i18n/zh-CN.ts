@@ -128,6 +128,7 @@ export default {
 
   tab_closeOtherTabs: "关闭其他标签页",
   tab_closeTab: "关闭标签",
+  tab_closeBlockedUnsaved: "保存失败，已保留标签页以避免丢失未保存内容",
 
   search_find: "查找",
   search_searchPlaceholder: "搜索...",

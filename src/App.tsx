@@ -233,26 +233,29 @@ const App: React.FC = () => {
   });
 
   const handleBeforeCloseTab = useCallback(
-    async (tabId: string) => {
+    async (tabId: string): Promise<boolean> => {
       const state = useAppStore.getState();
       if (tabId === state.activeTabId) {
         if (state.hasUnsavedChanges(tabId)) {
-          await forceSave(undefined, { trigger: "system" });
+          return forceSave(undefined, { trigger: "system" });
         }
-        return;
+        return true;
       }
-      await saveOpenTabIfDirty(tabId);
+      return saveOpenTabIfDirty(tabId);
     },
     [forceSave, saveOpenTabIfDirty],
   );
 
   const handleBeforeCloseOtherTabs = useCallback(
-    async (keepFileId: string) => {
+    async (keepFileId: string): Promise<boolean> => {
       const tabs = useAppStore.getState().openTabs;
+      let allSaved = true;
       for (const tabId of tabs) {
         if (tabId === keepFileId) continue;
-        await handleBeforeCloseTab(tabId);
+        const saved = await handleBeforeCloseTab(tabId);
+        if (!saved) allSaved = false;
       }
+      return allSaved;
     },
     [handleBeforeCloseTab],
   );
@@ -305,7 +308,11 @@ const App: React.FC = () => {
         void (async () => {
           const state = useAppStore.getState();
           if (state.hasUnsavedChanges(tabToClose)) {
-            await forceSave(undefined, { trigger: "system" });
+            const saved = await forceSave(undefined, { trigger: "system" });
+            if (!saved) {
+              showNotification(t("tab_closeBlockedUnsaved"), "error");
+              return;
+            }
           }
 
           const latestState = useAppStore.getState();
