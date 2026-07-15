@@ -115,6 +115,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   const saveGenerationRef = useRef(0);
   const pendingSaveRef = useRef<ForceSaveOptions | null>(null);
   const saveIdleResolversRef = useRef<Array<() => void>>([]);
+  const previousActiveTabIdRef = useRef<string | null>(activeTabId);
 
   const notifySaveIdle = useCallback(() => {
     const resolvers = saveIdleResolversRef.current;
@@ -189,8 +190,52 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     pathRef.current = currentFilePath;
   }, [currentFilePath]);
 
-  // Reset save state when file changes
+  const saveOpenTabIfDirty = useCallback(
+    async (tabId: string): Promise<boolean> => {
+      const state = useAppStore.getState();
+      if (!state.hasUnsavedChanges(tabId)) {
+        return true;
+      }
+
+      const tabContent = state.fileContents[tabId];
+      const node = findFileInTree(state.files, tabId);
+      if (tabContent === undefined || !node || node.type !== "file") {
+        return false;
+      }
+
+      if (!isMarkdownDocumentPath(node.path)) {
+        return true;
+      }
+
+      try {
+        const fs = await getFileSystem();
+        await fs.writeFile(node.path, tabContent);
+        state.markAsSaved(tabId, tabContent);
+        clearDraftBackup(tabId);
+        return true;
+      } catch (error) {
+        console.error(`Failed to save tab ${tabId}:`, error);
+        return false;
+      }
+    },
+    [],
+  );
+
+  // Flush the previous tab before resetting save state on tab switch.
   useEffect(() => {
+    const previousTabId = previousActiveTabIdRef.current;
+    previousActiveTabIdRef.current = activeTabId;
+
+    if (previousTabId && previousTabId !== activeTabId) {
+      flushActiveEditorPendingChanges();
+      void saveOpenTabIfDirty(previousTabId);
+    }
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     saveGenerationRef.current += 1;
     pendingSaveRef.current = null;
 
@@ -211,7 +256,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       error: null,
       retryCount: 0,
     };
-  }, [activeTabId, notifySaveIdle, setSaving]);
+  }, [activeTabId, notifySaveIdle, saveOpenTabIfDirty, setSaving]);
 
   const executeSaveRef = useRef<
     (retryCount?: number, options?: ForceSaveOptions) => Promise<boolean>
@@ -278,7 +323,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           const latestState = useAppStore.getState();
           if (latestState.openTabs.includes(tabId)) {
             markAsSaved(tabId, contentToSave);
-            lastSavedContentRef.current = contentToSave;
           }
           isSavingRef.current = false;
           setSaving(false);
@@ -473,33 +517,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       return result;
     },
     [executeSave, waitForSaveIdle],
-  );
-
-  const saveOpenTabIfDirty = useCallback(
-    async (tabId: string): Promise<boolean> => {
-      const state = useAppStore.getState();
-      if (!state.hasUnsavedChanges(tabId)) {
-        return true;
-      }
-
-      const content = state.fileContents[tabId];
-      const node = findFileInTree(state.files, tabId);
-      if (content === undefined || !node || node.type !== "file") {
-        return false;
-      }
-
-      try {
-        const fs = await getFileSystem();
-        await fs.writeFile(node.path, content);
-        state.markAsSaved(tabId, content);
-        clearDraftBackup(tabId);
-        return true;
-      } catch (error) {
-        console.error(`Failed to save tab ${tabId}:`, error);
-        return false;
-      }
-    },
-    [],
   );
 
   // Get save state

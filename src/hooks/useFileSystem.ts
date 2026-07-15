@@ -654,10 +654,8 @@ export function useFileSystem() {
         if (newPath) {
           const normalizedName =
             file.type === "file"
-              ? newName.endsWith(".md")
-                ? newName
-                : `${newName}.md`
-              : newName;
+              ? newName.trim() || file.name
+              : newName.trim() || file.name;
           useAppStore
             .getState()
             .updateFileName(file.id, normalizedName, newPath);

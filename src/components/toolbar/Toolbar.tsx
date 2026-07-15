@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ViewMode, type ThemeMode } from '../../types';
 import { ViewModeToggle } from '../toolbar/ViewModeToggle';
 import { AIButton } from '../toolbar/AIButton';
@@ -20,6 +20,7 @@ interface ToolbarProps {
   themeMode: ThemeMode;
   onPublish?: () => void;
   onExportPdf?: () => void;
+  onExportPlainText?: () => void;
   onShareLongImage?: () => void;
   isPreviewOnlyFile?: boolean;
 }
@@ -38,12 +39,36 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
   themeMode,
   onPublish,
   onExportPdf,
+  onExportPlainText,
   onShareLongImage,
   isPreviewOnlyFile = false,
 }) => {
   const { t } = useI18n();
   const isDark = themeMode === 'dark';
   const displayFileName = fileName.replace(/\.md$/i, '');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isExportMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!exportMenuRef.current?.contains(event.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsExportMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isExportMenuOpen]);
+
+  const exportDisabled = isPreviewOnlyFile || !fileName;
+  const canShowExport = Boolean(onExportPdf || onExportPlainText);
 
   return (
     <div
@@ -133,13 +158,13 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
           <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} previewOnly={isPreviewOnlyFile} />
         </div>
 
-        {(onPublish || onExportPdf || onShareLongImage) && (
+        {(onPublish || canShowExport || onShareLongImage) && (
           <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
             {onPublish && (
               <button
                 onClick={onPublish}
-                disabled={isPublishing}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                disabled={isPublishing || isPreviewOnlyFile || !fileName}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
                 title={isPublishing ? t('toolbar_publishing') : t('toolbar_publish')}
               >
                 {isPublishing ? (
@@ -157,18 +182,60 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(({
               </button>
             )}
 
-            {onExportPdf && (
-              <button
-                onClick={onExportPdf}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                title={t('toolbar_exportPdf')}
-              >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </button>
+            {canShowExport && (
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (exportDisabled) return;
+                    setIsExportMenuOpen((open) => !open);
+                  }}
+                  disabled={exportDisabled}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
+                  title={t('toolbar_export')}
+                  aria-expanded={isExportMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+                {isExportMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-40 mt-1 min-w-[10.5rem] overflow-hidden rounded-xl border border-gray-200/80 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-[#121923]"
+                  >
+                    {onExportPdf && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                        onClick={() => {
+                          setIsExportMenuOpen(false);
+                          onExportPdf();
+                        }}
+                      >
+                        {t('toolbar_exportPdf')}
+                      </button>
+                    )}
+                    {onExportPlainText && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                        onClick={() => {
+                          setIsExportMenuOpen(false);
+                          onExportPlainText();
+                        }}
+                      >
+                        {t('toolbar_exportPlainText')}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {onShareLongImage && (

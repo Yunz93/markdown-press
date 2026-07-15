@@ -3,18 +3,97 @@ import { redo as cmRedo, undo as cmUndo } from "@codemirror/commands";
 
 let activeEditorView: EditorView | null = null;
 let activeEditorFlush: (() => void) | null = null;
+let activeEditorTabId: string | null = null;
 
 interface FocusOptions {
   alignTopRatio?: number;
   focus?: boolean;
 }
 
+interface PendingEditorFocusRequest {
+  tabId: string | null;
+  start: number;
+  end: number;
+  options?: FocusOptions;
+}
+
+const EDITOR_FOCUS_RETRY_DELAYS_MS = [16, 64, 180, 360];
+let pendingEditorFocusRequest: PendingEditorFocusRequest | null = null;
+let pendingEditorFocusRetryTimers: number[] = [];
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function registerActiveEditorView(view: EditorView | null): void {
+function clearPendingEditorFocusRetries(): void {
+  pendingEditorFocusRetryTimers.forEach((timerId) =>
+    window.clearTimeout(timerId),
+  );
+  pendingEditorFocusRetryTimers = [];
+}
+
+function applyEditorRangeFocus(
+  start: number,
+  end: number = start,
+  options?: FocusOptions,
+): boolean {
+  if (!activeEditorView) return false;
+
+  const view = activeEditorView;
+  const docLength = view.state.doc.length;
+  const anchor = clamp(start, 0, docLength);
+  const head = clamp(end, 0, docLength);
+  const shouldFocus = options?.focus ?? true;
+
+  if (shouldFocus) {
+    view.focus();
+  }
+  view.dispatch({
+    selection: { anchor, head },
+    scrollIntoView: shouldFocus,
+  });
+
+  const alignTopRatio = clamp(options?.alignTopRatio ?? 0.3, 0, 1);
+  const lineTop = view.lineBlockAt(anchor).top;
+  const targetScrollTop = Math.max(
+    0,
+    lineTop - view.scrollDOM.clientHeight * alignTopRatio,
+  );
+  view.scrollDOM.scrollTop = targetScrollTop;
+
+  return true;
+}
+
+function tryFlushPendingEditorFocus(): boolean {
+  if (!pendingEditorFocusRequest) return false;
+  if (
+    pendingEditorFocusRequest.tabId != null &&
+    activeEditorTabId != null &&
+    pendingEditorFocusRequest.tabId !== activeEditorTabId
+  ) {
+    return false;
+  }
+
+  const { start, end, options } = pendingEditorFocusRequest;
+  const didFocus = applyEditorRangeFocus(start, end, options);
+  if (didFocus) {
+    clearPendingEditorFocusRetries();
+    pendingEditorFocusRequest = null;
+  }
+  return didFocus;
+}
+
+export function registerActiveEditorView(
+  view: EditorView | null,
+  tabId?: string | null,
+): void {
   activeEditorView = view;
+  if (tabId !== undefined) {
+    activeEditorTabId = tabId;
+  }
+  if (view) {
+    tryFlushPendingEditorFocus();
+  }
 }
 
 export function clearActiveEditorView(view: EditorView): void {
@@ -82,29 +161,40 @@ export function focusEditorRangeByOffset(
   end: number = start,
   options?: FocusOptions,
 ): boolean {
-  if (!activeEditorView) return false;
+  return applyEditorRangeFocus(start, end, options);
+}
 
-  const view = activeEditorView;
-  const docLength = view.state.doc.length;
-  const anchor = clamp(start, 0, docLength);
-  const head = clamp(end, 0, docLength);
-  const shouldFocus = options?.focus ?? true;
+/**
+ * Focus an editor range even if CodeMirror is still mounting (e.g. after
+ * opening a file from sidebar search). Retries briefly and also flushes when
+ * a view is registered via {@link registerActiveEditorView}.
+ */
+export function requestEditorRangeFocus(
+  tabId: string | null | undefined,
+  start: number,
+  end: number = start,
+  options?: FocusOptions,
+): boolean {
+  clearPendingEditorFocusRetries();
+  pendingEditorFocusRequest = {
+    tabId: tabId ?? null,
+    start,
+    end,
+    options,
+  };
 
-  if (shouldFocus) {
-    view.focus();
-  }
-  view.dispatch({
-    selection: { anchor, head },
-    scrollIntoView: shouldFocus,
-  });
+  const didFocus = tryFlushPendingEditorFocus();
+  if (didFocus) return true;
 
-  const alignTopRatio = clamp(options?.alignTopRatio ?? 0.3, 0, 1);
-  const lineTop = view.lineBlockAt(anchor).top;
-  const targetScrollTop = Math.max(
-    0,
-    lineTop - view.scrollDOM.clientHeight * alignTopRatio,
+  pendingEditorFocusRetryTimers = EDITOR_FOCUS_RETRY_DELAYS_MS.map((delay) =>
+    window.setTimeout(() => {
+      tryFlushPendingEditorFocus();
+    }, delay),
   );
-  view.scrollDOM.scrollTop = targetScrollTop;
+  return false;
+}
 
-  return true;
+export function clearPendingEditorRangeFocus(): void {
+  clearPendingEditorFocusRetries();
+  pendingEditorFocusRequest = null;
 }

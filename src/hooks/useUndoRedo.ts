@@ -10,11 +10,13 @@ import {
  * Global undo/redo wiring.
  *
  * The editor's CodeMirror history is the single source of truth whenever an
- * editor view is mounted: Ctrl+Z pressed outside the editor (sidebar,
- * preview, toolbar) is routed to CodeMirror so there is only one undo stack
- * per document. The store-level history is a fallback for content changes
- * made while no editor exists (e.g. preview-only files or AI rewrites in
- * preview mode).
+ * editor view is focused: Ctrl+Z inside the editor is handled by CodeMirror.
+ * When focus is outside the editor, this hook routes to CodeMirror first and
+ * falls back to store-level history if CM has nothing to undo (e.g. content
+ * changed via AI apply while the editor was not focused).
+ *
+ * Per-tab CodeMirror history is preserved across tab switches via the editor
+ * state cache in useCodeMirror, so remounting is no longer required.
  */
 export function useUndoRedo() {
   const { undo, redo, canUndo, canRedo, activeTabId, fileHistories } =
@@ -37,7 +39,9 @@ export function useUndoRedo() {
       if (e.key === "z" && !e.shiftKey) {
         if (getActiveEditorView()) {
           e.preventDefault();
-          undoInActiveEditor();
+          if (!undoInActiveEditor() && canUndo()) {
+            undo();
+          }
         } else if (canUndo()) {
           e.preventDefault();
           undo();
@@ -47,7 +51,9 @@ export function useUndoRedo() {
       else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
         if (getActiveEditorView()) {
           e.preventDefault();
-          redoInActiveEditor();
+          if (!redoInActiveEditor() && canRedo()) {
+            redo();
+          }
         } else if (canRedo()) {
           e.preventDefault();
           redo();

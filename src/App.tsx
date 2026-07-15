@@ -146,7 +146,7 @@ const App: React.FC = () => {
   });
 
   const { forceSave, saveOpenTabIfDirty } = useAutoSave({ enabled: true });
-  const { handleExportToPdf, buildLongImageSharePayload } =
+  const { handleExportToPdf, handleExportToPlainText, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
     usePublishActions(forceSave);
@@ -206,6 +206,7 @@ const App: React.FC = () => {
   useActiveFileWatch({
     activeTabId,
     currentFilePath,
+    openTabs,
     files,
     readFile,
     setCurrentFilePath,
@@ -221,7 +222,12 @@ const App: React.FC = () => {
     showNotification,
     t,
   });
-  const { handleCleanupUnusedAttachments } = useAttachmentCleanup({
+  const {
+    handleCleanupUnusedAttachments,
+    pendingCleanupAttachments,
+    confirmCleanupUnusedAttachments,
+    cancelCleanupUnusedAttachments,
+  } = useAttachmentCleanup({
     closeTab,
     fileContents,
     files,
@@ -403,12 +409,31 @@ const App: React.FC = () => {
   }, []);
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
+    const state = useAppStore.getState();
+    for (const tabId of state.openTabs) {
+      if (!state.hasUnsavedChanges(tabId)) continue;
+      const saved =
+        tabId === state.activeTabId
+          ? await forceSave(undefined, { trigger: "system" })
+          : await saveOpenTabIfDirty(tabId);
+      if (!saved) {
+        showNotification(
+          t("notifications_switchKnowledgeBaseSaveFailed"),
+          "error",
+        );
+        return;
+      }
+    }
     await openDirectory();
-  }, [openDirectory]);
+  }, [openDirectory, forceSave, saveOpenTabIfDirty, showNotification, t]);
 
   const handleOpenPublishDialog = useCallback(() => {
+    if (isPreviewOnlyActiveFile) {
+      showNotification(t("notifications_exportMarkdownOnly"), "error");
+      return;
+    }
     setIsPublishTargetDialogOpen(true);
-  }, []);
+  }, [isPreviewOnlyActiveFile, showNotification, t]);
 
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
@@ -594,6 +619,7 @@ const App: React.FC = () => {
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
+            onCleanupUnusedAttachments={handleCleanupUnusedAttachments}
             isOpen={isSidebarOpen}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}
@@ -620,6 +646,7 @@ const App: React.FC = () => {
               themeMode={settings.themeMode}
               onPublish={handleOpenPublishDialog}
               onExportPdf={handleExportToPdf}
+              onExportPlainText={handleExportToPlainText}
               onShareLongImage={() => {
                 setIsShareLongImageDialogOpen(true);
               }}
@@ -685,6 +712,11 @@ const App: React.FC = () => {
             void handleSubmitWechatDraft(input);
           }}
           onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
+          cleanupPendingCount={pendingCleanupAttachments?.length ?? 0}
+          onConfirmCleanupAttachments={() => {
+            void confirmCleanupUnusedAttachments();
+          }}
+          onCancelCleanupAttachments={cancelCleanupUnusedAttachments}
         />
       </div>
     </ErrorBoundary>

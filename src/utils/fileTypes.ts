@@ -45,3 +45,43 @@ export function isOpenableFile(node: FileNode): boolean {
 export function shouldReadInitialFileContent(name: string): boolean {
   return isMarkdownFile(name) || isHtmlFile(name);
 }
+
+/**
+ * Display name for the rename dialog: strip markdown extensions so users edit
+ * the stem, but keep the full name (including extension) for other file types.
+ */
+export function getRenameDialogDefaultValue(fileName: string): string {
+  if (/\.(md|markdown)$/i.test(fileName)) {
+    return fileName.replace(/\.(md|markdown)$/i, "");
+  }
+  return fileName;
+}
+
+/**
+ * Resolve the on-disk file name after a rename dialog submit.
+ * Markdown notes keep/restore their `.md` / `.markdown` extension; other files
+ * keep their original extension when the user only edits the stem.
+ */
+export function resolveRenamedFileName(
+  oldName: string,
+  inputName: string,
+): string {
+  const trimmed = inputName.trim();
+  if (!trimmed) return oldName;
+
+  if (isMarkdownFile(oldName)) {
+    if (/\.(md|markdown)$/i.test(trimmed)) return trimmed;
+    const oldExt = oldName.match(/\.(md|markdown)$/i)?.[0] ?? ".md";
+    return `${trimmed}${oldExt}`;
+  }
+
+  // Non-markdown: if the user typed a stem without a dot, preserve old ext.
+  if (!trimmed.includes(".")) {
+    const lastDot = oldName.lastIndexOf(".");
+    if (lastDot > 0) {
+      return `${trimmed}${oldName.slice(lastDot)}`;
+    }
+  }
+
+  return trimmed;
+}

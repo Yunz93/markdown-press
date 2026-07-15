@@ -59,6 +59,7 @@ describe("useActiveFileWatch", () => {
       useActiveFileWatch({
         activeTabId: note.id,
         currentFilePath: note.path,
+        openTabs: [note.id],
         files: [note],
         readFile,
         setCurrentFilePath: useAppStore.getState().setCurrentFilePath,
@@ -108,6 +109,7 @@ describe("useActiveFileWatch", () => {
       useActiveFileWatch({
         activeTabId: note.id,
         currentFilePath: note.path,
+        openTabs: [note.id],
         files: [note],
         readFile: vi.fn(),
         setCurrentFilePath: useAppStore.getState().setCurrentFilePath,
@@ -158,6 +160,7 @@ describe("useActiveFileWatch", () => {
       useActiveFileWatch({
         activeTabId: note.id,
         currentFilePath: note.path,
+        openTabs: [note.id],
         files: [note],
         readFile: vi.fn(),
         setCurrentFilePath: useAppStore.getState().setCurrentFilePath,

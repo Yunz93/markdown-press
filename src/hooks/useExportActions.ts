@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
-import { exportToHtml, exportToPdf } from "../utils/export";
+import {
+  exportToHtml,
+  exportToPdf,
+  exportToPlainText,
+  downloadPlainText,
+} from "../utils/export";
 import type { LongImageSharePayload } from "../components/share/longImageSharePayload";
 import {
   buildCodeExportFontFamily,
@@ -10,6 +15,7 @@ import { getFileSystem } from "../types/filesystem";
 import { t } from "../utils/i18n";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 import { findFileInTree } from "../utils/fileTree";
+import { isMarkdownFile, isPreviewOnlyFile } from "../utils/fileTypes";
 
 /**
  * Encapsulates export actions (PDF + long-image share payload).
@@ -38,6 +44,14 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     if (!activeFile) {
       showNotification(
         t(settings.language, "notifications_noFileToExport"),
+        "error",
+      );
+      return;
+    }
+
+    if (isPreviewOnlyFile(activeFile.name)) {
+      showNotification(
+        t(settings.language, "notifications_exportMarkdownOnly"),
         "error",
       );
       return;
@@ -105,11 +119,49 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     codeFontFamily,
     highlighter,
     settings.fontSize,
+    settings.language,
     settings.markdownStylePreset,
     settings.orderedListMode,
     settings.themeMode,
     showNotification,
   ]);
+
+  const handleExportToPlainText = useCallback(async () => {
+    if (
+      !activeTabId ||
+      useAppStore.getState().fileContents[activeTabId] === undefined
+    ) {
+      showNotification(
+        t(settings.language, "notifications_noFileToExport"),
+        "error",
+      );
+      return;
+    }
+
+    const activeFile = findFileInTree(files, activeTabId);
+    if (!activeFile || !isMarkdownFile(activeFile.name)) {
+      showNotification(
+        t(settings.language, "notifications_exportMarkdownOnly"),
+        "error",
+      );
+      return;
+    }
+
+    try {
+      const text = exportToPlainText(content);
+      const filename = activeFile.name.replace(/\.(md|markdown)$/i, "") || "export";
+      const saved = await downloadPlainText(text, filename);
+      if (saved) {
+        showNotification(
+          t(settings.language, "export_plainTextExported"),
+          "success",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to export plain text:", error);
+      showNotification(t(settings.language, "export_failed"), "error");
+    }
+  }, [activeTabId, content, files, settings.language, showNotification]);
 
   const buildLongImageSharePayload =
     useCallback(async (): Promise<LongImageSharePayload | null> => {
@@ -125,9 +177,9 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       }
 
       const activeFile = findFileInTree(files, activeTabId);
-      if (!activeFile) {
+      if (!activeFile || isPreviewOnlyFile(activeFile.name)) {
         showNotification(
-          t(settings.language, "notifications_noFileToExport"),
+          t(settings.language, "notifications_exportMarkdownOnly"),
           "error",
         );
         return null;
@@ -170,6 +222,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
 
   return {
     handleExportToPdf,
+    handleExportToPlainText,
     buildLongImageSharePayload,
   };
 }

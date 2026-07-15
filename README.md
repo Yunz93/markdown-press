@@ -66,7 +66,8 @@ xattr -cr /Applications/M記.app
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹                            |
 | `Cmd/Ctrl + W`                          | 关闭标签                                     |
 | `Cmd/Ctrl + +` / `Cmd/Ctrl + -`         | 放大 / 缩小界面文字                          |
-| `Cmd + Shift + -`                       | 清理未引用附件                               |
+| `Cmd/Ctrl + Shift + 0`                  | 重置界面文字大小                             |
+| `Cmd/Ctrl + Shift + -`                  | 清理未引用附件                               |
 | `Escape`                                | 关闭搜索面板、弹窗或菜单                     |
 
 ## 发布到 simple-blog

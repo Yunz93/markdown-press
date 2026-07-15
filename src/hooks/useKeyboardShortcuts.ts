@@ -35,6 +35,8 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   'openKnowledgeBase',
   'exportPdf',
   'closeTab',
+  'newNote',
+  'newFolder',
 ]);
 
 const SHORTCUT_ACTION_ALIASES: Partial<Record<keyof ShortcutConfig, string[]>> = {

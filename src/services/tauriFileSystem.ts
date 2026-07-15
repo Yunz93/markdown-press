@@ -300,8 +300,10 @@ export class TauriFileSystem implements IFileSystem {
   async renameFile(oldPath: string, newName: string): Promise<string> {
     try {
       const dir = await dirname(oldPath);
-      const nameWithExt = newName.endsWith(".md") ? newName : `${newName}.md`;
-      const newPath = await join(dir, nameWithExt);
+      // Callers pass the final basename (including the correct extension).
+      // Do not force `.md` here — that breaks HTML/PDF/image renames.
+      const baseName = newName.trim() || (await basename(oldPath));
+      const newPath = await join(dir, baseName);
       await rename(oldPath, newPath);
       const format = this.fileFormatStates.get(oldPath);
       if (format) {

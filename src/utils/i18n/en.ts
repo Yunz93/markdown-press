@@ -37,6 +37,8 @@ export default {
   toolbar_publishBlog: "Publish blog",
   toolbar_publishingBlog: "Publishing blog",
   toolbar_exportPdf: "Export PDF",
+  toolbar_export: "Export",
+  toolbar_exportPlainText: "Export plain text",
   toolbar_shareLongImage: "Long image share",
 
   share_longImageTitle: "Long image share",
@@ -85,7 +87,7 @@ export default {
   view_split: "Split view",
   view_preview: "Preview",
 
-  split_toggleOutline: "Toggle outline (Ctrl+O)",
+  split_toggleOutline: "Toggle outline",
   split_hideOutline: "Hide Outline",
   split_showOutline: "Show Outline",
 
@@ -112,6 +114,11 @@ export default {
   sidebar_paragraphAroundLine: "Around line {line}",
   sidebar_tryAnotherFilenameKeyword: "Try another filename keyword.",
   sidebar_trash: "Trash ({count})",
+  sidebar_trashEmpty: "Empty",
+  sidebar_cleanupUnusedAttachments: "Clean unused attachments",
+  sidebar_cleanupUnusedAttachmentsTitle: "Clean unused attachments",
+  sidebar_cleanupUnusedAttachmentsConfirm:
+    "Move {count} unreferenced attachment(s) to Trash. You can restore them from Trash later.",
   sidebar_newFileTitle: "New File",
   sidebar_renameTitle: "Rename",
   sidebar_newFolderTitle: "New Folder",
@@ -139,6 +146,16 @@ export default {
     "Save failed. The tab was kept open to avoid losing unsaved changes.",
   notifications_moveToTrashSaveFailed:
     "Could not move to trash: saving unsaved changes failed, the file was kept.",
+  notifications_renameSaveFailed:
+    "Could not rename: saving unsaved changes failed, the original file was kept.",
+  notifications_moveSaveFailed:
+    "Could not move: saving unsaved changes failed, the original location was kept.",
+  notifications_switchKnowledgeBaseSaveFailed:
+    "Could not switch knowledge base because unsaved notes failed to save.",
+  notifications_aiApplyStale:
+    "The note changed while the review was open. Apply was cancelled to avoid overwriting your edits.",
+  notifications_exportMarkdownOnly:
+    "Export and publish are only available for Markdown notes.",
   draft_restoreTitle: "Unsaved backup found",
   draft_restoreMessage:
     'A backup of "{name}" was kept after a failed save and differs from the file on disk. Restore the backup? Choosing "Discard backup" deletes it and keeps the version on disk.',
@@ -256,6 +273,9 @@ export default {
   settings_zoomUiOut: "Zoom UI out",
   settings_zoomUiOutDesc:
     "Decrease the text size of the sidebar, toolbar, settings, and other UI chrome.",
+  settings_zoomUiReset: "Reset UI zoom",
+  settings_zoomUiResetDesc:
+    "Restore the default UI text size (Cmd/Ctrl+Shift+0; Cmd/Ctrl+0 still opens Settings).",
   settings_uiFontCurrentOption: "Current custom stack",
   settings_uiFontPreview:
     "UI font preview: Markdown Press settings, sidebar, and toolbar",

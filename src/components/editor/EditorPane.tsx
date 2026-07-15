@@ -516,7 +516,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     useEffect(() => {
       const flush = codeMirror.flushPendingContentChange;
       if (codeMirror.view) {
-        registerActiveEditorView(codeMirror.view);
+        registerActiveEditorView(codeMirror.view, activeTabId);
         registerActiveEditorFlush(flush);
         scrollSync.registerView(codeMirror.view);
       }
@@ -527,7 +527,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         }
         scrollSync.registerView(null);
       };
-    }, [codeMirror.view, codeMirror.flushPendingContentChange, scrollSync]);
+    }, [
+      activeTabId,
+      codeMirror.view,
+      codeMirror.flushPendingContentChange,
+      scrollSync,
+    ]);
 
     // Expose imperative handle
     useImperativeHandle(

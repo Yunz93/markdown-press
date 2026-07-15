@@ -26,6 +26,15 @@ export const AiResultReviewDialog: React.FC = () => {
   if (!pendingAiResult) return null;
 
   const handleApply = () => {
+    const current = useAppStore.getState().fileContents[pendingAiResult.fileId];
+    if (
+      current !== undefined &&
+      current !== pendingAiResult.previousContent
+    ) {
+      showNotification(t("notifications_aiApplyStale"), "error");
+      setPendingAiResult(null);
+      return;
+    }
     setContentForFile(pendingAiResult.fileId, pendingAiResult.newContent);
     setPendingAiResult(null);
     showNotification(t("notifications_aiEnhanced"), "success");

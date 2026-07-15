@@ -378,7 +378,6 @@ export const SplitView: React.FC<SplitViewProps> = ({
             style={editorPaneStyle}
           >
             <EditorPane
-              key={`editor-${activePaneKey}`}
               ref={editorPaneRef}
               highlighter={highlighter}
               density={contentDensity}
