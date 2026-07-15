@@ -56,7 +56,10 @@ export interface UIActions {
   updateSettings: (
     updates: Partial<AppSettings> | ((state: UIState) => Partial<AppSettings>),
   ) => void;
-  showNotification: (msg: string, type?: "success" | "error" | "info") => void;
+  showNotification: (
+    msg: string,
+    type?: "success" | "error" | "info" | "warning",
+  ) => void;
   clearNotification: () => void;
   setActiveHeadingId: (id: string | null) => void;
 }

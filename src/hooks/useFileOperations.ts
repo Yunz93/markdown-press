@@ -192,13 +192,43 @@ export function useFileOperations() {
 
   const handleMoveToTrash = useCallback(
     async (file: FileNode) => {
+      const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
+
+      // Flush unsaved edits to disk first so the trashed copy keeps the
+      // latest content. Abort if the flush fails - otherwise closing the
+      // tabs below would silently drop those edits.
+      const state = useAppStore.getState();
+      const dirtyTabIds = affectedTabIds.filter((tabId) =>
+        state.hasUnsavedChanges(tabId),
+      );
+      if (dirtyTabIds.length > 0) {
+        try {
+          const fs = await getFileSystem();
+          for (const tabId of dirtyTabIds) {
+            const node = findFileInTree(state.files, tabId);
+            const content = state.fileContents[tabId];
+            if (!node || node.type !== "file" || content === undefined) {
+              continue;
+            }
+            await fs.writeFile(node.path, content);
+            state.markAsSaved(tabId, content);
+          }
+        } catch (e) {
+          console.error("Failed to save unsaved changes before trash:", e);
+          showNotification(
+            t(settings.language, "notifications_moveToTrashSaveFailed"),
+            "error",
+          );
+          return;
+        }
+      }
+
       const movedPath = await moveToTrash(file);
       if (!movedPath) return;
 
-      const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
       affectedTabIds.forEach((tabId) => closeTab(tabId));
     },
-    [moveToTrash, files, openTabs, closeTab],
+    [moveToTrash, files, openTabs, closeTab, showNotification, settings],
   );
 
   const handleRestoreFromTrash = useCallback(

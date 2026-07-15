@@ -137,6 +137,8 @@ export default {
   tab_closeTab: "Close tab",
   tab_closeBlockedUnsaved:
     "Save failed. The tab was kept open to avoid losing unsaved changes.",
+  notifications_moveToTrashSaveFailed:
+    "Could not move to trash: saving unsaved changes failed, the file was kept.",
 
   search_find: "Find",
   search_searchPlaceholder: "Search...",
@@ -550,6 +552,8 @@ export default {
   notifications_updateInstallFailed: "Failed to install the update: {error}",
   notifications_unresolvedImages:
     "{count} local image(s) could not be found and will be skipped during publish. Please check the image paths.",
+  notifications_publishSuccessWithMissingImages:
+    "Published to the blog, but {count} local image(s) could not be found and were skipped. Please check the image paths.",
   notifications_publishFailed: "Failed to publish blog",
   notifications_wechatDraftSuccess:
     "Published to the WeChat draft box and updated the note draft marker.",

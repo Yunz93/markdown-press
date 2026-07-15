@@ -129,6 +129,8 @@ export default {
   tab_closeOtherTabs: "关闭其他标签页",
   tab_closeTab: "关闭标签",
   tab_closeBlockedUnsaved: "保存失败，已保留标签页以避免丢失未保存内容",
+  notifications_moveToTrashSaveFailed:
+    "无法移入回收站：未保存的修改保存失败，已保留文件",
 
   search_find: "查找",
   search_searchPlaceholder: "搜索...",
@@ -502,6 +504,8 @@ export default {
   notifications_updateInstallFailed: "安装更新失败：{error}",
   notifications_unresolvedImages:
     "有 {count} 张本地图片无法找到，发布时将被跳过。请检查图片路径是否正确。",
+  notifications_publishSuccessWithMissingImages:
+    "已发布到博客，但有 {count} 张本地图片未找到、已被跳过。请检查图片路径。",
   notifications_publishFailed: "发布博客失败",
   notifications_wechatDraftSuccess:
     "已发布到微信公众号草稿箱，并更新了笔记草稿标识。",

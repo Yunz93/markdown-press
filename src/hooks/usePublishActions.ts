@@ -362,11 +362,16 @@ export function usePublishActions(
       }
 
       if (prepared.unresolvedImages.length > 0) {
+        // The publish itself succeeded; missing images are a warning, not an error.
         showNotification(
-          t(hydratedSettings.language, "notifications_unresolvedImages", {
-            count: String(prepared.unresolvedImages.length),
-          }),
-          "error",
+          t(
+            hydratedSettings.language,
+            "notifications_publishSuccessWithMissingImages",
+            {
+              count: String(prepared.unresolvedImages.length),
+            },
+          ),
+          "warning",
         );
       } else {
         showNotification(

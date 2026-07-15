@@ -211,9 +211,11 @@ export interface AppSettings {
   lastUpdateCheckAt: string;
 }
 
+export type NotificationType = "success" | "error" | "info" | "warning";
+
 export interface Notification {
   msg: string;
-  type: "success" | "error" | "info";
+  type: NotificationType;
 }
 
 export interface DragDropEvent {
