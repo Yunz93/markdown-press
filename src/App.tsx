@@ -625,7 +625,6 @@ const App: React.FC = () => {
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
-            onCleanupUnusedAttachments={handleCleanupUnusedAttachments}
             isOpen={isSidebarOpen}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}
