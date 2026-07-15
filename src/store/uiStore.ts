@@ -52,6 +52,7 @@ export interface UIState {
   isPublishing: boolean;
   settings: AppSettings;
   notification: Notification | null;
+  uiZoomHintPercent: number | null;
   activeHeadingId: string | null;
   /** Draft backup found for a just-opened file, awaiting a restore/discard decision. */
   pendingDraftRestore: PendingDraftRestore | null;
@@ -77,6 +78,7 @@ export interface UIActions {
     type?: "success" | "error" | "info" | "warning",
   ) => void;
   clearNotification: () => void;
+  showUiZoomHint: (percent: number) => void;
   setActiveHeadingId: (id: string | null) => void;
   setPendingDraftRestore: (pending: PendingDraftRestore | null) => void;
   setPendingAiResult: (pending: PendingAiResult | null) => void;
@@ -203,6 +205,7 @@ export const initialUIState: UIState = {
   notification: null,
   pendingDraftRestore: null,
   pendingAiResult: null,
+  uiZoomHintPercent: null,
   activeHeadingId: null,
 };
 
@@ -214,6 +217,7 @@ export function createUISlice(
   get: () => UIState & UIActions,
 ): UIState & UIActions {
   let notificationTimer: ReturnType<typeof setTimeout> | null = null;
+  let uiZoomHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   return {
     ...initialUIState,
@@ -289,6 +293,18 @@ export function createUISlice(
       }
 
       set(() => ({ notification: null }));
+    },
+
+    showUiZoomHint: (percent) => {
+      if (uiZoomHintTimer) {
+        clearTimeout(uiZoomHintTimer);
+      }
+
+      set(() => ({ uiZoomHintPercent: percent }));
+      uiZoomHintTimer = setTimeout(() => {
+        uiZoomHintTimer = null;
+        set(() => ({ uiZoomHintPercent: null }));
+      }, 1200);
     },
 
     setActiveHeadingId: (id) => set(() => ({ activeHeadingId: id })),
