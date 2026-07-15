@@ -209,7 +209,7 @@ function getShortcutGroups(
           id: "cleanupUnusedAttachments",
           label: t("settings_cleanupUnusedAttachments"),
           description: t("settings_cleanupUnusedAttachmentsDesc"),
-          shortcuts: ["Cmd+Shift+-"],
+          shortcuts: ["Cmd+Shift+-", "Ctrl+Shift+-"],
         },
       ],
     },

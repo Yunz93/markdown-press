@@ -36,6 +36,7 @@ import {
 } from "./utils";
 import { useI18n } from "../../hooks/useI18n";
 import { applyFixedMenuViewportFit } from "../../utils/fitFixedMenuToViewport";
+import { getRenameDialogDefaultValue } from "../../utils/fileTypes";
 
 export interface SidebarProps {
   files: FileNode[];
@@ -208,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onCreateFile,
     onNewFolder,
     onRename,
-    onDelete,
+    onDelete: _onDelete,
     onReveal,
     onMoveToTrash,
     onRestoreFromTrash,
@@ -301,10 +302,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
         onCreateFile,
         onRename,
         onNewFolder,
-        onDelete,
+        // Delete dialog is only opened for permanent trash deletion.
+        onDelete: onDeleteForever,
         onEmptyTrash,
       }),
-      [onCreateFile, onRename, onNewFolder, onDelete, onEmptyTrash],
+      [onCreateFile, onRename, onNewFolder, onDeleteForever, onEmptyTrash],
     );
 
     const {
@@ -685,7 +687,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                 <TrashView
                   trashItems={trashItems}
                   onRestore={onRestoreFromTrash}
-                  onDeleteForever={onDeleteForever}
+                  onDeleteForever={(node) => openDeleteDialog(node)}
                   onEmptyTrash={() => openEmptyTrashDialog()}
                   onContextMenu={openContextMenu}
                 />
@@ -744,7 +746,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             onRename={() =>
               openRenameDialog(
                 contextMenu.node,
-                contextMenu.node.name.replace(/\.md$/, ""),
+                getRenameDialogDefaultValue(contextMenu.node.name),
               )
             }
             onDelete={() => openDeleteDialog(contextMenu.node)}

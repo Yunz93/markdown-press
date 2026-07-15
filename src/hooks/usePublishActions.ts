@@ -26,6 +26,7 @@ import {
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
 import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
+import { isMarkdownFile } from "../utils/fileTypes";
 
 // Publishing can legitimately take a while (image uploads, GitHub tree
 // writes). Keep the timeout generous - a premature timeout is worse than a
@@ -223,6 +224,14 @@ export function usePublishActions(
     if (!activeFile) {
       showNotification(
         t(hydratedSettings.language, "notifications_noFileToPublish"),
+        "error",
+      );
+      return;
+    }
+
+    if (!isMarkdownFile(activeFile.name)) {
+      showNotification(
+        t(hydratedSettings.language, "notifications_exportMarkdownOnly"),
         "error",
       );
       return;
@@ -484,6 +493,14 @@ export function usePublishActions(
       if (!activeFile) {
         showNotification(
           t(hydratedSettings.language, "notifications_noFileToPublish"),
+          "error",
+        );
+        return false;
+      }
+
+      if (!isMarkdownFile(activeFile.name)) {
+        showNotification(
+          t(hydratedSettings.language, "notifications_exportMarkdownOnly"),
           "error",
         );
         return false;

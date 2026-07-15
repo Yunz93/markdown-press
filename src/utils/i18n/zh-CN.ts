@@ -35,6 +35,8 @@ export default {
   toolbar_publishBlog: "发布博客",
   toolbar_publishingBlog: "发布博客中",
   toolbar_exportPdf: "导出 PDF",
+  toolbar_export: "导出",
+  toolbar_exportPlainText: "导出纯文本",
   toolbar_shareLongImage: "长图分享",
 
   share_longImageTitle: "长图分享",
@@ -79,7 +81,7 @@ export default {
   view_split: "分屏",
   view_preview: "预览",
 
-  split_toggleOutline: "切换目录 (Ctrl+O)",
+  split_toggleOutline: "切换目录",
   split_hideOutline: "隐藏目录",
   split_showOutline: "显示目录",
 
@@ -105,6 +107,7 @@ export default {
   sidebar_paragraphAroundLine: "第 {line} 行附近",
   sidebar_tryAnotherFilenameKeyword: "换个文件名关键词试试。",
   sidebar_trash: "回收站（{count}）",
+  sidebar_trashEmpty: "无",
   sidebar_newFileTitle: "新建文件",
   sidebar_renameTitle: "重命名",
   sidebar_newFolderTitle: "新建文件夹",
@@ -131,6 +134,15 @@ export default {
   tab_closeBlockedUnsaved: "保存失败，已保留标签页以避免丢失未保存内容",
   notifications_moveToTrashSaveFailed:
     "无法移入回收站：未保存的修改保存失败，已保留文件",
+  notifications_renameSaveFailed:
+    "无法重命名：未保存的修改保存失败，已保留原文件",
+  notifications_moveSaveFailed:
+    "无法移动：未保存的修改保存失败，已保留原位置",
+  notifications_switchKnowledgeBaseSaveFailed:
+    "切换知识库前保存失败，请先处理未保存的笔记",
+  notifications_aiApplyStale:
+    "笔记在审阅期间已被修改，已取消应用以避免覆盖你的编辑",
+  notifications_exportMarkdownOnly: "仅支持对 Markdown 笔记导出或发布",
   draft_restoreTitle: "发现未保存的备份",
   draft_restoreMessage:
     "「{name}」上次保存失败时留下了备份内容，与磁盘上的文件不一致。要恢复备份内容吗？选择“放弃备份”将删除备份并保留磁盘上的版本。",

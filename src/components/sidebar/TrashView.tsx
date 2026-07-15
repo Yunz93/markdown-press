@@ -23,7 +23,7 @@ export const TrashView: React.FC<TrashViewProps> = ({
   if (trashItems.length === 0) {
     return (
       <div className="px-3 py-2 text-xs italic text-gray-400 text-center">
-        无
+        {t("sidebar_trashEmpty")}
       </div>
     );
   }

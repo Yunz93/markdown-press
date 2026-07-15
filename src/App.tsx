@@ -146,7 +146,7 @@ const App: React.FC = () => {
   });
 
   const { forceSave, saveOpenTabIfDirty } = useAutoSave({ enabled: true });
-  const { handleExportToPdf, buildLongImageSharePayload } =
+  const { handleExportToPdf, handleExportToPlainText, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
     usePublishActions(forceSave);
@@ -403,12 +403,31 @@ const App: React.FC = () => {
   }, []);
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
+    const state = useAppStore.getState();
+    for (const tabId of state.openTabs) {
+      if (!state.hasUnsavedChanges(tabId)) continue;
+      const saved =
+        tabId === state.activeTabId
+          ? await forceSave(undefined, { trigger: "system" })
+          : await saveOpenTabIfDirty(tabId);
+      if (!saved) {
+        showNotification(
+          t("notifications_switchKnowledgeBaseSaveFailed"),
+          "error",
+        );
+        return;
+      }
+    }
     await openDirectory();
-  }, [openDirectory]);
+  }, [openDirectory, forceSave, saveOpenTabIfDirty, showNotification, t]);
 
   const handleOpenPublishDialog = useCallback(() => {
+    if (isPreviewOnlyActiveFile) {
+      showNotification(t("notifications_exportMarkdownOnly"), "error");
+      return;
+    }
     setIsPublishTargetDialogOpen(true);
-  }, []);
+  }, [isPreviewOnlyActiveFile, showNotification, t]);
 
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
@@ -620,6 +639,7 @@ const App: React.FC = () => {
               themeMode={settings.themeMode}
               onPublish={handleOpenPublishDialog}
               onExportPdf={handleExportToPdf}
+              onExportPlainText={handleExportToPlainText}
               onShareLongImage={() => {
                 setIsShareLongImageDialogOpen(true);
               }}

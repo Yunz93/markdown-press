@@ -263,9 +263,9 @@ export class BrowserFileSystem implements IFileSystem {
    */
   async renameFile(oldPath: string, newName: string): Promise<string> {
     try {
-      const normalizedName = newName.endsWith(".md")
-        ? newName
-        : `${newName}.md`;
+      // Callers pass the final basename (including the correct extension).
+      const normalizedName =
+        newName.trim() || oldPath.split(/[/\\]/).pop() || newName;
       // Read old content
       const content = await this.readFile(oldPath);
 

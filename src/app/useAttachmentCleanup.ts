@@ -138,7 +138,8 @@ export function useAttachmentCleanup(options: UseAttachmentCleanupOptions) {
     const handleCleanupShortcut = (event: KeyboardEvent) => {
       if (event.repeat) return;
       if (event.code !== "Minus") return;
-      if (!event.metaKey || !event.shiftKey || event.ctrlKey || event.altKey)
+      // Cmd/Ctrl+Shift+- — support both macOS and Windows/Linux.
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey)
         return;
 
       event.preventDefault();
