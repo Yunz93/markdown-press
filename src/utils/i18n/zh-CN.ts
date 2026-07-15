@@ -131,6 +131,11 @@ export default {
   tab_closeBlockedUnsaved: "保存失败，已保留标签页以避免丢失未保存内容",
   notifications_moveToTrashSaveFailed:
     "无法移入回收站：未保存的修改保存失败，已保留文件",
+  draft_restoreTitle: "发现未保存的备份",
+  draft_restoreMessage:
+    "「{name}」上次保存失败时留下了备份内容，与磁盘上的文件不一致。要恢复备份内容吗？选择“放弃备份”将删除备份并保留磁盘上的版本。",
+  draft_restoreConfirm: "恢复备份",
+  draft_restoreDiscard: "放弃备份",
 
   search_find: "查找",
   search_searchPlaceholder: "搜索...",

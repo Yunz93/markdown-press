@@ -19,6 +19,7 @@ import {
   isPreviewOnlyFile,
 } from "../utils/fileTypes";
 import { normalizeSlashes } from "../utils/pathHelpers";
+import { clearDraftBackup, readDraftBackup } from "../utils/draftBackup";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -135,6 +136,21 @@ export function useFileOperations() {
           const text = await readFile(file);
           updateTabContent(file.id, text);
           markAsSaved(file.id);
+
+          // A draft backup exists when a previous save failed. Offer to
+          // restore it instead of silently keeping the (older) disk content.
+          const draft = readDraftBackup(file.id);
+          if (draft !== null) {
+            if (draft === text) {
+              clearDraftBackup(file.id);
+            } else {
+              useAppStore.getState().setPendingDraftRestore({
+                fileId: file.id,
+                fileName: file.name,
+                draftContent: draft,
+              });
+            }
+          }
         }
       } catch (e) {
         console.error("Failed to read file:", file.path, e);

@@ -1,6 +1,11 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
 import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
+import {
+  clearDraftBackup,
+  readDraftBackup,
+  writeDraftBackup,
+} from "../utils/draftBackup";
 import { getFileSystem } from "../types/filesystem";
 import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
@@ -293,6 +298,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
         markAsSaved(tabId, contentToSave);
         lastSavedContentRef.current = contentToSave;
+        clearDraftBackup(tabId);
         saveStateRef.current = {
           status: "saved",
           lastSavedAt: new Date(),
@@ -354,13 +360,12 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         notifySaveIdle();
 
         // Save to local storage as backup
-        try {
-          localStorage.setItem(`draft_${tabId}`, contentToSave);
+        if (writeDraftBackup(tabId, contentToSave)) {
           showNotification(
             t(settings.language, "notifications_saveBackupCreated"),
             "error",
           );
-        } catch (backupError) {
+        } else {
           showNotification(
             t(settings.language, "notifications_saveFailed", {
               message: saveStateRef.current.error || "",
@@ -487,6 +492,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         const fs = await getFileSystem();
         await fs.writeFile(node.path, content);
         state.markAsSaved(tabId, content);
+        clearDraftBackup(tabId);
         return true;
       } catch (error) {
         console.error(`Failed to save tab ${tabId}:`, error);
@@ -502,31 +508,12 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     [],
   );
 
-  // Restore draft from local storage
-  const restoreDraft = useCallback((fileId: string): string | null => {
-    try {
-      const draft = localStorage.getItem(`draft_${fileId}`);
-      return draft;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Clear draft from local storage
-  const clearDraft = useCallback((fileId: string): void => {
-    try {
-      localStorage.removeItem(`draft_${fileId}`);
-    } catch {
-      // Ignore errors
-    }
-  }, []);
-
   return {
     isSaving,
     forceSave,
     saveOpenTabIfDirty,
     getSaveState,
-    restoreDraft,
-    clearDraft,
+    restoreDraft: readDraftBackup,
+    clearDraft: clearDraftBackup,
   };
 }

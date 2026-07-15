@@ -1,6 +1,9 @@
 import React from "react";
 import { SettingsModal } from "./settings/SettingsModal";
-import { PromptDialog } from "./ui/Dialog";
+import { ConfirmDialog, PromptDialog } from "./ui/Dialog";
+import { useAppStore } from "../store/appStore";
+import { useI18n } from "../hooks/useI18n";
+import { clearDraftBackup } from "../utils/draftBackup";
 import { PublishTargetDialog } from "./publish/PublishTargetDialog";
 import { WechatDraftDialog } from "./publish/WechatDraftDialog";
 import { ShareLongImageDialog } from "./share/ShareLongImageDialog";
@@ -62,6 +65,29 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onSubmitWechatDraft,
   onCloseShareLongImage,
 }) => {
+  const { t: tr } = useI18n();
+  const pendingDraftRestore = useAppStore((state) => state.pendingDraftRestore);
+  const setPendingDraftRestore = useAppStore(
+    (state) => state.setPendingDraftRestore,
+  );
+  const setContentForFile = useAppStore((state) => state.setContentForFile);
+
+  const handleRestoreDraft = () => {
+    if (!pendingDraftRestore) return;
+    setContentForFile(
+      pendingDraftRestore.fileId,
+      pendingDraftRestore.draftContent,
+    );
+    clearDraftBackup(pendingDraftRestore.fileId);
+    setPendingDraftRestore(null);
+  };
+
+  const handleDiscardDraft = () => {
+    if (!pendingDraftRestore) return;
+    clearDraftBackup(pendingDraftRestore.fileId);
+    setPendingDraftRestore(null);
+  };
+
   return (
     <>
       <SettingsModal
@@ -104,6 +130,19 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         onClose={onCloseShareLongImage}
         buildPayload={buildPayload}
         attachmentContext={attachmentContext}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingDraftRestore !== null}
+        onClose={handleDiscardDraft}
+        onConfirm={handleRestoreDraft}
+        title={tr("draft_restoreTitle")}
+        message={tr("draft_restoreMessage", {
+          name: pendingDraftRestore?.fileName ?? "",
+        })}
+        confirmText={tr("draft_restoreConfirm")}
+        cancelText={tr("draft_restoreDiscard")}
+        variant="warning"
       />
 
       {notification && (

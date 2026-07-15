@@ -139,6 +139,11 @@ export default {
     "Save failed. The tab was kept open to avoid losing unsaved changes.",
   notifications_moveToTrashSaveFailed:
     "Could not move to trash: saving unsaved changes failed, the file was kept.",
+  draft_restoreTitle: "Unsaved backup found",
+  draft_restoreMessage:
+    'A backup of "{name}" was kept after a failed save and differs from the file on disk. Restore the backup? Choosing "Discard backup" deletes it and keeps the version on disk.',
+  draft_restoreConfirm: "Restore backup",
+  draft_restoreDiscard: "Discard backup",
 
   search_find: "Find",
   search_searchPlaceholder: "Search...",

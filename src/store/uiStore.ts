@@ -32,6 +32,12 @@ function normalizeLanguage(language: unknown): AppSettings["language"] {
 /**
  * UI store state interface
  */
+export interface PendingDraftRestore {
+  fileId: string;
+  fileName: string;
+  draftContent: string;
+}
+
 export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
@@ -41,6 +47,8 @@ export interface UIState {
   settings: AppSettings;
   notification: Notification | null;
   activeHeadingId: string | null;
+  /** Draft backup found for a just-opened file, awaiting a restore/discard decision. */
+  pendingDraftRestore: PendingDraftRestore | null;
 }
 
 /**
@@ -62,6 +70,7 @@ export interface UIActions {
   ) => void;
   clearNotification: () => void;
   setActiveHeadingId: (id: string | null) => void;
+  setPendingDraftRestore: (pending: PendingDraftRestore | null) => void;
 }
 
 /**
@@ -182,6 +191,7 @@ export const initialUIState: UIState = {
   isPublishing: false,
   settings: defaultSettings,
   notification: null,
+  pendingDraftRestore: null,
   activeHeadingId: null,
 };
 
@@ -270,6 +280,9 @@ export function createUISlice(
     },
 
     setActiveHeadingId: (id) => set(() => ({ activeHeadingId: id })),
+
+    setPendingDraftRestore: (pending) =>
+      set(() => ({ pendingDraftRestore: pending })),
   };
 }
 
