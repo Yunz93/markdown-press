@@ -229,7 +229,6 @@ const App: React.FC = () => {
     t,
   });
   const {
-    handleCleanupUnusedAttachments,
     pendingCleanupAttachments,
     confirmCleanupUnusedAttachments,
     cancelCleanupUnusedAttachments,
