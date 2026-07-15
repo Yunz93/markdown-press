@@ -200,6 +200,7 @@ export default {
   search_searching: "搜索中...",
   search_matchCount: "{current} / {total} 处匹配",
   search_noMatches: "未找到匹配",
+  search_resultsTruncated: "匹配过多，仅显示前 {count} 处",
 
   export_title: "导出",
   export_format: "格式",

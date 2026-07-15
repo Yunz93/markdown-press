@@ -210,6 +210,7 @@ export default {
   search_searching: "Searching...",
   search_matchCount: "{current} / {total} matches",
   search_noMatches: "No matches found",
+  search_resultsTruncated: "Too many matches; showing the first {count}",
 
   export_title: "Export",
   export_format: "Format",

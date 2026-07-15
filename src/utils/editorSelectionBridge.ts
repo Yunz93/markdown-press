@@ -1,4 +1,5 @@
 import type { EditorView } from "@codemirror/view";
+import { redo as cmRedo, undo as cmUndo } from "@codemirror/commands";
 
 let activeEditorView: EditorView | null = null;
 let activeEditorFlush: (() => void) | null = null;
@@ -44,6 +45,23 @@ export function clearActiveEditorFlush(flush: () => void): void {
 
 export function flushActiveEditorPendingChanges(): void {
   activeEditorFlush?.();
+}
+
+/**
+ * Run undo against the active CodeMirror view. Returns false when no view is
+ * mounted or its history has nothing to undo, so callers can fall back to the
+ * store-level history. Keeping CodeMirror as the primary undo stack avoids
+ * two competing histories fighting over the same document.
+ */
+export function undoInActiveEditor(): boolean {
+  if (!activeEditorView) return false;
+  return cmUndo(activeEditorView);
+}
+
+/** Redo counterpart of {@link undoInActiveEditor}. */
+export function redoInActiveEditor(): boolean {
+  if (!activeEditorView) return false;
+  return cmRedo(activeEditorView);
 }
 
 export function insertTextAtCursor(text: string): boolean {
