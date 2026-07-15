@@ -2,8 +2,6 @@ import { useCallback, useRef } from "react";
 import { useAppStore } from "../store/appStore";
 import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
 import {
-  generateFrontmatter,
-  parseFrontmatter,
   updateFrontmatter,
 } from "../utils/frontmatter";
 import { type Frontmatter } from "../types";
@@ -246,19 +244,13 @@ export function usePublishActions(
     };
 
     try {
-      const { frontmatter, body } = parseFrontmatter(currentContent);
-      const merged: Frontmatter = {
-        ...(frontmatter || {}),
-        is_publish: true,
-      };
-      const nextContent = `${generateFrontmatter(merged)}${body}`;
-      const previousContent = currentContent;
-      publishCheckpointContent = previousContent;
+      // Keep the local note unpublished until the remote publish succeeds.
+      // `prepareSimpleBlogPublish` still stamps `is_publish: true` onto the
+      // uploaded markdown payload so the remote post is marked correctly.
+      publishCheckpointContent = currentContent;
 
-      setContentForFile(targetTabId, nextContent);
-      const saved = await forceSave(nextContent, { trigger: "system" });
+      const saved = await forceSave(currentContent, { trigger: "system" });
       if (!saved) {
-        setContentForFile(targetTabId, previousContent);
         showNotification(
           t(hydratedSettings.language, "notifications_saveBeforePublishFailed"),
           "error",
@@ -268,7 +260,7 @@ export function usePublishActions(
 
       const storeState = useAppStore.getState();
       const contentToPublish =
-        storeState.fileContents[targetTabId] ?? nextContent;
+        storeState.fileContents[targetTabId] ?? currentContent;
       const latestFiles = storeState.files;
       const latestRootFolderPath = storeState.rootFolderPath;
 
@@ -283,7 +275,6 @@ export function usePublishActions(
       );
 
       if (!hostingResult.ok) {
-        await rollbackPublishCheckpoint();
         if (hostingResult.reason === "hosting_not_configured") {
           showNotification(
             t(
@@ -313,7 +304,6 @@ export function usePublishActions(
           trigger: "system",
         });
         if (!savedHosting) {
-          await rollbackPublishCheckpoint();
           setContentForFile(targetTabId, beforeHostingContent);
           showNotification(
             t(
@@ -365,9 +355,16 @@ export function usePublishActions(
         prepared.postRelativePath,
       );
 
-      // From this point on the remote publish has succeeded. Never roll the
-      // local note back to "unpublished": that would contradict reality and
-      // hide the published state from the user.
+      // Remote publish succeeded — now write local publish markers.
+      await backfillFrontmatter(
+        targetTabId,
+        activeFile.path,
+        publishedUrl
+          ? { is_publish: true, link: publishedUrl }
+          : { is_publish: true },
+        "notifications_publishBackfillFailed",
+      );
+
       if (!publishedUrl) {
         showNotification(
           t(hydratedSettings.language, "notifications_publishUrlBuildFailed"),
@@ -375,13 +372,6 @@ export function usePublishActions(
         );
         return;
       }
-
-      await backfillFrontmatter(
-        targetTabId,
-        activeFile.path,
-        { link: publishedUrl },
-        "notifications_publishBackfillFailed",
-      );
 
       if (prepared.unresolvedImages.length > 0) {
         // The publish itself succeeded; missing images are a warning, not an error.
@@ -404,8 +394,8 @@ export function usePublishActions(
     } catch (error) {
       console.error("Failed to publish blog:", error);
       if (error instanceof PublishTimeoutError) {
-        // The backend command was not cancelled and may still finish
-        // successfully, so keep the local publish state as-is.
+        // Backend may still succeed remotely. Local note stays unpublished
+        // until the user re-publishes or we confirm; avoid forging success.
         showNotification(
           t(hydratedSettings.language, "notifications_publishResultUnknown"),
           "warning",
@@ -413,8 +403,11 @@ export function usePublishActions(
         return;
       }
       if (publishCheckpointContent !== null && targetTabId) {
-        setContentForFile(targetTabId, publishCheckpointContent);
-        await forceSave(publishCheckpointContent, { trigger: "system" });
+        const latest = useAppStore.getState().fileContents[targetTabId];
+        if (latest !== publishCheckpointContent) {
+          setContentForFile(targetTabId, publishCheckpointContent);
+          await forceSave(publishCheckpointContent, { trigger: "system" });
+        }
       }
       const message =
         error instanceof Error

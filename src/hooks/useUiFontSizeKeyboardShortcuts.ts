@@ -1,7 +1,11 @@
 import { useEffect } from "react";
-import { useAppStore } from "../store/appStore";
+import { useAppStore, defaultSettings } from "../store/appStore";
 import { isShortcutCaptureActive } from "../utils/shortcutCaptureGate";
-import { getUiFontSizeZoomDelta, stepUiFontSize } from "../utils/uiFontSize";
+import {
+  getUiFontSizeZoomDelta,
+  isUiFontSizeResetShortcut,
+  stepUiFontSize,
+} from "../utils/uiFontSize";
 
 export function useUiFontSizeKeyboardShortcuts(): void {
   const updateSettings = useAppStore((state) => state.updateSettings);
@@ -9,6 +13,12 @@ export function useUiFontSizeKeyboardShortcuts(): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isShortcutCaptureActive()) {
+        return;
+      }
+
+      if (isUiFontSizeResetShortcut(event)) {
+        event.preventDefault();
+        updateSettings({ uiFontSize: defaultSettings.uiFontSize });
         return;
       }
 

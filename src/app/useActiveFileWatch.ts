@@ -1,13 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAppStore } from "../store/appStore";
 import { findFileInTree } from "./appShellUtils";
 import type { FileNode } from "../types";
 import type { FileWatchEvent } from "../types/filesystem";
 import type { TranslationKey } from "../utils/i18n";
+import { isMarkdownFile, isPreviewOnlyFile } from "../utils/fileTypes";
 
 interface UseActiveFileWatchOptions {
   activeTabId: string | null;
   currentFilePath: string | null;
+  openTabs: string[];
   files: FileNode[];
   readFile: (file: FileNode) => Promise<string>;
   setCurrentFilePath: (path: string | null) => void;
@@ -21,10 +23,64 @@ interface UseActiveFileWatchOptions {
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
 }
 
+function shouldWatchTabContent(node: FileNode | undefined): boolean {
+  if (!node || node.type !== "file") return false;
+  return isMarkdownFile(node.name) || isPreviewOnlyFile(node.name);
+}
+
+async function reloadTabFromDisk(
+  tabId: string,
+  readFile: (file: FileNode) => Promise<string>,
+  showNotification: (message: string, type: "success" | "error") => void,
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string,
+  options?: { notifyReload?: boolean },
+): Promise<void> {
+  const state = useAppStore.getState();
+  if (state.hasUnsavedChanges(tabId)) {
+    showNotification(t("notifications_fileChangedOnDisk"), "error");
+    return;
+  }
+
+  const node = findFileInTree(state.files, tabId);
+  if (!node || node.type !== "file") return;
+
+  try {
+    const latestContent = await readFile(node);
+    const stateAfterRead = useAppStore.getState();
+
+    if (stateAfterRead.hasUnsavedChanges(tabId)) {
+      showNotification(t("notifications_fileChangedOnDisk"), "error");
+      return;
+    }
+
+    const currentCached = stateAfterRead.fileContents[tabId];
+    if (currentCached === latestContent) return;
+
+    const stateBeforeUpdate = useAppStore.getState();
+    if (stateBeforeUpdate.hasUnsavedChanges(tabId)) {
+      showNotification(t("notifications_fileChangedOnDisk"), "error");
+      return;
+    }
+
+    // Only reload tabs that already have content cached (opened).
+    if (stateBeforeUpdate.fileContents[tabId] === undefined) return;
+
+    stateBeforeUpdate.setContentForFile(tabId, latestContent, true);
+    stateBeforeUpdate.markAsSaved(tabId);
+    if (options?.notifyReload !== false) {
+      showNotification(t("notifications_fileReloaded"), "success");
+    }
+  } catch (error) {
+    console.error("Failed to reload file from disk:", error);
+    showNotification(t("notifications_reloadFileFailed"), "error");
+  }
+}
+
 export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
   const {
     activeTabId,
     currentFilePath,
+    openTabs,
     files,
     readFile,
     setCurrentFilePath,
@@ -44,23 +100,36 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
     }
   }, [activeTabId, files, currentFilePath, setCurrentFilePath]);
 
+  // Watch every open tab so inactive tabs also pick up external edits/deletes.
+  const openTabsKey = openTabs.join("\0");
+  const watchersRef = useRef<Map<string, () => void>>(new Map());
+
   useEffect(() => {
-    if (!activeTabId || !currentFilePath) return;
-
     let disposed = false;
-    let unwatch: (() => void) | null = null;
 
-    const setupWatcher = async () => {
+    const stopWatching = (tabId: string) => {
+      const unwatch = watchersRef.current.get(tabId);
       if (unwatch) {
         unwatch();
-        unwatch = null;
+        watchersRef.current.delete(tabId);
+      }
+    };
+
+    const setupWatcherForTab = async (tabId: string) => {
+      const node = findFileInTree(files, tabId);
+      if (!shouldWatchTabContent(node) || !node) {
+        stopWatching(tabId);
+        return;
       }
 
-      const watcher = await watchFile(currentFilePath, async (event) => {
+      // Replace existing watcher for this tab (path may have changed).
+      stopWatching(tabId);
+
+      const watcher = await watchFile(node.path, async (event) => {
         if (disposed) return;
         if (event?.type === "deleted") {
           const state = useAppStore.getState();
-          if (state.hasUnsavedChanges(activeTabId)) {
+          if (state.hasUnsavedChanges(tabId)) {
             showNotification(
               t("notifications_fileDeletedOnDiskUnsaved"),
               "error",
@@ -68,7 +137,7 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
             void refreshFileTree();
             return;
           }
-          closeTab(activeTabId);
+          closeTab(tabId);
           void refreshFileTree();
           showNotification(t("notifications_fileDeletedOnDisk"), "error");
           return;
@@ -79,40 +148,11 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
         }
         if (event?.type !== "modified") return;
 
-        const state = useAppStore.getState();
-        if (state.hasUnsavedChanges(activeTabId)) {
-          showNotification(t("notifications_fileChangedOnDisk"), "error");
-          return;
-        }
-
-        const node = findFileInTree(state.files, activeTabId);
-        if (!node || node.type !== "file") return;
-
-        try {
-          const latestContent = await readFile(node);
-          const stateAfterRead = useAppStore.getState();
-
-          if (stateAfterRead.hasUnsavedChanges(activeTabId)) {
-            showNotification(t("notifications_fileChangedOnDisk"), "error");
-            return;
-          }
-
-          const currentCached = stateAfterRead.fileContents[activeTabId];
-          if (currentCached === latestContent) return;
-
-          const stateBeforeUpdate = useAppStore.getState();
-          if (stateBeforeUpdate.hasUnsavedChanges(activeTabId)) {
-            showNotification(t("notifications_fileChangedOnDisk"), "error");
-            return;
-          }
-
-          stateBeforeUpdate.setContentForFile(activeTabId, latestContent, true);
-          stateBeforeUpdate.markAsSaved(activeTabId);
-          showNotification(t("notifications_fileReloaded"), "success");
-        } catch (error) {
-          console.error("Failed to reload file from disk:", error);
-          showNotification(t("notifications_reloadFileFailed"), "error");
-        }
+        await reloadTabFromDisk(tabId, readFile, showNotification, t, {
+          // Avoid toast spam when many background tabs reload at once;
+          // always notify for the active tab.
+          notifyReload: tabId === useAppStore.getState().activeTabId,
+        });
       });
 
       if (disposed) {
@@ -120,21 +160,33 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
         return;
       }
 
-      unwatch = watcher;
+      if (watcher) {
+        watchersRef.current.set(tabId, watcher);
+      }
     };
 
-    void setupWatcher();
+    const desired = new Set(openTabs);
+    for (const tabId of [...watchersRef.current.keys()]) {
+      if (!desired.has(tabId)) {
+        stopWatching(tabId);
+      }
+    }
+
+    for (const tabId of openTabs) {
+      void setupWatcherForTab(tabId);
+    }
 
     return () => {
       disposed = true;
-      if (unwatch) {
-        unwatch();
-        unwatch = null;
+      for (const tabId of [...watchersRef.current.keys()]) {
+        stopWatching(tabId);
       }
     };
+    // files is used for path resolution; openTabsKey tracks membership.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    activeTabId,
-    currentFilePath,
+    openTabsKey,
+    files,
     closeTab,
     readFile,
     refreshFileTree,

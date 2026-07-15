@@ -115,6 +115,10 @@ export default {
   sidebar_tryAnotherFilenameKeyword: "Try another filename keyword.",
   sidebar_trash: "Trash ({count})",
   sidebar_trashEmpty: "Empty",
+  sidebar_cleanupUnusedAttachments: "Clean unused attachments",
+  sidebar_cleanupUnusedAttachmentsTitle: "Clean unused attachments",
+  sidebar_cleanupUnusedAttachmentsConfirm:
+    "Move {count} unreferenced attachment(s) to Trash. You can restore them from Trash later.",
   sidebar_newFileTitle: "New File",
   sidebar_renameTitle: "Rename",
   sidebar_newFolderTitle: "New Folder",
@@ -269,6 +273,9 @@ export default {
   settings_zoomUiOut: "Zoom UI out",
   settings_zoomUiOutDesc:
     "Decrease the text size of the sidebar, toolbar, settings, and other UI chrome.",
+  settings_zoomUiReset: "Reset UI zoom",
+  settings_zoomUiResetDesc:
+    "Restore the default UI text size (Cmd/Ctrl+Shift+0; Cmd/Ctrl+0 still opens Settings).",
   settings_uiFontCurrentOption: "Current custom stack",
   settings_uiFontPreview:
     "UI font preview: Markdown Press settings, sidebar, and toolbar",

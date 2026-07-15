@@ -108,6 +108,10 @@ export default {
   sidebar_tryAnotherFilenameKeyword: "换个文件名关键词试试。",
   sidebar_trash: "回收站（{count}）",
   sidebar_trashEmpty: "无",
+  sidebar_cleanupUnusedAttachments: "清理未引用附件",
+  sidebar_cleanupUnusedAttachmentsTitle: "清理未引用附件",
+  sidebar_cleanupUnusedAttachmentsConfirm:
+    "将把 {count} 个未被引用的附件移入回收站。此操作可从回收站还原。",
   sidebar_newFileTitle: "新建文件",
   sidebar_renameTitle: "重命名",
   sidebar_newFolderTitle: "新建文件夹",
@@ -255,6 +259,9 @@ export default {
   settings_zoomUiInDesc: "增大侧边栏、工具栏、设置面板等界面文字大小。",
   settings_zoomUiOut: "缩小界面",
   settings_zoomUiOutDesc: "减小侧边栏、工具栏、设置面板等界面文字大小。",
+  settings_zoomUiReset: "重置界面缩放",
+  settings_zoomUiResetDesc:
+    "将界面文字大小恢复为默认值（Cmd/Ctrl+Shift+0；Cmd/Ctrl+0 仍用于打开设置）。",
   settings_uiFontCurrentOption: "当前自定义配置",
   settings_uiFontPreview: "界面字体预览：Markdown Press 设置、侧边栏与工具栏",
   settings_editorFont: "编辑区字体",

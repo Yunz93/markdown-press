@@ -40,13 +40,24 @@ export function getUiFontSizeZoomDelta(event: KeyboardEvent): -1 | 0 | 1 {
     return 0;
   }
 
-  if (isZoomOutKey(event)) {
+  // Zoom out takes priority over cleanup-style chords that also use Minus.
+  if (isZoomOutKey(event) && !event.shiftKey && !event.altKey) {
     return -1;
   }
 
-  if (isZoomInKey(event)) {
+  if (isZoomInKey(event) && !event.altKey) {
     return 1;
   }
 
   return 0;
+}
+
+/** Cmd/Ctrl+Shift+0 resets UI zoom (Cmd+0 remains Settings). */
+export function isUiFontSizeResetShortcut(event: KeyboardEvent): boolean {
+  if (event.repeat || !hasPrimaryModifier(event) || !event.shiftKey || event.altKey) {
+    return false;
+  }
+  const code = event.code.toLowerCase();
+  const key = event.key;
+  return code === "digit0" || code === "numpad0" || key === "0";
 }

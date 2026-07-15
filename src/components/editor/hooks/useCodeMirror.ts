@@ -16,7 +16,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
+import type { Extension } from "@codemirror/state";
 import { type CompletionSource } from "@codemirror/autocomplete";
 import {
   EditorView,
@@ -120,6 +121,8 @@ export function useCodeMirror(
   // Track if we're currently syncing content to avoid loops
   const isSyncingContentRef = useRef(false);
   const previousDocumentKeyRef = useRef<string | null>(documentKey);
+  const editorExtensionsRef = useRef<Extension[]>([]);
+  const editorStateCacheRef = useRef<Map<string, EditorState>>(new Map());
 
   // Track initial content for delayed initialization
   const initialContentRef = useRef(content || "");
@@ -297,32 +300,41 @@ export function useCodeMirror(
     if (!editorElementReady || !editorRef.current || viewRef.current) return;
 
     try {
+      const extensions = createEditorExtensions({
+        parent: editorRef.current,
+        themeMode,
+        orderedListMode,
+        wordWrap,
+        placeholder,
+        compartments,
+        completionSourceRef,
+        onScrollRef,
+        onPasteImageRef,
+        onContextMenuRef,
+        onWikiLinkStartRef,
+        onChangeRef,
+        viewRef,
+        isApplyingOrderedNormalizationRef,
+        normalizationTimeoutRef,
+        isSyncingContentRef,
+        changeTimeoutRef,
+        pendingContentChangeIsLargeRef,
+        orderedListModeRef,
+        flushPendingContentChange,
+      });
+      editorExtensionsRef.current = extensions;
+
+      const cachedState =
+        documentKey != null
+          ? editorStateCacheRef.current.get(documentKey)
+          : undefined;
       const view = new EditorView({
-        state: EditorState.create({
-          doc: initialContentRef.current,
-          extensions: createEditorExtensions({
-            parent: editorRef.current,
-            themeMode,
-            orderedListMode,
-            wordWrap,
-            placeholder,
-            compartments,
-            completionSourceRef,
-            onScrollRef,
-            onPasteImageRef,
-            onContextMenuRef,
-            onWikiLinkStartRef,
-            onChangeRef,
-            viewRef,
-            isApplyingOrderedNormalizationRef,
-            normalizationTimeoutRef,
-            isSyncingContentRef,
-            changeTimeoutRef,
-            pendingContentChangeIsLargeRef,
-            orderedListModeRef,
-            flushPendingContentChange,
+        state:
+          cachedState ??
+          EditorState.create({
+            doc: initialContentRef.current,
+            extensions,
           }),
-        }),
         parent: editorRef.current,
       });
 
@@ -345,7 +357,14 @@ export function useCodeMirror(
         cancelAnimationFrame(restoreScrollFrameRef.current);
         restoreScrollFrameRef.current = null;
       }
-      viewRef.current?.destroy();
+      const view = viewRef.current;
+      if (view) {
+        const key = previousDocumentKeyRef.current;
+        if (key) {
+          editorStateCacheRef.current.set(key, view.state);
+        }
+        view.destroy();
+      }
       viewRef.current = null;
       setViewReady(false);
     };
@@ -358,8 +377,66 @@ export function useCodeMirror(
 
     const safeContent = content || "";
     const currentContent = view.state.doc.toString();
-    const isDocumentSwitch = previousDocumentKeyRef.current !== documentKey;
-    if (currentContent === safeContent && !isDocumentSwitch) return;
+    const previousKey = previousDocumentKeyRef.current;
+    const isDocumentSwitch = previousKey !== documentKey;
+
+    if (isDocumentSwitch) {
+      // Pending edits are flushed by the onChange-identity effect before this
+      // sync runs, so the cached state already includes the latest keystrokes.
+      if (previousKey) {
+        editorStateCacheRef.current.set(previousKey, view.state);
+      }
+
+      const cachedState =
+        documentKey != null
+          ? editorStateCacheRef.current.get(documentKey)
+          : undefined;
+
+      isSyncingContentRef.current = true;
+      if (cachedState) {
+        view.setState(cachedState);
+        if (view.state.doc.toString() !== safeContent) {
+          view.dispatch({
+            changes: {
+              from: 0,
+              to: view.state.doc.length,
+              insert: safeContent,
+            },
+            annotations: [Transaction.addToHistory.of(false)],
+            scrollIntoView: false,
+          });
+        }
+      } else {
+        view.setState(
+          EditorState.create({
+            doc: safeContent,
+            extensions: editorExtensionsRef.current,
+          }),
+        );
+      }
+
+      // Re-apply live compartments so restored states pick up current theme/wrap.
+      view.dispatch({
+        effects: [
+          compartments.darkTheme.reconfigure(
+            EditorView.darkTheme.of(themeMode === "dark"),
+          ),
+          compartments.wrap.reconfigure(
+            wordWrap ? EditorView.lineWrapping : [],
+          ),
+          compartments.keymap.reconfigure(
+            Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
+          ),
+          compartments.placeholder.reconfigure(cmPlaceholder(placeholder)),
+        ],
+      });
+
+      isSyncingContentRef.current = false;
+      previousDocumentKeyRef.current = documentKey;
+      return;
+    }
+
+    if (currentContent === safeContent) return;
 
     if (restoreScrollFrameRef.current !== null) {
       cancelAnimationFrame(restoreScrollFrameRef.current);
@@ -372,22 +449,16 @@ export function useCodeMirror(
     const shouldRestoreFocus = view.hasFocus;
 
     isSyncingContentRef.current = true;
-    if (currentContent !== safeContent) {
-      const replacement = getDocumentReplacementRange(
-        currentContent,
-        safeContent,
-      );
-      view.dispatch({
-        changes: replacement,
-        scrollIntoView: false,
-      });
-    }
+    const replacement = getDocumentReplacementRange(
+      currentContent,
+      safeContent,
+    );
+    view.dispatch({
+      changes: replacement,
+      scrollIntoView: false,
+    });
 
     const restoreScrollPosition = () => {
-      if (isDocumentSwitch) {
-        scrollDom.scrollTo({ top: 0, left: 0 });
-        return;
-      }
       const maxScrollTop = Math.max(
         0,
         scrollDom.scrollHeight - scrollDom.clientHeight,
@@ -413,7 +484,18 @@ export function useCodeMirror(
 
     isSyncingContentRef.current = false;
     previousDocumentKeyRef.current = documentKey;
-  }, [content, documentKey]);
+  }, [
+    content,
+    documentKey,
+    compartments.darkTheme,
+    compartments.wrap,
+    compartments.keymap,
+    compartments.placeholder,
+    themeMode,
+    wordWrap,
+    orderedListMode,
+    placeholder,
+  ]);
 
   // Update word wrap
   const setWordWrap = useCallback(

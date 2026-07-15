@@ -39,6 +39,9 @@ interface AppDialogsProps {
   onCloseWechatDraft: () => void;
   onSubmitWechatDraft: (input: WechatDraftPublishInput) => void;
   onCloseShareLongImage: () => void;
+  cleanupPendingCount?: number;
+  onConfirmCleanupAttachments?: () => void;
+  onCancelCleanupAttachments?: () => void;
 }
 
 export const AppDialogs: React.FC<AppDialogsProps> = ({
@@ -65,6 +68,9 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onCloseWechatDraft,
   onSubmitWechatDraft,
   onCloseShareLongImage,
+  cleanupPendingCount = 0,
+  onConfirmCleanupAttachments,
+  onCancelCleanupAttachments,
 }) => {
   const { t: tr } = useI18n();
   const pendingDraftRestore = useAppStore((state) => state.pendingDraftRestore);
@@ -146,6 +152,18 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         confirmText={tr("draft_restoreConfirm")}
         cancelText={tr("draft_restoreDiscard")}
         variant="warning"
+      />
+
+      <ConfirmDialog
+        isOpen={cleanupPendingCount > 0}
+        onClose={() => onCancelCleanupAttachments?.()}
+        onConfirm={() => onConfirmCleanupAttachments?.()}
+        title={tr("sidebar_cleanupUnusedAttachmentsTitle")}
+        message={tr("sidebar_cleanupUnusedAttachmentsConfirm", {
+          count: cleanupPendingCount,
+        })}
+        confirmText={tr("sidebar_cleanupUnusedAttachments")}
+        variant="danger"
       />
 
       {notification && (

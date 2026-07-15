@@ -3,6 +3,7 @@ import { useAppStore, selectContent } from "../../store/appStore";
 import { focusEditorRangeByOffset } from "../../utils/editorSelectionBridge";
 import { useI18n } from "../../hooks/useI18n";
 import { isLargeFile } from "../../utils/performance";
+import { ViewMode } from "../../types";
 
 interface ContentSearchProps {
   onClose: () => void;
@@ -56,6 +57,16 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   // Focus search input on mount
   useEffect(() => {
     searchInputRef.current?.focus();
+  }, []);
+
+  // Ensure the editor pane is visible so match selection is not hidden.
+  useEffect(() => {
+    const state = useAppStore.getState();
+    if (state.viewMode === ViewMode.PREVIEW) {
+      state.setViewMode(ViewMode.SPLIT, "direct");
+    }
+    // Only on open — avoid fighting other view-mode controllers while searching.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Find all matches

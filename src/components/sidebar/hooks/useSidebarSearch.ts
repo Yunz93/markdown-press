@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { FileNode } from '../../../types';
 import { useAppStore } from '../../../store/appStore';
 import { isTrashRootName, sanitizeTrashFolder } from '../../../utils/trashFolder';
+import { requestEditorRangeFocus } from '../../../utils/editorSelectionBridge';
 
 const isMarkdownFile = (fileName: string): boolean => /\.(md|markdown)$/i.test(fileName);
 
@@ -94,11 +95,10 @@ export function useSidebarSearch(
   deps: {
     onFileSelect: (file: FileNode) => Promise<void> | void;
     onClose: () => void;
-    focusEditorRangeByOffset: (start: number, end: number, options?: { alignTopRatio?: number }) => void;
   }
 ): UseSidebarSearchReturn {
   const { files, fileContents, readFile: readFileFn } = options;
-  const { onFileSelect, onClose, focusEditorRangeByOffset } = deps;
+  const { onFileSelect, onClose } = deps;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SidebarSearchResult[]>([]);
@@ -239,13 +239,14 @@ export function useSidebarSearch(
     async (file: FileNode, snippet?: SidebarSearchSnippet) => {
       await onFileSelect(file);
       if (snippet) {
-        requestAnimationFrame(() => {
-          focusEditorRangeByOffset(snippet.start, snippet.end, { alignTopRatio: 0.3 });
+        // Queue focus so it lands after CodeMirror mounts / switches tabs.
+        requestEditorRangeFocus(file.id, snippet.start, snippet.end, {
+          alignTopRatio: 0.3,
         });
       }
       if (window.innerWidth < 768) onClose();
     },
-    [onFileSelect, onClose, focusEditorRangeByOffset]
+    [onFileSelect, onClose]
   );
 
   return {

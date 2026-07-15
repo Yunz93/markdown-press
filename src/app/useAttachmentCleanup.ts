@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { findUnusedAttachments } from "../utils/attachmentCleanup";
 import type { FileNode } from "../types";
 import type { TranslationKey } from "../utils/i18n";
@@ -33,6 +33,72 @@ export function useAttachmentCleanup(options: UseAttachmentCleanupOptions) {
     t,
   } = options;
 
+  const [pendingCleanupAttachments, setPendingCleanupAttachments] = useState<
+    FileNode[] | null
+  >(null);
+
+  const executeCleanup = useCallback(
+    async (unusedAttachments: FileNode[]) => {
+      const unusedPaths = new Set(unusedAttachments.map((file) => file.path));
+      let movedCount = 0;
+
+      for (const attachment of unusedAttachments) {
+        const movedPath = await moveToTrash(attachment, {
+          silent: true,
+          skipRefresh: true,
+        });
+
+        if (movedPath) {
+          movedCount += 1;
+        } else {
+          console.error(
+            "Failed to move unused attachment to trash:",
+            attachment.path,
+          );
+        }
+      }
+
+      if (movedCount > 0) {
+        openTabs
+          .filter((tabId) => unusedPaths.has(tabId))
+          .forEach((tabId) => closeTab(tabId));
+        await refreshFileTree();
+      }
+
+      if (movedCount === unusedAttachments.length) {
+        showNotification(
+          t("notifications_unusedAttachmentsRemoved", { count: movedCount }),
+          "success",
+        );
+        return;
+      }
+
+      if (movedCount > 0) {
+        showNotification(
+          t("notifications_unusedAttachmentsPartiallyRemoved", {
+            deleted: movedCount,
+            failed: unusedAttachments.length - movedCount,
+          }),
+          "error",
+        );
+        return;
+      }
+
+      showNotification(
+        t("notifications_removeUnusedAttachmentsFailed"),
+        "error",
+      );
+    },
+    [
+      closeTab,
+      moveToTrash,
+      openTabs,
+      refreshFileTree,
+      showNotification,
+      t,
+    ],
+  );
+
   const handleCleanupUnusedAttachments = useCallback(async () => {
     if (!rootFolderPath) {
       showNotification(t("notifications_noKnowledgeBaseOpened"), "error");
@@ -63,57 +129,7 @@ export function useAttachmentCleanup(options: UseAttachmentCleanupOptions) {
         return;
       }
 
-      const unusedPaths = new Set(
-        scanResult.unusedAttachments.map((file) => file.path),
-      );
-      let movedCount = 0;
-
-      for (const attachment of scanResult.unusedAttachments) {
-        const movedPath = await moveToTrash(attachment, {
-          silent: true,
-          skipRefresh: true,
-        });
-
-        if (movedPath) {
-          movedCount += 1;
-        } else {
-          console.error(
-            "Failed to move unused attachment to trash:",
-            attachment.path,
-          );
-        }
-      }
-
-      if (movedCount > 0) {
-        openTabs
-          .filter((tabId) => unusedPaths.has(tabId))
-          .forEach((tabId) => closeTab(tabId));
-        await refreshFileTree();
-      }
-
-      if (movedCount === scanResult.unusedAttachments.length) {
-        showNotification(
-          t("notifications_unusedAttachmentsRemoved", { count: movedCount }),
-          "success",
-        );
-        return;
-      }
-
-      if (movedCount > 0) {
-        showNotification(
-          t("notifications_unusedAttachmentsPartiallyRemoved", {
-            deleted: movedCount,
-            failed: scanResult.unusedAttachments.length - movedCount,
-          }),
-          "error",
-        );
-        return;
-      }
-
-      showNotification(
-        t("notifications_removeUnusedAttachmentsFailed"),
-        "error",
-      );
+      setPendingCleanupAttachments(scanResult.unusedAttachments);
     } catch (error) {
       console.error("Failed to cleanup unused attachments:", error);
       showNotification(
@@ -122,17 +138,24 @@ export function useAttachmentCleanup(options: UseAttachmentCleanupOptions) {
       );
     }
   }, [
-    closeTab,
     fileContents,
     files,
-    moveToTrash,
-    openTabs,
-    refreshFileTree,
     resourceFolder,
     rootFolderPath,
     showNotification,
     t,
   ]);
+
+  const confirmCleanupUnusedAttachments = useCallback(async () => {
+    const pending = pendingCleanupAttachments;
+    setPendingCleanupAttachments(null);
+    if (!pending || pending.length === 0) return;
+    await executeCleanup(pending);
+  }, [executeCleanup, pendingCleanupAttachments]);
+
+  const cancelCleanupUnusedAttachments = useCallback(() => {
+    setPendingCleanupAttachments(null);
+  }, []);
 
   useEffect(() => {
     const handleCleanupShortcut = (event: KeyboardEvent) => {
@@ -151,5 +174,10 @@ export function useAttachmentCleanup(options: UseAttachmentCleanupOptions) {
       window.removeEventListener("keydown", handleCleanupShortcut, true);
   }, [handleCleanupUnusedAttachments]);
 
-  return { handleCleanupUnusedAttachments };
+  return {
+    handleCleanupUnusedAttachments,
+    pendingCleanupAttachments,
+    confirmCleanupUnusedAttachments,
+    cancelCleanupUnusedAttachments,
+  };
 }

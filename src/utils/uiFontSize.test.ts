@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampUiFontSize,
   getUiFontSizeZoomDelta,
+  isUiFontSizeResetShortcut,
   stepUiFontSize,
   UI_FONT_SIZE_MAX,
   UI_FONT_SIZE_MIN,
@@ -73,6 +74,24 @@ describe("uiFontSize utils", () => {
         }),
       ),
     ).toBe(-1);
+  });
+
+  it("detects zoom reset shortcut with primary modifier and shift", () => {
+    expect(
+      isUiFontSizeResetShortcut(
+        createKeyboardEvent({
+          key: "0",
+          code: "Digit0",
+          metaKey: true,
+          shiftKey: true,
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isUiFontSizeResetShortcut(
+        createKeyboardEvent({ key: "0", code: "Digit0", metaKey: true }),
+      ),
+    ).toBe(false);
   });
 
   it("ignores zoom shortcuts without modifier or on repeat", () => {

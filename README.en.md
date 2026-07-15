@@ -66,6 +66,7 @@ Defaults below; the full list lives in **Settings → Shortcuts**.
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | New note / new folder                              |
 | `Cmd/Ctrl + W`                          | Close tab                                          |
 | `Cmd/Ctrl + +` / `Cmd/Ctrl + -`         | Zoom UI text in / out                              |
+| `Cmd/Ctrl + Shift + 0`                  | Reset UI text size                                 |
 | `Cmd/Ctrl + Shift + -`                  | Clean unused attachments                           |
 | `Escape`                                | Close search panel, dialog, or menu                |
 

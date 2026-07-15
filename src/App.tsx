@@ -206,6 +206,7 @@ const App: React.FC = () => {
   useActiveFileWatch({
     activeTabId,
     currentFilePath,
+    openTabs,
     files,
     readFile,
     setCurrentFilePath,
@@ -221,7 +222,12 @@ const App: React.FC = () => {
     showNotification,
     t,
   });
-  const { handleCleanupUnusedAttachments } = useAttachmentCleanup({
+  const {
+    handleCleanupUnusedAttachments,
+    pendingCleanupAttachments,
+    confirmCleanupUnusedAttachments,
+    cancelCleanupUnusedAttachments,
+  } = useAttachmentCleanup({
     closeTab,
     fileContents,
     files,
@@ -613,6 +619,7 @@ const App: React.FC = () => {
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
+            onCleanupUnusedAttachments={handleCleanupUnusedAttachments}
             isOpen={isSidebarOpen}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}
@@ -705,6 +712,11 @@ const App: React.FC = () => {
             void handleSubmitWechatDraft(input);
           }}
           onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
+          cleanupPendingCount={pendingCleanupAttachments?.length ?? 0}
+          onConfirmCleanupAttachments={() => {
+            void confirmCleanupUnusedAttachments();
+          }}
+          onCancelCleanupAttachments={cancelCleanupUnusedAttachments}
         />
       </div>
     </ErrorBoundary>

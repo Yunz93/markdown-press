@@ -52,6 +52,28 @@ describe("useUiFontSizeKeyboardShortcuts", () => {
     expect(useAppStore.getState().settings.uiFontSize).toBe(17);
   });
 
+  it("resets ui font size on Cmd/Ctrl+Shift+0", () => {
+    useAppStore.setState({
+      settings: {
+        ...defaultSettings,
+        uiFontSize: 20,
+      },
+    });
+
+    render(React.createElement(Harness));
+
+    fireEvent.keyDown(window, {
+      key: "0",
+      code: "Digit0",
+      metaKey: true,
+      shiftKey: true,
+    });
+
+    expect(useAppStore.getState().settings.uiFontSize).toBe(
+      defaultSettings.uiFontSize,
+    );
+  });
+
   it("clamps ui font size at the configured bounds", () => {
     useAppStore.setState({
       settings: {
