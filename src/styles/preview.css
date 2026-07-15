@@ -411,28 +411,35 @@
 
 .preview-pane-document.markdown-body h1 {
   color: var(--mp-doc-heading-1, var(--mp-doc-accent, #7c3aed));
+  /* 覆盖 github-markdown 的 2em，缩小与 h2 的级差 */
+  font-size: 1.6em;
 }
 
 .preview-pane-document.markdown-body h2 {
   color: var(--mp-doc-heading-2, var(--mp-doc-accent, #7c3aed));
   border-bottom: none;
   padding-bottom: 0;
+  font-size: 1.35em;
 }
 
 .preview-pane-document.markdown-body h3 {
   color: var(--mp-doc-heading-3, var(--mp-doc-accent, #7c3aed));
+  font-size: 1.2em;
 }
 
 .preview-pane-document.markdown-body h4 {
   color: var(--mp-doc-heading-4, var(--mp-doc-accent, #7c3aed));
+  font-size: 1.05em;
 }
 
 .preview-pane-document.markdown-body h5 {
   color: var(--mp-doc-heading-5, var(--mp-doc-accent, #7c3aed));
+  font-size: 0.95em;
 }
 
 .preview-pane-document.markdown-body h6 {
   color: var(--mp-doc-heading-6, var(--mp-doc-accent, #7c3aed));
+  font-size: 0.9em;
 }
 
 .preview-pane-document.markdown-body a {

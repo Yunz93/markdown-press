@@ -250,16 +250,33 @@ ${markdownStyleCssVariables}
       font-weight: var(--mp-doc-heading-weight);
     }
 
-    .export-document .markdown-body h1 { color: var(--mp-doc-heading-1); }
+    /* 与 preview.css 标题阶梯一致，覆盖 github-markdown 默认字号 */
+    .export-document .markdown-body h1 {
+      color: var(--mp-doc-heading-1);
+      font-size: 1.6em;
+    }
     .export-document .markdown-body h2 {
       color: var(--mp-doc-heading-2);
       border-bottom: none;
       padding-bottom: 0;
+      font-size: 1.35em;
     }
-    .export-document .markdown-body h3 { color: var(--mp-doc-heading-3); }
-    .export-document .markdown-body h4 { color: var(--mp-doc-heading-4); }
-    .export-document .markdown-body h5 { color: var(--mp-doc-heading-5); }
-    .export-document .markdown-body h6 { color: var(--mp-doc-heading-6); }
+    .export-document .markdown-body h3 {
+      color: var(--mp-doc-heading-3);
+      font-size: 1.2em;
+    }
+    .export-document .markdown-body h4 {
+      color: var(--mp-doc-heading-4);
+      font-size: 1.05em;
+    }
+    .export-document .markdown-body h5 {
+      color: var(--mp-doc-heading-5);
+      font-size: 0.95em;
+    }
+    .export-document .markdown-body h6 {
+      color: var(--mp-doc-heading-6);
+      font-size: 0.9em;
+    }
 
     .export-document .markdown-body ul,
     .export-document .markdown-body ol {

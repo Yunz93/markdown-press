@@ -9,6 +9,28 @@ describe("buildExportStyles", () => {
     );
   });
 
+  it("matches preview heading font-size scale in export body", () => {
+    const css = buildExportStyles("light");
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h1\s*\{[^}]*font-size:\s*1\.6em;/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h2\s*\{[^}]*font-size:\s*1\.35em;/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h3\s*\{[^}]*font-size:\s*1\.2em;/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h4\s*\{[^}]*font-size:\s*1\.05em;/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h5\s*\{[^}]*font-size:\s*0\.95em;/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h6\s*\{[^}]*font-size:\s*0\.9em;/m,
+    );
+  });
+
   it("includes explicit list markers for export body (matches preview pane)", () => {
     const css = buildExportStyles("light");
     expect(css).toContain(".export-document .markdown-body ul");
