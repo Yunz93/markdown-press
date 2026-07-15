@@ -1,9 +1,20 @@
 import { useCallback, useEffect } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
+import {
+  getActiveEditorView,
+  redoInActiveEditor,
+  undoInActiveEditor,
+} from "../utils/editorSelectionBridge";
 
 /**
- * Hook for undo/redo functionality
- * Integrates with the store's history state
+ * Global undo/redo wiring.
+ *
+ * The editor's CodeMirror history is the single source of truth whenever an
+ * editor view is mounted: Ctrl+Z pressed outside the editor (sidebar,
+ * preview, toolbar) is routed to CodeMirror so there is only one undo stack
+ * per document. The store-level history is a fallback for content changes
+ * made while no editor exists (e.g. preview-only files or AI rewrites in
+ * preview mode).
  */
 export function useUndoRedo() {
   const { undo, redo, canUndo, canRedo, activeTabId, fileHistories } =
@@ -14,6 +25,7 @@ export function useUndoRedo() {
     (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
 
+      // Focus inside the editor: CodeMirror's own history keymap handles it.
       const activeElement = document.activeElement as HTMLElement | null;
       if (activeElement?.closest(".cm-editor")) return;
 
@@ -23,14 +35,20 @@ export function useUndoRedo() {
 
       // Undo: Ctrl+Z or Cmd+Z (not Shift+Z for redo)
       if (e.key === "z" && !e.shiftKey) {
-        if (canUndo()) {
+        if (getActiveEditorView()) {
+          e.preventDefault();
+          undoInActiveEditor();
+        } else if (canUndo()) {
           e.preventDefault();
           undo();
         }
       }
       // Redo: Ctrl+Shift+Z or Cmd+Shift+Z, or Ctrl+Y
       else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
-        if (canRedo()) {
+        if (getActiveEditorView()) {
+          e.preventDefault();
+          redoInActiveEditor();
+        } else if (canRedo()) {
           e.preventDefault();
           redo();
         }

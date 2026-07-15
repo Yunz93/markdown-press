@@ -19,6 +19,7 @@ import {
   isPreviewOnlyFile,
 } from "../utils/fileTypes";
 import { normalizeSlashes } from "../utils/pathHelpers";
+import { clearDraftBackup, readDraftBackup } from "../utils/draftBackup";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -135,6 +136,21 @@ export function useFileOperations() {
           const text = await readFile(file);
           updateTabContent(file.id, text);
           markAsSaved(file.id);
+
+          // A draft backup exists when a previous save failed. Offer to
+          // restore it instead of silently keeping the (older) disk content.
+          const draft = readDraftBackup(file.id);
+          if (draft !== null) {
+            if (draft === text) {
+              clearDraftBackup(file.id);
+            } else {
+              useAppStore.getState().setPendingDraftRestore({
+                fileId: file.id,
+                fileName: file.name,
+                draftContent: draft,
+              });
+            }
+          }
         }
       } catch (e) {
         console.error("Failed to read file:", file.path, e);
@@ -192,13 +208,43 @@ export function useFileOperations() {
 
   const handleMoveToTrash = useCallback(
     async (file: FileNode) => {
+      const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
+
+      // Flush unsaved edits to disk first so the trashed copy keeps the
+      // latest content. Abort if the flush fails - otherwise closing the
+      // tabs below would silently drop those edits.
+      const state = useAppStore.getState();
+      const dirtyTabIds = affectedTabIds.filter((tabId) =>
+        state.hasUnsavedChanges(tabId),
+      );
+      if (dirtyTabIds.length > 0) {
+        try {
+          const fs = await getFileSystem();
+          for (const tabId of dirtyTabIds) {
+            const node = findFileInTree(state.files, tabId);
+            const content = state.fileContents[tabId];
+            if (!node || node.type !== "file" || content === undefined) {
+              continue;
+            }
+            await fs.writeFile(node.path, content);
+            state.markAsSaved(tabId, content);
+          }
+        } catch (e) {
+          console.error("Failed to save unsaved changes before trash:", e);
+          showNotification(
+            t(settings.language, "notifications_moveToTrashSaveFailed"),
+            "error",
+          );
+          return;
+        }
+      }
+
       const movedPath = await moveToTrash(file);
       if (!movedPath) return;
 
-      const affectedTabIds = collectAffectedOpenTabIds(files, openTabs, file);
       affectedTabIds.forEach((tabId) => closeTab(tabId));
     },
-    [moveToTrash, files, openTabs, closeTab],
+    [moveToTrash, files, openTabs, closeTab, showNotification, settings],
   );
 
   const handleRestoreFromTrash = useCallback(

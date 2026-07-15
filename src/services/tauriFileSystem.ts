@@ -563,7 +563,19 @@ export class TauriFileSystem implements IFileSystem {
         }
       }
 
-      const timer = window.setInterval(async () => {
+      // Chain polls with setTimeout so a slow read of a large file can never
+      // overlap the next poll.
+      const POLL_INTERVAL_MS = 1500;
+      let disposed = false;
+      let timer: number | null = null;
+
+      const scheduleNext = () => {
+        if (disposed) return;
+        timer = window.setTimeout(runPoll, POLL_INTERVAL_MS);
+      };
+
+      const runPoll = async () => {
+        if (disposed) return;
         try {
           const latestKnown = this.fileFormatStates.get(path)?.lastContent;
           if (latestKnown !== undefined) {
@@ -572,12 +584,14 @@ export class TauriFileSystem implements IFileSystem {
 
           const currentRaw = await readTextFile(path);
           const current = this.captureFileFormat(path, currentRaw);
+          if (disposed) return;
 
           if (current !== previous) {
             previous = current;
             callback({ path, type: "modified" });
           }
         } catch (error) {
+          if (disposed) return;
           const message =
             error instanceof Error
               ? error.message.toLowerCase()
@@ -589,7 +603,7 @@ export class TauriFileSystem implements IFileSystem {
             (message.includes("路径") && message.includes("找不到"));
           if (isMissingFile) {
             callback({ path, type: "deleted" });
-            window.clearInterval(timer);
+            disposed = true;
             return;
           }
           // Windows often returns transient sharing/access errors while the file is being deleted or replaced; skip one poll instead of surfacing "watch failed".
@@ -602,15 +616,21 @@ export class TauriFileSystem implements IFileSystem {
             message.includes("resource temporarily unavailable") ||
             message.includes("interrupted") ||
             message.includes("os error 32");
-          if (isTransientRead) {
-            return;
+          if (!isTransientRead) {
+            callback({ path, type: "error", error });
           }
-          callback({ path, type: "error", error });
+        } finally {
+          scheduleNext();
         }
-      }, 1500);
+      };
+
+      scheduleNext();
 
       return () => {
-        window.clearInterval(timer);
+        disposed = true;
+        if (timer !== null) {
+          window.clearTimeout(timer);
+        }
       };
     } catch (error) {
       console.error("Failed to watch file:", error);
@@ -620,13 +640,23 @@ export class TauriFileSystem implements IFileSystem {
 
   /**
    * Poll the knowledge base directory and emit when the visible tree changes.
+   *
+   * Scans are chained with setTimeout instead of setInterval so a slow scan
+   * of a large tree can never overlap the next one, and the polling interval
+   * backs off proportionally to how long the scan actually took.
    */
   async watchDirectory(
     dirPath: string,
     callback: (event: DirectoryWatchEvent) => void,
   ): Promise<() => void> {
+    const BASE_INTERVAL_MS = 2000;
+    // Never spend more than ~1/4 of wall-clock time scanning large trees.
+    const SCAN_BACKOFF_FACTOR = 4;
+
     try {
       let previousSignature = "";
+      let disposed = false;
+      let timer: number | null = null;
 
       try {
         const initialTree = await this.readDirectory(dirPath);
@@ -635,24 +665,42 @@ export class TauriFileSystem implements IFileSystem {
         previousSignature = "";
       }
 
-      const timer = window.setInterval(async () => {
+      const scheduleNext = (delayMs: number) => {
+        if (disposed) return;
+        timer = window.setTimeout(runScan, delayMs);
+      };
+
+      const runScan = async () => {
+        if (disposed) return;
+        const startedAt = Date.now();
         try {
           const currentTree = await this.readDirectory(dirPath);
+          if (disposed) return;
+
           const signature = buildFileTreeSignature(currentTree);
-
-          if (signature === previousSignature) {
-            return;
+          if (signature !== previousSignature) {
+            previousSignature = signature;
+            callback({ type: "changed", tree: currentTree });
           }
-
-          previousSignature = signature;
-          callback({ type: "changed", tree: currentTree });
         } catch (error) {
-          callback({ type: "error", error });
+          if (!disposed) {
+            callback({ type: "error", error });
+          }
+        } finally {
+          const scanDuration = Date.now() - startedAt;
+          scheduleNext(
+            Math.max(BASE_INTERVAL_MS, scanDuration * SCAN_BACKOFF_FACTOR),
+          );
         }
-      }, 2000);
+      };
+
+      scheduleNext(BASE_INTERVAL_MS);
 
       return () => {
-        window.clearInterval(timer);
+        disposed = true;
+        if (timer !== null) {
+          window.clearTimeout(timer);
+        }
       };
     } catch (error) {
       console.error("Failed to watch directory:", error);

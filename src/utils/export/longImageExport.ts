@@ -13,6 +13,10 @@ import {
   yieldToEventLoopForRasterCapture,
 } from "./exportRasterHost";
 import { waitForNextPaint } from "./images";
+import {
+  notifyIfExportScaleDegraded,
+  type ExportRenderScaleDegradation,
+} from "./pdfExport";
 
 export const EXPORT_CANVAS_TO_BLOB_TIMEOUT_MS = 30_000;
 export const EXPORT_LONG_IMAGE_PREPARE_TIMEOUT_MS = 45_000;
@@ -23,18 +27,16 @@ export function canvasToPngBlob(
 ): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
     let settled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
+    // `settle` only runs from async callbacks, after `timeoutId` is assigned.
     const settle = (callback: () => void) => {
       if (settled) return;
       settled = true;
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId);
-      }
+      clearTimeout(timeoutId);
       callback();
     };
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       settle(() => {
         reject(new Error("Long image export timed out while encoding PNG"));
       });
@@ -52,10 +54,16 @@ export function canvasToPngBlob(
   });
 }
 
+export interface RasterizeExportOptions {
+  /** Invoked when the render scale was reduced far below the requested quality. */
+  onScaleDegraded?: (info: ExportRenderScaleDegradation) => void;
+}
+
 export async function rasterizeExportHtmlToPngBlob(
   htmlContent: string,
   sourceFilePath?: string,
   attachmentContext?: ExportAttachmentContext | null,
+  options?: RasterizeExportOptions,
 ): Promise<Blob> {
   const { host, renderTarget, theme, backgroundColor } =
     mountExportHtmlForRasterization(htmlContent);
@@ -75,6 +83,7 @@ export async function rasterizeExportHtmlToPngBlob(
       renderTarget.scrollWidth,
       renderTarget.scrollHeight,
     );
+    notifyIfExportScaleDegraded(safeScale, options?.onScaleDegraded);
 
     await yieldToEventLoopForRasterCapture();
 

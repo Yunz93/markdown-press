@@ -4,6 +4,7 @@ import { useI18n } from "../../../hooks/useI18n";
 import type { TranslationKey } from "../../../utils/i18n";
 import {
   formatShortcutForDisplay,
+  normalizeShortcutForPlatform,
   shortcutFromKeyboardEvent,
 } from "../../../utils/shortcuts";
 import { setShortcutCaptureActive } from "../../../utils/shortcutCaptureGate";
@@ -84,6 +85,13 @@ function getShortcutGroups(
           description: t("settings_openSettingsDesc"),
           editable: true,
           settingKey: "settings",
+        },
+        {
+          id: "toggleTheme",
+          label: t("settings_toggleTheme"),
+          description: t("settings_toggleThemeDesc"),
+          editable: true,
+          settingKey: "toggleTheme",
         },
         {
           id: "zoomUiIn",
@@ -221,6 +229,7 @@ function getShortcutLabels(
     settings: t("settings_openSettings"),
     toggleOutline: t("settings_toggleOutline"),
     toggleSidebar: t("settings_toggleSidebar"),
+    toggleTheme: t("settings_toggleTheme"),
     newNote: t("settings_newNote"),
     newFolder: t("settings_newFolder"),
     closeTab: t("settings_closeTab"),
@@ -247,10 +256,14 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
   const [recordingKey, setRecordingKey] = useState<keyof ShortcutConfig | null>(
     null,
   );
+  const [conflictWith, setConflictWith] = useState<keyof ShortcutConfig | null>(
+    null,
+  );
   const shortcutsRef = useRef(settings.shortcuts);
   shortcutsRef.current = settings.shortcuts;
 
   const toggleRecorder = useCallback((settingKey: keyof ShortcutConfig) => {
+    setConflictWith(null);
     setRecordingKey((prev) => (prev === settingKey ? null : settingKey));
   }, []);
 
@@ -277,6 +290,24 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
       const serialized = shortcutFromKeyboardEvent(event);
       if (!serialized) return;
 
+      // Reject chords already bound to another action so two actions can
+      // never silently share one shortcut. Keep recording so the user can
+      // immediately try a different combination.
+      const conflictingKey = (
+        Object.entries(shortcutsRef.current) as Array<
+          [keyof ShortcutConfig, string]
+        >
+      ).find(
+        ([key, value]) =>
+          key !== capturedSettingKey &&
+          normalizeShortcutForPlatform(value) === serialized,
+      )?.[0];
+      if (conflictingKey) {
+        setConflictWith(conflictingKey);
+        return;
+      }
+
+      setConflictWith(null);
       setShortcutCaptureActive(false);
       onUpdateSettings({
         shortcuts: {
@@ -406,6 +437,15 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                                     ? t("settings_shortcutListening")
                                     : formatShortcutForDisplay(editableValue)}
                                 </button>
+                                {isRecording && conflictWith && (
+                                  <span className="max-w-[13rem] text-right text-[10px] text-red-500 dark:text-red-400">
+                                    {t("settings_shortcutConflict", {
+                                      label:
+                                        shortcutLabels[conflictWith] ??
+                                        conflictWith,
+                                    })}
+                                  </span>
+                                )}
                                 {isRecording && (
                                   <span className="text-[10px] text-gray-400 dark:text-gray-500">
                                     {t("settings_shortcutEscToCancel")}

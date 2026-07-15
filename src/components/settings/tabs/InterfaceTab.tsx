@@ -29,6 +29,15 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
     settings.uiFontFamily?.trim() || DEFAULT_UI_FONT_FAMILY;
   const uiFontOptions = buildFontOptions(currentUiFontValue);
 
+  const themeOptions: Array<{
+    value: "light" | "dark" | "system";
+    label: string;
+  }> = [
+    { value: "light", label: t("settings_themeLight") },
+    { value: "dark", label: t("settings_themeDark") },
+    { value: "system", label: t("settings_themeSystem") },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in-02s">
       <div>
@@ -53,6 +62,48 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("settings_interfaceDesc")}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {t("settings_themeLabel")}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {themeOptions.map((option) => {
+                const isSelected =
+                  option.value === "system"
+                    ? settings.themeFollowSystem
+                    : !settings.themeFollowSystem &&
+                      settings.themeMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      if (option.value === "system") {
+                        onUpdateSettings({ themeFollowSystem: true });
+                      } else {
+                        onUpdateSettings({
+                          themeFollowSystem: false,
+                          themeMode: option.value,
+                        });
+                      }
+                    }}
+                    className={`rounded-xl border px-3 py-2 text-sm transition-all ${
+                      isSelected
+                        ? "border-accent-DEFAULT bg-accent-DEFAULT/10 text-gray-900 dark:text-white ring-2 ring-accent-DEFAULT/20"
+                        : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:border-accent-DEFAULT/60"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("settings_themeDesc")}
             </p>
           </div>
 

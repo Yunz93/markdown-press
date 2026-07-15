@@ -77,7 +77,8 @@ export function shouldAvoidClipPathForImageDecode(): boolean {
  * 范围过大时，会导致 WebView 无响应。
  *
  * 应对：
- * - longImageExport.ts 分 tile 渲染，每个 tile 限制高度
+ * - longImageExport.ts 通过 computeSafeLongImageRenderScale 压低 render scale，
+ *   把输出画布限制在平台安全上限内（未做分 tile 拼接；scale 明显降低时会提示用户）
  * - 降低 render scale 减少像素处理量
  * - 各超时常量见下方 export
  */

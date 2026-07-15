@@ -70,6 +70,14 @@ export const ShareLongImageDialog: React.FC<ShareLongImageDialogProps> = ({
         payload.html,
         payload.sourceFilePath,
         attachmentContext,
+        {
+          onScaleDegraded: () => {
+            showNotification(
+              t("notifications_exportQualityReduced"),
+              "warning",
+            );
+          },
+        },
       );
       if (sessionId !== generationSessionRef.current) {
         return;

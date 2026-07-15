@@ -15,6 +15,42 @@ const katexOptions: katex.KatexOptions = {
   trust: false,
 };
 
+// KaTeX renders synchronously inside markdown-it, so math-heavy documents pay
+// the full cost on every preview re-render. Formulas rarely change between
+// keystrokes elsewhere in the document - memoize rendered output.
+const KATEX_CACHE_MAX_ENTRIES = 500;
+const katexRenderCache = new Map<string, string>();
+
+/** Test-only: reset the memoized KaTeX output between test cases. */
+export function clearKatexRenderCacheForTests(): void {
+  katexRenderCache.clear();
+}
+
+function renderKatexCached(content: string, displayMode: boolean): string {
+  const cacheKey = `${displayMode ? "d" : "i"}:${content}`;
+  const cached = katexRenderCache.get(cacheKey);
+  if (cached !== undefined) {
+    // Refresh recency for simple LRU behavior.
+    katexRenderCache.delete(cacheKey);
+    katexRenderCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  const rendered = katex.renderToString(
+    content,
+    displayMode ? { ...katexOptions, displayMode: true } : katexOptions,
+  );
+
+  if (katexRenderCache.size >= KATEX_CACHE_MAX_ENTRIES) {
+    const oldestKey = katexRenderCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      katexRenderCache.delete(oldestKey);
+    }
+  }
+  katexRenderCache.set(cacheKey, rendered);
+  return rendered;
+}
+
 let beautifulMermaidModulePromise: Promise<
   typeof import("beautiful-mermaid")
 > | null = null;
@@ -228,7 +264,7 @@ export function initKaTeX(md: any) {
 
       if (!silent) {
         try {
-          const rendered = katex.renderToString(content, katexOptions);
+          const rendered = renderKatexCached(content, false);
           const token = state.push("html_inline", "", 0);
           token.content = rendered;
         } catch {
@@ -304,7 +340,7 @@ export function initKaTeX(md: any) {
   md.renderer.rules.katex_display = (tokens: any[], idx: number) => {
     const content = tokens[idx].content;
     try {
-      return `<div class="katex-display">${katex.renderToString(content, { ...katexOptions, displayMode: true })}</div>`;
+      return `<div class="katex-display">${renderKatexCached(content, true)}</div>`;
     } catch {
       return `<div class="katex-error">Failed to render: ${escapeHtml(content)}</div>`;
     }

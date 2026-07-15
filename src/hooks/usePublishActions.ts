@@ -27,7 +27,22 @@ import { refreshDocumentUpdateTime } from "../utils/metadataFields";
 import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
 
-const PUBLISH_TIMEOUT_MS = 45000;
+// Publishing can legitimately take a while (image uploads, GitHub tree
+// writes). Keep the timeout generous - a premature timeout is worse than a
+// slow publish because the backend command keeps running either way.
+const PUBLISH_TIMEOUT_MS = 120000;
+
+/**
+ * Thrown when the UI stops waiting for a publish command. The backend
+ * invocation is NOT cancelled and may still succeed remotely, so callers
+ * must not roll back local publish state on this error.
+ */
+class PublishTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PublishTimeoutError";
+  }
+}
 
 /**
  * Encapsulates blog and WeChat publish actions.
@@ -77,7 +92,7 @@ export function usePublishActions(
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = window.setTimeout(() => {
           const lang = useAppStore.getState().settings.language;
-          reject(new Error(t(lang, timeoutTranslationKey)));
+          reject(new PublishTimeoutError(t(lang, timeoutTranslationKey)));
         }, PUBLISH_TIMEOUT_MS);
       });
 
@@ -341,32 +356,35 @@ export function usePublishActions(
         prepared.postRelativePath,
       );
 
+      // From this point on the remote publish has succeeded. Never roll the
+      // local note back to "unpublished": that would contradict reality and
+      // hide the published state from the user.
       if (!publishedUrl) {
-        await rollbackPublishCheckpoint();
         showNotification(
           t(hydratedSettings.language, "notifications_publishUrlBuildFailed"),
-          "error",
+          "warning",
         );
         return;
       }
 
-      const linkUpdated = await backfillFrontmatter(
+      await backfillFrontmatter(
         targetTabId,
         activeFile.path,
         { link: publishedUrl },
         "notifications_publishBackfillFailed",
       );
-      if (!linkUpdated) {
-        await rollbackPublishCheckpoint();
-        return;
-      }
 
       if (prepared.unresolvedImages.length > 0) {
+        // The publish itself succeeded; missing images are a warning, not an error.
         showNotification(
-          t(hydratedSettings.language, "notifications_unresolvedImages", {
-            count: String(prepared.unresolvedImages.length),
-          }),
-          "error",
+          t(
+            hydratedSettings.language,
+            "notifications_publishSuccessWithMissingImages",
+            {
+              count: String(prepared.unresolvedImages.length),
+            },
+          ),
+          "warning",
         );
       } else {
         showNotification(
@@ -376,6 +394,15 @@ export function usePublishActions(
       }
     } catch (error) {
       console.error("Failed to publish blog:", error);
+      if (error instanceof PublishTimeoutError) {
+        // The backend command was not cancelled and may still finish
+        // successfully, so keep the local publish state as-is.
+        showNotification(
+          t(hydratedSettings.language, "notifications_publishResultUnknown"),
+          "warning",
+        );
+        return;
+      }
       if (publishCheckpointContent !== null && targetTabId) {
         setContentForFile(targetTabId, publishCheckpointContent);
         await forceSave(publishCheckpointContent, { trigger: "system" });
@@ -536,6 +563,13 @@ export function usePublishActions(
         return true;
       } catch (error) {
         console.error("Failed to publish WeChat draft:", error);
+        if (error instanceof PublishTimeoutError) {
+          showNotification(
+            t(hydratedSettings.language, "notifications_publishResultUnknown"),
+            "warning",
+          );
+          return false;
+        }
         const message =
           error instanceof Error
             ? localizeKnownError(hydratedSettings.language, error.message)

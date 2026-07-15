@@ -12,8 +12,10 @@ import { buildFileMap, findFileInTree } from "../../utils/fileTree";
 
 interface TabBarProps {
   onToggleSidebar: () => void;
-  onBeforeCloseTab?: (fileId: string) => Promise<void>;
-  onBeforeCloseOtherTabs?: (keepFileId: string) => Promise<void>;
+  /** Returns whether the tab is safe to close (content saved or not dirty). */
+  onBeforeCloseTab?: (fileId: string) => Promise<boolean>;
+  /** Returns whether all other tabs are safe to close. */
+  onBeforeCloseOtherTabs?: (keepFileId: string) => Promise<boolean>;
 }
 
 interface TabContextMenuState {
@@ -111,10 +113,13 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
       files,
       openTabs,
       activeTabId,
+      fileContents,
+      lastSavedContent,
       setActiveTab,
       activateTab,
       closeTab,
       closeOtherTabs,
+      showNotification,
     } = useAppStore();
     const [contextMenu, setContextMenu] = useState<TabContextMenuState | null>(
       null,
@@ -137,13 +142,17 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
       (e: React.MouseEvent, fileId: string) => {
         e.stopPropagation();
         void (async () => {
-          await onBeforeCloseTab?.(fileId);
+          const safeToClose = (await onBeforeCloseTab?.(fileId)) ?? true;
+          if (!safeToClose) {
+            showNotification(t("tab_closeBlockedUnsaved"), "error");
+            return;
+          }
           if (useAppStore.getState().openTabs.includes(fileId)) {
             closeTab(fileId);
           }
         })();
       },
-      [closeTab, onBeforeCloseTab],
+      [closeTab, onBeforeCloseTab, showNotification, t],
     );
 
     const handleTabContextMenu = useCallback(
@@ -158,7 +167,11 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
     const handleCloseOtherTabs = useCallback(
       (fileId: string) => {
         void (async () => {
-          await onBeforeCloseOtherTabs?.(fileId);
+          const safeToClose = (await onBeforeCloseOtherTabs?.(fileId)) ?? true;
+          if (!safeToClose) {
+            showNotification(t("tab_closeBlockedUnsaved"), "error");
+            return;
+          }
           const file = fileMap.get(fileId);
           closeOtherTabs(fileId);
           if (file) {
@@ -166,7 +179,14 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
           }
         })();
       },
-      [activateTab, closeOtherTabs, fileMap, onBeforeCloseOtherTabs],
+      [
+        activateTab,
+        closeOtherTabs,
+        fileMap,
+        onBeforeCloseOtherTabs,
+        showNotification,
+        t,
+      ],
     );
 
     const handleTabStripKeyDown = useCallback(
@@ -211,7 +231,10 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
             if (!file) return null;
 
             const isActive = activeTabId === fileId;
-            const hasChanges = false; // Could track dirty state in future
+            const tabContent = fileContents[fileId];
+            const hasChanges =
+              tabContent !== undefined &&
+              tabContent !== lastSavedContent[fileId];
 
             return (
               <div
