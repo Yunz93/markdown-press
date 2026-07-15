@@ -41,6 +41,7 @@ import { mountPdfPreview } from "../../utils/pdfPreview";
 import { debounce, throttle } from "../../utils/throttle";
 import { useThrottledResize } from "../../utils/performance";
 import {
+  mountLazyPreviewImageWarming,
   resolvePreviewSource,
   warmPreviewImage,
 } from "../../utils/previewImageCache";
@@ -553,6 +554,26 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       previewLayoutActive,
       previewRenderActive,
       runMermaidInPreview,
+    ]);
+
+    // Lazily materialize preview images as they approach the viewport so
+    // image-heavy notes do not read every attachment into memory up front.
+    useEffect(() => {
+      const container = previewRef.current;
+      if (!container || !previewRenderActive || !isMarkdownPreview) return;
+
+      return mountLazyPreviewImageWarming(container, {
+        sourceFilePath: currentFilePath,
+        root: container,
+        rootMargin: "360px 0px",
+        concurrency: 2,
+      });
+    }, [
+      currentFilePath,
+      isMarkdownPreview,
+      previewRenderActive,
+      renderer.enhancedBodyHtml,
+      renderer.parsedContent.bodyHTML,
     ]);
 
     // Cleanup on unmount

@@ -14,6 +14,9 @@ vi.mock('../../../utils/previewImageCache', async () => {
   return {
     resolvePreviewSource: vi.fn(async (src: string) => src),
     warmPreviewImage: vi.fn(async (src: string) => src),
+    getCachedPreviewImageSrc: vi.fn(() => null),
+    previewSourceNeedsMaterialization: vi.fn(() => false),
+    mountLazyPreviewImageWarming: vi.fn(() => () => {}),
     hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
   };
 });

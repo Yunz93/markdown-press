@@ -9,8 +9,9 @@
 
 import { renderMarkdown } from "../../../utils/markdown";
 import {
+  getCachedPreviewImageSrc,
+  previewSourceNeedsMaterialization,
   resolvePreviewSource,
-  warmPreviewImage,
 } from "../../../utils/previewImageCache";
 import {
   parseWikiLinkReference,
@@ -38,6 +39,43 @@ import {
   protectShikiPresInHtmlString,
   restoreShikiPresFromSnapshots,
 } from "./shikiHtmlSnapshots";
+
+/**
+ * Attach a displayable image `src` without eagerly materializing every file
+ * into a blob. Cached blob URLs are reused; browser-local files that need
+ * object-URL creation are deferred to viewport warming.
+ */
+async function configureResolvedPreviewImage(
+  image: HTMLImageElement,
+  previewTarget: string,
+  sourceFilePath?: string | null,
+): Promise<void> {
+  const cachedSrc = getCachedPreviewImageSrc(
+    previewTarget,
+    sourceFilePath || undefined,
+  );
+  if (cachedSrc) {
+    configurePreviewImageElement(image, cachedSrc, previewTarget);
+    return;
+  }
+
+  if (previewSourceNeedsMaterialization(previewTarget)) {
+    configurePreviewImageElement(image, "", previewTarget, { warmed: false });
+    return;
+  }
+
+  try {
+    const displaySrc = await resolvePreviewSource(
+      previewTarget,
+      sourceFilePath || undefined,
+    );
+    configurePreviewImageElement(image, displaySrc, previewTarget);
+  } catch {
+    configurePreviewImageElement(image, previewTarget, previewTarget, {
+      warmed: false,
+    });
+  }
+}
 
 export interface EnhancePreviewHtmlOptions {
   basePreviewHtml: string;
@@ -151,13 +189,15 @@ export async function enhancePreviewHtml(
         }
 
         try {
-          const warmedSrc = await warmPreviewImage(
+          await configureResolvedPreviewImage(
+            image,
             previewTarget,
-            currentFilePath || undefined,
+            currentFilePath,
           );
-          configurePreviewImageElement(image, warmedSrc, previewTarget);
         } catch {
-          configurePreviewImageElement(image, previewTarget, previewTarget);
+          configurePreviewImageElement(image, previewTarget, previewTarget, {
+            warmed: false,
+          });
         }
       } catch (error) {
         console.warn("Failed to process image:", error);
@@ -397,16 +437,17 @@ export async function enhancePreviewHtml(
           }
 
           try {
-            const warmedSrc = await warmPreviewImage(
+            await configureResolvedPreviewImage(
+              image,
               resolvedTarget.path,
-              currentFilePath || undefined,
+              currentFilePath,
             );
-            configurePreviewImageElement(image, warmedSrc, resolvedTarget.path);
           } catch {
             configurePreviewImageElement(
               image,
               resolvedTarget.path,
               resolvedTarget.path,
+              { warmed: false },
             );
           }
 
