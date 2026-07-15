@@ -133,6 +133,20 @@ export function shouldGuardWikiEmbedAttributes(): boolean {
  * - font-src: 字体加载来源受限
  * - img-src: 图片加载来源受限
  * - script-src: 禁止 inline script、禁止 eval（除非 'unsafe-eval'）
+ *
+ * 额外的 release-only 陷阱（dev 无法复现）：Tauri 在打包时会自动向 CSP 注入
+ * nonce/hash（"asset CSP modification"）。一旦 style-src 中出现 nonce，按 CSP
+ * 规范 'unsafe-inline' 会被浏览器忽略，导致：
+ * - Shiki 高亮失色（token 颜色全在 span 的 inline style 属性上，style 属性
+ *   无法携带 nonce，只能靠 'unsafe-inline' 放行）
+ * - Mermaid 图裂开（官方 mermaid 运行时注入 <style>；beautiful-mermaid 的
+ *   SVG 依赖 inline style 属性与 <style> 块，均无 nonce）
+ *
+ * 应对：tauri.conf.json 中设置
+ * `"dangerousDisableAssetCspModification": ["style-src"]`，
+ * 只关闭 style-src 的 nonce 注入让 'unsafe-inline' 恢复生效；script-src 的
+ * hash 注入保持开启（index.html 的 inline boot script 依赖它）。
+ * 回归防护见 cspParity.test.ts。
  */
 
 // ── 汇总 ─────────────────────────────────────────────────────────
