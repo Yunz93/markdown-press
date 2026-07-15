@@ -136,6 +136,11 @@ export default {
     "「{name}」上次保存失败时留下了备份内容，与磁盘上的文件不一致。要恢复备份内容吗？选择“放弃备份”将删除备份并保留磁盘上的版本。",
   draft_restoreConfirm: "恢复备份",
   draft_restoreDiscard: "放弃备份",
+  ai_reviewTitle: "AI 增强结果",
+  ai_reviewDescription: "请确认以下内容。应用后将替换当前笔记（可撤销）。",
+  ai_reviewLengthChange: "字符数 {before} → {after}",
+  ai_reviewApply: "应用",
+  ai_reviewDiscard: "丢弃",
 
   search_find: "查找",
   search_searchPlaceholder: "搜索...",

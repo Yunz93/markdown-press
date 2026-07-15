@@ -1,6 +1,7 @@
 import React from "react";
 import { SettingsModal } from "./settings/SettingsModal";
 import { ConfirmDialog, PromptDialog } from "./ui/Dialog";
+import { AiResultReviewDialog } from "./ai/AiResultReviewDialog";
 import { useAppStore } from "../store/appStore";
 import { useI18n } from "../hooks/useI18n";
 import { clearDraftBackup } from "../utils/draftBackup";
@@ -131,6 +132,8 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         buildPayload={buildPayload}
         attachmentContext={attachmentContext}
       />
+
+      <AiResultReviewDialog />
 
       <ConfirmDialog
         isOpen={pendingDraftRestore !== null}

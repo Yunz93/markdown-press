@@ -38,6 +38,12 @@ export interface PendingDraftRestore {
   draftContent: string;
 }
 
+export interface PendingAiResult {
+  fileId: string;
+  previousContent: string;
+  newContent: string;
+}
+
 export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
@@ -49,6 +55,8 @@ export interface UIState {
   activeHeadingId: string | null;
   /** Draft backup found for a just-opened file, awaiting a restore/discard decision. */
   pendingDraftRestore: PendingDraftRestore | null;
+  /** AI enhancement output awaiting an apply/discard decision. */
+  pendingAiResult: PendingAiResult | null;
 }
 
 /**
@@ -71,6 +79,7 @@ export interface UIActions {
   clearNotification: () => void;
   setActiveHeadingId: (id: string | null) => void;
   setPendingDraftRestore: (pending: PendingDraftRestore | null) => void;
+  setPendingAiResult: (pending: PendingAiResult | null) => void;
 }
 
 /**
@@ -192,6 +201,7 @@ export const initialUIState: UIState = {
   settings: defaultSettings,
   notification: null,
   pendingDraftRestore: null,
+  pendingAiResult: null,
   activeHeadingId: null,
 };
 
@@ -283,6 +293,8 @@ export function createUISlice(
 
     setPendingDraftRestore: (pending) =>
       set(() => ({ pendingDraftRestore: pending })),
+
+    setPendingAiResult: (pending) => set(() => ({ pendingAiResult: pending })),
   };
 }
 
