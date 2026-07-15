@@ -27,18 +27,16 @@ export function canvasToPngBlob(
 ): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
     let settled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
+    // `settle` only runs from async callbacks, after `timeoutId` is assigned.
     const settle = (callback: () => void) => {
       if (settled) return;
       settled = true;
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId);
-      }
+      clearTimeout(timeoutId);
       callback();
     };
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       settle(() => {
         reject(new Error("Long image export timed out while encoding PNG"));
       });

@@ -42,6 +42,7 @@ import katex from "katex";
 
 import {
   applyKatexDarkTheme,
+  clearKatexRenderCacheForTests,
   getKatexRenderMode,
   getMermaidDefinition,
   getMermaidFirstDirective,
@@ -521,6 +522,12 @@ describe("renderMermaidDiagrams edge cases", () => {
 });
 
 describe("initKaTeX", () => {
+  beforeEach(() => {
+    // Rendered formulas are memoized module-wide; clear so mocks that throw
+    // (error-path tests) are actually invoked instead of hitting the cache.
+    clearKatexRenderCacheForTests();
+  });
+
   it("registers inline math ruler and renders KaTeX", () => {
     const md = createMockMarkdownIt();
     initKaTeX(md);

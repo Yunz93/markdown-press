@@ -21,6 +21,11 @@ const katexOptions: katex.KatexOptions = {
 const KATEX_CACHE_MAX_ENTRIES = 500;
 const katexRenderCache = new Map<string, string>();
 
+/** Test-only: reset the memoized KaTeX output between test cases. */
+export function clearKatexRenderCacheForTests(): void {
+  katexRenderCache.clear();
+}
+
 function renderKatexCached(content: string, displayMode: boolean): string {
   const cacheKey = `${displayMode ? "d" : "i"}:${content}`;
   const cached = katexRenderCache.get(cacheKey);
