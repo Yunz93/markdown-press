@@ -1,4 +1,6 @@
 import React, { Component, type ReactNode } from "react";
+import { useAppStore } from "../store/appStore";
+import { t } from "../utils/i18n";
 
 interface Props {
   children: ReactNode;
@@ -39,21 +41,25 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
 
+      // Class components cannot use hooks; read the language directly from
+      // the store. The error screen is transient, so non-reactive is fine.
+      const language = useAppStore.getState().settings.language;
+
       return (
         <div className="flex flex-col items-center justify-center h-full p-8 text-center select-none">
           <div className="text-4xl mb-4 opacity-40">:(</div>
           <h2 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">
-            Something went wrong
+            {t(language, "errorBoundary_title")}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
             {this.state.error?.message ||
-              "An unexpected error occurred in this component."}
+              t(language, "errorBoundary_fallbackMessage")}
           </p>
           <button
             onClick={this.handleRetry}
             className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
-            Try Again
+            {t(language, "errorBoundary_retry")}
           </button>
         </div>
       );
