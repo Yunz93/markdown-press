@@ -53,6 +53,64 @@ export function renderProperties(
   `;
 }
 
+/** Parse `--name: value;` declarations from a CSS text fragment into `into`. */
+function collectCssCustomProperties(
+  cssFragment: string,
+  into: Record<string, string>,
+): void {
+  const declRegex = /(--[\w-]+)\s*:\s*([^;{}]+);/g;
+  let match: RegExpExecArray | null;
+  while ((match = declRegex.exec(cssFragment)) !== null) {
+    into[match[1]] = match[2].trim();
+  }
+}
+
+/**
+ * github-markdown-css scopes its theme tokens (--fgColor-*, --bgColor-*, …) to
+ * `@media (prefers-color-scheme: …)` blocks. The export raster host renders in
+ * the app WebView whose OS scheme may not match the export theme, and
+ * html2canvas cannot resolve CSS custom properties at all. Extract the base
+ * tokens plus the block matching `theme` so they can be baked into the CSS.
+ *
+ * Exported for testing.
+ */
+export function extractGithubMarkdownThemeVars(
+  css: string,
+  theme: "light" | "dark",
+): Record<string, string> {
+  const vars: Record<string, string> = {};
+  const mediaRegex = /@media\s*\(prefers-color-scheme:\s*(dark|light)\)\s*\{/g;
+  const themedBlocks: Array<{ scheme: string; body: string }> = [];
+  let outsideMedia = "";
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = mediaRegex.exec(css)) !== null) {
+    const bodyStart = mediaRegex.lastIndex;
+    let depth = 1;
+    let i = bodyStart;
+    while (i < css.length && depth > 0) {
+      const ch = css[i];
+      if (ch === "{") depth += 1;
+      else if (ch === "}") depth -= 1;
+      i += 1;
+    }
+    themedBlocks.push({ scheme: match[1], body: css.slice(bodyStart, i - 1) });
+    outsideMedia += css.slice(cursor, match.index);
+    cursor = i;
+    mediaRegex.lastIndex = i;
+  }
+  outsideMedia += css.slice(cursor);
+
+  collectCssCustomProperties(outsideMedia, vars);
+  for (const block of themedBlocks) {
+    if (block.scheme === theme) {
+      collectCssCustomProperties(block.body, vars);
+    }
+  }
+  return vars;
+}
+
 export function buildExportStyles(
   theme: "light" | "dark",
   fontFamily?: string,
@@ -96,6 +154,14 @@ export function buildExportStyles(
     "--accent-color": tokens.accent,
     "--code-bg": tokens.codeBg,
   };
+  // github-markdown-css scopes its theme variables (--fgColor-*, --borderColor-*, …)
+  // to `prefers-color-scheme` media queries. html2canvas cannot resolve them, and the
+  // OS scheme may not match the export theme, so bake the chosen theme's definitions
+  // into the map so every github var() reference resolves to a concrete value.
+  Object.assign(
+    cssVarValues,
+    extractGithubMarkdownThemeVars(githubMarkdownCss, theme),
+  );
   Object.entries(
     getMarkdownStyleCssVariables(normalizedStylePreset, theme),
   ).forEach(([name, value]) => {
@@ -149,7 +215,10 @@ ${markdownStyleCssVariables}
       line-height: 1.95;
       background-color: transparent;
       color: var(--text-primary);
-      padding: 30px 28px 72px;
+      /* Single padding layer like the preview pane (medium layout: 44/40/60);
+         the old export double padding (30+52 top, 28+56 x) made shared images
+         look much narrower than the live preview. */
+      padding: 44px 40px 72px;
       max-width: ${PREVIEW_PANEL_WIDTH_PX}px;
       margin: 0 auto;
 ${markdownStyleCssVariables}
@@ -158,28 +227,69 @@ ${markdownStyleCssVariables}
     .export-document .markdown-body {
       box-sizing: border-box;
       min-width: 200px;
-      max-width: 980px;
+      max-width: none;
       margin: 0;
-      padding: 52px 56px 72px;
+      padding: 0;
       background: transparent !important;
       color: var(--text-primary);
       font-family: inherit !important;
       font-size: inherit !important;
       line-height: inherit;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    /* Match preview.css paragraph rhythm (preview-pane-document rules). */
+    .export-document .markdown-body p {
+      margin-top: 0;
+      margin-bottom: 1em;
+    }
+
+    .export-document .markdown-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .export-document .markdown-body p:has(+ ul),
+    .export-document .markdown-body p:has(+ ol) {
+      margin-bottom: 0;
+    }
+
+    .export-document .markdown-body p + ul,
+    .export-document .markdown-body p + ol {
+      margin-top: 0;
+    }
+
+    /* Source blank lines: renderMarkdown emits .preview-source-blank-line divs;
+       preview.css gives them one line-height of space. Without this rule the
+       export collapses them to 0px and the shared image loses all blank-line
+       spacing the preview shows. */
+    .export-document .markdown-body .preview-source-blank-line {
+      display: block;
+      height: 1.95em;
+      margin: 0;
+      pointer-events: none;
+    }
+
+    .export-document .markdown-body > :has(+ .preview-source-blank-line) {
+      margin-bottom: 0;
+    }
+
+    .export-document .markdown-body .preview-source-blank-line + * {
+      margin-top: 0;
     }
 
     .export-document[data-theme="light"] .markdown-body {
       color: var(--mp-doc-text) !important;
-      --color-fg-default: var(--mp-doc-text) !important;
-      --color-fg-muted: var(--mp-doc-muted) !important;
-      --color-canvas-default: transparent !important;
+      --fgColor-default: var(--mp-doc-text) !important;
+      --fgColor-muted: var(--mp-doc-muted) !important;
+      --bgColor-default: transparent !important;
     }
 
     .export-document[data-theme="dark"] .markdown-body {
       color: var(--mp-doc-text);
-      --color-fg-default: var(--mp-doc-text);
-      --color-fg-muted: var(--mp-doc-muted);
-      --color-canvas-default: transparent;
+      --fgColor-default: var(--mp-doc-text);
+      --fgColor-muted: var(--mp-doc-muted);
+      --bgColor-default: transparent;
     }
 
     .export-document .markdown-body,
@@ -463,6 +573,8 @@ ${exportDelStrikeBlock}
       background: var(--mp-doc-code-bg);
       border-radius: 0.45rem;
       padding: 0.15rem 0.35rem;
+      /* 与 preview.css 一致：行内代码不能继承正文 1.95 行高 */
+      line-height: 1.35;
       font-family: ${resolvedCodeFontFamily};
       font-size: ${resolvedCodeFontSize}px;
     }
@@ -488,10 +600,13 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body pre {
       background: var(--mp-doc-code-bg);
       color: var(--mp-doc-code-text);
+      /* Match preview rhythm: one blank line ≈ 1 line-height (1.95). */
+      margin: 1.95em 0;
       border: 1px solid var(--mp-doc-code-border);
       border-radius: 1rem;
       padding: 0;
       overflow: hidden;
+      max-width: 100%;
       box-shadow: ${
         theme === "dark"
           ? "inset 0 1px 0 rgba(255, 255, 255, 0.03)"
@@ -513,6 +628,10 @@ ${exportDelStrikeBlock}
       border: 1px solid var(--mp-doc-code-border);
       border-radius: 1rem;
       overflow: hidden;
+      /* Shiki's inline background is neutralised below for html2canvas rounded
+         corners; the wrapper must supply the fill or fences render on the page
+         background instead of the code background shown in the preview. */
+      background: var(--mp-doc-code-bg);
       box-shadow: ${
         theme === "dark"
           ? "inset 0 1px 0 rgba(255, 255, 255, 0.03)"
@@ -591,6 +710,50 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body ul li::marker,
     .export-document .markdown-body ol li::marker {
       color: var(--mp-doc-list-marker);
+    }
+
+    .export-document .markdown-body hr {
+      background-color: var(--mp-doc-border);
+      border-color: var(--mp-doc-border);
+    }
+
+    /* Mermaid: mirror preview.css container styling and nested-SVG guards.
+       Without these the generic export svg sizing rule reshapes Mermaid's
+       nested coordinate systems and diagrams lose the padded card look. */
+    .export-document .markdown-body .mermaid {
+      display: block;
+      padding: 1.5em;
+      background: ${theme === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(128, 128, 128, 0.05)"};
+      border-radius: 8px;
+      margin: 1em 0;
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .export-document .markdown-body .mermaid svg {
+      max-width: none !important;
+    }
+
+    .export-document .markdown-body .mermaid > svg {
+      display: block;
+      width: auto;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    .export-document .markdown-body .mermaid svg svg {
+      max-width: none !important;
+      width: auto !important;
+      height: auto !important;
+    }
+
+    .export-document .markdown-body .mermaid-error {
+      color: #ef4444;
+      font-family: monospace;
+      padding: 1em;
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 4px;
+      white-space: pre-wrap;
     }
 
     .export-properties {
