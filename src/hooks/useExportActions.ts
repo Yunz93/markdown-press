@@ -66,6 +66,14 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
           files,
           rootFolderPath,
         },
+        {
+          onScaleDegraded: () => {
+            showNotification(
+              t(settings.language, "notifications_exportQualityReduced"),
+              "warning",
+            );
+          },
+        },
       );
       if (savedPath !== null) {
         showNotification(

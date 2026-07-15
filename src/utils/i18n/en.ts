@@ -548,6 +548,8 @@ export default {
     "Failed to save the note before publishing.",
   notifications_publishTimeout:
     "Publishing timed out. Check your GitHub connection and token permissions, then try again.",
+  notifications_exportQualityReduced:
+    "The document is very long, so the export resolution was reduced automatically to avoid a crash.",
   notifications_publishResultUnknown:
     "Timed out waiting for the publish result: it may still have succeeded remotely. Verify the remote state before retrying; local state was not rolled back.",
   notifications_publishInProgress:

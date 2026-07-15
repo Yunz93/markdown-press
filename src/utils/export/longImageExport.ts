@@ -13,6 +13,10 @@ import {
   yieldToEventLoopForRasterCapture,
 } from "./exportRasterHost";
 import { waitForNextPaint } from "./images";
+import {
+  notifyIfExportScaleDegraded,
+  type ExportRenderScaleDegradation,
+} from "./pdfExport";
 
 export const EXPORT_CANVAS_TO_BLOB_TIMEOUT_MS = 30_000;
 export const EXPORT_LONG_IMAGE_PREPARE_TIMEOUT_MS = 45_000;
@@ -52,10 +56,16 @@ export function canvasToPngBlob(
   });
 }
 
+export interface RasterizeExportOptions {
+  /** Invoked when the render scale was reduced far below the requested quality. */
+  onScaleDegraded?: (info: ExportRenderScaleDegradation) => void;
+}
+
 export async function rasterizeExportHtmlToPngBlob(
   htmlContent: string,
   sourceFilePath?: string,
   attachmentContext?: ExportAttachmentContext | null,
+  options?: RasterizeExportOptions,
 ): Promise<Blob> {
   const { host, renderTarget, theme, backgroundColor } =
     mountExportHtmlForRasterization(htmlContent);
@@ -75,6 +85,7 @@ export async function rasterizeExportHtmlToPngBlob(
       renderTarget.scrollWidth,
       renderTarget.scrollHeight,
     );
+    notifyIfExportScaleDegraded(safeScale, options?.onScaleDegraded);
 
     await yieldToEventLoopForRasterCapture();
 
