@@ -1,12 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "../ui/Dialog";
 import { useI18n } from "../../hooks/useI18n";
-import {
-  isValidBlogRepoUrl,
-  isValidBlogSiteUrl,
-  isValidOrEmptyBlogRepoUrl,
-  isValidOrEmptyBlogSiteUrl,
-} from "../../utils/blogRepo";
 import type {
   SimpleBlogPublishDefaults,
   SimpleBlogPublishInput,
@@ -27,10 +21,6 @@ export const SimpleBlogPublishDialog: React.FC<
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [aliases, setAliases] = useState("");
-  const [blogRepoUrl, setBlogRepoUrl] = useState("");
-  const [blogSiteUrl, setBlogSiteUrl] = useState("");
-  const [blogGithubToken, setBlogGithubToken] = useState("");
-  const [showGithubToken, setShowGithubToken] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -41,10 +31,6 @@ export const SimpleBlogPublishDialog: React.FC<
     setTitle(defaults.title);
     setSlug(defaults.slug);
     setAliases(defaults.aliases);
-    setBlogRepoUrl(defaults.blogRepoUrl);
-    setBlogSiteUrl(defaults.blogSiteUrl);
-    setBlogGithubToken(defaults.blogGithubToken);
-    setShowGithubToken(false);
 
     requestAnimationFrame(() => {
       titleInputRef.current?.focus();
@@ -52,14 +38,7 @@ export const SimpleBlogPublishDialog: React.FC<
     });
   }, [defaults, isOpen]);
 
-  const canSubmit = useMemo(() => {
-    return (
-      Boolean(title.trim()) &&
-      isValidBlogRepoUrl(blogRepoUrl) &&
-      isValidBlogSiteUrl(blogSiteUrl) &&
-      Boolean(blogGithubToken.trim())
-    );
-  }, [blogGithubToken, blogRepoUrl, blogSiteUrl, title]);
+  const canSubmit = useMemo(() => Boolean(title.trim()), [title]);
 
   const handleSubmit = () => {
     if (!canSubmit || isSubmitting) {
@@ -70,9 +49,6 @@ export const SimpleBlogPublishDialog: React.FC<
       title: title.trim(),
       slug: slug.trim(),
       aliases: aliases.trim(),
-      blogRepoUrl: blogRepoUrl.trim(),
-      blogSiteUrl: blogSiteUrl.trim(),
-      blogGithubToken: blogGithubToken.trim(),
     });
   };
 
@@ -90,106 +66,6 @@ export const SimpleBlogPublishDialog: React.FC<
           <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
             {t("simpleBlogDialog_desc")}
           </p>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t("settings_blogRepoUrl")}
-            </label>
-            <input
-              type="text"
-              value={blogRepoUrl}
-              onChange={(event) => setBlogRepoUrl(event.target.value)}
-              placeholder={t("settings_blogRepoUrlPlaceholder")}
-              className={`w-full rounded-xl border px-3 py-2 text-sm transition-all focus:border-accent-DEFAULT focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 bg-white dark:bg-white/5 ${
-                isValidOrEmptyBlogRepoUrl(blogRepoUrl)
-                  ? "border-gray-200 dark:border-white/10"
-                  : "border-red-500 dark:border-red-500"
-              }`}
-            />
-            {blogRepoUrl && !isValidOrEmptyBlogRepoUrl(blogRepoUrl) && (
-              <p className="mt-1.5 text-xs text-red-500">
-                {t("settings_blogRepoUrlInvalid")}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t("settings_githubToken")}
-            </label>
-            <div className="relative">
-              <input
-                type={showGithubToken ? "text" : "password"}
-                value={blogGithubToken}
-                onChange={(event) => setBlogGithubToken(event.target.value)}
-                placeholder="github_pat_xxx..."
-                autoComplete="off"
-                spellCheck={false}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 pr-10 text-sm font-mono transition-all focus:border-accent-DEFAULT focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 dark:border-white/10 dark:bg-white/5"
-              />
-              <button
-                type="button"
-                onClick={() => setShowGithubToken((value) => !value)}
-                className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                title={
-                  showGithubToken
-                    ? t("settings_hideToken")
-                    : t("settings_showToken")
-                }
-                aria-label={
-                  showGithubToken
-                    ? t("settings_hideToken")
-                    : t("settings_showToken")
-                }
-              >
-                {showGithubToken ? (
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t("settings_blogSiteUrl")}
-            </label>
-            <input
-              type="text"
-              value={blogSiteUrl}
-              onChange={(event) => setBlogSiteUrl(event.target.value)}
-              placeholder={t("settings_blogSiteUrlPlaceholder")}
-              className={`w-full rounded-xl border px-3 py-2 text-sm transition-all focus:border-accent-DEFAULT focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 bg-white dark:bg-white/5 ${
-                isValidOrEmptyBlogSiteUrl(blogSiteUrl)
-                  ? "border-gray-200 dark:border-white/10"
-                  : "border-red-500 dark:border-red-500"
-              }`}
-            />
-            {blogSiteUrl && !isValidOrEmptyBlogSiteUrl(blogSiteUrl) && (
-              <p className="mt-1.5 text-xs text-red-500">
-                {t("settings_blogSiteUrlInvalid")}
-              </p>
-            )}
-          </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">

@@ -58,6 +58,10 @@ import {
   type SimpleBlogPublishInput,
 } from "./utils/simpleBlogPublish";
 import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
+import {
+  isValidBlogRepoUrl,
+  isValidBlogSiteUrl,
+} from "./utils/blogRepo";
 import { isTauriEnvironment } from "./types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -450,10 +454,33 @@ const App: React.FC = () => {
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
     void (async () => {
-      await hydrateSensitiveSettingsIntoStore();
+      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      const language = hydratedSettings.language;
+
+      if (!hydratedSettings.blogRepoUrl.trim()) {
+        showNotification(t("notifications_setBlogRepoFirst"), "error");
+        return;
+      }
+      if (!isValidBlogRepoUrl(hydratedSettings.blogRepoUrl)) {
+        showNotification(t("notifications_setValidBlogRepoFirst"), "error");
+        return;
+      }
+      if (!hydratedSettings.blogSiteUrl.trim()) {
+        showNotification(t("notifications_setBlogSiteFirst"), "error");
+        return;
+      }
+      if (!isValidBlogSiteUrl(hydratedSettings.blogSiteUrl)) {
+        showNotification(t("notifications_setValidBlogSiteFirst"), "error");
+        return;
+      }
+      if (!hydratedSettings.blogGithubToken?.trim()) {
+        showNotification(t("notifications_setGithubTokenFirst"), "error");
+        return;
+      }
+
       setIsSimpleBlogDialogOpen(true);
     })();
-  }, []);
+  }, [showNotification, t]);
 
   const handleSubmitSimpleBlog = useCallback(
     async (input: SimpleBlogPublishInput) => {
@@ -493,8 +520,8 @@ const App: React.FC = () => {
       return null;
     }
 
-    return extractSimpleBlogPublishDefaults(content, activeFile.path, settings);
-  }, [activeFile, content, settings]);
+    return extractSimpleBlogPublishDefaults(content, activeFile.path);
+  }, [activeFile, content]);
   const notification = useAppStore((state) => state.notification);
   const currentKnowledgeBaseName = useMemo(
     () => getPathBasename(rootFolderPath),

@@ -80,7 +80,7 @@ export default {
 
   simpleBlogDialog_title: "Publish to Simple Blog",
   simpleBlogDialog_desc:
-    "Fill in the blog target and article details before publishing. The repository URL, token, and site domain are saved to settings for next time.",
+    "Confirm the article title, slug, and aliases before publishing. Configure the blog repository, token, and site domain in Settings.",
   simpleBlogDialog_titleLabel: "Title",
   simpleBlogDialog_slugLabel: "Slug",
   simpleBlogDialog_slugDesc: "Controls the article URL. Leave empty to fall back to the title.",

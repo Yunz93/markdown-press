@@ -23,7 +23,7 @@ title: Styled Post
 });
 
 describe('extractSimpleBlogPublishDefaults', () => {
-  it('prefills article metadata and blog settings', () => {
+  it('prefills article metadata from frontmatter', () => {
     const defaults = extractSimpleBlogPublishDefaults(
       `---
 title: Hello World
@@ -34,20 +34,12 @@ aliases:
 
 body`,
       '/notes/hello-world.md',
-      {
-        blogRepoUrl: 'https://github.com/you/simple-blog',
-        blogSiteUrl: 'https://blog.example.com',
-        blogGithubToken: 'token',
-      },
     );
 
     expect(defaults).toEqual({
       title: 'Hello World',
       slug: 'hello',
       aliases: 'hi',
-      blogRepoUrl: 'https://github.com/you/simple-blog',
-      blogSiteUrl: 'https://blog.example.com',
-      blogGithubToken: 'token',
     });
   });
 });

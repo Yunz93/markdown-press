@@ -26,18 +26,12 @@ export interface SimpleBlogPublishDefaults {
   title: string;
   slug: string;
   aliases: string;
-  blogRepoUrl: string;
-  blogSiteUrl: string;
-  blogGithubToken: string;
 }
 
 export interface SimpleBlogPublishInput {
   title: string;
   slug: string;
   aliases: string;
-  blogRepoUrl: string;
-  blogSiteUrl: string;
-  blogGithubToken: string;
 }
 
 export interface PreparedSimpleBlogPublish {
@@ -293,11 +287,6 @@ function resolveSimpleBlogPublishSlug(
 export function extractSimpleBlogPublishDefaults(
   markdownContent: string,
   currentFilePath: string,
-  settings: {
-    blogRepoUrl?: string;
-    blogSiteUrl?: string;
-    blogGithubToken?: string;
-  },
 ): SimpleBlogPublishDefaults {
   const title = resolveSimpleBlogTitle(markdownContent, currentFilePath);
   const aliasesValue = resolveSimpleBlogAliases(
@@ -312,9 +301,6 @@ export function extractSimpleBlogPublishDefaults(
     title,
     slug: resolveSimpleBlogPublishSlug(markdownContent, currentFilePath),
     aliases,
-    blogRepoUrl: settings.blogRepoUrl?.trim() ?? "",
-    blogSiteUrl: settings.blogSiteUrl?.trim() ?? "",
-    blogGithubToken: settings.blogGithubToken?.trim() ?? "",
   };
 }
 

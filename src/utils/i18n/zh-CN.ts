@@ -73,8 +73,7 @@ export default {
   wechatDraftDialog_submit: "发布到草稿箱",
 
   simpleBlogDialog_title: "发布到 Simple Blog",
-  simpleBlogDialog_desc:
-    "发布前填写博客目标与文章信息。仓库地址、令牌和站点域名会保存到设置，方便下次继续使用。",
+  simpleBlogDialog_desc: "发布前确认文章标题、Slug 与别名。博客仓库、令牌和站点域名请在设置中配置。",
   simpleBlogDialog_titleLabel: "标题",
   simpleBlogDialog_slugLabel: "Slug",
   simpleBlogDialog_slugDesc: "决定文章地址；留空时回退到标题。",

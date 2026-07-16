@@ -1,9 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useAppStore } from "../store/appStore";
-import {
-  hydrateSensitiveSettingsIntoStore,
-  persistSecureSetting,
-} from "../services/secureSettingsService";
+import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
 import {
   updateFrontmatter,
 } from "../utils/frontmatter";
@@ -176,11 +173,15 @@ export function usePublishActions(
         return false;
       }
 
-      const normalizedBlogRepoUrl = normalizeBlogRepoUrl(input.blogRepoUrl);
-      const normalizedBlogSiteUrl = normalizeBlogSiteUrl(input.blogSiteUrl);
-      const blogGithubToken = input.blogGithubToken.trim();
+      if (!hydratedSettings.blogRepoUrl.trim()) {
+        showNotification(
+          t(language, "notifications_setBlogRepoFirst"),
+          "error",
+        );
+        return false;
+      }
 
-      if (!normalizedBlogRepoUrl || !isValidBlogRepoUrl(normalizedBlogRepoUrl)) {
+      if (!isValidBlogRepoUrl(hydratedSettings.blogRepoUrl)) {
         showNotification(
           t(language, "notifications_setValidBlogRepoFirst"),
           "error",
@@ -188,7 +189,15 @@ export function usePublishActions(
         return false;
       }
 
-      if (!normalizedBlogSiteUrl || !isValidBlogSiteUrl(normalizedBlogSiteUrl)) {
+      if (!hydratedSettings.blogSiteUrl.trim()) {
+        showNotification(
+          t(language, "notifications_setBlogSiteFirst"),
+          "error",
+        );
+        return false;
+      }
+
+      if (!isValidBlogSiteUrl(hydratedSettings.blogSiteUrl)) {
         showNotification(
           t(language, "notifications_setValidBlogSiteFirst"),
           "error",
@@ -196,7 +205,7 @@ export function usePublishActions(
         return false;
       }
 
-      if (!blogGithubToken) {
+      if (!hydratedSettings.blogGithubToken?.trim()) {
         showNotification(
           t(language, "notifications_setGithubTokenFirst"),
           "error",
@@ -238,29 +247,13 @@ export function usePublishActions(
         return false;
       }
 
-      useAppStore.getState().updateSettings({
-        blogRepoUrl: normalizedBlogRepoUrl,
-        blogSiteUrl: normalizedBlogSiteUrl,
-        blogGithubToken,
-      });
-
-      try {
-        await persistSecureSetting("blogGithubToken", blogGithubToken);
-      } catch (error) {
-        console.error("Failed to persist GitHub token before publish:", error);
-        showNotification(
-          t(language, "notifications_setGithubTokenFirst"),
-          "error",
-        );
-        return false;
-      }
-
-      const publishSettings = {
-        ...useAppStore.getState().settings,
-        blogRepoUrl: normalizedBlogRepoUrl,
-        blogSiteUrl: normalizedBlogSiteUrl,
-        blogGithubToken,
-      };
+      const normalizedBlogRepoUrl = normalizeBlogRepoUrl(
+        hydratedSettings.blogRepoUrl,
+      );
+      const normalizedBlogSiteUrl = normalizeBlogSiteUrl(
+        hydratedSettings.blogSiteUrl,
+      );
+      const blogGithubToken = hydratedSettings.blogGithubToken.trim();
 
       setPublishing(true);
       let publishCheckpointContent: string | null = null;
@@ -298,7 +291,7 @@ export function usePublishActions(
             files: latestFiles,
             rootFolderPath: latestRootFolderPath,
             currentFilePath: activeFile.path,
-            settings: publishSettings,
+            settings: hydratedSettings,
           },
         );
 
