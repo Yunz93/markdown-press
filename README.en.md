@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 Pin a release (optional):
 
 ```bash
-RELEASE_TAG=v0.9.11 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+RELEASE_TAG=v0.9.12 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **M記.app** into Applications. If Gatekeeper still blocks the app, run:
