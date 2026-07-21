@@ -152,8 +152,11 @@ const App: React.FC = () => {
   });
 
   const { forceSave, saveOpenTabIfDirty } = useAutoSave({ enabled: true });
-  const { handleExportToPdf, handleExportToPlainText, buildLongImageSharePayload } =
-    useExportActions(highlighter);
+  const {
+    handleExportToPdf,
+    handleExportToPlainText,
+    buildLongImageSharePayload,
+  } = useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
     usePublishActions(forceSave);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
@@ -229,7 +232,6 @@ const App: React.FC = () => {
     t,
   });
   const {
-    handleCleanupUnusedAttachments,
     pendingCleanupAttachments,
     confirmCleanupUnusedAttachments,
     cancelCleanupUnusedAttachments,
