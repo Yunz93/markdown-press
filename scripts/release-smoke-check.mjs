@@ -58,9 +58,12 @@ function assertReleaseWorkflowConfig() {
   const tauriConfigPath = join(projectRoot, "src-tauri", "tauri.conf.json");
   const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, "utf8"));
 
-  if (tauriConfig?.bundle?.createUpdaterArtifacts !== true) {
+  if (
+    tauriConfig?.bundle?.createUpdaterArtifacts !== true &&
+    tauriConfig?.bundle?.createUpdaterArtifacts !== false
+  ) {
     console.error(
-      "src-tauri/tauri.conf.json must set bundle.createUpdaterArtifacts to true so tagged Windows releases emit latest.json and signed updater assets.",
+      "src-tauri/tauri.conf.json must set bundle.createUpdaterArtifacts to true or false.",
     );
     process.exit(1);
   }
@@ -224,7 +227,7 @@ const checklist = [
   "Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.  [auto: releaseSmokeAuto.test.ts + releaseParity.test.ts]",
   "Click external links from Preview and confirm the system browser opens.",
   "Switch between Editor / Preview / Split, resize the window, and confirm layout widths stay stable.",
-  "For tagged releases, confirm updater signature assets and latest.json are attached to the GitHub Release (createUpdaterArtifacts must stay true).",
+  "For tagged releases with createUpdaterArtifacts=true, confirm updater signature assets and latest.json are attached to the GitHub Release.",
 ];
 
 console.log("\nRelease smoke check passed.\n");

@@ -14,6 +14,8 @@ This repository uses the Tauri updater plugin for Windows in-app updates.
 
 With this enabled, tagged Windows builds emit signed updater packages plus `latest.json`. Leaving it `false` publishes installers only — Settings → About will never see new versions.
 
+Current release status: `createUpdaterArtifacts` is temporarily `false` because the configured private key is password-protected and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is empty. After rotating to a no-password CI key (or setting the password secret), flip it back to `true`.
+
 ## One-time setup
 
 1. Generate a Tauri updater keypair:

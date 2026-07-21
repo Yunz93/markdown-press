@@ -105,9 +105,9 @@ jobs:
 
             #### 修复与改进
 
-            - Windows 更新：开启 updater 产物生成，Release 将附带 `latest.json` 与签名包，应用内检查更新可用。
             - 侧边栏：移除「清理未引用附件」按钮；快捷键 `Cmd/Ctrl + Shift + -` 仍可清理。
             - 发布就绪：补齐 1.0 门禁说明，README / PRD / 冒烟检查与更新文档对齐。
+            - Windows 应用内更新：签名密钥准备链路已加固；本版本暂不生成 `latest.json`（需配置无密码密钥或正确的 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 后再开启）。
 
             ### macOS 安装说明
 
@@ -212,9 +212,9 @@ jobs:
 
             #### 修复与改进
 
-            - Windows 更新：开启 updater 产物生成，Release 将附带 `latest.json` 与签名包，应用内检查更新可用。
             - 侧边栏：移除「清理未引用附件」按钮；快捷键 `Cmd/Ctrl + Shift + -` 仍可清理。
             - 发布就绪：补齐 1.0 门禁说明，README / PRD / 冒烟检查与更新文档对齐。
+            - Windows 应用内更新：签名密钥准备链路已加固；本版本暂不生成 `latest.json`（需配置无密码密钥或正确的 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 后再开启）。
 
             ### macOS 安装说明
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const RAW_COMMENT_PREFIX = "untrusted comment:";
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -108,6 +108,26 @@ if (!rawKey) {
 }
 
 validateRawKey(rawKey);
+
+const tauriConfig = JSON.parse(
+  readFileSync(
+    new URL("../src-tauri/tauri.conf.json", import.meta.url),
+    "utf8",
+  ),
+);
+const updaterArtifactsEnabled =
+  tauriConfig?.bundle?.createUpdaterArtifacts === true;
+
+if (
+  updaterArtifactsEnabled &&
+  rawKey.includes("minisign encrypted secret key") &&
+  !process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD?.trim()
+) {
+  fail(
+    "Updater private key is password-protected, but TAURI_SIGNING_PRIVATE_KEY_PASSWORD is empty. " +
+      "Set the password secret, or regenerate a no-password key with `tauri signer generate --ci` and update the embedded pubkey.",
+  );
+}
 
 // Always re-encode from the validated raw key so Tauri receives strict base64
 // even when the GitHub secret was URL-encoded or otherwise polluted.
