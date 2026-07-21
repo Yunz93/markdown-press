@@ -14,8 +14,6 @@ Grab the installer for your platform from [GitHub Releases](https://github.com/Y
 
 ### macOS
 
-### macOS
-
 **Recommended: one-line install** (downloads, clears quarantine, and copies to Applications):
 
 ```bash

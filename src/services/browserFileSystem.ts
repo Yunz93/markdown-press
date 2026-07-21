@@ -505,7 +505,7 @@ export class BrowserFileSystem implements IFileSystem {
   }
 
   /**
-   * Move a file (not implemented for browser)
+   * Move a file or directory via copy + delete (browser File System Access API).
    */
   async moveFile(sourcePath: string, targetPath: string): Promise<string> {
     const kind = await this.getEntryKind(sourcePath);
