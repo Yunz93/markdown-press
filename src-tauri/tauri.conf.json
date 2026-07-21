@@ -33,7 +33,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": ["app", "dmg", "nsis"],
     "fileAssociations": [
       {
