@@ -57,6 +57,21 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_INPUT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: node scripts/prepare-tauri-signing-key.mjs
 
+      # Tauri 2.x corrupts key decoding when TAURI_SIGNING_PRIVATE_KEY_PASSWORD is set
+      # to an empty string (Invalid symbol at ~offset 346). Only export a real password.
+      - name: Export updater signing password
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT}" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<EOF"
+              printf '%s\n' "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT}"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Import Apple Developer certificate
         if: env.APPLE_CERTIFICATE != ''
         env:
@@ -80,7 +95,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY || '-' }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}
@@ -169,11 +183,25 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_INPUT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: node scripts/prepare-tauri-signing-key.mjs
 
+      # Tauri 2.x corrupts key decoding when TAURI_SIGNING_PRIVATE_KEY_PASSWORD is set
+      # to an empty string (Invalid symbol at ~offset 346). Only export a real password.
+      - name: Export updater signing password
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT}" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<EOF"
+              printf '%s\n' "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT}"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}

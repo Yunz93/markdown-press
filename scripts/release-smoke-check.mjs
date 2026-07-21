@@ -110,6 +110,24 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
+  if (
+    workflow.includes(
+      "TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}",
+    )
+  ) {
+    console.error(
+      "release.yml must not set TAURI_SIGNING_PRIVATE_KEY_PASSWORD to the secret directly on the build step; an empty password env corrupts Tauri key decoding. Export it conditionally instead.",
+    );
+    process.exit(1);
+  }
+
+  if (workflow.split("Export updater signing password").length - 1 !== 2) {
+    console.error(
+      "release.yml must conditionally export TAURI_SIGNING_PRIVATE_KEY_PASSWORD on both macOS and Windows jobs.",
+    );
+    process.exit(1);
+  }
+
   if (workflow.includes("releaseAssetNamePattern")) {
     console.error(
       "tauri-action@v0 ignores releaseAssetNamePattern; use assetNamePattern for release asset names.",
