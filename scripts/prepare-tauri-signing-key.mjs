@@ -3,6 +3,7 @@
 import { writeFileSync } from "node:fs";
 
 const RAW_COMMENT_PREFIX = "untrusted comment:";
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
 function fail(message) {
   console.error(message);
@@ -18,15 +19,44 @@ function normalizeRawKey(value) {
   return trimmed.replace(/\\n/g, "\n");
 }
 
-function normalizeBase64Key(value) {
-  const normalized = value.replace(/\s+/g, "");
+function sanitizeBase64Candidate(value) {
+  let normalized = value.replace(/\s+/g, "");
+  if (!normalized) {
+    return null;
+  }
+
+  // Secrets pasted through URL-encoded forms may contain %2B/%2F/%3D.
+  if (normalized.includes("%")) {
+    try {
+      normalized = decodeURIComponent(normalized);
+    } catch {
+      fail(
+        "TAURI_SIGNING_PRIVATE_KEY contains `%` but is not valid URL-encoding. " +
+          "Re-set the secret to the exact single-line base64 output from `tauri signer generate --ci`.",
+      );
+    }
+  }
+
+  normalized = normalized.replace(/\s+/g, "");
+  if (!BASE64_PATTERN.test(normalized)) {
+    fail(
+      "TAURI_SIGNING_PRIVATE_KEY is not valid base64 after cleanup. " +
+        "Re-set the secret to the exact single-line base64 output from `tauri signer generate --ci`.",
+    );
+  }
+
+  return normalized;
+}
+
+function decodeBase64Key(value) {
+  const normalized = sanitizeBase64Candidate(value);
   if (!normalized) {
     return null;
   }
 
   try {
     const decoded = Buffer.from(normalized, "base64").toString("utf8").trim();
-    return decoded.startsWith(RAW_COMMENT_PREFIX) ? normalized : null;
+    return decoded.startsWith(RAW_COMMENT_PREFIX) ? decoded : null;
   } catch {
     return null;
   }
@@ -49,6 +79,14 @@ function validateRawKey(rawKey) {
   }
 }
 
+function encodeCiBase64Key(rawKey) {
+  const signingKey = Buffer.from(`${rawKey}\n`, "utf8").toString("base64");
+  if (!BASE64_PATTERN.test(signingKey)) {
+    fail("Internal error: re-encoded updater signing key is not valid base64.");
+  }
+  return signingKey;
+}
+
 function writeGithubEnv(name, value) {
   const envPath = process.env.GITHUB_ENV;
   if (!envPath) {
@@ -67,10 +105,7 @@ if (!input?.trim()) {
   );
 }
 
-const ciBase64Key = normalizeBase64Key(input);
-const rawKey = ciBase64Key
-  ? Buffer.from(ciBase64Key, "base64").toString("utf8").trim()
-  : normalizeRawKey(input);
+const rawKey = decodeBase64Key(input) ?? normalizeRawKey(input);
 
 if (!rawKey) {
   fail(
@@ -81,11 +116,10 @@ if (!rawKey) {
 
 validateRawKey(rawKey);
 
-// Tauri's bundler always base64-decodes TAURI_SIGNING_PRIVATE_KEY (even when it is a
-// filesystem path whose contents are read first). Export CI base64 key contents —
-// never raw minisign text or a path to a raw key file.
-const signingKey =
-  ciBase64Key ?? Buffer.from(`${rawKey}\n`, "utf8").toString("base64");
+// Always re-encode from the validated raw key. Never pass the secret through
+// unchanged: Node's base64 decoder is lenient and can accept dirty input that
+// Tauri's strict decoder later rejects (e.g. URL-encoded `%2B`).
+const signingKey = encodeCiBase64Key(rawKey);
 
 writeGithubEnv("TAURI_SIGNING_PRIVATE_KEY", signingKey);
 
