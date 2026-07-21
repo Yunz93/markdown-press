@@ -88,8 +88,8 @@ function assertReleaseWorkflowConfig() {
     "utf8",
   );
   if (
-    !prepareSigningKeyScript.includes(
-      "writeGithubEnv('TAURI_SIGNING_PRIVATE_KEY', keyPath)",
+    !/writeGithubEnv\(\s*['"]TAURI_SIGNING_PRIVATE_KEY['"]\s*,\s*keyPath\s*\)/.test(
+      prepareSigningKeyScript,
     )
   ) {
     console.error(
