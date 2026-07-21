@@ -54,7 +54,6 @@ export interface SidebarProps {
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
-  onCleanupUnusedAttachments?: () => void;
   isOpen: boolean;
   searchFocusRequestKey?: number;
   locateCurrentFileRequestKey?: number;
@@ -219,7 +218,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     currentKnowledgeBaseName,
     currentKnowledgeBasePath,
     onSwitchKnowledgeBase,
-    onCleanupUnusedAttachments,
     isOpen,
     searchFocusRequestKey = 0,
     locateCurrentFileRequestKey = 0,
@@ -692,31 +690,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                 />
               )}
             </div>
-
-            {onCleanupUnusedAttachments && (
-              <button
-                type="button"
-                onClick={onCleanupUnusedAttachments}
-                className="flex items-center justify-between gap-2 w-full px-3 py-2 text-gray-600 dark:text-gray-300 rounded-xl border border-transparent hover:border-gray-200/70 dark:hover:border-white/10 hover:bg-white/60 dark:hover:bg-[#121923] transition-colors"
-                title={t("sidebar_cleanupUnusedAttachments")}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <svg
-                    className="w-4 h-4 shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  <span className="text-xs font-medium truncate">
-                    {t("sidebar_cleanupUnusedAttachments")}
-                  </span>
-                </div>
-              </button>
-            )}
 
             <button
               onClick={onSwitchKnowledgeBase}
