@@ -88,12 +88,24 @@ function assertReleaseWorkflowConfig() {
     "utf8",
   );
   if (
-    !/writeGithubEnv\(\s*['"]TAURI_SIGNING_PRIVATE_KEY['"]\s*,\s*keyPath\s*\)/.test(
+    !/writeGithubEnv\(\s*["']TAURI_SIGNING_PRIVATE_KEY["']\s*,\s*signingKey\s*\)/.test(
       prepareSigningKeyScript,
     )
   ) {
     console.error(
-      "prepare-tauri-signing-key.mjs must export the temp key file path via TAURI_SIGNING_PRIVATE_KEY (not raw key contents).",
+      "prepare-tauri-signing-key.mjs must export CI base64 key contents via TAURI_SIGNING_PRIVATE_KEY (not a raw key file path).",
+    );
+    process.exit(1);
+  }
+
+  if (
+    prepareSigningKeyScript.includes("writeGithubEnv(") &&
+    /writeGithubEnv\(\s*["']TAURI_SIGNING_PRIVATE_KEY["']\s*,\s*keyPath\s*\)/.test(
+      prepareSigningKeyScript,
+    )
+  ) {
+    console.error(
+      "prepare-tauri-signing-key.mjs must not pass a raw key file path to TAURI_SIGNING_PRIVATE_KEY; Tauri base64-decodes the value.",
     );
     process.exit(1);
   }
@@ -210,7 +222,7 @@ console.log(
   "  - releaseParity.test.ts: fixture-based render invariants (__PROD__ mode)",
 );
 console.log(
-  "  - prepareTauriSigningKey.test.ts: updater signing key path export",
+  "  - prepareTauriSigningKey.test.ts: updater signing key base64 export",
 );
 
 console.log("\nManual checklist:");
