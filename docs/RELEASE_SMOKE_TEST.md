@@ -17,7 +17,7 @@ CI and release workflow gates:
 
 ```bash
 npm run smoke:release-workflow
-npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts
+npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/prepareTauriSigningKey.test.ts
 ```
 
 Manual checklist:
