@@ -43,7 +43,7 @@ jobs:
         run: npm run smoke:release-workflow
 
       - name: Config parity and release parity gates
-        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts
+        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts src/utils/prepareTauriSigningKey.test.ts
 
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -155,7 +155,7 @@ jobs:
         run: npm run smoke:release-workflow
 
       - name: Config parity and release parity gates
-        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts
+        run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts src/utils/prepareTauriSigningKey.test.ts
 
       - name: Sync app version from Git tag
         if: startsWith(github.ref, 'refs/tags/')

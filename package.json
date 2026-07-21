@@ -18,7 +18,7 @@
     "release:sync-version": "node scripts/sync-version-from-tag.mjs",
     "smoke:release": "node scripts/release-smoke-check.mjs --app",
     "smoke:release-workflow": "node scripts/release-smoke-check.mjs --workflow-only",
-    "test:release-parity": "vitest run src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts",
+    "test:release-parity": "vitest run src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts src/utils/prepareTauriSigningKey.test.ts",
     "prepare": "husky"
   },
   "dependencies": {

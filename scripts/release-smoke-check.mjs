@@ -83,6 +83,21 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
+  const prepareSigningKeyScript = readFileSync(
+    join(projectRoot, "scripts", "prepare-tauri-signing-key.mjs"),
+    "utf8",
+  );
+  if (
+    !prepareSigningKeyScript.includes(
+      "writeGithubEnv('TAURI_SIGNING_PRIVATE_KEY', keyPath)",
+    )
+  ) {
+    console.error(
+      "prepare-tauri-signing-key.mjs must export the temp key file path via TAURI_SIGNING_PRIVATE_KEY (not raw key contents).",
+    );
+    process.exit(1);
+  }
+
   if (workflow.includes("releaseAssetNamePattern")) {
     console.error(
       "tauri-action@v0 ignores releaseAssetNamePattern; use assetNamePattern for release asset names.",
@@ -195,7 +210,7 @@ console.log(
   "  - releaseParity.test.ts: fixture-based render invariants (__PROD__ mode)",
 );
 console.log(
-  "  - releaseSmokeAuto.test.ts: Shiki, Mermaid, KaTeX, wiki embeds, WKWebView snapshots",
+  "  - prepareTauriSigningKey.test.ts: updater signing key path export",
 );
 
 console.log("\nManual checklist:");
