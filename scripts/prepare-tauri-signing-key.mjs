@@ -19,7 +19,7 @@ function normalizeRawKey(value) {
   return trimmed.replace(/\\n/g, "\n");
 }
 
-function sanitizeBase64Candidate(value) {
+function prepareBase64Candidate(value) {
   let normalized = value.replace(/\s+/g, "");
   if (!normalized) {
     return null;
@@ -30,24 +30,24 @@ function sanitizeBase64Candidate(value) {
     try {
       normalized = decodeURIComponent(normalized).replace(/\s+/g, "");
     } catch {
-      return null;
+      // Keep the original candidate; Node's decoder may still recover enough
+      // bytes for us to validate the decoded minisign payload below.
     }
   }
 
-  if (!BASE64_PATTERN.test(normalized)) {
-    return null;
-  }
-
-  return normalized;
+  // Accept URL-safe base64 variants.
+  return normalized.replace(/-/g, "+").replace(/_/g, "/");
 }
 
 function decodeBase64Key(value) {
-  const normalized = sanitizeBase64Candidate(value);
+  const normalized = prepareBase64Candidate(value);
   if (!normalized) {
     return null;
   }
 
   try {
+    // Node's base64 decoder is intentionally lenient. Prefer validating the
+    // decoded minisign payload, then re-encode cleanly for Tauri.
     const decoded = Buffer.from(normalized, "base64").toString("utf8").trim();
     return decoded.startsWith(RAW_COMMENT_PREFIX) ? decoded : null;
   } catch {
@@ -109,9 +109,8 @@ if (!rawKey) {
 
 validateRawKey(rawKey);
 
-// Always re-encode from the validated raw key. Never pass the secret through
-// unchanged: Node's base64 decoder is lenient and can accept dirty input that
-// Tauri's strict decoder later rejects (e.g. URL-encoded `%2B`).
+// Always re-encode from the validated raw key so Tauri receives strict base64
+// even when the GitHub secret was URL-encoded or otherwise polluted.
 const signingKey = encodeCiBase64Key(rawKey);
 
 writeGithubEnv("TAURI_SIGNING_PRIVATE_KEY", signingKey);

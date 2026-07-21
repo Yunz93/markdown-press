@@ -78,6 +78,25 @@ describe("prepare-tauri-signing-key.mjs", () => {
     );
   });
 
+  it("recovers polluted base64 by lenient decode then clean re-encode", () => {
+    const clean = Buffer.from(`${SAMPLE_RAW_KEY}\n`, "utf8").toString("base64");
+    // Insert characters Node ignores but Tauri rejects.
+    const dirty = `${clean.slice(0, 40)}%${clean.slice(40, 80)} ${clean.slice(80)}`;
+
+    const { workDir, githubEnvPath, result } = runPrepare(dirty);
+    tempDirs.push(workDir);
+
+    expect(result.status).toBe(0);
+    const githubEnv = readFileSync(githubEnvPath, "utf8");
+    const match = githubEnv.match(
+      /TAURI_SIGNING_PRIVATE_KEY<<EOF\n([^\n]+)\nEOF\n/,
+    );
+    const exported = match?.[1] ?? "";
+    expect(exported.includes("%")).toBe(false);
+    expect(exported.includes(" ")).toBe(false);
+    expect(exported).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
+  });
+
   it("URL-decodes percent-encoded base64 secrets before re-encoding", () => {
     const clean = Buffer.from(`${SAMPLE_RAW_KEY}\n`, "utf8").toString("base64");
     const dirty = clean.replace(/\+/g, "%2B").replace(/\//g, "%2F");
