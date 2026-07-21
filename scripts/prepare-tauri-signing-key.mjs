@@ -28,21 +28,14 @@ function sanitizeBase64Candidate(value) {
   // Secrets pasted through URL-encoded forms may contain %2B/%2F/%3D.
   if (normalized.includes("%")) {
     try {
-      normalized = decodeURIComponent(normalized);
+      normalized = decodeURIComponent(normalized).replace(/\s+/g, "");
     } catch {
-      fail(
-        "TAURI_SIGNING_PRIVATE_KEY contains `%` but is not valid URL-encoding. " +
-          "Re-set the secret to the exact single-line base64 output from `tauri signer generate --ci`.",
-      );
+      return null;
     }
   }
 
-  normalized = normalized.replace(/\s+/g, "");
   if (!BASE64_PATTERN.test(normalized)) {
-    fail(
-      "TAURI_SIGNING_PRIVATE_KEY is not valid base64 after cleanup. " +
-        "Re-set the secret to the exact single-line base64 output from `tauri signer generate --ci`.",
-    );
+    return null;
   }
 
   return normalized;
