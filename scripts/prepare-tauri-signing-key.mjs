@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 
 const RAW_COMMENT_PREFIX = "untrusted comment:";
 
@@ -20,7 +18,7 @@ function normalizeRawKey(value) {
   return trimmed.replace(/\\n/g, "\n");
 }
 
-function decodeBase64Key(value) {
+function normalizeBase64Key(value) {
   const normalized = value.replace(/\s+/g, "");
   if (!normalized) {
     return null;
@@ -28,7 +26,7 @@ function decodeBase64Key(value) {
 
   try {
     const decoded = Buffer.from(normalized, "base64").toString("utf8").trim();
-    return decoded.startsWith(RAW_COMMENT_PREFIX) ? decoded : null;
+    return decoded.startsWith(RAW_COMMENT_PREFIX) ? normalized : null;
   } catch {
     return null;
   }
@@ -51,15 +49,6 @@ function validateRawKey(rawKey) {
   }
 }
 
-function writeGithubOutput(name, value) {
-  const outputPath = process.env.GITHUB_OUTPUT;
-  if (!outputPath) {
-    return;
-  }
-
-  writeFileSync(outputPath, `${name}=${value}\n`, { flag: "a" });
-}
-
 function writeGithubEnv(name, value) {
   const envPath = process.env.GITHUB_ENV;
   if (!envPath) {
@@ -78,7 +67,10 @@ if (!input?.trim()) {
   );
 }
 
-const rawKey = normalizeRawKey(input) ?? decodeBase64Key(input);
+const ciBase64Key = normalizeBase64Key(input);
+const rawKey = ciBase64Key
+  ? Buffer.from(ciBase64Key, "base64").toString("utf8").trim()
+  : normalizeRawKey(input);
 
 if (!rawKey) {
   fail(
@@ -89,14 +81,14 @@ if (!rawKey) {
 
 validateRawKey(rawKey);
 
-const keyDir = mkdtempSync(join(tmpdir(), "tauri-signing-key-"));
-const keyPath = join(keyDir, "updater.key");
+// Tauri's bundler always base64-decodes TAURI_SIGNING_PRIVATE_KEY (even when it is a
+// filesystem path whose contents are read first). Export CI base64 key contents —
+// never raw minisign text or a path to a raw key file.
+const signingKey =
+  ciBase64Key ?? Buffer.from(`${rawKey}\n`, "utf8").toString("base64");
 
-writeFileSync(keyPath, `${rawKey}\n`, "utf8");
-writeGithubOutput("private_key_path", keyPath);
-// Tauri accepts either key contents or a filesystem path in TAURI_SIGNING_PRIVATE_KEY.
-// Always pass the temp file path: raw minisign text is not valid base64 and breaks
-// createUpdaterArtifacts signing with "failed to decode base64 secret key".
-writeGithubEnv("TAURI_SIGNING_PRIVATE_KEY", keyPath);
+writeGithubEnv("TAURI_SIGNING_PRIVATE_KEY", signingKey);
 
-console.log(`Prepared Tauri updater private key at ${keyPath}`);
+console.log(
+  "Prepared Tauri updater private key as CI base64 for TAURI_SIGNING_PRIVATE_KEY.",
+);
