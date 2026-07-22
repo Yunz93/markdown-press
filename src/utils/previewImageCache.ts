@@ -128,10 +128,13 @@ function registerUnloadCleanup() {
 /**
  * Resolve a URL suitable for `<img src>` / media elements.
  *
- * In Tauri, prefer `convertFileSrc` (protocol URL) over reading the full file
- * into a Blob — materializing every image up front is the main cause of jank
- * in long, image-heavy preview documents. Browser virtual paths still need
- * object URLs because there is no asset protocol.
+ * Prefer filesystem object URLs for local files. Tauri's `convertFileSrc`
+ * emits `asset://` URLs, but this app does not enable `protocol-asset` for
+ * opened vaults — only `fs_scope` is registered — so asset URLs fail to load
+ * (broken-image `?` while the filename/alt still appears). Object URLs from
+ * `readBinaryFile` work with the existing scope. Callers that care about
+ * memory on long docs should defer via {@link previewSourceNeedsMaterialization}
+ * + lazy warming instead of resolving every image up front.
  */
 export async function resolvePreviewSource(
   src: string,
@@ -159,7 +162,17 @@ export async function resolvePreviewSource(
         : trimmedSrc
       : "";
 
-  // Tauri: use the asset protocol instead of reading bytes into memory.
+  if (localSourceCandidate) {
+    try {
+      const fs = await getFileSystem();
+      if (typeof fs.getFileObjectUrl === "function") {
+        return await fs.getFileObjectUrl(localSourceCandidate);
+      }
+    } catch {
+      // Fall through to environment-specific URL resolution.
+    }
+  }
+
   if (isTauriEnvironment()) {
     if (trimmedSrc.startsWith("asset:") || trimmedSrc.startsWith("tauri:")) {
       return trimmedSrc;
@@ -181,18 +194,8 @@ export async function resolvePreviewSource(
       return trimmedSrc;
     }
 
+    // Last resort only — vault paths are not on the asset protocol scope.
     return convertFileSrc(await normalize(absolutePath));
-  }
-
-  if (localSourceCandidate) {
-    try {
-      const fs = await getFileSystem();
-      if (typeof fs.getFileObjectUrl === "function") {
-        return await fs.getFileObjectUrl(localSourceCandidate);
-      }
-    } catch {
-      // Fall through to environment-specific URL resolution.
-    }
   }
 
   if (
@@ -213,18 +216,28 @@ export async function resolvePreviewSource(
   );
 }
 
-/** True when displaying the image requires reading file bytes (browser FS Access). */
+/**
+ * True when displaying the image requires reading file bytes into an object
+ * URL. Used to defer materialization until the image approaches the viewport
+ * so image-heavy notes do not stutter on first paint.
+ */
 export function previewSourceNeedsMaterialization(src: string): boolean {
   const trimmed = src.trim();
   if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
     return false;
   }
-  if (hasUrlScheme(trimmed) && !trimmed.startsWith("file://")) {
+  // Remote / protocol URLs that the webview can fetch directly.
+  if (
+    hasUrlScheme(trimmed) &&
+    !trimmed.startsWith("file://") &&
+    !trimmed.startsWith("asset:") &&
+    !trimmed.startsWith("tauri:")
+  ) {
     return false;
   }
-  if (isTauriEnvironment()) {
-    return false;
-  }
+  // Local vault files (browser FS Access and Tauri fs_scope) need object URLs.
+  // asset:/tauri: are included here because vault asset-protocol serving is
+  // not configured; treating them as already-displayable would leave broken imgs.
   return true;
 }
 

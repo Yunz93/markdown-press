@@ -63,10 +63,20 @@ describe("previewSourceNeedsMaterialization", () => {
     );
   });
 
-  it("is true for local browser paths and false in tauri", () => {
+  it("is true for local paths in both browser and tauri", () => {
     expect(previewSourceNeedsMaterialization("/vault/img/a.png")).toBe(true);
+    expect(
+      previewSourceNeedsMaterialization(
+        "/vault/resources/Pasted image 20260603161808.png",
+      ),
+    ).toBe(true);
     vi.mocked(isTauriEnvironment).mockReturnValue(true);
-    expect(previewSourceNeedsMaterialization("/vault/img/a.png")).toBe(false);
+    expect(previewSourceNeedsMaterialization("/vault/img/a.png")).toBe(true);
+    expect(
+      previewSourceNeedsMaterialization(
+        "resources/Pasted image 20260603161808.png",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -143,7 +153,7 @@ describe("resolvePreviewSource environment branches", () => {
     ).resolves.toBe("object:/vault/img/poster.png");
   });
 
-  it("converts relative paths with tauri convertFileSrc without reading object urls", async () => {
+  it("uses filesystem object urls in tauri instead of broken asset protocol urls", async () => {
     vi.mocked(isTauriEnvironment).mockReturnValue(true);
     const { getFileSystem } = await import("../types/filesystem");
     const getFileObjectUrl = vi.fn(async (path: string) => `object:${path}`);
@@ -151,8 +161,33 @@ describe("resolvePreviewSource environment branches", () => {
 
     await expect(
       resolvePreviewSource("img/poster.png", "/vault/notes/a.md"),
+    ).resolves.toBe("object:/vault/notes/img/poster.png");
+    expect(getFileObjectUrl).toHaveBeenCalledWith(
+      "/vault/notes/img/poster.png",
+    );
+  });
+
+  it("loads pasted Obsidian-style filenames with spaces via object urls", async () => {
+    vi.mocked(isTauriEnvironment).mockReturnValue(true);
+    const { getFileSystem } = await import("../types/filesystem");
+    const getFileObjectUrl = vi.fn(async (path: string) => `object:${path}`);
+    vi.mocked(getFileSystem).mockResolvedValue({ getFileObjectUrl } as never);
+
+    const pasted = "/vault/resources/Pasted image 20260603161808.png";
+    await expect(resolvePreviewSource(pasted)).resolves.toBe(
+      `object:${pasted}`,
+    );
+    expect(getFileObjectUrl).toHaveBeenCalledWith(pasted);
+  });
+
+  it("falls back to convertFileSrc only when object urls are unavailable", async () => {
+    vi.mocked(isTauriEnvironment).mockReturnValue(true);
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
+
+    await expect(
+      resolvePreviewSource("img/poster.png", "/vault/notes/a.md"),
     ).resolves.toBe("asset:///vault/notes/img/poster.png");
-    expect(getFileObjectUrl).not.toHaveBeenCalled();
   });
 });
 
