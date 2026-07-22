@@ -22,9 +22,15 @@ export function getLocalPreviewLinkTarget(href: string): string {
   const hashIndex = trimmed.indexOf("#");
   const withoutHash = hashIndex >= 0 ? trimmed.slice(0, hashIndex) : trimmed;
   const queryIndex = withoutHash.indexOf("?");
-  return (
+  const withoutQuery = (
     queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash
   ).trim();
+
+  try {
+    return decodeURIComponent(withoutQuery);
+  } catch {
+    return withoutQuery;
+  }
 }
 
 export function isImageAttachment(fileName: string): boolean {

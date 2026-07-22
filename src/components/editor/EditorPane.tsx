@@ -52,6 +52,7 @@ import {
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
 import type { WikiLinkPreviewData } from "./hooks";
 import { throttle } from "../../utils/throttle";
+import { decodeUserFacingPath } from "../../utils/pathHelpers";
 import { findOpenWikiLinkAt } from "../../utils/wikiLinkEditor";
 import { parseMarkdownDestination } from "../../utils/markdownDestination";
 import { useI18n } from "../../hooks/useI18n";
@@ -484,14 +485,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         );
 
         if (!resolved) {
-          let displayPath = match.src.trim();
-          try {
-            displayPath = decodeURIComponent(displayPath);
-          } catch {
-            /* keep raw */
-          }
           showNotification(
-            t("notifications_imageFileNotFound", { path: displayPath }),
+            t("notifications_imageFileNotFound", {
+              path: decodeUserFacingPath(match.src),
+            }),
             "error",
           );
           return;
