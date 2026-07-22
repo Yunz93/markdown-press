@@ -25,6 +25,11 @@ import {
   normalizeNewNoteLocation,
   resolveNewNoteFolderPath,
 } from "../utils/newNoteLocation";
+import { remapPathsInIndex } from "../services/vault/linkIndexService";
+import {
+  LINK_INDEX_FILE,
+  writeIndexJson,
+} from "../services/vault/indexStorage";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -366,6 +371,12 @@ export function useFileOperations() {
     (pathMap: Record<string, string>) => {
       useAppStore.setState((state) => buildTabPathRemapState(state, pathMap));
       migrateDraftBackupKeys(pathMap);
+
+      const linkIndex = useAppStore.getState().linkIndex;
+      if (!linkIndex || Object.keys(pathMap).length === 0) return;
+      const next = remapPathsInIndex(linkIndex, pathMap);
+      useAppStore.getState().setLinkIndex(next);
+      void writeIndexJson(next.vaultRoot, LINK_INDEX_FILE, next);
     },
     [],
   );

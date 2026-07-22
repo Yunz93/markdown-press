@@ -111,6 +111,26 @@ export default {
   links_unresolved: "未解析链接",
   links_unresolvedEmpty: "没有死链",
   links_createNote: "创建",
+  links_neighborhood: "邻域",
+
+  askVault_title: "问知识库",
+  askVault_short: "问库",
+  askVault_scope: "检索范围",
+  askVault_scopeVault: "全库",
+  askVault_scopeFolder: "当前文件夹",
+  askVault_scopeCurrent: "当前笔记",
+  askVault_placeholder: "用自然语言提问，例如：上次关于发布流程的结论是什么？",
+  askVault_ask: "提问",
+  askVault_asking: "检索并生成中…",
+  askVault_toggleSources: "查看将依据的片段",
+  askVault_sourcesPreview: "检索片段",
+  askVault_answer: "回答",
+  askVault_insert: "插入到当前笔记（需确认）",
+  askVault_citations: "来源",
+  askVault_history: "历史",
+  askVault_failed: "知识库问答失败",
+
+  notifications_invalidWikiTarget: "无效的双链目标路径",
 
   index_title: "知识库索引",
   index_desc:

@@ -118,6 +118,25 @@ export default {
   links_unresolved: "Unresolved links",
   links_unresolvedEmpty: "No dead links",
   links_createNote: "Create",
+  links_neighborhood: "Neighborhood",
+
+  askVault_title: "Ask vault",
+  askVault_short: "Ask",
+  askVault_scope: "Search scope",
+  askVault_scopeVault: "Entire vault",
+  askVault_scopeFolder: "Current folder",
+  askVault_scopeCurrent: "Current note",
+  askVault_placeholder:
+    "Ask in natural language, e.g. What was the last conclusion about the release process?",
+  askVault_ask: "Ask",
+  askVault_asking: "Retrieving and answering…",
+  askVault_toggleSources: "Show retrieved snippets",
+  askVault_sourcesPreview: "Retrieved snippets",
+  askVault_answer: "Answer",
+  askVault_insert: "Insert into current note (confirm required)",
+  askVault_citations: "Sources",
+  askVault_history: "History",
+  askVault_failed: "Ask vault failed",
 
   index_title: "Vault index",
   index_desc:
@@ -809,6 +828,7 @@ export default {
   notifications_wikiCreated: "Wiki created: {name}",
   notifications_wikiCreateFailed:
     "Failed to generate the wiki article. Check your AI settings and try again.",
+  notifications_invalidWikiTarget: "Invalid wiki link target path",
   notifications_failedOpenLinkInBrowser: "Failed to open link in browser",
   notifications_referenceNotFound: "Reference not found: {target}",
   notifications_headingNotFound: "Heading not found: {target}",

@@ -28,6 +28,7 @@ import { Toolbar } from "./components/toolbar/Toolbar";
 import { SplitView } from "./components/editor/SplitView";
 import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useCodeMirror";
 import { RightRail } from "./components/rightRail/RightRail";
+import { AskVaultPanel } from "./components/ai/AskVaultPanel";
 import { ContentSearch } from "./components/search/ContentSearch";
 import { TabBar } from "./components/tabs/TabBar";
 import { useExportActions } from "./hooks/useExportActions";
@@ -63,7 +64,8 @@ import {
 } from "./utils/simpleBlogPublish";
 import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
 import { isValidBlogRepoUrl, isValidBlogSiteUrl } from "./utils/blogRepo";
-import { isTauriEnvironment } from "./types/filesystem";
+import { isTauriEnvironment, getFileSystem } from "./types/filesystem";
+import { joinFsPath } from "./utils/pathHelpers";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KnowledgeBaseOnboarding } from "./components/KnowledgeBaseOnboarding";
@@ -177,6 +179,7 @@ const App: React.FC = () => {
   const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
   const [isShareLongImageDialogOpen, setIsShareLongImageDialogOpen] =
     useState(false);
+  const [isAskVaultOpen, setIsAskVaultOpen] = useState(false);
   const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] =
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
@@ -425,13 +428,58 @@ const App: React.FC = () => {
   );
 
   const handleCreateMissingWikiNote = useCallback(
-    (targetRaw: string) => {
-      const trimmed = targetRaw.trim();
-      if (!trimmed) return;
-      const baseName = trimmed.split("/").filter(Boolean).pop() || trimmed;
-      void fileOps.handleCreateFile(undefined, baseName);
+    async (targetRaw: string) => {
+      const trimmed = targetRaw.trim().split("|")[0]?.split("#")[0]?.trim();
+      if (!trimmed || !rootFolderPath) return;
+
+      const segments = trimmed
+        .replace(/\\/g, "/")
+        .replace(/^\.\//, "")
+        .split("/")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (segments.some((part) => part === "..")) {
+        showNotification(t("notifications_invalidWikiTarget"), "error");
+        return;
+      }
+      if (segments.length === 0) return;
+
+      const leaf = segments[segments.length - 1]!.replace(
+        /\.(md|markdown)$/i,
+        "",
+      );
+      const parentSegments = segments.slice(0, -1);
+      try {
+        const fs = await getFileSystem();
+        const parentFolder =
+          parentSegments.length > 0
+            ? joinFsPath(rootFolderPath, ...parentSegments)
+            : rootFolderPath;
+        if (parentSegments.length > 0) {
+          await fs.createDirectory(parentFolder);
+          await refreshFileTree();
+        }
+        await fileOps.handleCreateFile(
+          parentSegments.length > 0
+            ? {
+                id: parentFolder,
+                name: parentSegments[parentSegments.length - 1]!,
+                type: "folder",
+                path: parentFolder,
+              }
+            : undefined,
+          leaf,
+        );
+      } catch (error) {
+        showNotification(
+          error instanceof Error
+            ? error.message
+            : t("notifications_wikiCreateFailed"),
+          "error",
+        );
+      }
     },
-    [fileOps],
+    [fileOps, refreshFileTree, rootFolderPath, showNotification, t],
   );
 
   const handleOutlineWidthChange = useCallback((nextWidth: number) => {
@@ -711,6 +759,7 @@ const App: React.FC = () => {
               viewMode={viewMode}
               onViewModeChange={handleToolbarViewModeChange}
               onAIAnalyze={handleAIAnalyze}
+              onAskVault={() => setIsAskVaultOpen(true)}
               isAnalyzing={isAnalyzing}
               isSaving={isSaving}
               isPublishing={isPublishing}
@@ -768,6 +817,13 @@ const App: React.FC = () => {
             </div>
           </main>
         </div>
+
+        <AskVaultPanel
+          open={isAskVaultOpen}
+          onClose={() => setIsAskVaultOpen(false)}
+          onOpenFile={fileOps.handleFileSelect}
+          readFile={readFile}
+        />
 
         <AppDialogs
           isSettingsOpen={isSettingsOpen}

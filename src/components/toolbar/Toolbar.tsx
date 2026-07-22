@@ -11,6 +11,7 @@ interface ToolbarProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onAIAnalyze: () => void;
+  onAskVault?: () => void;
   isAnalyzing: boolean;
   isSaving: boolean;
   isPublishing?: boolean;
@@ -31,6 +32,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     viewMode,
     onViewModeChange,
     onAIAnalyze,
+    onAskVault,
     isAnalyzing,
     isSaving,
     isPublishing = false,
@@ -221,6 +223,17 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
               isLoading={isAnalyzing}
               disabled={!fileName || isPreviewOnlyFile}
             />
+            {onAskVault ? (
+              <button
+                type="button"
+                onClick={onAskVault}
+                disabled={isPreviewOnlyFile}
+                className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] px-2 text-xs font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
+                title={t("askVault_title")}
+              >
+                {t("askVault_short")}
+              </button>
+            ) : null}
 
             <ViewModeToggle
               viewMode={viewMode}

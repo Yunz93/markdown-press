@@ -371,6 +371,214 @@
   color: #93c5fd;
 }
 
+.links-neighborhood-graph {
+  display: block;
+  margin: 0 4px 8px;
+}
+
+.links-neighborhood-edge {
+  stroke: rgba(148, 163, 184, 0.7);
+  stroke-width: 1;
+}
+
+.links-neighborhood-edge.is-in {
+  stroke: rgba(59, 130, 246, 0.55);
+}
+
+.links-neighborhood-edge.is-out {
+  stroke: rgba(16, 185, 129, 0.55);
+}
+
+.links-neighborhood-node {
+  cursor: pointer;
+  fill: #e2e8f0;
+  stroke: #94a3b8;
+  stroke-width: 1;
+}
+
+.links-neighborhood-node.is-in {
+  fill: rgba(59, 130, 246, 0.2);
+  stroke: #3b82f6;
+}
+
+.links-neighborhood-node.is-out {
+  fill: rgba(16, 185, 129, 0.2);
+  stroke: #10b981;
+}
+
+.dark .links-neighborhood-node {
+  fill: #1e293b;
+  stroke: #64748b;
+}
+
+.links-neighborhood-center {
+  fill: #0f172a;
+}
+
+.dark .links-neighborhood-center {
+  fill: #e2e8f0;
+}
+
+.links-neighborhood-center-label {
+  fill: #f8fafc;
+  font-size: 8px;
+  pointer-events: none;
+}
+
+.dark .links-neighborhood-center-label {
+  fill: #0f172a;
+}
+
+.links-neighborhood-label {
+  fill: #64748b;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+/* Ask Vault */
+.ask-vault-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+}
+
+.ask-vault-panel {
+  width: min(640px, 100%);
+  max-height: min(84vh, 820px);
+  overflow: auto;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+  padding: 18px;
+}
+
+.dark .ask-vault-panel {
+  background: rgba(15, 23, 42, 0.96);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ask-vault-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ask-vault-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ask-vault-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+}
+
+.ask-vault-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ask-vault-controls select,
+.ask-vault-controls textarea,
+.ask-vault-actions button {
+  border-radius: 12px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(248, 250, 252, 0.9);
+  color: inherit;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.dark .ask-vault-controls select,
+.dark .ask-vault-controls textarea,
+.dark .ask-vault-actions button {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ask-vault-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ask-vault-primary {
+  background: #0f172a !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 600;
+}
+
+.dark .ask-vault-primary {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.ask-vault-answer,
+.ask-vault-history,
+.ask-vault-sources-preview,
+.ask-vault-citations {
+  margin-top: 14px;
+}
+
+.ask-vault-answer h3,
+.ask-vault-history h3,
+.ask-vault-sources-preview h3,
+.ask-vault-citations h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.ask-vault-answer-body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ask-vault-citation,
+.ask-vault-history-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: rgba(15, 23, 42, 0.04);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.dark .ask-vault-citation,
+.dark .ask-vault-history-item {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ask-vault-citation span,
+.ask-vault-sources-preview pre {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+  white-space: pre-wrap;
+}
+
 /* Writing Stats Styles */
 .writing-stats {
   background: transparent;

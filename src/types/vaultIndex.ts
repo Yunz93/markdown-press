@@ -79,3 +79,22 @@ export interface RetrieveOptions {
   topK?: number;
   excludePaths?: string[];
 }
+
+export interface AskVaultCitation {
+  index: number;
+  path: string;
+  relPath: string;
+  titlePath: string[];
+  snippet: string;
+  startLine: number;
+  endLine: number;
+  headingAnchor: string | null;
+}
+
+export interface AskVaultAnswer {
+  answerMarkdown: string;
+  citations: AskVaultCitation[];
+  usedChunkIds: string[];
+  model: string;
+  retrievedAt: number;
+}

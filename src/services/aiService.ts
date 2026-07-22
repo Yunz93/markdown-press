@@ -18,6 +18,9 @@ import {
   resolveProviderWikiTemplate,
   type WikiPromptOptions,
 } from "./ai/prompts";
+import { generateGeminiJson } from "./geminiService";
+import { generateCodexJson } from "./codexService";
+import { generateDeepSeekJson } from "./deepseekService";
 
 export { buildWikiPrompt };
 
@@ -141,4 +144,32 @@ export async function generateWikiFromSelectionWithProvider(
     resolveProviderWikiTemplate(settings),
   );
   return PROVIDERS[resolveProviderId(settings)].generateWiki(prompt, settings);
+}
+
+/**
+ * Shared JSON completion used by Ask Vault (and future structured AI tools).
+ */
+export async function completeJsonWithProvider<T>(
+  prompt: string,
+  settings: AppSettings,
+  geminiSchema?: Record<string, unknown>,
+): Promise<T> {
+  ensureAIConfiguration(settings);
+  const providerId = resolveProviderId(settings);
+  if (providerId === "gemini") {
+    return generateGeminiJson<T>({
+      apiKey: settings.geminiApiKey || "",
+      modelName: settings.geminiModel || "gemini-2.0-flash-exp",
+      prompt,
+      systemPrompt: resolveProviderSystemPrompt(settings),
+      schema: geminiSchema ?? {
+        type: "object",
+        properties: {},
+      },
+    });
+  }
+  if (providerId === "codex") {
+    return generateCodexJson<T>(prompt, settings);
+  }
+  return generateDeepSeekJson<T>(prompt, settings);
 }

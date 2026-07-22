@@ -56,6 +56,81 @@ function formatOutboundMeta(link: WikiOutboundLink): string {
   return parts.join(" · ");
 }
 
+const NeighborhoodGraph: React.FC<{
+  centerPath: string;
+  nodes: Array<{ path: string; kind: "in" | "out" }>;
+  onOpenPath: (path: string) => void;
+}> = ({ centerPath, nodes, onOpenPath }) => {
+  const width = 220;
+  const height = 140;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = 48;
+
+  return (
+    <svg
+      className="links-neighborhood-graph"
+      viewBox={`0 0 ${width} ${height}`}
+      width="100%"
+      height={height}
+      role="img"
+    >
+      {nodes.map((node, index) => {
+        const angle =
+          (Math.PI * 2 * index) / Math.max(nodes.length, 1) - Math.PI / 2;
+        const x = cx + Math.cos(angle) * radius;
+        const y = cy + Math.sin(angle) * radius;
+        return (
+          <g key={node.path}>
+            <line
+              x1={cx}
+              y1={cy}
+              x2={x}
+              y2={y}
+              className={
+                node.kind === "in"
+                  ? "links-neighborhood-edge is-in"
+                  : "links-neighborhood-edge is-out"
+              }
+            />
+            <circle
+              cx={x}
+              cy={y}
+              r={10}
+              className={
+                node.kind === "in"
+                  ? "links-neighborhood-node is-in"
+                  : "links-neighborhood-node is-out"
+              }
+              onClick={() => onOpenPath(node.path)}
+            >
+              <title>{displayName(node.path)}</title>
+            </circle>
+            <text
+              x={x}
+              y={y + 22}
+              textAnchor="middle"
+              className="links-neighborhood-label"
+              onClick={() => onOpenPath(node.path)}
+            >
+              {displayName(node.path).slice(0, 8)}
+            </text>
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cy} r={14} className="links-neighborhood-center" />
+      <text
+        x={cx}
+        y={cy + 4}
+        textAnchor="middle"
+        className="links-neighborhood-center-label"
+      >
+        {displayName(centerPath).slice(0, 6)}
+      </text>
+    </svg>
+  );
+};
+
 export const LinksPanel: React.FC<LinksPanelProps> = ({
   onOpenPath,
   onCreateMissingNote,
@@ -82,6 +157,29 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
     [outbounds],
   );
 
+  const neighborhood = useMemo(() => {
+    if (!currentFilePath) {
+      return {
+        center: "",
+        nodes: [] as Array<{ path: string; kind: "in" | "out" }>,
+      };
+    }
+    const nodes: Array<{ path: string; kind: "in" | "out" }> = [];
+    const seen = new Set<string>();
+    for (const group of backlinks) {
+      if (seen.has(group.sourcePath)) continue;
+      seen.add(group.sourcePath);
+      nodes.push({ path: group.sourcePath, kind: "in" });
+    }
+    for (const link of resolvedOutbounds) {
+      const path = link.resolvedPath!;
+      if (path === currentFilePath || seen.has(path)) continue;
+      seen.add(path);
+      nodes.push({ path, kind: "out" });
+    }
+    return { center: currentFilePath, nodes: nodes.slice(0, 8) };
+  }, [backlinks, currentFilePath, resolvedOutbounds]);
+
   if (!currentFilePath) {
     return <p className="empty-message">{t("links_noFile")}</p>;
   }
@@ -99,6 +197,20 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
 
   return (
     <div className="links-panel-body">
+      {neighborhood.nodes.length > 0 ? (
+        <section className="links-section">
+          <h3 className="links-section-title">
+            {t("links_neighborhood")}
+            <span className="links-count">{neighborhood.nodes.length}</span>
+          </h3>
+          <NeighborhoodGraph
+            centerPath={neighborhood.center}
+            nodes={neighborhood.nodes}
+            onOpenPath={onOpenPath}
+          />
+        </section>
+      ) : null}
+
       <section className="links-section">
         <h3 className="links-section-title">
           {t("links_backlinks")}
