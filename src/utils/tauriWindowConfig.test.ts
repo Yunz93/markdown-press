@@ -34,6 +34,8 @@ const MAIN_WINDOW_CHROME_KEYS = [
   "theme",
   "width",
   "height",
+  "minWidth",
+  "minHeight",
   "resizable",
   "fullscreen",
   "dragDropEnabled",
@@ -164,6 +166,16 @@ describe("Tauri window config", () => {
     expect(getMainWindow(mergedDevConfig)?.devtools).toBe(true);
     expect(getMainWindow(mergedDevConfig)?.hiddenTitle).toBe(true);
     expect(getMainWindow(mergedDevConfig)?.titleBarStyle).toBe("Overlay");
+  });
+
+  it("keeps a usable minimum main-window size for dense chrome layouts", () => {
+    const config = readTauriConfig("src-tauri/tauri.conf.json");
+    const mainWindow = getMainWindow(config);
+
+    expect(mainWindow?.width).toBe(1200);
+    expect(mainWindow?.height).toBe(800);
+    expect(mainWindow?.minWidth).toBe(960);
+    expect(mainWindow?.minHeight).toBe(640);
   });
 
   it("grants the default desktop permissions to file document windows", () => {

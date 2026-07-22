@@ -148,6 +148,40 @@ fn queue_opened_file_paths(app: &tauri::AppHandle, paths: Vec<String>) {
     let _ = app.emit("opened-files", paths);
 }
 
+/// Matches `app.windows[main].width/height` in tauri.conf.json.
+const DEFAULT_WINDOW_WIDTH: f64 = 1200.0;
+const DEFAULT_WINDOW_HEIGHT: f64 = 800.0;
+/// Keep secondary/file windows usable — platform default without an explicit
+/// size is often ~300–400px and clips the sidebar + editor chrome.
+const MIN_WINDOW_WIDTH: f64 = 960.0;
+const MIN_WINDOW_HEIGHT: f64 = 640.0;
+
+fn clamp_window_size(width: f64, height: f64) -> (f64, f64) {
+    (
+        width.max(MIN_WINDOW_WIDTH),
+        height.max(MIN_WINDOW_HEIGHT),
+    )
+}
+
+fn resolve_file_window_size(main_logical_size: Option<(f64, f64)>) -> (f64, f64) {
+    match main_logical_size {
+        Some((width, height)) if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 => {
+            clamp_window_size(width, height)
+        }
+        _ => (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT),
+    }
+}
+
+fn main_window_logical_size(app: &tauri::AppHandle) -> Option<(f64, f64)> {
+    let main = app.get_webview_window("main")?;
+    let scale = main.scale_factor().ok()?;
+    if scale <= 0.0 {
+        return None;
+    }
+    let size = main.inner_size().ok()?;
+    Some((size.width as f64 / scale, size.height as f64 / scale))
+}
+
 #[tauri::command]
 fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let Some(normalized) = normalize_opened_file_path(PathBuf::from(path)) else {
@@ -162,8 +196,15 @@ fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), St
 
     let encoded = urlencoding::encode(&normalized);
     let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
+    let (width, height) = resolve_file_window_size(main_window_logical_size(&app));
+
+    // Explicit size is required: WebviewWindowBuilder defaults are far smaller
+    // than the configured main window, which made double-click .md opens unusable.
     let window = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title("Markdown Press")
+        .inner_size(width, height)
+        .min_inner_size(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+        .resizable(true)
         .build()
         .map_err(|e| format!("Failed to create window: {}", e))?;
 
@@ -504,6 +545,30 @@ mod tests {
         );
 
         cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn resolve_file_window_size_uses_defaults_when_main_size_is_missing() {
+        assert_eq!(
+            resolve_file_window_size(None),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+        assert_eq!(
+            resolve_file_window_size(Some((0.0, 100.0))),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn resolve_file_window_size_clamps_tiny_main_window_sizes() {
+        assert_eq!(
+            resolve_file_window_size(Some((400.0, 300.0))),
+            (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+        );
+        assert_eq!(
+            resolve_file_window_size(Some((1400.0, 900.0))),
+            (1400.0, 900.0)
+        );
     }
 
     fn create_test_directory(prefix: &str) -> PathBuf {
