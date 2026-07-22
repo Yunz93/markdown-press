@@ -12,7 +12,10 @@
   --pane-content-top: 52px;
   --pane-content-bottom: 72px;
   --editor-code-block-bg: var(--mp-doc-code-bg, rgba(248, 250, 252, 0.96));
-  --editor-code-block-border: var(--mp-doc-code-border, rgba(148, 163, 184, 0.2));
+  --editor-code-block-border: var(
+    --mp-doc-code-border,
+    rgba(148, 163, 184, 0.2)
+  );
   --editor-code-block-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
   --editor-code-fg: var(--mp-doc-code-text, #1f2937);
   --editor-code-keyword: var(--mp-code-keyword, #d73a49);
@@ -31,7 +34,10 @@
 
 .dark .editor-pane-layout {
   --editor-code-block-bg: var(--mp-doc-code-bg, rgba(15, 23, 42, 0.82));
-  --editor-code-block-border: var(--mp-doc-code-border, rgba(148, 163, 184, 0.16));
+  --editor-code-block-border: var(
+    --mp-doc-code-border,
+    rgba(148, 163, 184, 0.16)
+  );
   --editor-code-block-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   --editor-code-fg: var(--mp-doc-code-text, #e5eef9);
   --editor-code-keyword: var(--mp-code-keyword, #f97583);
@@ -87,12 +93,13 @@
   max-width: 100%;
   min-height: calc(100vh - 12rem);
   box-sizing: border-box;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--editor-content-bottom, var(--pane-content-bottom)) !important;
+  padding: var(--pane-content-top) var(--pane-content-px)
+    var(--editor-content-bottom, var(--pane-content-bottom)) !important;
   outline: none;
   white-space: pre;
   word-wrap: normal;
   letter-spacing: 0.01em;
-  tab-size: 2;
+  tab-size: var(--editor-tab-size, 4);
   color: var(--mp-doc-text, #1f2937);
   caret-color: transparent;
   font-family: var(--editor-font-family);
@@ -192,6 +199,24 @@
   display: none;
 }
 
+.editor-pane-layout.show-editor-gutters .cm-gutters {
+  display: flex;
+  background: transparent;
+  border: none;
+  color: color-mix(in srgb, currentColor 35%, transparent);
+  min-width: 2.25rem;
+}
+
+.editor-pane-layout.show-editor-gutters .cm-lineNumbers .cm-gutterElement {
+  padding: 0 0.5rem 0 0.25rem;
+  min-width: 2rem;
+  text-align: right;
+}
+
+.editor-pane-layout.show-editor-gutters .cm-foldGutter {
+  width: 1rem;
+}
+
 .editor-pane-layout .cm-activeLine {
   background: transparent;
 }
@@ -208,7 +233,11 @@
 }
 
 .editor-pane-layout .cm-selectionLayer .cm-selectionBackground,
-.editor-pane-layout .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+.editor-pane-layout
+  .cm-editor.cm-focused
+  > .cm-scroller
+  > .cm-selectionLayer
+  .cm-selectionBackground {
   background: var(--mp-doc-selection, rgba(168, 85, 247, 0.18));
 }
 
@@ -221,9 +250,13 @@
 }
 
 @keyframes cm-blink {
-  0% {}
-  50% { opacity: 0; }
-  100% {}
+  0% {
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+  }
 }
 
 .editor-pane-layout .cm-cursor,
@@ -247,7 +280,11 @@
   background: var(--mp-doc-accent, #7c3aed);
 }
 
-.editor-pane-layout .cm-editor.cm-focused > .cm-scroller > .cm-cursorLayer .cm-cursor {
+.editor-pane-layout
+  .cm-editor.cm-focused
+  > .cm-scroller
+  > .cm-cursorLayer
+  .cm-cursor {
   display: block;
 }
 
@@ -311,7 +348,10 @@
   border-radius: 14px;
   padding: 0.55rem 0.75rem;
   color: #1f2937;
-  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .editor-pane-layout .cm-tooltip-autocomplete ul li[aria-selected],
@@ -407,7 +447,8 @@
   background: transparent;
 }
 
-.editor-pane-layout .wiki-link-hover-preview-body.preview-pane-document.markdown-body {
+.editor-pane-layout
+  .wiki-link-hover-preview-body.preview-pane-document.markdown-body {
   /* `preview.css` scopes most typography under `.preview-pane-document.markdown-body`,
      but for this editor-side overlay we keep the smaller card padding. */
   padding: 0.85rem 0.95rem 0.95rem !important;
@@ -424,10 +465,16 @@
 }
 
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre,
-.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre:not(.shiki) code,
+.editor-pane-layout
+  .wiki-link-hover-preview-body.markdown-body
+  pre:not(.shiki)
+  code,
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki,
 .editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki code,
-.editor-pane-layout .wiki-link-hover-preview-body.markdown-body pre.shiki .line {
+.editor-pane-layout
+  .wiki-link-hover-preview-body.markdown-body
+  pre.shiki
+  .line {
   line-height: 1.15;
 }
 
@@ -654,7 +701,12 @@
 }
 
 .dark .editor-pane-layout .cm-selectionLayer .cm-selectionBackground,
-.dark .editor-pane-layout .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+.dark
+  .editor-pane-layout
+  .cm-editor.cm-focused
+  > .cm-scroller
+  > .cm-selectionLayer
+  .cm-selectionBackground {
   background: var(--mp-doc-selection, rgba(192, 132, 252, 0.22));
 }
 
@@ -769,9 +821,10 @@
   display: block;
   color: #1f2937;
   caret-color: #7c3aed;
-  padding: var(--pane-content-top) var(--pane-content-px) var(--pane-content-bottom);
+  padding: var(--pane-content-top) var(--pane-content-px)
+    var(--pane-content-bottom);
   letter-spacing: 0.01em;
-  tab-size: 2;
+  tab-size: var(--editor-tab-size, 4);
 }
 
 .editor-pane::selection {
@@ -862,11 +915,13 @@
 }
 
 @keyframes editor-caret-blink {
-  0%, 48% {
+  0%,
+  48% {
     opacity: 1;
   }
 
-  50%, 100% {
+  50%,
+  100% {
     opacity: 0;
   }
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ViewMode } from "../types";
 import {
+  buildCloseBracketChars,
+  buildIndentUnitString,
   normalizeDefaultViewMode,
   normalizeTabSize,
 } from "./editorPreferences";
@@ -25,5 +27,38 @@ describe("normalizeDefaultViewMode", () => {
     expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.EDITOR);
     expect(normalizeDefaultViewMode(ViewMode.PREVIEW)).toBe(ViewMode.PREVIEW);
     expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.SPLIT);
+  });
+});
+
+describe("buildIndentUnitString", () => {
+  it("returns spaces or a tab based on settings", () => {
+    expect(buildIndentUnitString(2, false)).toBe("  ");
+    expect(buildIndentUnitString(4, false)).toBe("    ");
+    expect(buildIndentUnitString(4, true)).toBe("\t");
+  });
+});
+
+describe("buildCloseBracketChars", () => {
+  it("combines bracket and markdown pairs", () => {
+    expect(buildCloseBracketChars(false, false)).toEqual([]);
+    expect(buildCloseBracketChars(true, false)).toEqual([
+      "(",
+      "[",
+      "{",
+      "'",
+      '"',
+    ]);
+    expect(buildCloseBracketChars(false, true)).toEqual(["*", "_", "`", "~"]);
+    expect(buildCloseBracketChars(true, true)).toEqual([
+      "(",
+      "[",
+      "{",
+      "'",
+      '"',
+      "*",
+      "_",
+      "`",
+      "~",
+    ]);
   });
 });

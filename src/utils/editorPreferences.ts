@@ -2,6 +2,9 @@ import { ViewMode } from "../types";
 
 export const DEFAULT_TAB_SIZE = 4;
 
+const DEFAULT_CLOSE_BRACKETS = ["(", "[", "{", "'", '"'] as const;
+const MARKDOWN_CLOSE_BRACKETS = ["*", "_", "`", "~"] as const;
+
 export function normalizeTabSize(value: unknown): 2 | 4 {
   const numeric =
     typeof value === "number"
@@ -26,4 +29,31 @@ export function normalizeDefaultViewMode(value: unknown): ViewMode {
     return ViewMode.SPLIT;
   }
   return ViewMode.SPLIT;
+}
+
+/** Indent string used by Tab / list nesting for the current settings. */
+export function buildIndentUnitString(
+  tabSize: unknown,
+  useTabs: boolean,
+): string {
+  if (useTabs) return "\t";
+  return " ".repeat(normalizeTabSize(tabSize));
+}
+
+/**
+ * Characters that should auto-close, based on bracket / Markdown pairing toggles.
+ * Returns an empty array when both toggles are off.
+ */
+export function buildCloseBracketChars(
+  autoPairBrackets: boolean,
+  autoPairMarkdown: boolean,
+): string[] {
+  const brackets: string[] = [];
+  if (autoPairBrackets) {
+    brackets.push(...DEFAULT_CLOSE_BRACKETS);
+  }
+  if (autoPairMarkdown) {
+    brackets.push(...MARKDOWN_CLOSE_BRACKETS);
+  }
+  return brackets;
 }

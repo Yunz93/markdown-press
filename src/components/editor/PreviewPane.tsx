@@ -187,7 +187,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           "--pane-backdrop-px": `${layoutMetrics.backdropPaddingX}px`,
           "--pane-backdrop-py": `${layoutMetrics.backdropPaddingY}px`,
           "--pane-frame-max-width": `${layoutMetrics.frameMaxWidth}px`,
-          "--pane-sheet-max-width": `${layoutMetrics.sheetMaxWidth}px`,
+          "--pane-sheet-max-width": settings.readableLineLength
+            ? `${layoutMetrics.sheetMaxWidth}px`
+            : "100%",
           "--pane-sheet-radius": `${layoutMetrics.sheetRadius}px`,
           "--pane-content-px": `${layoutMetrics.contentPaddingX}px`,
           "--pane-content-top": `${layoutMetrics.contentPaddingTop}px`,
@@ -204,6 +206,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         scaledPreviewFontSize,
         scaledCodeFontSize,
         codeFontFamily,
+        settings.readableLineLength,
       ],
     );
 

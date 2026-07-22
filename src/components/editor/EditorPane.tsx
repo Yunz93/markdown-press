@@ -317,6 +317,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       rootFolderPath,
       currentFilePath,
       resourceFolder: settings.resourceFolder,
+      attachmentLocation: settings.attachmentLocation,
       attachmentPasteFormat: settings.attachmentPasteFormat,
       writeBinaryFile,
       refreshFileTree,
@@ -390,6 +391,15 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       wordWrap: settings.wordWrap,
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
+      autoPairBrackets: settings.autoPairBrackets,
+      autoPairMarkdown: settings.autoPairMarkdown,
+      showLineNumbers: settings.showLineNumbers,
+      enableFolding: settings.enableFolding,
+      tabSize: settings.tabSize,
+      useTabs: settings.useTabs,
+      showIndentationGuides: settings.showIndentationGuides,
+      spellcheck: settings.spellcheck,
+      convertHtmlOnPaste: settings.convertHtmlOnPaste,
       onChange: updateContent,
       onScroll: scrollSync.handleScroll,
       completionSource: wikiLinks.completionSource,
@@ -602,7 +612,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--pane-backdrop-px": `${layoutMetrics.backdropPaddingX}px`,
           "--pane-backdrop-py": `${layoutMetrics.backdropPaddingY}px`,
           "--pane-frame-max-width": `${layoutMetrics.frameMaxWidth}px`,
-          "--pane-sheet-max-width": `${layoutMetrics.sheetMaxWidth}px`,
+          "--pane-sheet-max-width": settings.readableLineLength
+            ? `${layoutMetrics.sheetMaxWidth}px`
+            : "100%",
           "--pane-sheet-radius": `${layoutMetrics.sheetRadius}px`,
           "--pane-content-px": `${layoutMetrics.contentPaddingX}px`,
           "--pane-content-top": `${layoutMetrics.contentPaddingTop}px`,
@@ -613,6 +625,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--editor-code-font-family": codeFontFamily,
           "--editor-code-font-size": `${scaledCodeFontSize}px`,
           "--editor-line-height": String(EDITOR_LINE_HEIGHT),
+          "--editor-tab-size": String(settings.tabSize),
         }) as React.CSSProperties,
       [
         layoutMetrics,
@@ -620,6 +633,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         scaledEditorFontSize,
         scaledCodeFontSize,
         codeFontFamily,
+        settings.readableLineLength,
+        settings.tabSize,
       ],
     );
 
@@ -857,7 +872,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     return (
       <div
         ref={layoutRef}
-        className="editor-pane-layout h-full min-w-0 flex flex-col relative"
+        className={`editor-pane-layout h-full min-w-0 flex flex-col relative${
+          settings.showLineNumbers || settings.enableFolding
+            ? " show-editor-gutters"
+            : ""
+        }`}
         style={layoutStyle}
       >
         {isSaving && (

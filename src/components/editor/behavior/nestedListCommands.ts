@@ -14,6 +14,7 @@ import {
   updateSelectedLines as updateSelectedLinesWithSelectionMap,
   isBlankLine,
   getLeadingIndent,
+  getIndentUnit,
 } from "./core";
 import {
   type ListItemInfo,
@@ -24,8 +25,6 @@ import {
   isEmptyListItem,
   getStrictOrderedListNormalizationChanges,
   getOrderedListParentForContinuation,
-  LIST_INDENT_SIZE,
-  LIST_INDENT_UNIT,
   getLevelFromIndent,
   getIndentColumnWidth,
 } from "./nestedListBehavior";
@@ -86,11 +85,14 @@ function getListContentStartColumn(item: ListItemInfo): number {
   return quoteLength + item.indent.length + markerText.length + 1;
 }
 
-function getChildIndentForParent(parent: ListItemInfo): string {
+function getChildIndentForParent(
+  parent: ListItemInfo,
+  indentUnit: string,
+): string {
   const parentWidth = getIndentColumnWidth(parent.indent);
   const markerContentOffset = getMarkerText(parent).length + 1;
   return getIndentByColumn(
-    parentWidth + Math.max(LIST_INDENT_UNIT.length, markerContentOffset),
+    parentWidth + Math.max(indentUnit.length, markerContentOffset),
   );
 }
 
@@ -339,8 +341,8 @@ function dispatchListItemLevelChanges(
   return true;
 }
 
-function indentSelectedLine(lineText: string): string {
-  return `${LIST_INDENT_UNIT}${lineText}`;
+function indentSelectedLine(state: EditorState, lineText: string): string {
+  return `${getIndentUnit(state)}${lineText}`;
 }
 
 function outdentSelectedLine(
@@ -348,6 +350,7 @@ function outdentSelectedLine(
   lineText: string,
   lineNumber: number,
 ): string {
+  const indentUnit = getIndentUnit(state);
   const item = parseListItem(lineText, lineNumber, 0);
   if (item) {
     if (getIndentColumnWidth(item.indent) === 0) {
@@ -359,7 +362,7 @@ function outdentSelectedLine(
       item,
       findOutdentIndent(state, item),
     );
-    return formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+    return formatListItem(newItem).replace(/\t/g, indentUnit);
   }
 
   const indent = getLeadingIndent(lineText);
@@ -370,7 +373,7 @@ function outdentSelectedLine(
     return lineText.slice(1);
   }
   const toRemove = Math.min(
-    LIST_INDENT_SIZE,
+    Math.max(indentUnit.length, 1),
     indent.match(/^ */)?.[0].length ?? 0,
   );
   return lineText.slice(toRemove);
@@ -455,7 +458,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
       content: "",
     };
     const insert =
-      "\n" + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+      "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
 
     dispatch(
       state.update({
@@ -477,7 +480,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
       content: "",
     };
     const insert =
-      "\n" + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+      "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
 
     dispatch(
       state.update({
@@ -496,7 +499,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
     content: "",
   };
   const insert =
-    "\n" + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+    "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
 
   dispatch(
     state.update({
@@ -529,7 +532,7 @@ export const handleOrderedListContinuationEnter: StateCommand = ({
     content: "",
   };
   const insert =
-    "\n" + formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT);
+    "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
 
   dispatch(
     state.update({
@@ -678,12 +681,11 @@ export const handleListTab = (options?: {
   strictMode?: boolean;
 }): StateCommand => {
   return ({ state, dispatch }): boolean => {
+    const indentUnit = getIndentUnit(state);
     const hasSelection = state.selection.ranges.some((r) => !r.empty);
     if (hasSelection) {
-      return updateSelectedLinesWithSelectionMap(
-        state,
-        dispatch,
-        indentSelectedLine,
+      return updateSelectedLinesWithSelectionMap(state, dispatch, (lineText) =>
+        indentSelectedLine(state, lineText),
       );
     }
 
@@ -716,7 +718,7 @@ export const handleListTab = (options?: {
             parent,
             item.lineNumber,
           );
-          const proposed = getChildIndentForParent(parent);
+          const proposed = getChildIndentForParent(parent, indentUnit);
 
           if (
             existingChildIndent !== null &&
@@ -727,10 +729,10 @@ export const handleListTab = (options?: {
             nextIndent = proposed;
           } else {
             // 已经处于该父级子列范围内（多次 Tab），在当前缩进上再加深一级
-            nextIndent = `${item.indent}${LIST_INDENT_UNIT}`;
+            nextIndent = `${item.indent}${indentUnit}`;
           }
         } else {
-          nextIndent = `${item.indent}${LIST_INDENT_UNIT}`;
+          nextIndent = `${item.indent}${indentUnit}`;
         }
 
         // markerStyle 继承策略：仅当 (父级是 ordered) 且 (当前子项内容为空)
@@ -746,10 +748,7 @@ export const handleListTab = (options?: {
             : undefined,
         });
         // Ensure output uses spaces only, replace any tabs with the editor indent unit.
-        const formatted = formatListItem(newItem).replace(
-          /\t/g,
-          LIST_INDENT_UNIT,
-        );
+        const formatted = formatListItem(newItem).replace(/\t/g, indentUnit);
         updates.push({ item, newItem, newText: formatted });
         plannedItems.set(item.lineNumber, newItem);
       }
@@ -760,8 +759,8 @@ export const handleListTab = (options?: {
     }
 
     const changes = state.changeByRange((range) => ({
-      changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
-      range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
+      changes: { from: range.from, to: range.to, insert: indentUnit },
+      range: EditorSelection.cursor(range.from + indentUnit.length),
     }));
 
     dispatch(
@@ -816,7 +815,7 @@ export const handleListShiftTab = (options?: {
         updates.push({
           item,
           newItem,
-          newText: formatListItem(newItem).replace(/\t/g, LIST_INDENT_UNIT),
+          newText: formatListItem(newItem).replace(/\t/g, getIndentUnit(state)),
         });
       }
 
