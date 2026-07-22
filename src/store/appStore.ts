@@ -108,6 +108,7 @@ export const useAppStore = create<AppState>()(
           themeMode: normalizeThemeMode(
             persistedSettings.themeMode ?? defaultSettings.themeMode,
           ),
+          themeFollowSystem: persistedSettings.themeFollowSystem === true,
           markdownStylePreset: normalizeMarkdownStylePreset(
             persistedSettings.markdownStylePreset,
           ),

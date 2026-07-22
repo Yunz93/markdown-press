@@ -261,6 +261,10 @@ export function createUISlice(
             themeMode: normalizeThemeMode(
               updates.themeMode ?? state.settings.themeMode,
             ),
+            themeFollowSystem:
+              typeof updates.themeFollowSystem === "boolean"
+                ? updates.themeFollowSystem
+                : state.settings.themeFollowSystem === true,
             markdownStylePreset: normalizeMarkdownStylePreset(
               updates.markdownStylePreset ?? state.settings.markdownStylePreset,
             ),

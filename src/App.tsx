@@ -120,7 +120,7 @@ const App: React.FC = () => {
   useUndoRedo();
 
   useSystemThemeFollow();
-  useThemeSync(settings.themeMode);
+  useThemeSync(settings.themeMode, settings.themeFollowSystem);
   useLayoutEffect(() => {
     const scaledFontSize = getScaledEditorFontSize(
       settings.fontSize,
