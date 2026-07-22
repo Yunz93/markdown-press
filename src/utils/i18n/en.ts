@@ -115,6 +115,7 @@ export default {
   sidebar_tryAnotherFilenameKeyword: "Try another filename keyword.",
   sidebar_trash: "Trash ({count})",
   sidebar_trashEmpty: "Empty",
+  sidebar_fileTypeNotSupported: "This file type cannot be opened",
   sidebar_cleanupUnusedAttachments: "Clean unused attachments",
   sidebar_cleanupUnusedAttachmentsTitle: "Clean unused attachments",
   sidebar_cleanupUnusedAttachmentsConfirm:

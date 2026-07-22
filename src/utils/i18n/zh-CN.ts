@@ -108,6 +108,7 @@ export default {
   sidebar_tryAnotherFilenameKeyword: "换个文件名关键词试试。",
   sidebar_trash: "回收站（{count}）",
   sidebar_trashEmpty: "无",
+  sidebar_fileTypeNotSupported: "暂不支持打开此类型",
   sidebar_cleanupUnusedAttachments: "清理未引用附件",
   sidebar_cleanupUnusedAttachmentsTitle: "清理未引用附件",
   sidebar_cleanupUnusedAttachmentsConfirm:
@@ -140,8 +141,7 @@ export default {
     "无法移入回收站：未保存的修改保存失败，已保留文件",
   notifications_renameSaveFailed:
     "无法重命名：未保存的修改保存失败，已保留原文件",
-  notifications_moveSaveFailed:
-    "无法移动：未保存的修改保存失败，已保留原位置",
+  notifications_moveSaveFailed: "无法移动：未保存的修改保存失败，已保留原位置",
   notifications_switchKnowledgeBaseSaveFailed:
     "切换知识库前保存失败，请先处理未保存的笔记",
   notifications_aiApplyStale:
