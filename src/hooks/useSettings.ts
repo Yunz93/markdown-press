@@ -94,11 +94,11 @@ export function useSettings() {
   );
 
   const addMetadataField = useCallback(
-    (key: string, defaultValue: string) => {
+    (key: string, defaultValue: string, description = "") => {
       updateSettings((state) => ({
         metadataFields: [
           ...state.settings.metadataFields,
-          { key, defaultValue },
+          { key, defaultValue, description },
         ],
       }));
     },

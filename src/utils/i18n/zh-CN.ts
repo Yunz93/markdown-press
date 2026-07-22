@@ -140,8 +140,7 @@ export default {
     "无法移入回收站：未保存的修改保存失败，已保留文件",
   notifications_renameSaveFailed:
     "无法重命名：未保存的修改保存失败，已保留原文件",
-  notifications_moveSaveFailed:
-    "无法移动：未保存的修改保存失败，已保留原位置",
+  notifications_moveSaveFailed: "无法移动：未保存的修改保存失败，已保留原位置",
   notifications_switchKnowledgeBaseSaveFailed:
     "切换知识库前保存失败，请先处理未保存的笔记",
   notifications_aiApplyStale:
@@ -438,8 +437,12 @@ export default {
   settings_metadataTemplateDesc: "创建新文件时添加到 frontmatter 的属性。",
   settings_addField: "添加字段",
   settings_dragToReorder: "拖拽以重新排序",
+  settings_metadataKeyLabel: "字段名",
+  settings_metadataValueLabel: "默认值",
+  settings_metadataDescriptionLabel: "字段说明",
   settings_metadataKeyPlaceholder: "键（如：tags）",
   settings_metadataValuePlaceholder: "值（如：draft）",
+  settings_metadataDescriptionPlaceholder: "说明（如：标签列表）",
   settings_metadataNowHint: "使用 {now} 表示当前日期",
   settings_metadataTip:
     "提示：拖拽可重新排序。使用 {now} 表示日期，{nowDatetime} 表示时间戳。`status` 仅用于编辑状态；发布由 `is_publish` 控制。",

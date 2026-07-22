@@ -472,8 +472,13 @@ export default {
     "Fields added to frontmatter when creating a new file.",
   settings_addField: "Add Field",
   settings_dragToReorder: "Drag to reorder",
+  settings_metadataKeyLabel: "Key",
+  settings_metadataValueLabel: "Default value",
+  settings_metadataDescriptionLabel: "Description",
   settings_metadataKeyPlaceholder: "Key (for example: tags)",
   settings_metadataValuePlaceholder: "Value (for example: draft)",
+  settings_metadataDescriptionPlaceholder:
+    "Description (for example: tag list)",
   settings_metadataNowHint: "Use {now} for the current date",
   settings_metadataTip:
     "Tip: drag to reorder. Use {now} for the date and {nowDatetime} for the timestamp. `status` is only for editorial state; publishing is controlled by `is_publish`.",
