@@ -6,7 +6,6 @@ import {
   normalizeBlogRepoUrl,
   normalizeBlogSiteUrl,
 } from '../../../utils/blogRepo';
-import { openExternalUrl } from '../../../utils/externalLinks';
 import { useI18n } from '../../../hooks/useI18n';
 import type { SettingsTabProps } from '../types';
 import { useSecureSettings } from '../useSecureSettings';
@@ -134,27 +133,6 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
               {t('settings_blogSiteUrlInvalid')}
             </p>
           )}
-        </div>
-
-        <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
-          <p>
-            {t('settings_publishGuide1').split('simple-blog')[0]}
-            <a
-              href="https://github.com/Yunz93/simple-blog"
-              onClick={(event) => {
-                event.preventDefault();
-                void openExternalUrl('https://github.com/Yunz93/simple-blog');
-              }}
-              className="font-medium text-accent-DEFAULT hover:underline"
-            >
-              simple-blog
-            </a>
-            {t('settings_publishGuide1').split('simple-blog')[1]}
-          </p>
-          <p className="mt-2">{t('settings_publishGuide2')}</p>
-          <p className="mt-2">{t('settings_publishGuide3')}</p>
-          <p className="mt-2">{t('settings_publishGuide4')}</p>
-          <p className="mt-2">{t('settings_publishGuide5')}</p>
         </div>
       </div>
     </div>

@@ -78,6 +78,17 @@ export default {
   wechatDraftDialog_coverEmpty: "No cover image selected yet",
   wechatDraftDialog_submit: "Publish to drafts",
 
+  simpleBlogDialog_title: "Publish to Simple Blog",
+  simpleBlogDialog_desc:
+    "Confirm the article title, slug, and aliases before publishing. Configure the blog repository, token, and site domain in Settings.",
+  simpleBlogDialog_titleLabel: "Title",
+  simpleBlogDialog_slugLabel: "Slug",
+  simpleBlogDialog_slugDesc: "Controls the article URL. Leave empty to fall back to the title.",
+  simpleBlogDialog_aliasesLabel: "Aliases",
+  simpleBlogDialog_aliasesDesc:
+    "Optional. Separate multiple aliases with commas. Leave empty to match the title.",
+  simpleBlogDialog_submit: "Publish to blog",
+
   ai_button: "AI Enhance",
   ai_buttonLoading: "Enhancing with AI",
   ai_generateWiki: "Generate explainer wiki with AI",
@@ -522,16 +533,6 @@ export default {
     "This public site URL is used to write back the article `link`, for example `https://your-blog.com` or `your-blog.vercel.app`.",
   settings_blogSiteUrlInvalid:
     "Use a public URL like `https://your-blog.com` or `your-blog.vercel.app`.",
-  settings_publishGuide1:
-    "Start with simple-blog, deploy it, then paste the GitHub repository used by your deployed blog here.",
-  settings_publishGuide2:
-    "If you deployed through Vercel, open the project dashboard, find the connected Git repository, and use that repository URL as the publish target.",
-  settings_publishGuide3:
-    "Also fill in your public blog domain. After a successful publish, markdown-press writes the final article URL back into the note frontmatter `link`.",
-  settings_publishGuide4:
-    "`title` defaults to the current file name, `aliases` defaults to `title`, and `slug` controls the final article URL. If `slug` is empty, publishing falls back to `title`.",
-  settings_publishGuide5:
-    "`status` is not used to decide whether a note is published. Publishing writes `is_publish: true`, so `status` can stay focused on draft or review flow.",
   settings_wechatSectionTitle: "WeChat Official Account Drafts",
   settings_wechatSectionDesc:
     "Publish the current note to the WeChat Official Account draft box and update the same draft later.",

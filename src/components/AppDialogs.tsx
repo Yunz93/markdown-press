@@ -6,6 +6,7 @@ import { useAppStore } from "../store/appStore";
 import { useI18n } from "../hooks/useI18n";
 import { clearDraftBackup } from "../utils/draftBackup";
 import { PublishTargetDialog } from "./publish/PublishTargetDialog";
+import { SimpleBlogPublishDialog } from "./publish/SimpleBlogPublishDialog";
 import { WechatDraftDialog } from "./publish/WechatDraftDialog";
 import { ShareLongImageDialog } from "./share/ShareLongImageDialog";
 import type { AppSettings, FileNode, Notification } from "../types";
@@ -13,17 +14,23 @@ import type {
   WechatDraftDefaults,
   WechatDraftPublishInput,
 } from "../utils/wechatPublish";
+import type {
+  SimpleBlogPublishDefaults,
+  SimpleBlogPublishInput,
+} from "../utils/simpleBlogPublish";
 import type { LongImageSharePayload } from "./share/longImageSharePayload";
 
 interface AppDialogsProps {
   isSettingsOpen: boolean;
   isNewNoteDialogOpen: boolean;
   isPublishTargetDialogOpen: boolean;
+  isSimpleBlogDialogOpen: boolean;
   isWechatDraftDialogOpen: boolean;
   isShareLongImageDialogOpen: boolean;
   isPublishing: boolean;
   settings: AppSettings;
   wechatDraftDefaults: WechatDraftDefaults | null;
+  simpleBlogPublishDefaults: SimpleBlogPublishDefaults | null;
   notification: Notification | null;
   attachmentContext: { files: FileNode[]; rootFolderPath: string | null };
   t: (key: string) => string;
@@ -36,6 +43,8 @@ interface AppDialogsProps {
   onClosePublishTarget: () => void;
   onSelectSimpleBlog: () => void;
   onSelectWechatDraft: () => void;
+  onCloseSimpleBlog: () => void;
+  onSubmitSimpleBlog: (input: SimpleBlogPublishInput) => void;
   onCloseWechatDraft: () => void;
   onSubmitWechatDraft: (input: WechatDraftPublishInput) => void;
   onCloseShareLongImage: () => void;
@@ -48,11 +57,13 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   isSettingsOpen,
   isNewNoteDialogOpen,
   isPublishTargetDialogOpen,
+  isSimpleBlogDialogOpen,
   isWechatDraftDialogOpen,
   isShareLongImageDialogOpen,
   isPublishing,
   settings,
   wechatDraftDefaults,
+  simpleBlogPublishDefaults,
   notification,
   attachmentContext,
   t,
@@ -65,6 +76,8 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onClosePublishTarget,
   onSelectSimpleBlog,
   onSelectWechatDraft,
+  onCloseSimpleBlog,
+  onSubmitSimpleBlog,
   onCloseWechatDraft,
   onSubmitWechatDraft,
   onCloseShareLongImage,
@@ -120,6 +133,16 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         onClose={onClosePublishTarget}
         onSelectSimpleBlog={onSelectSimpleBlog}
         onSelectWechatDraft={onSelectWechatDraft}
+      />
+
+      <SimpleBlogPublishDialog
+        isOpen={isSimpleBlogDialogOpen}
+        isSubmitting={isPublishing}
+        defaults={simpleBlogPublishDefaults}
+        onClose={onCloseSimpleBlog}
+        onSubmit={(input) => {
+          void onSubmitSimpleBlog(input);
+        }}
       />
 
       <WechatDraftDialog

@@ -53,6 +53,15 @@ import {
   extractWechatDraftDefaults,
   type WechatDraftPublishInput,
 } from "./utils/wechatPublish";
+import {
+  extractSimpleBlogPublishDefaults,
+  type SimpleBlogPublishInput,
+} from "./utils/simpleBlogPublish";
+import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
+import {
+  isValidBlogRepoUrl,
+  isValidBlogSiteUrl,
+} from "./utils/blogRepo";
 import { isTauriEnvironment } from "./types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -166,6 +175,7 @@ const App: React.FC = () => {
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
   const [isPublishTargetDialogOpen, setIsPublishTargetDialogOpen] =
     useState(false);
+  const [isSimpleBlogDialogOpen, setIsSimpleBlogDialogOpen] = useState(false);
   const [isWechatDraftDialogOpen, setIsWechatDraftDialogOpen] = useState(false);
   const [isShareLongImageDialogOpen, setIsShareLongImageDialogOpen] =
     useState(false);
@@ -445,8 +455,44 @@ const App: React.FC = () => {
 
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
-    void handlePublishSimpleBlog();
-  }, [handlePublishSimpleBlog]);
+    void (async () => {
+      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      const language = hydratedSettings.language;
+
+      if (!hydratedSettings.blogRepoUrl.trim()) {
+        showNotification(t("notifications_setBlogRepoFirst"), "error");
+        return;
+      }
+      if (!isValidBlogRepoUrl(hydratedSettings.blogRepoUrl)) {
+        showNotification(t("notifications_setValidBlogRepoFirst"), "error");
+        return;
+      }
+      if (!hydratedSettings.blogSiteUrl.trim()) {
+        showNotification(t("notifications_setBlogSiteFirst"), "error");
+        return;
+      }
+      if (!isValidBlogSiteUrl(hydratedSettings.blogSiteUrl)) {
+        showNotification(t("notifications_setValidBlogSiteFirst"), "error");
+        return;
+      }
+      if (!hydratedSettings.blogGithubToken?.trim()) {
+        showNotification(t("notifications_setGithubTokenFirst"), "error");
+        return;
+      }
+
+      setIsSimpleBlogDialogOpen(true);
+    })();
+  }, [showNotification, t]);
+
+  const handleSubmitSimpleBlog = useCallback(
+    async (input: SimpleBlogPublishInput) => {
+      const published = await handlePublishSimpleBlog(input);
+      if (published) {
+        setIsSimpleBlogDialogOpen(false);
+      }
+    },
+    [handlePublishSimpleBlog],
+  );
 
   const handleSelectWechatDraftPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
@@ -469,6 +515,14 @@ const App: React.FC = () => {
     }
 
     return extractWechatDraftDefaults(content, activeFile.path);
+  }, [activeFile, content]);
+
+  const simpleBlogPublishDefaults = useMemo(() => {
+    if (!activeFile || !content) {
+      return null;
+    }
+
+    return extractSimpleBlogPublishDefaults(content, activeFile.path);
   }, [activeFile, content]);
   const notification = useAppStore((state) => state.notification);
   const currentKnowledgeBaseName = useMemo(
@@ -698,11 +752,13 @@ const App: React.FC = () => {
           isSettingsOpen={isSettingsOpen}
           isNewNoteDialogOpen={isNewNoteDialogOpen}
           isPublishTargetDialogOpen={isPublishTargetDialogOpen}
+          isSimpleBlogDialogOpen={isSimpleBlogDialogOpen}
           isWechatDraftDialogOpen={isWechatDraftDialogOpen}
           isShareLongImageDialogOpen={isShareLongImageDialogOpen}
           isPublishing={isPublishing}
           settings={settings}
           wechatDraftDefaults={wechatDraftDefaults}
+          simpleBlogPublishDefaults={simpleBlogPublishDefaults}
           notification={notification}
           attachmentContext={{ files, rootFolderPath }}
           t={t as unknown as (key: string) => string}
@@ -715,6 +771,10 @@ const App: React.FC = () => {
           onClosePublishTarget={() => setIsPublishTargetDialogOpen(false)}
           onSelectSimpleBlog={handleSelectSimpleBlogPublish}
           onSelectWechatDraft={handleSelectWechatDraftPublish}
+          onCloseSimpleBlog={() => setIsSimpleBlogDialogOpen(false)}
+          onSubmitSimpleBlog={(input) => {
+            void handleSubmitSimpleBlog(input);
+          }}
           onCloseWechatDraft={() => setIsWechatDraftDialogOpen(false)}
           onSubmitWechatDraft={(input) => {
             void handleSubmitWechatDraft(input);

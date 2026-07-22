@@ -72,6 +72,15 @@ export default {
   wechatDraftDialog_coverEmpty: "尚未选择封面图",
   wechatDraftDialog_submit: "发布到草稿箱",
 
+  simpleBlogDialog_title: "发布到 Simple Blog",
+  simpleBlogDialog_desc: "发布前确认文章标题、Slug 与别名。博客仓库、令牌和站点域名请在设置中配置。",
+  simpleBlogDialog_titleLabel: "标题",
+  simpleBlogDialog_slugLabel: "Slug",
+  simpleBlogDialog_slugDesc: "决定文章地址；留空时回退到标题。",
+  simpleBlogDialog_aliasesLabel: "别名",
+  simpleBlogDialog_aliasesDesc: "可选。多个别名用英文逗号分隔；留空时与标题相同。",
+  simpleBlogDialog_submit: "发布到博客",
+
   ai_button: "AI 增强",
   ai_buttonLoading: "AI 增强中",
   ai_generateWiki: "AI 生成字段解读 Wiki",
@@ -481,16 +490,6 @@ export default {
     "这里填博客的公开访问地址，用来回写文章的 `link`，例如 `https://your-blog.com` 或 `your-blog.vercel.app`。",
   settings_blogSiteUrlInvalid:
     "请输入公开可访问的网址，例如 `https://your-blog.com` 或 `your-blog.vercel.app`。",
-  settings_publishGuide1:
-    "先基于 simple-blog 搭好并部署，再把部署所用的 GitHub 仓库地址填到这里。",
-  settings_publishGuide2:
-    "如果你是通过 Vercel 部署的，可以到项目后台查看绑定的 Git 仓库，把对应仓库地址复制过来作为发布目标。",
-  settings_publishGuide3:
-    "同时把博客的公开域名也填上。发布成功后，markdown-press 会自动把最终文章链接写回笔记 frontmatter 的 `link` 字段。",
-  settings_publishGuide4:
-    "发布规则是：`title` 默认取当前文件名，`aliases` 默认跟 `title` 一样，`slug` 决定最终文章地址；如果没填 `slug`，就回退到 `title`。",
-  settings_publishGuide5:
-    "`status` 不参与是否发布的判断。发布时会写入 `is_publish: true`，所以 `status` 可以继续只用来管理草稿或审核状态。",
   settings_wechatSectionTitle: "微信公众号草稿箱",
   settings_wechatSectionDesc:
     "把当前笔记发布到微信公众号草稿箱，支持后续更新已有草稿。",

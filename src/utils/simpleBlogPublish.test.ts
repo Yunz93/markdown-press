@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { prepareSimpleBlogPublish } from './simpleBlogPublish';
+import {
+  applySimpleBlogPublishInput,
+  extractSimpleBlogPublishDefaults,
+  prepareSimpleBlogPublish,
+} from './simpleBlogPublish';
 
 describe('prepareSimpleBlogPublish', () => {
   it('writes the selected markdown style preset into published frontmatter', async () => {
@@ -15,5 +19,51 @@ title: Styled Post
     });
 
     expect(prepared.markdownContent).toContain('markdown_style: topaz');
+  });
+});
+
+describe('extractSimpleBlogPublishDefaults', () => {
+  it('prefills article metadata from frontmatter', () => {
+    const defaults = extractSimpleBlogPublishDefaults(
+      `---
+title: Hello World
+slug: hello
+aliases:
+  - hi
+---
+
+body`,
+      '/notes/hello-world.md',
+    );
+
+    expect(defaults).toEqual({
+      title: 'Hello World',
+      slug: 'hello',
+      aliases: 'hi',
+    });
+  });
+});
+
+describe('applySimpleBlogPublishInput', () => {
+  it('writes title slug aliases and clears empty slug', () => {
+    const next = applySimpleBlogPublishInput(
+      `---
+title: Old
+slug: old-slug
+---
+
+body`,
+      {
+        title: 'New Title',
+        slug: '',
+        aliases: 'a, b',
+      },
+    );
+
+    expect(next).toContain('title: New Title');
+    expect(next).toContain('aliases:');
+    expect(next).toContain('- a');
+    expect(next).toContain('- b');
+    expect(next).not.toContain('slug:');
   });
 });

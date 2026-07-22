@@ -22,6 +22,18 @@ export interface SimpleBlogPublishAsset {
   targetRelativePath: string;
 }
 
+export interface SimpleBlogPublishDefaults {
+  title: string;
+  slug: string;
+  aliases: string;
+}
+
+export interface SimpleBlogPublishInput {
+  title: string;
+  slug: string;
+  aliases: string;
+}
+
 export interface PreparedSimpleBlogPublish {
   markdownContent: string;
   postRelativePath: string;
@@ -270,6 +282,58 @@ function resolveSimpleBlogPublishSlug(
     stripExtension(getPathBasename(currentFilePath)) ||
     "published-post"
   );
+}
+
+export function extractSimpleBlogPublishDefaults(
+  markdownContent: string,
+  currentFilePath: string,
+): SimpleBlogPublishDefaults {
+  const title = resolveSimpleBlogTitle(markdownContent, currentFilePath);
+  const aliasesValue = resolveSimpleBlogAliases(
+    markdownContent,
+    currentFilePath,
+  );
+  const aliases = Array.isArray(aliasesValue)
+    ? aliasesValue.join(", ")
+    : aliasesValue;
+
+  return {
+    title,
+    slug: resolveSimpleBlogPublishSlug(markdownContent, currentFilePath),
+    aliases,
+  };
+}
+
+export function applySimpleBlogPublishInput(
+  markdownContent: string,
+  input: Pick<SimpleBlogPublishInput, "title" | "slug" | "aliases">,
+): string {
+  const { frontmatter, body } = parseFrontmatter(markdownContent);
+  const title = input.title.trim();
+  const slug = normalizeSlugCandidate(input.slug);
+  const aliasesRaw = input.aliases.trim();
+  const aliases = aliasesRaw
+    ? aliasesRaw.includes(",")
+      ? aliasesRaw
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : aliasesRaw
+    : title;
+
+  const nextFrontmatter: Frontmatter = {
+    ...(frontmatter || {}),
+    title: title || "published-post",
+    aliases,
+  };
+
+  if (slug) {
+    nextFrontmatter.slug = slug;
+  } else {
+    delete nextFrontmatter.slug;
+  }
+
+  return `${generateFrontmatter(nextFrontmatter)}${body}`;
 }
 
 function ensurePublishedFrontmatter(
