@@ -60,6 +60,3 @@ describe("vectorStore", () => {
     expect(store.size()).toBe(2);
   });
 });
-
-// silence unused FileNode import warning if any
-void (null as unknown as FileNode);
