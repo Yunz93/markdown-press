@@ -367,30 +367,14 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       };
     }, [scroll]);
 
-    // Apply heading attributes after render - use requestIdleCallback for better performance
-    useEffect(() => {
+    // Stamp heading ids before paint so outline / wiki jumps can find targets
+    // on the first click instead of racing requestIdleCallback.
+    useLayoutEffect(() => {
       if (!isMarkdownPreview || !previewRenderActive) return;
       const container = previewRef.current;
       if (!container) return;
 
-      const applyHeadingAttributes = () => {
-        applyPreviewHeadingAttributes(
-          container,
-          flattenedHeadings,
-          activeTabId,
-        );
-      };
-
-      // Use requestIdleCallback for non-critical updates
-      if ("requestIdleCallback" in window) {
-        const id = requestIdleCallback(applyHeadingAttributes, {
-          timeout: 100,
-        });
-        return () => cancelIdleCallback(id);
-      } else {
-        const id = setTimeout(applyHeadingAttributes, 0);
-        return () => clearTimeout(id);
-      }
+      applyPreviewHeadingAttributes(container, flattenedHeadings, activeTabId);
     }, [
       activeTabId,
       flattenedHeadings,

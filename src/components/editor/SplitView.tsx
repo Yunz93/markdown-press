@@ -19,6 +19,7 @@ import { getMarkdownStyleCssVariables } from "../../utils/markdownStyle";
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
 import { getUiFontScale } from "../../utils/uiFontSize";
 import { ErrorBoundary } from "../ErrorBoundary";
+import { isHeadingNavigationLocked } from "../../utils/previewNavigationBridge";
 
 const PANE_TRANSITION_MS = 200;
 const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
@@ -160,6 +161,11 @@ export const SplitView: React.FC<SplitViewProps> = ({
   // (scroll events can fire before child useEffects run).
   const handleEditorScroll = useCallback((percentage: number) => {
     editorScrollPercentageRef.current = percentage;
+    // Outline/wiki heading jumps scroll both panes absolutely; percentage sync
+    // would yank the preview off the target chapter mid-jump.
+    if (isHeadingNavigationLocked()) {
+      return;
+    }
     const mode = useAppStore.getState().viewMode;
     if (mode !== ViewMode.PREVIEW) {
       previewScrollPercentageRef.current = percentage;
@@ -178,6 +184,9 @@ export const SplitView: React.FC<SplitViewProps> = ({
     }
 
     previewScrollPercentageRef.current = percentage;
+    if (isHeadingNavigationLocked()) {
+      return;
+    }
     const mode = useAppStore.getState().viewMode;
     if (mode !== ViewMode.EDITOR) {
       editorScrollPercentageRef.current = percentage;
