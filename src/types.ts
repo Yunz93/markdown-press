@@ -83,6 +83,8 @@ export interface ShortcutConfig {
 export interface MetadataField {
   key: string;
   defaultValue: string;
+  /** Optional human-readable explanation shown in settings. */
+  description: string;
 }
 
 export interface KnowledgeBaseMeta {
