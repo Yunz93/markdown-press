@@ -66,6 +66,10 @@ vi.mock("./PreviewPane", () => ({
 }));
 
 import { SplitView } from "./SplitView";
+import {
+  beginHeadingNavigationLock,
+  endHeadingNavigationLock,
+} from "../../utils/previewNavigationBridge";
 
 function seedSplitViewStore(
   overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
@@ -113,6 +117,7 @@ describe("SplitView scroll handshake", () => {
 
   afterEach(() => {
     cleanup();
+    endHeadingNavigationLock();
     vi.useRealTimers();
     vi.unstubAllGlobals();
     useAppStore.setState({
@@ -334,6 +339,27 @@ describe("SplitView scroll handshake", () => {
     expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.18, {
       immediate: true,
     });
+    expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
+  });
+
+  it("suppresses split percentage sync while outline heading navigation is locked", async () => {
+    renderSplitView();
+
+    await waitFor(() => {
+      expect(editorOnScroll).toBeTypeOf("function");
+      expect(previewOnScroll).toBeTypeOf("function");
+    });
+
+    mockPreviewSyncScrollTo.mockClear();
+    mockEditorSyncScrollTo.mockClear();
+    beginHeadingNavigationLock(1000);
+
+    act(() => {
+      editorOnScroll?.(0.42);
+      previewOnScroll?.(0.55);
+    });
+
+    expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
     expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
   });
 });

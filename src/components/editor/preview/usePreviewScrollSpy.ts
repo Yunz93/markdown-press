@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { useAppStore } from "../../../store/appStore";
+import { isHeadingNavigationLocked } from "../../../utils/previewNavigationBridge";
 
 /**
  * Scroll-spy for the preview pane: keeps `activeHeadingId` in sync with the
@@ -18,6 +19,9 @@ export function usePreviewScrollSpy(
 
     const updateActiveHeading = () => {
       rafId = null;
+      // Keep the outline highlight pinned to the clicked chapter while the
+      // programmatic jump is still settling through intermediate headings.
+      if (isHeadingNavigationLocked()) return;
       const headingElements =
         element.querySelectorAll<HTMLElement>("[data-heading-id]");
       if (headingElements.length === 0) return;

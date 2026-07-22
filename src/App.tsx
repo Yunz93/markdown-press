@@ -33,8 +33,11 @@ import { TabBar } from "./components/tabs/TabBar";
 import { useExportActions } from "./hooks/useExportActions";
 import { usePublishActions } from "./hooks/usePublishActions";
 import { ViewMode } from "./types";
-import { focusEditorRangeByOffset } from "./utils/editorSelectionBridge";
-import { requestPreviewHeadingScroll } from "./utils/previewNavigationBridge";
+import { requestEditorRangeFocus } from "./utils/editorSelectionBridge";
+import {
+  beginHeadingNavigationLock,
+  requestPreviewHeadingScroll,
+} from "./utils/previewNavigationBridge";
 import { getResolvedUiFontFamily } from "./utils/fontSettings";
 import { logEnvironment, assertDevReleaseParity } from "./utils/environment";
 import { useI18n } from "./hooks/useI18n";
@@ -58,10 +61,7 @@ import {
   type SimpleBlogPublishInput,
 } from "./utils/simpleBlogPublish";
 import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
-import {
-  isValidBlogRepoUrl,
-  isValidBlogSiteUrl,
-} from "./utils/blogRepo";
+import { isValidBlogRepoUrl, isValidBlogSiteUrl } from "./utils/blogRepo";
 import { isTauriEnvironment } from "./types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -366,6 +366,8 @@ const App: React.FC = () => {
   const handleHeadingClick = useCallback(
     (id: string, line: number) => {
       setActiveHeadingId(id);
+      // Quiet split-pane percentage sync + scroll-spy while both panes jump.
+      beginHeadingNavigationLock();
 
       const lineIndex = Math.max(0, line - 1);
       const lines = content.split("\n");
@@ -374,15 +376,16 @@ const App: React.FC = () => {
         .reduce((sum, l) => sum + l.length + 1, 0);
 
       if (viewMode !== ViewMode.PREVIEW) {
-        focusEditorRangeByOffset(cursorPos, cursorPos, { alignTopRatio: 0.3 });
+        requestEditorRangeFocus(activeTabId, cursorPos, cursorPos, {
+          alignTopRatio: 0.3,
+        });
       }
 
       if (viewMode !== ViewMode.EDITOR) {
-        const scrollOptions = {
-          alignMode: "center" as const,
-          behavior: "smooth" as const,
-        };
-        requestPreviewHeadingScroll(activeTabId, id, scrollOptions);
+        requestPreviewHeadingScroll(activeTabId, id, {
+          alignMode: "center",
+          behavior: "auto",
+        });
       }
     },
     [activeTabId, content, setActiveHeadingId, viewMode],
