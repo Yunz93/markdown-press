@@ -19,6 +19,7 @@ import {
 import { normalizeMetadataFields } from "../utils/metadataFields";
 import { normalizeTrashFolder } from "../utils/trashFolder";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
+import { normalizeNewNoteLocation } from "../utils/newNoteLocation";
 import { normalizeMarkdownStylePreset } from "../utils/markdownStyle";
 import {
   resolveLocalizedPrompts,
@@ -119,6 +120,10 @@ export const useAppStore = create<AppState>()(
           ),
           trashFolder: normalizeTrashFolder(
             persistedSettings.trashFolder ?? defaultSettings.trashFolder,
+          ),
+          newNoteLocation: normalizeNewNoteLocation(
+            persistedSettings.newNoteLocation ??
+              defaultSettings.newNoteLocation,
           ),
           metadataFields: normalizeMetadataFields(
             persistedSettings.metadataFields,

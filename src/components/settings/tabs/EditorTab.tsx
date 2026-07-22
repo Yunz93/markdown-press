@@ -8,6 +8,7 @@ import {
   getResolvedEditorFontFamily,
   getResolvedPreviewFontFamily,
 } from "../../../utils/fontSettings";
+import { normalizeNewNoteLocation } from "../../../utils/newNoteLocation";
 import { useI18n } from "../../../hooks/useI18n";
 import type { TranslationKey } from "../../../utils/i18n";
 import type { SettingsTabProps } from "../types";
@@ -218,6 +219,46 @@ export const EditorTab: React.FC<EditorTabProps> = ({
               >
                 {t("settings_codeFontPreview")}
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+          {t("settings_notes")}
+        </h3>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-4 border-b border-gray-200/70 pb-4 dark:border-white/10">
+            <div className="min-w-0">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t("settings_newNoteLocation")}
+              </label>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t("settings_newNoteLocationDesc")}
+              </p>
+            </div>
+            <div className="w-[min(16.5rem,52%)] shrink-0">
+              <SettingsSelect
+                aria-label={t("settings_newNoteLocation")}
+                value={normalizeNewNoteLocation(settings.newNoteLocation)}
+                options={[
+                  {
+                    value: "knowledgeBaseRoot",
+                    label: t("settings_newNoteLocationRoot"),
+                  },
+                  {
+                    value: "currentFileFolder",
+                    label: t("settings_newNoteLocationCurrentFolder"),
+                  },
+                ]}
+                onChange={(newNoteLocation) =>
+                  onUpdateSettings({
+                    newNoteLocation:
+                      newNoteLocation as AppSettings["newNoteLocation"],
+                  })
+                }
+              />
             </div>
           </div>
         </div>

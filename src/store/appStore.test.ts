@@ -67,6 +67,10 @@ describe("defaultSettings", () => {
     expect(defaultSettings.deepseekApiBaseUrl).toBe("https://api.deepseek.com");
     expect(defaultSettings.deepseekModel).toBe("deepseek-v4-flash");
   });
+
+  it("defaults new notes to the knowledge base root", () => {
+    expect(defaultSettings.newNoteLocation).toBe("knowledgeBaseRoot");
+  });
 });
 
 describe("persisted AI settings migration", () => {
