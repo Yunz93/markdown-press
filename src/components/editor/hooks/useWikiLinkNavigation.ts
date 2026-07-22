@@ -25,6 +25,7 @@ import {
 import type { FileNode } from "../../../types";
 import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
+import { decodeUserFacingPath } from "../../../utils/pathHelpers";
 
 export interface HeadingScrollOptions {
   alignTopRatio?: number;
@@ -345,7 +346,7 @@ export function useWikiLinkNavigation(
             t(
               useAppStore.getState().settings.language,
               "notifications_referenceNotFound",
-              { target: wikiTarget },
+              { target: decodeUserFacingPath(wikiTarget) },
             ),
             "error",
           );
@@ -387,7 +388,7 @@ export function useWikiLinkNavigation(
             t(
               useAppStore.getState().settings.language,
               "notifications_headingNotFound",
-              { target: wikiTarget },
+              { target: decodeUserFacingPath(wikiTarget) },
             ),
             "error",
           );
@@ -412,7 +413,7 @@ export function useWikiLinkNavigation(
           t(
             useAppStore.getState().settings.language,
             "notifications_linkedFileNotFound",
-            { target: wikiTarget },
+            { target: decodeUserFacingPath(wikiTarget) },
           ),
           "error",
         );

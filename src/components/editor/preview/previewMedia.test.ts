@@ -103,6 +103,14 @@ describe("local preview links", () => {
       "../papers/saycan.pdf",
     );
   });
+
+  it("decodes percent-encoded Chinese filenames from markdown hrefs", () => {
+    expect(
+      getLocalPreviewLinkTarget(
+        "%E5%85%B7%E8%BA%AB%E6%99%BA%E8%83%BD%E5%BC%80%E6%BA%90%E5%B9%B3%E5%8F%B0%E5%AE%8C%E6%95%B4%20PRD.md",
+      ),
+    ).toBe("具身智能开源平台完整 PRD.md");
+  });
 });
 
 describe("hasEmbeddableMediaLinksInHtml", () => {

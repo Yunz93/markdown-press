@@ -1,5 +1,5 @@
-export function getPathSeparator(path: string): '/' | '\\' {
-  return path.includes('\\') ? '\\' : '/';
+export function getPathSeparator(path: string): "/" | "\\" {
+  return path.includes("\\") ? "\\" : "/";
 }
 
 export function joinFsPath(basePath: string, ...segments: string[]): string {
@@ -15,7 +15,7 @@ export function joinFsPath(basePath: string, ...segments: string[]): string {
  * Normalize backslashes to forward slashes and strip trailing slashes.
  */
 export function normalizeSlashes(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
 /**
@@ -25,12 +25,12 @@ export function normalizeSlashes(path: string): string {
 export function sanitizeResourceFolder(folder: string): string {
   const cleaned = folder
     .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/^\.\//, '');
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/^\.\//, "");
 
-  if (cleaned.split('/').some((s) => s === '..')) {
-    throw new Error('Path traversal is not allowed in resource folder name');
+  if (cleaned.split("/").some((s) => s === "..")) {
+    throw new Error("Path traversal is not allowed in resource folder name");
   }
 
   return cleaned;
@@ -47,8 +47,8 @@ export function getPathBasename(path: string): string {
  * Both paths should be forward-slash normalized absolute paths.
  */
 export function getRelativePath(fromFile: string, toFile: string): string {
-  const fromParts = normalizeSlashes(fromFile).split('/').filter(Boolean);
-  const toParts = normalizeSlashes(toFile).split('/').filter(Boolean);
+  const fromParts = normalizeSlashes(fromFile).split("/").filter(Boolean);
+  const toParts = normalizeSlashes(toFile).split("/").filter(Boolean);
 
   // Drop filename from source to get its directory
   fromParts.pop();
@@ -65,14 +65,11 @@ export function getRelativePath(fromFile: string, toFile: string): string {
   const upSegments = fromParts.length - commonLength;
   const downSegments = toParts.slice(commonLength);
 
-  if (upSegments === 0 && downSegments.length === 0) return '.';
+  if (upSegments === 0 && downSegments.length === 0) return ".";
 
-  const parts = [
-    ...Array<string>(upSegments).fill('..'),
-    ...downSegments,
-  ];
+  const parts = [...Array<string>(upSegments).fill(".."), ...downSegments];
 
-  return parts.join('/');
+  return parts.join("/");
 }
 
 /**
@@ -80,7 +77,26 @@ export function getRelativePath(fromFile: string, toFile: string): string {
  */
 export function getPathDirname(path: string): string {
   const normalized = normalizeSlashes(path);
-  const idx = normalized.lastIndexOf('/');
-  if (idx <= 0) return '/';
+  const idx = normalized.lastIndexOf("/");
+  if (idx <= 0) return "/";
   return normalized.slice(0, idx);
+}
+
+/**
+ * Decode percent-encoded path segments for user-facing text (toasts, labels).
+ * Markdown often stores Chinese filenames as `%E5%85%B7…`; leave already-decoded
+ * Unicode and remote URLs untouched.
+ */
+export function decodeUserFacingPath(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/^[a-z][a-z\d+\-.]*:/i.test(trimmed) || trimmed.startsWith("//")) {
+    return trimmed;
+  }
+
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
 }

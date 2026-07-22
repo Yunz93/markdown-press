@@ -67,6 +67,7 @@ import { applyPreviewHeadingAttributes } from "../../utils/previewHeadingAttribu
 import { parseFrontmatter } from "../../utils/frontmatter";
 import { openExternalUrl } from "../../utils/externalLinks";
 import { isWindowsPlatform } from "../../utils/platform";
+import { decodeUserFacingPath } from "../../utils/pathHelpers";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
 import {
@@ -775,7 +776,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           );
           if (!resolvedAttachment) {
             showNotification(
-              t("notifications_linkedFileNotFound", { target: href }),
+              t("notifications_linkedFileNotFound", { target: localTarget }),
               "error",
             );
             return;
@@ -842,7 +843,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           );
           if (!resolvedAttachment) {
             showNotification(
-              t("notifications_linkedFileNotFound", { target: embedTarget }),
+              t("notifications_linkedFileNotFound", {
+                target: decodeUserFacingPath(embedTarget),
+              }),
               "error",
             );
             return;
