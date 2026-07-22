@@ -4,6 +4,7 @@ export const SENSITIVE_SETTING_KEYS = [
   "geminiApiKey",
   "codexApiKey",
   "deepseekApiKey",
+  "embeddingApiKey",
   "imageHostingGithubToken",
   "imageHostingS3SecretAccessKey",
   "imageHostingOssAccessKeySecret",

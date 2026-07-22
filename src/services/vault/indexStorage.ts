@@ -124,3 +124,5 @@ export async function clearIndexStorage(vaultRoot: string): Promise<void> {
 }
 
 export const LINK_INDEX_FILE = "link-index.json";
+export const CHUNK_INDEX_FILE = "chunk-index.json";
+export const VECTOR_INDEX_FILE = "vector-index.json";

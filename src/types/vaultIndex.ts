@@ -41,3 +41,41 @@ export interface BacklinkGroup {
   sourcePath: string;
   links: WikiOutboundLink[];
 }
+
+export type SearchMode = "keyword" | "semantic" | "hybrid";
+export type EmbeddingProviderId = "none" | "openai-compatible";
+
+export interface TextChunk {
+  id: string;
+  path: string;
+  relPath: string;
+  titlePath: string[];
+  headingAnchor: string | null;
+  startLine: number;
+  endLine: number;
+  text: string;
+  contentHash: string;
+}
+
+export interface ChunkIndexSnapshot {
+  version: 1;
+  vaultRoot: string;
+  builtAt: number;
+  /** path -> chunks */
+  byPath: Record<string, TextChunk[]>;
+}
+
+export interface RetrieveHit {
+  chunk: TextChunk;
+  score: number;
+  source: "keyword" | "vector" | "hybrid";
+}
+
+export interface RetrieveOptions {
+  mode: SearchMode;
+  scope?: "vault" | "folder" | "files";
+  folderPath?: string | null;
+  filePaths?: string[];
+  topK?: number;
+  excludePaths?: string[];
+}

@@ -183,6 +183,12 @@ export const defaultSettings: AppSettings = {
   wikiPromptTemplate: "",
   wikiPromptTemplateZh: DEFAULT_WIKI_PROMPT_TEMPLATE,
   wikiPromptTemplateEn: DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
+  searchModeDefault: "keyword",
+  embeddingProvider: "none",
+  embeddingApiBaseUrl: "http://127.0.0.1:11434/v1",
+  embeddingApiKey: "",
+  embeddingModel: "nomic-embed-text",
+  privacyMode: false,
   imageHosting: defaultImageHostingConfig,
   shortcuts: {
     save: `${primaryShortcutModifier}+S`,

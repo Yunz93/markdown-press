@@ -102,7 +102,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <AITab settings={settings} onUpdateSettings={onUpdateSettings} />
         );
       case "index":
-        return <IndexTab />;
+        return (
+          <IndexTab settings={settings} onUpdateSettings={onUpdateSettings} />
+        );
       case "metadata":
         return (
           <MetadataTab

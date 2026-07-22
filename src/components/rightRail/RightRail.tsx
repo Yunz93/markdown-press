@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from "react";
 import type { HeadingNode } from "../../utils/outline";
 import { OutlinePanel } from "../outline/OutlinePanel";
 import { LinksPanel } from "../backlinks/LinksPanel";
+import { RelatedNotesPanel } from "../related/RelatedNotesPanel";
 import { useAppStore } from "../../store/appStore";
 import { useI18n } from "../../hooks/useI18n";
 
@@ -92,6 +93,15 @@ export const RightRail: React.FC<RightRailProps> = ({
               <span className="right-rail-tab-dot" aria-hidden />
             ) : null}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={rightRailTab === "related"}
+            className={`right-rail-tab ${rightRailTab === "related" ? "active" : ""}`}
+            onClick={() => setRightRailTab("related")}
+          >
+            {t("related_tab")}
+          </button>
         </div>
         <button
           className="collapse-btn"
@@ -124,11 +134,13 @@ export const RightRail: React.FC<RightRailProps> = ({
               onWidthChange={onWidthChange}
               embedded
             />
-          ) : (
+          ) : rightRailTab === "links" ? (
             <LinksPanel
               onOpenPath={onOpenPath}
               onCreateMissingNote={onCreateMissingNote}
             />
+          ) : (
+            <RelatedNotesPanel onOpenPath={onOpenPath} />
           )}
         </div>
       )}

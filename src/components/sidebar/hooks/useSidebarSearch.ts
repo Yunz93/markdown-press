@@ -1,13 +1,17 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { FileNode } from '../../../types';
-import { useAppStore } from '../../../store/appStore';
-import { isTrashRootName, sanitizeTrashFolder } from '../../../utils/trashFolder';
-import { requestEditorRangeFocus } from '../../../utils/editorSelectionBridge';
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import type { FileNode, SearchMode } from "../../../types";
+import { useAppStore } from "../../../store/appStore";
+import {
+  isTrashRootName,
+  sanitizeTrashFolder,
+} from "../../../utils/trashFolder";
+import { requestEditorRangeFocus } from "../../../utils/editorSelectionBridge";
+import { retrieve } from "../../../services/vault/retrieveService";
+import { createEmbeddingProvider } from "../../../services/vault/embeddingProvider";
+import { getActiveVectorStore } from "../../../services/vault/semanticIndexRuntime";
 
-const isMarkdownFile = (fileName: string): boolean => /\.(md|markdown)$/i.test(fileName);
-
-const isTrashRootNode = (node: FileNode): boolean =>
-  node.type === 'folder' && isTrashRootName(node.name, sanitizeTrashFolder(useAppStore.getState().settings.trashFolder));
+const isMarkdownFile = (fileName: string): boolean =>
+  /\.(md|markdown)$/i.test(fileName);
 
 export interface SidebarSearchSnippet {
   line: number;
@@ -35,23 +39,31 @@ export interface UseSidebarSearchOptions {
 export interface UseSidebarSearchReturn {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  searchMode: SearchMode;
+  setSearchMode: (mode: SearchMode) => void;
   searchResults: SidebarSearchResult[];
   isSearching: boolean;
   filteredFiles: FileNode[];
   hasSearchQuery: boolean;
   hasVisibleFiles: boolean;
-  handleSearchResultSelect: (file: FileNode, snippet?: SidebarSearchSnippet) => Promise<void>;
+  handleSearchResultSelect: (
+    file: FileNode,
+    snippet?: SidebarSearchSnippet,
+  ) => Promise<void>;
 }
 
 const normalizeSearchTarget = (text: string): string => {
   return text
     .toLowerCase()
-    .replace(/[\u3000-\u303F\uFF00-\uFFEF]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[\u3000-\u303F\uFF00-\uFFEF]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 };
 
-const collectParagraphMatches = (content: string, query: string): SidebarSearchSnippet[] => {
+const collectParagraphMatches = (
+  content: string,
+  query: string,
+): SidebarSearchSnippet[] => {
   const normalizedQuery = normalizeSearchTarget(query);
   const lowerContent = content.toLowerCase();
   const snippets: SidebarSearchSnippet[] = [];
@@ -66,14 +78,14 @@ const collectParagraphMatches = (content: string, query: string): SidebarSearchS
 
   for (const matchPos of positions) {
     let start = matchPos;
-    while (start > 0 && content[start - 1] !== '\n') start--;
+    while (start > 0 && content[start - 1] !== "\n") start--;
     while (start < content.length && /\s/.test(content[start])) start++;
 
     let end = matchPos + normalizedQuery.length;
-    while (end < content.length && content[end] !== '\n') end++;
+    while (end < content.length && content[end] !== "\n") end++;
     while (end > start && /\s/.test(content[end - 1])) end--;
 
-    const line = content.slice(0, start).split('\n').length;
+    const line = content.slice(0, start).split("\n").length;
     const key = `${start}-${end}`;
 
     if (!seenRanges.has(key)) {
@@ -95,42 +107,53 @@ export function useSidebarSearch(
   deps: {
     onFileSelect: (file: FileNode) => Promise<void> | void;
     onClose: () => void;
-  }
+  },
 ): UseSidebarSearchReturn {
   const { files, fileContents, readFile: readFileFn } = options;
   const { onFileSelect, onClose } = deps;
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const defaultMode = useAppStore(
+    (s) => s.settings.searchModeDefault ?? "keyword",
+  );
+  const settings = useAppStore((s) => s.settings);
+  const chunkIndex = useAppStore((s) => s.chunkIndex);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<SearchMode>(defaultMode);
   const [searchResults, setSearchResults] = useState<SidebarSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const contentCacheRef = useRef<Map<string, string | undefined>>(new Map());
   const trashFolder = useAppStore((state) => state.settings.trashFolder);
 
+  useEffect(() => {
+    setSearchMode(defaultMode);
+  }, [defaultMode]);
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredFiles = useMemo(() => {
-    // Sort files: folders first, then by name (case-insensitive, locale-aware)
     const sortNodes = (nodes: FileNode[]): FileNode[] => {
       return [...nodes].sort((a, b) => {
-        // Folders come before files
         if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
+          return a.type === "folder" ? -1 : 1;
         }
-        // Sort by name (case-insensitive)
-        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
       });
     };
 
     const normalizedTrashFolder = sanitizeTrashFolder(trashFolder);
-    const visibleFiles = files.filter((node) => !node.isTrash && !isTrashRootName(node.name, normalizedTrashFolder));
+    const visibleFiles = files.filter(
+      (node) =>
+        !node.isTrash && !isTrashRootName(node.name, normalizedTrashFolder),
+    );
 
     if (!normalizedQuery) {
       return sortNodes(visibleFiles);
     }
 
-    const filtered = visibleFiles.filter((file) =>
-      file.name.toLowerCase().includes(normalizedQuery) ||
-      normalizeSearchTarget(file.name).includes(normalizedQuery)
+    const filtered = visibleFiles.filter(
+      (file) =>
+        file.name.toLowerCase().includes(normalizedQuery) ||
+        normalizeSearchTarget(file.name).includes(normalizedQuery),
     );
     return sortNodes(filtered);
   }, [files, normalizedQuery, trashFolder]);
@@ -142,9 +165,9 @@ export function useSidebarSearch(
     const result: FileNode[] = [];
     const walk = (nodes: FileNode[]) => {
       for (const node of nodes) {
-        if (node.type === 'folder' && node.children) {
+        if (node.type === "folder" && node.children) {
           walk(node.children);
-        } else if (node.type === 'file' && isMarkdownFile(node.name)) {
+        } else if (node.type === "file" && isMarkdownFile(node.name)) {
           result.push(node);
         }
       }
@@ -152,6 +175,15 @@ export function useSidebarSearch(
     walk(files);
     return result;
   }, [files]);
+
+  const filesByPath = useMemo(() => {
+    const map = new Map<string, FileNode>();
+    for (const file of searchableFiles) {
+      map.set(file.path.replace(/\\/g, "/"), file);
+      map.set(file.id, file);
+    }
+    return map;
+  }, [searchableFiles]);
 
   useEffect(() => {
     Object.entries(fileContents).forEach(([fileId, content]) => {
@@ -181,6 +213,74 @@ export function useSidebarSearch(
     const timer = window.setTimeout(() => {
       void (async () => {
         setIsSearching(true);
+
+        if (searchMode !== "keyword" && chunkIndex) {
+          try {
+            const hits = await retrieve({
+              query: searchQuery.trim(),
+              chunkIndex,
+              vectorStore: getActiveVectorStore(),
+              embeddingProvider: createEmbeddingProvider(settings),
+              retrieve: { mode: searchMode, topK: 30 },
+            });
+            if (cancelled) return;
+
+            const byPath = new Map<string, SidebarSearchResult>();
+            for (const hit of hits) {
+              const file =
+                filesByPath.get(hit.chunk.path.replace(/\\/g, "/")) ||
+                filesByPath.get(hit.chunk.path);
+              if (!file) continue;
+              const existing = byPath.get(file.path);
+              const snippet: SidebarSearchSnippet = {
+                line: hit.chunk.startLine,
+                start: 0,
+                end: 0,
+                text: hit.chunk.text.slice(0, 160),
+              };
+              if (!existing) {
+                byPath.set(file.path, {
+                  file,
+                  filenameMatched: false,
+                  snippets: [snippet],
+                });
+              } else if (existing.snippets.length < 3) {
+                existing.snippets.push(snippet);
+              }
+            }
+
+            for (const file of searchableFiles) {
+              const filenameMatched =
+                normalizeSearchTarget(file.name).includes(normalizedQuery) ||
+                file.name.toLowerCase().includes(normalizedQuery);
+              if (!filenameMatched) continue;
+              if (!byPath.has(file.path)) {
+                byPath.set(file.path, {
+                  file,
+                  filenameMatched: true,
+                  snippets: [],
+                });
+              } else {
+                byPath.get(file.path)!.filenameMatched = true;
+              }
+            }
+
+            const nextResults = [...byPath.values()].sort((left, right) => {
+              if (left.filenameMatched !== right.filenameMatched) {
+                return left.filenameMatched ? -1 : 1;
+              }
+              return left.file.name.localeCompare(
+                right.file.name,
+                "zh-Hans-CN",
+              );
+            });
+            setSearchResults(nextResults);
+            setIsSearching(false);
+            return;
+          } catch {
+            // Fall through to keyword search.
+          }
+        }
 
         const nextResults: SidebarSearchResult[] = [];
         for (const file of searchableFiles) {
@@ -219,7 +319,7 @@ export function useSidebarSearch(
           if (left.snippets.length !== right.snippets.length) {
             return right.snippets.length - left.snippets.length;
           }
-          return left.file.name.localeCompare(right.file.name, 'zh-Hans-CN');
+          return left.file.name.localeCompare(right.file.name, "zh-Hans-CN");
         });
 
         if (!cancelled) {
@@ -233,25 +333,35 @@ export function useSidebarSearch(
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [readFileFn, normalizedQuery, searchableFiles]);
+  }, [
+    readFileFn,
+    normalizedQuery,
+    searchableFiles,
+    searchMode,
+    chunkIndex,
+    settings,
+    searchQuery,
+    filesByPath,
+  ]);
 
   const handleSearchResultSelect = useCallback(
     async (file: FileNode, snippet?: SidebarSearchSnippet) => {
       await onFileSelect(file);
-      if (snippet) {
-        // Queue focus so it lands after CodeMirror mounts / switches tabs.
+      if (snippet && snippet.end > snippet.start) {
         requestEditorRangeFocus(file.id, snippet.start, snippet.end, {
           alignTopRatio: 0.3,
         });
       }
       if (window.innerWidth < 768) onClose();
     },
-    [onFileSelect, onClose]
+    [onFileSelect, onClose],
   );
 
   return {
     searchQuery,
     setSearchQuery,
+    searchMode,
+    setSearchMode,
     searchResults,
     isSearching,
     filteredFiles,

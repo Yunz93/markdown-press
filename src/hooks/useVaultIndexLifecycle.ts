@@ -8,9 +8,14 @@ import {
   removeFilesFromIndex,
   updateFilesInIndex,
 } from "../services/vault/linkIndexService";
-import type { LinkIndexSnapshot } from "../types/vaultIndex";
+import type {
+  ChunkIndexSnapshot,
+  LinkIndexSnapshot,
+} from "../types/vaultIndex";
 import {
+  CHUNK_INDEX_FILE,
   LINK_INDEX_FILE,
+  VECTOR_INDEX_FILE,
   readIndexJson,
   writeIndexJson,
 } from "../services/vault/indexStorage";
@@ -19,12 +24,25 @@ import {
   setVaultRebuildHandler,
 } from "../services/vault/linkIndexEvents";
 import { buildFileTreeSignature } from "../utils/fileTree";
+import {
+  buildFullChunkIndex,
+  removeChunkPaths,
+  upsertChunkPaths,
+} from "../services/vault/chunkIndexService";
+import {
+  clearSemanticRuntime,
+  ensureActiveVectorStore,
+  getActiveChunkIndex,
+  setActiveChunkIndex,
+} from "../services/vault/semanticIndexRuntime";
+import { embedChunkIndex } from "../services/vault/semanticEmbedService";
+import type { VectorStoreSnapshot } from "../services/vault/vectorStore";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
 }
 
-function isValidSnapshot(
+function isValidLinkSnapshot(
   value: LinkIndexSnapshot | null,
   vaultRoot: string,
 ): value is LinkIndexSnapshot {
@@ -37,8 +55,21 @@ function isValidSnapshot(
   );
 }
 
+function isValidChunkSnapshot(
+  value: ChunkIndexSnapshot | null,
+  vaultRoot: string,
+): value is ChunkIndexSnapshot {
+  return (
+    !!value &&
+    value.version === 1 &&
+    normalizePath(value.vaultRoot) === normalizePath(vaultRoot) &&
+    typeof value.byPath === "object" &&
+    value.byPath !== null
+  );
+}
+
 /**
- * Keeps the vault wiki link index in sync with open/save/tree changes.
+ * Keeps vault link + chunk (+ optional embedding) indexes in sync.
  */
 export function useVaultIndexLifecycle(): {
   rebuildLinkIndex: () => Promise<void>;
@@ -46,19 +77,68 @@ export function useVaultIndexLifecycle(): {
 } {
   const rootFolderPath = useAppStore((s) => s.rootFolderPath);
   const files = useAppStore((s) => s.files);
+  const embeddingProvider = useAppStore(
+    (s) => s.settings.embeddingProvider ?? "none",
+  );
   const generationRef = useRef(0);
   const buildingRef = useRef(false);
   const prevPathsRef = useRef<string>("");
 
-  const persistSnapshot = useCallback(async (snapshot: LinkIndexSnapshot) => {
-    await writeIndexJson(snapshot.vaultRoot, LINK_INDEX_FILE, snapshot);
+  const syncSemanticStatus = useCallback((vectorCount: number) => {
+    useAppStore.getState().setSemanticStatus(vectorCount > 0, vectorCount);
   }, []);
+
+  const refreshSemanticForChunkIndex = useCallback(
+    async (
+      chunkIndex: ChunkIndexSnapshot,
+      options?: { previousByPath?: ChunkIndexSnapshot["byPath"] },
+    ) => {
+      const state = useAppStore.getState();
+      const vaultRoot = chunkIndex.vaultRoot;
+      state.setChunkIndex(chunkIndex);
+      setActiveChunkIndex(chunkIndex);
+      await writeIndexJson(vaultRoot, CHUNK_INDEX_FILE, chunkIndex);
+
+      const provider = state.settings.embeddingProvider ?? "none";
+      const store = ensureActiveVectorStore(vaultRoot);
+      if (provider === "none") {
+        store.load(null);
+        syncSemanticStatus(0);
+        return;
+      }
+
+      try {
+        await embedChunkIndex({
+          chunkIndex,
+          vectorStore: store,
+          settings: state.settings,
+          previousByPath: options?.previousByPath,
+          shouldCancel: () => false,
+        });
+        if (store.size() > 0) {
+          await writeIndexJson(
+            vaultRoot,
+            VECTOR_INDEX_FILE,
+            store.toSnapshot(),
+          );
+        }
+        syncSemanticStatus(store.size());
+      } catch (error) {
+        console.warn("Failed to embed chunk index:", error);
+        syncSemanticStatus(store.size());
+      }
+    },
+    [syncSemanticStatus],
+  );
 
   const rebuildLinkIndex = useCallback(async () => {
     const state = useAppStore.getState();
     const vaultRoot = state.rootFolderPath;
     if (!vaultRoot) {
       state.setLinkIndex(null);
+      state.setChunkIndex(null);
+      state.setSemanticStatus(false, 0);
+      clearSemanticRuntime();
       return;
     }
 
@@ -74,6 +154,7 @@ export function useVaultIndexLifecycle(): {
 
     try {
       const fs = await getFileSystem();
+      const previousChunks = getActiveChunkIndex()?.byPath;
       const snapshot = await buildFullLinkIndex({
         files: state.files,
         vaultRoot,
@@ -92,9 +173,20 @@ export function useVaultIndexLifecycle(): {
       });
 
       if (generation !== generationRef.current) return;
-
       state.setLinkIndex(snapshot);
-      await persistSnapshot(snapshot);
+      await writeIndexJson(snapshot.vaultRoot, LINK_INDEX_FILE, snapshot);
+
+      const chunkIndex = await buildFullChunkIndex({
+        files: state.files,
+        vaultRoot,
+        readFile: (path) => fs.readFile(path),
+        shouldCancel: () => generation !== generationRef.current,
+      });
+      if (generation !== generationRef.current) return;
+      await refreshSemanticForChunkIndex(chunkIndex, {
+        previousByPath: previousChunks,
+      });
+
       prevPathsRef.current = buildFileTreeSignature(state.files);
     } catch (error) {
       if (generation !== generationRef.current) return;
@@ -107,13 +199,16 @@ export function useVaultIndexLifecycle(): {
         buildingRef.current = false;
       }
     }
-  }, [persistSnapshot]);
+  }, [refreshSemanticForChunkIndex]);
 
   const ensureIndex = useCallback(async () => {
     const state = useAppStore.getState();
     const vaultRoot = state.rootFolderPath;
     if (!vaultRoot) {
       state.setLinkIndex(null);
+      state.setChunkIndex(null);
+      state.setSemanticStatus(false, 0);
+      clearSemanticRuntime();
       return;
     }
 
@@ -121,7 +216,16 @@ export function useVaultIndexLifecycle(): {
       vaultRoot,
       LINK_INDEX_FILE,
     );
-    if (isValidSnapshot(cached, vaultRoot)) {
+    const cachedChunks = await readIndexJson<ChunkIndexSnapshot>(
+      vaultRoot,
+      CHUNK_INDEX_FILE,
+    );
+    const cachedVectors = await readIndexJson<VectorStoreSnapshot>(
+      vaultRoot,
+      VECTOR_INDEX_FILE,
+    );
+
+    if (isValidLinkSnapshot(cached, vaultRoot)) {
       const { toAdd, toRemove } = reconcileTreeWithIndex({
         snapshot: cached,
         files: state.files,
@@ -129,12 +233,29 @@ export function useVaultIndexLifecycle(): {
       if (toAdd.length === 0 && toRemove.length === 0) {
         state.setLinkIndex(cached);
         prevPathsRef.current = buildFileTreeSignature(state.files);
+
+        if (isValidChunkSnapshot(cachedChunks, vaultRoot)) {
+          state.setChunkIndex(cachedChunks);
+          setActiveChunkIndex(cachedChunks);
+          const store = ensureActiveVectorStore(vaultRoot);
+          store.load(cachedVectors);
+          syncSemanticStatus(store.size());
+          return;
+        }
+
+        const fs = await getFileSystem();
+        const chunkIndex = await buildFullChunkIndex({
+          files: state.files,
+          vaultRoot,
+          readFile: (path) => fs.readFile(path),
+        });
+        await refreshSemanticForChunkIndex(chunkIndex);
         return;
       }
     }
 
     await rebuildLinkIndex();
-  }, [rebuildLinkIndex]);
+  }, [rebuildLinkIndex, refreshSemanticForChunkIndex, syncSemanticStatus]);
 
   const invalidateFile = useCallback(
     async (path: string, content?: string) => {
@@ -145,25 +266,38 @@ export function useVaultIndexLifecycle(): {
 
       try {
         const fs = await getFileSystem();
+        const fileContent =
+          content ?? state.fileContents[path] ?? (await fs.readFile(path));
         const next = await reindexFileContents({
           snapshot,
-          pathContents: {
-            [path]:
-              content ?? state.fileContents[path] ?? (await fs.readFile(path)),
-          },
+          pathContents: { [path]: fileContent },
           files: state.files,
           vaultRoot,
         });
         state.setLinkIndex(next);
-        void persistSnapshot(next);
+        void writeIndexJson(vaultRoot, LINK_INDEX_FILE, next);
+
+        const previousChunks = state.chunkIndex;
+        const baseChunks =
+          previousChunks ??
+          createEmptyChunkFallback(vaultRoot, state.chunkIndex);
+        const nextChunks = await upsertChunkPaths({
+          snapshot: baseChunks,
+          paths: [path],
+          vaultRoot,
+          readFile: async () => fileContent,
+          contentsByPath: { [path]: fileContent },
+        });
+        await refreshSemanticForChunkIndex(nextChunks, {
+          previousByPath: previousChunks?.byPath,
+        });
       } catch (error) {
         console.warn("Failed to update link index for file:", path, error);
       }
     },
-    [persistSnapshot],
+    [refreshSemanticForChunkIndex],
   );
 
-  // Register save-path invalidation for autosave / manual save.
   useEffect(() => {
     setVaultFileSavedHandler((path, content) => {
       void invalidateFile(path, content);
@@ -176,18 +310,33 @@ export function useVaultIndexLifecycle(): {
     return () => setVaultRebuildHandler(null);
   }, [rebuildLinkIndex]);
 
-  // Open / switch vault → ensure index
   useEffect(() => {
     generationRef.current += 1;
     if (!rootFolderPath) {
-      useAppStore.getState().setLinkIndex(null);
+      const state = useAppStore.getState();
+      state.setLinkIndex(null);
+      state.setChunkIndex(null);
+      state.setSemanticStatus(false, 0);
+      clearSemanticRuntime();
       prevPathsRef.current = "";
       return;
     }
     void ensureIndex();
   }, [rootFolderPath, ensureIndex]);
 
-  // Tree shape changes (watch / refresh) → reconcile
+  // Re-embed when provider toggles after an index already exists.
+  const prevEmbeddingProviderRef = useRef(embeddingProvider);
+  useEffect(() => {
+    if (prevEmbeddingProviderRef.current === embeddingProvider) return;
+    prevEmbeddingProviderRef.current = embeddingProvider;
+    const state = useAppStore.getState();
+    const chunkIndex = state.chunkIndex;
+    if (!state.rootFolderPath || !chunkIndex) return;
+    void refreshSemanticForChunkIndex(chunkIndex, {
+      previousByPath: chunkIndex.byPath,
+    });
+  }, [embeddingProvider, refreshSemanticForChunkIndex]);
+
   useEffect(() => {
     if (!rootFolderPath) return;
     const signature = buildFileTreeSignature(files);
@@ -235,14 +384,46 @@ export function useVaultIndexLifecycle(): {
         }
 
         useAppStore.getState().setLinkIndex(next);
-        void persistSnapshot(next);
+        void writeIndexJson(rootFolderPath, LINK_INDEX_FILE, next);
+
+        let chunkIndex =
+          state.chunkIndex ??
+          createEmptyChunkFallback(rootFolderPath, state.chunkIndex);
+        const previousByPath = chunkIndex.byPath;
+        if (toRemove.length > 0) {
+          chunkIndex = removeChunkPaths(chunkIndex, toRemove);
+        }
+        if (toAdd.length > 0) {
+          const fs = await getFileSystem();
+          chunkIndex = await upsertChunkPaths({
+            snapshot: chunkIndex,
+            paths: toAdd,
+            vaultRoot: rootFolderPath,
+            readFile: (path) => fs.readFile(path),
+          });
+        }
+        await refreshSemanticForChunkIndex(chunkIndex, { previousByPath });
       } catch (error) {
         console.warn("Failed to reconcile link index:", error);
       }
     };
 
     void run();
-  }, [files, rootFolderPath, persistSnapshot]);
+  }, [files, rootFolderPath, refreshSemanticForChunkIndex]);
 
   return { rebuildLinkIndex, invalidateFile };
+}
+
+function createEmptyChunkFallback(
+  vaultRoot: string,
+  existing: ChunkIndexSnapshot | null,
+): ChunkIndexSnapshot {
+  return (
+    existing ?? {
+      version: 1,
+      vaultRoot: vaultRoot.replace(/\\/g, "/"),
+      builtAt: Date.now(),
+      byPath: {},
+    }
+  );
 }

@@ -170,6 +170,9 @@ export const useAppStore = create<AppState>()(
           // Never hydrate bulky/runtime link index from settings persist blob.
           linkIndex: currentState.linkIndex,
           linkIndexProgress: currentState.linkIndexProgress,
+          chunkIndex: currentState.chunkIndex,
+          semanticReady: currentState.semanticReady,
+          semanticVectorCount: currentState.semanticVectorCount,
         };
       },
     },
