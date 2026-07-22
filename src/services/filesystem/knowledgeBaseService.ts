@@ -11,6 +11,11 @@ interface OpenKnowledgeBaseOptions {
   path?: string;
   silentSuccess?: boolean;
   skipSampleNotes?: boolean;
+  /**
+   * When true, restore `lastOpenedFilePath` if it still exists in the tree.
+   * Interactive folder opens should leave this false so no tab opens until the user picks a file.
+   */
+  restoreLastOpenedFile?: boolean;
 }
 
 interface OpenKnowledgeBaseParams {
@@ -20,7 +25,6 @@ interface OpenKnowledgeBaseParams {
     fileNodes: FileNode[],
     filePath: string,
   ) => FileNode | undefined;
-  findInitialOpenableFile: (fileNodes: FileNode[]) => FileNode | null;
   fs: {
     copySampleNotes?: (targetDir: string) => Promise<boolean>;
     fileExists?: (path: string) => Promise<boolean>;
@@ -31,6 +35,7 @@ interface OpenKnowledgeBaseParams {
   hasOpenedKnowledgeBaseBefore: (path: string) => boolean;
   handleInitialFileError: (error: unknown) => void;
   initializeSampleNotes: (targetDir: string) => Promise<boolean>;
+  /** Only restored when the path still exists in the opened tree. Never falls back to "first file". */
   lastOpenedFilePath: string | null;
   options?: OpenKnowledgeBaseOptions;
   registerAllowedPath: (path: string, recursive: boolean) => Promise<void>;
@@ -73,7 +78,6 @@ export async function openKnowledgeBaseWorkspace(
     addTab,
     clearAllCache,
     findPreferredFile,
-    findInitialOpenableFile,
     fs,
     hasOpenedKnowledgeBaseBefore,
     handleInitialFileError,
@@ -143,11 +147,14 @@ export async function openKnowledgeBaseWorkspace(
   setFiles(fileNodes);
   setRootFolderPath(dirPath);
 
-  const preferredInitialFile = lastOpenedFilePath
-    ? findPreferredFile(fileNodes, lastOpenedFilePath)
-    : undefined;
+  // Only restore the previously opened file on explicit restore (e.g. cold start).
+  // Interactive "open folder" must not auto-open the first note or a leftover
+  // lastOpenedFilePath — that produced surprise tabs like "未命名".
+  const shouldRestoreLastOpenedFile = Boolean(options?.restoreLastOpenedFile);
   const initialFile =
-    preferredInitialFile ?? findInitialOpenableFile(fileNodes);
+    shouldRestoreLastOpenedFile && lastOpenedFilePath
+      ? (findPreferredFile(fileNodes, lastOpenedFilePath) ?? null)
+      : null;
 
   let openedPreviewOnly = false;
   if (initialFile) {

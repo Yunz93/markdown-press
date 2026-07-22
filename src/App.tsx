@@ -518,6 +518,7 @@ const App: React.FC = () => {
         silentSuccess: true,
         skipSampleNotes: true,
         suppressErrors: true,
+        restoreLastOpenedFile: true,
       });
 
       if (cancelled) return;

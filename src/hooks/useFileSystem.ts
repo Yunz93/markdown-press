@@ -40,19 +40,9 @@ import {
   writeBinaryFileContent,
   writeFileContent,
 } from "../services/filesystem/ioService";
-import { findFileInTree, findFirstMatchingFile } from "../utils/fileTree";
-import { isMarkdownFile, isOpenableFile } from "../utils/fileTypes";
+import { findFileInTree } from "../utils/fileTree";
 
 const TRASH_ROOT_MARKER = "__root__";
-
-function findFirstOpenableFile(nodes: FileNode[]): FileNode | null {
-  return (
-    findFirstMatchingFile(
-      nodes,
-      (node) => node.type === "file" && isMarkdownFile(node.name),
-    ) ?? findFirstMatchingFile(nodes, isOpenableFile)
-  );
-}
 
 function hasOpenedKnowledgeBaseBefore(path: string): boolean {
   const normalizedPath = normalizeSlashes(path);
@@ -401,6 +391,7 @@ export function useFileSystem() {
         silentSuccess?: boolean;
         skipSampleNotes?: boolean;
         suppressErrors?: boolean;
+        restoreLastOpenedFile?: boolean;
       },
     ): Promise<string | null> => {
       try {
@@ -409,7 +400,6 @@ export function useFileSystem() {
           addTab,
           clearAllCache,
           findPreferredFile: findFileInTree,
-          findInitialOpenableFile: findFirstOpenableFile,
           fs,
           hasOpenedKnowledgeBaseBefore,
           handleInitialFileError: (error) => {
@@ -429,6 +419,7 @@ export function useFileSystem() {
             path,
             silentSuccess: options?.silentSuccess,
             skipSampleNotes: options?.skipSampleNotes,
+            restoreLastOpenedFile: options?.restoreLastOpenedFile,
           },
           registerAllowedPath: registerTauriAllowedPath,
           registerAllowedPathIfExists: registerTauriAllowedPathIfExists,
