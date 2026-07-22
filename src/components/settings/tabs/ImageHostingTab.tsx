@@ -13,6 +13,7 @@ import type { TranslationKey } from "../../../utils/i18n";
 import type { SettingsTabProps } from "../types";
 import { useSecureSettings } from "../useSecureSettings";
 import { testImageHostingConnection } from "../../../services/imageHostingService";
+import { SettingsSelect } from "../SettingsSelect";
 
 const PROVIDER_OPTIONS: {
   value: ImageHostingProvider;
@@ -38,7 +39,6 @@ const QINIU_ZONES: { value: string; labelKey: TranslationKey }[] = [
 
 const inputClass =
   "w-full px-3 py-2 border border-gray-200 dark:border-white/10 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all rounded-xl";
-const selectClass = `${inputClass} appearance-none`;
 const labelClass =
   "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5";
 const descClass = "mt-1 text-[11px] text-gray-400 dark:text-gray-500";
@@ -165,19 +165,19 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
           {/* Provider Selection */}
           <div>
             <label className={labelClass}>{t("imageHosting_provider")}</label>
-            <select
+            <SettingsSelect
+              aria-label={t("imageHosting_provider")}
               value={ih.provider}
-              onChange={(e) =>
-                updateIH({ provider: e.target.value as ImageHostingProvider })
+              options={PROVIDER_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: opt.labelKey
+                  ? t(opt.labelKey)
+                  : (opt.fixedLabel ?? opt.value),
+              }))}
+              onChange={(provider) =>
+                updateIH({ provider: provider as ImageHostingProvider })
               }
-              className={selectClass}
-            >
-              {PROVIDER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.labelKey ? t(opt.labelKey) : opt.fixedLabel}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {ih.provider !== "none" && (
@@ -464,17 +464,15 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
             </div>
             <div>
               <label className={labelClass}>{t("imageHosting_zone")}</label>
-              <select
+              <SettingsSelect
+                aria-label={t("imageHosting_zone")}
                 value={ih.qiniu.zone}
-                onChange={(e) => updateQiniu({ zone: e.target.value })}
-                className={selectClass}
-              >
-                {QINIU_ZONES.map((z) => (
-                  <option key={z.value} value={z.value}>
-                    {t(z.labelKey)} ({z.value})
-                  </option>
-                ))}
-              </select>
+                options={QINIU_ZONES.map((z) => ({
+                  value: z.value,
+                  label: `${t(z.labelKey)} (${z.value})`,
+                }))}
+                onChange={(zone) => updateQiniu({ zone })}
+              />
             </div>
           </div>
           <div>
@@ -529,16 +527,17 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>{t("imageHosting_method")}</label>
-              <select
+              <SettingsSelect
+                aria-label={t("imageHosting_method")}
                 value={ih.custom.method}
-                onChange={(e) =>
-                  updateCustom({ method: e.target.value as "POST" | "PUT" })
+                options={[
+                  { value: "POST", label: "POST" },
+                  { value: "PUT", label: "PUT" },
+                ]}
+                onChange={(method) =>
+                  updateCustom({ method: method as "POST" | "PUT" })
                 }
-                className={selectClass}
-              >
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-              </select>
+              />
             </div>
             <div>
               <label className={labelClass}>
