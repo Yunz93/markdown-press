@@ -7,6 +7,9 @@ import React, {
 } from "react";
 import { FileTypeIcon } from "../FileTypeIcon";
 import type { FileNode } from "../../types";
+import { isOpenableFile } from "../../utils/fileTypes";
+import { getFileTypeBadge } from "../../utils/fileIconKind";
+import { useI18n } from "../../hooks/useI18n";
 import {
   extractDraggedNodeId as extractDraggedNodeIdFromEvent,
   setDragPayload,
@@ -38,6 +41,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     expandedPathIds,
     locateRequestKey = 0,
   }) {
+    const { t } = useI18n();
     const [expanded, setExpanded] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -45,6 +49,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     const itemRef = useRef<HTMLDivElement>(null);
 
     const isFolder = node.type === "folder";
+    const canOpen = isFolder || isOpenableFile(node);
+    const typeBadge = !isFolder ? getFileTypeBadge(node.name) : null;
     const isDropTarget = !node.isTrash;
 
     const extractDraggedNodeId = useCallback(
@@ -58,11 +64,12 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         e.stopPropagation();
         if (isFolder) {
           setExpanded((prev) => !prev);
-        } else {
-          onSelect(node);
+          return;
         }
+        if (!canOpen) return;
+        onSelect(node);
       },
-      [isFolder, onSelect, node],
+      [canOpen, isFolder, onSelect, node],
     );
 
     const handleRightClick = useCallback(
@@ -151,6 +158,9 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     const isInLocatedPath = Boolean(expandedPathIds?.has(node.id));
     const displayName =
       node.type === "file" ? node.name.replace(/\.md$/i, "") : node.name;
+    const itemTitle = !canOpen
+      ? `${displayName} · ${t("sidebar_fileTypeNotSupported")}`
+      : displayName;
 
     useEffect(() => {
       if (locateRequestKey <= 0 || !isFolder || !isInLocatedPath) return;
@@ -186,17 +196,21 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         <div
           ref={itemRef}
           className={`
-          group relative flex items-center py-2 px-3 cursor-pointer transition-all duration-200 mx-2 rounded-lg text-sm border border-transparent
+          group relative flex items-center py-2 px-3 transition-all duration-200 mx-2 rounded-lg text-sm border border-transparent
+          ${canOpen ? "cursor-pointer" : "cursor-not-allowed"}
           ${
             isActive
               ? "bg-accent-DEFAULT/14 text-gray-900 font-semibold shadow-sm ring-1 ring-inset ring-accent-DEFAULT/35 dark:bg-accent-DEFAULT/22 dark:text-white dark:ring-accent-DEFAULT/45"
-              : "font-medium text-gray-600 hover:bg-black/[0.04] hover:text-black dark:text-slate-400 dark:hover:bg-[#121923] dark:hover:text-white"
+              : canOpen
+                ? "font-medium text-gray-600 hover:bg-black/[0.04] hover:text-black dark:text-slate-400 dark:hover:bg-[#121923] dark:hover:text-white"
+                : "font-medium text-gray-400/80 opacity-55 dark:text-slate-500 dark:opacity-50"
           }
           ${isDragOver ? "bg-accent-DEFAULT/20 border-accent-DEFAULT dark:bg-accent-DEFAULT/20 dark:border-accent-DEFAULT" : ""}
           ${isDragging ? "opacity-60" : ""}
         `}
           style={{ paddingLeft: `${level * 8 + 12}px` }}
           aria-selected={isActive}
+          aria-disabled={!canOpen}
           draggable={!node.isTrash}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
@@ -205,7 +219,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
           onDragEnd={handleDragEnd}
           onClick={handleClick}
           onContextMenu={handleRightClick}
-          title={displayName}
+          title={itemTitle}
         >
           {isActive && (
             <span
@@ -214,7 +228,13 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
             />
           )}
           <span
-            className={`mr-2.5 transition-colors ${isActive ? "text-accent-DEFAULT" : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"}`}
+            className={`mr-2.5 shrink-0 transition-colors ${
+              isActive
+                ? "text-accent-DEFAULT"
+                : canOpen
+                  ? "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+                  : "text-gray-300 dark:text-slate-600"
+            }`}
           >
             {isFolder ? (
               expanded ? (
@@ -248,7 +268,19 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
               />
             )}
           </span>
-          <span className="truncate flex-1">{displayName}</span>
+          <span className="truncate min-w-0 flex-1">{displayName}</span>
+          {typeBadge && (
+            <span
+              className={`ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide leading-none ${
+                canOpen
+                  ? "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-slate-400"
+                  : "bg-gray-100/70 text-gray-400 dark:bg-white/5 dark:text-slate-600"
+              }`}
+              aria-hidden
+            >
+              {typeBadge}
+            </span>
+          )}
           {isFolder && (
             <span className="ml-auto opacity-30 group-hover:opacity-100 transition-opacity">
               {expanded ? (
