@@ -16,7 +16,6 @@ import {
   isEmptyQuoteLine,
   insertText,
   looksLikeUrl,
-  LIST_INDENT_UNIT,
   getIndentUnit,
   updateSelectedLines,
   getLeadingIndent,
@@ -269,19 +268,21 @@ export function createHandleSmartTab(
       state.selection.main.from,
     );
 
+    const indent = getIndentUnit(state);
+
     // 代码块内处理
     if (insideFencedCode) {
       if (hasExpandedSelection) {
         return updateSelectedLines(
           state,
           dispatch,
-          (lineText) => `${LIST_INDENT_UNIT}${lineText}`,
+          (lineText) => `${indent}${lineText}`,
         );
       }
 
       const changes = state.changeByRange((range) => ({
-        changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
-        range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
+        changes: { from: range.from, to: range.to, insert: indent },
+        range: EditorSelection.cursor(range.from + indent.length),
       }));
 
       dispatch(
@@ -295,14 +296,13 @@ export function createHandleSmartTab(
         return updateSelectedLines(
           state,
           dispatch,
-          (lineText) => `${getIndentUnit(state)}${lineText}`,
+          (lineText) => `${indent}${lineText}`,
         );
       }
 
-      const indentUnit = getIndentUnit(state);
       const changes = state.changeByRange((range) => ({
-        changes: { from: range.from, to: range.to, insert: indentUnit },
-        range: EditorSelection.cursor(range.from + indentUnit.length),
+        changes: { from: range.from, to: range.to, insert: indent },
+        range: EditorSelection.cursor(range.from + indent.length),
       }));
 
       dispatch(
@@ -322,13 +322,13 @@ export function createHandleSmartTab(
       return updateSelectedLines(
         state,
         dispatch,
-        (lineText) => `${LIST_INDENT_UNIT}${lineText}`,
+        (lineText) => `${indent}${lineText}`,
       );
     }
 
     const changes = state.changeByRange((range) => ({
-      changes: { from: range.from, to: range.to, insert: LIST_INDENT_UNIT },
-      range: EditorSelection.cursor(range.from + LIST_INDENT_UNIT.length),
+      changes: { from: range.from, to: range.to, insert: indent },
+      range: EditorSelection.cursor(range.from + indent.length),
     }));
 
     dispatch(

@@ -3,8 +3,8 @@
  * Main entry point for markdown editing behaviors
  */
 
-import type { KeyBinding } from '@codemirror/view';
-import type { OrderedListMode } from '../../../types';
+import type { KeyBinding } from "@codemirror/view";
+import type { OrderedListMode } from "../../../types";
 
 // Re-export core utilities
 export {
@@ -17,6 +17,7 @@ export {
   EMPTY_LINE_REGEX,
   isBlankLine,
   getLeadingIndent,
+  getIndentUnit,
   getIndentColumnWidth,
   addIndentUnit,
   removeIndentUnit,
@@ -31,7 +32,7 @@ export {
   looksLikeUrl,
   isEmptyListItem,
   isEmptyQuoteLine,
-} from './core';
+} from "./core";
 
 // Re-export types
 export type {
@@ -40,20 +41,13 @@ export type {
   ListInfo,
   StructuredLine,
   OrderedNormalizationMode,
-} from './core';
+} from "./core";
 
 // Re-export quote utilities
-export {
-  parseQuote,
-  buildQuoteRaw,
-  buildQuotePrefix,
-} from './quotes';
+export { parseQuote, buildQuoteRaw, buildQuotePrefix } from "./quotes";
 
 // Re-export list utilities
-export {
-  parseListLine,
-  formatListLine,
-} from './lists';
+export { parseListLine, formatListLine } from "./lists";
 
 // Re-export inline commands
 export {
@@ -62,20 +56,17 @@ export {
   toggleInlineCode,
   insertLink,
   insertCodeBlock,
-} from './commands/inline';
+} from "./commands/inline";
 
 // Re-export block commands
-export {
-  toggleBlockquote,
-  cycleHeading,
-} from './commands/block';
+export { toggleBlockquote, cycleHeading } from "./commands/block";
 
 // Re-export list commands
 export {
   toggleUnorderedList,
   toggleOrderedList,
   createToggleOrderedList,
-} from './commands/list';
+} from "./commands/list";
 
 // Re-export input handling
 export {
@@ -87,18 +78,35 @@ export {
   createHandleSmartTab,
   createHandleSmartShiftTab,
   createHandleSmartBackspace,
-} from './input';
+} from "./input";
 
 // Re-export normalization
-export {
-  getStrictOrderedListNormalizationChanges,
-} from './normalization';
+export { getStrictOrderedListNormalizationChanges } from "./normalization";
 
 // Import for creating key bindings
-import { toggleBold, toggleItalic, toggleInlineCode, insertLink, insertCodeBlock } from './commands/inline';
-import { toggleBlockquote, cycleHeading } from './commands/block';
-import { toggleUnorderedList, toggleOrderedList, createToggleOrderedList } from './commands/list';
-import { handleSmartEnter, handleSmartBackspace, handleSmartTab, handleSmartShiftTab, handleStructuredPaste, createHandleSmartTab, createHandleSmartShiftTab, createHandleSmartBackspace } from './input';
+import {
+  toggleBold,
+  toggleItalic,
+  toggleInlineCode,
+  insertLink,
+  insertCodeBlock,
+} from "./commands/inline";
+import { toggleBlockquote, cycleHeading } from "./commands/block";
+import {
+  toggleUnorderedList,
+  toggleOrderedList,
+  createToggleOrderedList,
+} from "./commands/list";
+import {
+  handleSmartEnter,
+  handleSmartBackspace,
+  handleSmartTab,
+  handleSmartShiftTab,
+  handleStructuredPaste,
+  createHandleSmartTab,
+  createHandleSmartShiftTab,
+  createHandleSmartBackspace,
+} from "./input";
 
 // ==================== 命令导出 ====================
 
@@ -121,20 +129,22 @@ export const markdownCommands = {
 
 // ==================== 键绑定 ====================
 
-export function createMarkdownKeyBindings(orderedListMode: OrderedListMode): KeyBinding[] {
+export function createMarkdownKeyBindings(
+  orderedListMode: OrderedListMode,
+): KeyBinding[] {
   return [
-    { key: 'Enter', run: handleSmartEnter },
-    { key: 'Backspace', run: createHandleSmartBackspace(orderedListMode) },
-    { key: 'Shift-Tab', run: createHandleSmartShiftTab(orderedListMode) },
-    { key: 'Tab', run: createHandleSmartTab(orderedListMode) },
-    { key: 'Mod-b', run: toggleBold },
-    { key: 'Mod-i', run: toggleItalic },
-    { key: 'Mod-k', run: insertLink },
-    { key: 'Mod-Shift-k', run: insertCodeBlock },
-    { key: 'Mod-`', run: toggleInlineCode },
-    { key: 'Mod-Shift-l', run: toggleUnorderedList },
-    { key: 'Mod-Shift-o', run: createToggleOrderedList(orderedListMode) },
-    { key: 'Mod-Shift-.', run: toggleBlockquote },
-    { key: 'Mod-Shift-h', run: cycleHeading },
+    { key: "Enter", run: handleSmartEnter },
+    { key: "Backspace", run: createHandleSmartBackspace(orderedListMode) },
+    { key: "Shift-Tab", run: createHandleSmartShiftTab(orderedListMode) },
+    { key: "Tab", run: createHandleSmartTab(orderedListMode) },
+    { key: "Mod-b", run: toggleBold },
+    { key: "Mod-i", run: toggleItalic },
+    { key: "Mod-k", run: insertLink },
+    { key: "Mod-Shift-k", run: insertCodeBlock },
+    { key: "Mod-`", run: toggleInlineCode },
+    { key: "Mod-Shift-l", run: toggleUnorderedList },
+    { key: "Mod-Shift-o", run: createToggleOrderedList(orderedListMode) },
+    { key: "Mod-Shift-.", run: toggleBlockquote },
+    { key: "Mod-Shift-h", run: cycleHeading },
   ];
 }

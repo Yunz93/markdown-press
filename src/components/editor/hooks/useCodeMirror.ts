@@ -35,6 +35,11 @@ import {
   getEditorTooltipSpace,
   isLargeEditorState,
 } from "./codeMirrorHelpers";
+import {
+  buildEditorPreferenceEffects,
+  createEditorPreferenceCompartments,
+  type EditorPreferenceOptions,
+} from "./editorPreferenceExtensions";
 
 export { getEditorTooltipSpace };
 
@@ -50,6 +55,15 @@ export interface UseCodeMirrorOptions {
   orderedListMode?: OrderedListMode;
   /** 与 html.dark / 应用主题一致，供补全浮层等 CodeMirror 主题作用域使用 */
   themeMode?: ThemeMode;
+  autoPairBrackets?: boolean;
+  autoPairMarkdown?: boolean;
+  showLineNumbers?: boolean;
+  enableFolding?: boolean;
+  tabSize?: number;
+  useTabs?: boolean;
+  showIndentationGuides?: boolean;
+  spellcheck?: boolean;
+  convertHtmlOnPaste?: boolean;
   onChange: (content: string, meta?: CodeMirrorContentChangeMeta) => void;
   onScroll?: () => void;
   completionSource?: CompletionSource;
@@ -69,6 +83,17 @@ export interface UseCodeMirrorReturn {
   flushPendingContentChange: () => void;
 }
 
+const DEFAULT_PREFERENCES: EditorPreferenceOptions = {
+  autoPairBrackets: true,
+  autoPairMarkdown: true,
+  showLineNumbers: false,
+  enableFolding: false,
+  tabSize: 4,
+  useTabs: false,
+  showIndentationGuides: false,
+  spellcheck: false,
+};
+
 export function useCodeMirror(
   options: UseCodeMirrorOptions,
 ): UseCodeMirrorReturn {
@@ -79,6 +104,15 @@ export function useCodeMirror(
     wordWrap = true,
     orderedListMode = "strict",
     themeMode = "light",
+    autoPairBrackets = DEFAULT_PREFERENCES.autoPairBrackets,
+    autoPairMarkdown = DEFAULT_PREFERENCES.autoPairMarkdown,
+    showLineNumbers = DEFAULT_PREFERENCES.showLineNumbers,
+    enableFolding = DEFAULT_PREFERENCES.enableFolding,
+    tabSize = DEFAULT_PREFERENCES.tabSize,
+    useTabs = DEFAULT_PREFERENCES.useTabs,
+    showIndentationGuides = DEFAULT_PREFERENCES.showIndentationGuides,
+    spellcheck = DEFAULT_PREFERENCES.spellcheck,
+    convertHtmlOnPaste = true,
     onChange,
     onScroll,
     completionSource,
@@ -86,6 +120,29 @@ export function useCodeMirror(
     onWikiLinkStart,
     onContextMenu,
   } = options;
+
+  const preferences = useMemo<EditorPreferenceOptions>(
+    () => ({
+      autoPairBrackets,
+      autoPairMarkdown,
+      showLineNumbers,
+      enableFolding,
+      tabSize,
+      useTabs,
+      showIndentationGuides,
+      spellcheck,
+    }),
+    [
+      autoPairBrackets,
+      autoPairMarkdown,
+      showLineNumbers,
+      enableFolding,
+      tabSize,
+      useTabs,
+      showIndentationGuides,
+      spellcheck,
+    ],
+  );
 
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -102,6 +159,7 @@ export function useCodeMirror(
   const onPasteImageRef = useRef(onPasteImage);
   const onWikiLinkStartRef = useRef(onWikiLinkStart);
   const onContextMenuRef = useRef(onContextMenu);
+  const convertHtmlOnPasteRef = useRef(convertHtmlOnPaste);
   const loadedMarkdownLanguageKeysRef = useRef<Set<string>>(new Set());
   const pendingContentChangeIsLargeRef = useRef(false);
   const orderedListModeRef = useRef(orderedListMode);
@@ -115,6 +173,10 @@ export function useCodeMirror(
       darkTheme: new Compartment(),
       markdown: new Compartment(),
     }),
+    [],
+  );
+  const preferenceCompartments = useMemo(
+    () => createEditorPreferenceCompartments(),
     [],
   );
 
@@ -172,6 +234,21 @@ export function useCodeMirror(
       normalizationTimeoutRef.current = null;
     }
   }, [orderedListMode]);
+
+  useEffect(() => {
+    convertHtmlOnPasteRef.current = convertHtmlOnPaste;
+  }, [convertHtmlOnPaste]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: buildEditorPreferenceEffects(
+        preferenceCompartments,
+        preferences,
+      ),
+    });
+  }, [preferenceCompartments, preferences]);
 
   // Callback ref to track when editor element is mounted
   const setEditorElement = useCallback((element: HTMLDivElement | null) => {
@@ -306,13 +383,16 @@ export function useCodeMirror(
         orderedListMode,
         wordWrap,
         placeholder,
+        preferences,
         compartments,
+        preferenceCompartments,
         completionSourceRef,
         onScrollRef,
         onPasteImageRef,
         onContextMenuRef,
         onWikiLinkStartRef,
         onChangeRef,
+        convertHtmlOnPasteRef,
         viewRef,
         isApplyingOrderedNormalizationRef,
         normalizationTimeoutRef,
@@ -428,6 +508,7 @@ export function useCodeMirror(
             Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
           ),
           compartments.placeholder.reconfigure(cmPlaceholder(placeholder)),
+          ...buildEditorPreferenceEffects(preferenceCompartments, preferences),
         ],
       });
 
@@ -491,6 +572,8 @@ export function useCodeMirror(
     compartments.wrap,
     compartments.keymap,
     compartments.placeholder,
+    preferenceCompartments,
+    preferences,
     themeMode,
     wordWrap,
     orderedListMode,

@@ -1,4 +1,5 @@
 import type { AppSettings, ImageHostingConfig, Notification } from "../types";
+import { ViewMode } from "../types";
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
   DEFAULT_AI_SYSTEM_PROMPT_EN,
@@ -19,6 +20,11 @@ import {
 import { DEFAULT_METADATA_FIELDS } from "../utils/metadataFields";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
 import { normalizeTrashFolder } from "../utils/trashFolder";
+import { normalizeAttachmentLocation } from "../utils/attachmentLocation";
+import {
+  normalizeDefaultViewMode,
+  normalizeTabSize,
+} from "../utils/editorPreferences";
 import { normalizeNewNoteLocation } from "../utils/newNoteLocation";
 import { getPreferredShortcutModifierToken } from "../utils/shortcuts";
 
@@ -138,10 +144,23 @@ export const defaultSettings: AppSettings = {
   fontSize: 16,
   wordWrap: true,
   formatMarkdownOnManualSave: false,
+  autoPairBrackets: true,
+  autoPairMarkdown: true,
+  readableLineLength: true,
+  showLineNumbers: false,
+  tabSize: 4,
+  useTabs: false,
+  enableFolding: false,
+  spellcheck: false,
+  showIndentationGuides: false,
+  convertHtmlOnPaste: true,
   resourceFolder: "resources",
   wikiFolder: "wiki",
   trashFolder: ".trash",
   newNoteLocation: "knowledgeBaseRoot",
+  newNoteFolder: "notes",
+  attachmentLocation: "resourceFolder",
+  defaultViewMode: ViewMode.SPLIT,
   attachmentPasteFormat: "obsidian",
   orderedListMode: "strict",
   markdownStylePreset: DEFAULT_MARKDOWN_STYLE_PRESET,
@@ -247,6 +266,11 @@ export function createUISlice(
           wikiFolder: normalizeWikiFolder(settings.wikiFolder),
           trashFolder: normalizeTrashFolder(settings.trashFolder),
           newNoteLocation: normalizeNewNoteLocation(settings.newNoteLocation),
+          attachmentLocation: normalizeAttachmentLocation(
+            settings.attachmentLocation,
+          ),
+          tabSize: normalizeTabSize(settings.tabSize),
+          defaultViewMode: normalizeDefaultViewMode(settings.defaultViewMode),
         },
       })),
 
@@ -279,6 +303,15 @@ export function createUISlice(
             ),
             newNoteLocation: normalizeNewNoteLocation(
               updates.newNoteLocation ?? state.settings.newNoteLocation,
+            ),
+            attachmentLocation: normalizeAttachmentLocation(
+              updates.attachmentLocation ?? state.settings.attachmentLocation,
+            ),
+            tabSize: normalizeTabSize(
+              updates.tabSize ?? state.settings.tabSize,
+            ),
+            defaultViewMode: normalizeDefaultViewMode(
+              updates.defaultViewMode ?? state.settings.defaultViewMode,
             ),
           },
         };

@@ -10,6 +10,7 @@
 import type { MutableRefObject } from "react";
 import {
   Compartment,
+  EditorSelection,
   EditorState,
   type Extension,
   Prec,
@@ -31,12 +32,12 @@ import {
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { indentUnit, syntaxHighlighting } from "@codemirror/language";
+import { syntaxHighlighting } from "@codemirror/language";
 import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
+import { convertHtmlToMarkdown } from "../../../utils/htmlToMarkdown";
 import {
   createMarkdownKeyBindings,
   getStrictOrderedListNormalizationChanges,
-  LIST_INDENT_UNIT,
 } from "../behavior";
 import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
@@ -51,6 +52,11 @@ import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
 import { getEditorTooltipSpace, isLargeEditorState } from "./codeMirrorHelpers";
+import {
+  type EditorPreferenceCompartments,
+  type EditorPreferenceOptions,
+  wrapEditorPreferenceExtensions,
+} from "./editorPreferenceExtensions";
 
 interface EditorCompartments {
   wrap: Compartment;
@@ -66,7 +72,9 @@ export interface CreateEditorExtensionsContext {
   orderedListMode: OrderedListMode;
   wordWrap: boolean;
   placeholder: string;
+  preferences: EditorPreferenceOptions;
   compartments: EditorCompartments;
+  preferenceCompartments: EditorPreferenceCompartments;
   completionSourceRef: MutableRefObject<CompletionSource | undefined>;
   onScrollRef: MutableRefObject<(() => void) | undefined>;
   onPasteImageRef: MutableRefObject<
@@ -79,6 +87,7 @@ export interface CreateEditorExtensionsContext {
   onChangeRef: MutableRefObject<
     (content: string, meta?: CodeMirrorContentChangeMeta) => void
   >;
+  convertHtmlOnPasteRef: MutableRefObject<boolean>;
   viewRef: MutableRefObject<EditorView | null>;
   isApplyingOrderedNormalizationRef: MutableRefObject<boolean>;
   normalizationTimeoutRef: MutableRefObject<number | null>;
@@ -87,6 +96,36 @@ export interface CreateEditorExtensionsContext {
   pendingContentChangeIsLargeRef: MutableRefObject<boolean>;
   orderedListModeRef: MutableRefObject<OrderedListMode>;
   flushPendingContentChange: () => void;
+}
+
+function clipboardHasImage(event: ClipboardEvent): boolean {
+  return Array.from(event.clipboardData?.items ?? []).some((item) =>
+    item.type.startsWith("image/"),
+  );
+}
+
+function tryConvertHtmlPaste(view: EditorView, event: ClipboardEvent): boolean {
+  const html = event.clipboardData?.getData("text/html")?.trim();
+  if (!html) return false;
+
+  const markdownText = convertHtmlToMarkdown(html);
+  if (!markdownText) return false;
+
+  const selection = view.state.selection.main;
+  event.preventDefault();
+  view.dispatch(
+    view.state.update({
+      changes: {
+        from: selection.from,
+        to: selection.to,
+        insert: markdownText,
+      },
+      selection: EditorSelection.cursor(selection.from + markdownText.length),
+      scrollIntoView: true,
+      userEvent: "input.paste",
+    }),
+  );
+  return true;
 }
 
 export function createEditorExtensions(
@@ -98,13 +137,16 @@ export function createEditorExtensions(
     orderedListMode,
     wordWrap,
     placeholder,
+    preferences,
     compartments,
+    preferenceCompartments,
     completionSourceRef,
     onScrollRef,
     onPasteImageRef,
     onContextMenuRef,
     onWikiLinkStartRef,
     onChangeRef,
+    convertHtmlOnPasteRef,
     viewRef,
     isApplyingOrderedNormalizationRef,
     normalizationTimeoutRef,
@@ -141,8 +183,7 @@ export function createEditorExtensions(
       position: "absolute",
       tooltipSpace: getEditorTooltipSpace,
     }),
-    EditorState.tabSize.of(LIST_INDENT_UNIT.length),
-    indentUnit.of(LIST_INDENT_UNIT),
+    ...wrapEditorPreferenceExtensions(preferenceCompartments, preferences),
     compartments.markdown.of(
       markdown({ codeLanguages: resolveEditorCodeLanguage }),
     ),
@@ -171,13 +212,9 @@ export function createEditorExtensions(
         };
       })(),
       paste: (event, view) => {
-        if (handleStructuredPaste(view, event)) {
-          return true;
-        }
-
-        // Handle image paste
+        // Handle image paste first
         const pasteImage = onPasteImageRef.current;
-        if (pasteImage) {
+        if (pasteImage && clipboardHasImage(event)) {
           const clipboardItems = Array.from(event.clipboardData?.items ?? []);
           const imageItem = clipboardItems.find((item) =>
             item.type.startsWith("image/"),
@@ -190,6 +227,15 @@ export function createEditorExtensions(
             return true;
           }
         }
+
+        if (convertHtmlOnPasteRef.current && tryConvertHtmlPaste(view, event)) {
+          return true;
+        }
+
+        if (handleStructuredPaste(view, event)) {
+          return true;
+        }
+
         return false;
       },
       contextmenu: (event, view) => {

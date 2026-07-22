@@ -149,6 +149,7 @@ export function useFileOperations() {
           return;
         }
 
+        const wasAlreadyOpen = openTabs.includes(file.id);
         addTab(file.id);
         setCurrentFilePath(file.path);
 
@@ -163,6 +164,10 @@ export function useFileOperations() {
           }
           setViewMode(ViewMode.PREVIEW);
           return;
+        }
+
+        if (!wasAlreadyOpen) {
+          setViewMode(settings.defaultViewMode);
         }
 
         const cachedContent = fileContents[file.id];
@@ -206,6 +211,9 @@ export function useFileOperations() {
       markAsSaved,
       showNotification,
       fileContents,
+      openTabs,
+      settings.defaultViewMode,
+      settings.language,
     ],
   );
 
@@ -234,6 +242,7 @@ export function useFileOperations() {
         rootFolderPath: storeState.rootFolderPath,
         currentFilePath: storeState.currentFilePath,
         explicitFolderPath: parentFolder?.path,
+        newNoteFolder: settings.newNoteFolder,
       });
 
       const newFile = await createFile(
@@ -244,14 +253,18 @@ export function useFileOperations() {
       if (newFile) {
         addTab(newFile.id, initialContent);
         setCurrentFilePath(newFile.path);
+        setViewMode(settings.defaultViewMode);
       }
     },
     [
       settings.metadataFields,
       settings.newNoteLocation,
+      settings.newNoteFolder,
+      settings.defaultViewMode,
       createFile,
       addTab,
       setCurrentFilePath,
+      setViewMode,
     ],
   );
 

@@ -96,7 +96,14 @@ export interface KnowledgeBaseMeta {
 export type ThemeMode = "light" | "dark";
 export type AppLanguage = "zh-CN" | "en";
 export type AttachmentPasteFormat = "markdown" | "obsidian";
-export type NewNoteLocation = "knowledgeBaseRoot" | "currentFileFolder";
+export type NewNoteLocation =
+  | "knowledgeBaseRoot"
+  | "currentFileFolder"
+  | "specifiedFolder";
+export type AttachmentLocation =
+  | "resourceFolder"
+  | "sameAsCurrent"
+  | "subfolderUnderCurrent";
 export type OrderedListMode = "strict" | "loose";
 export type MarkdownStylePreset = "nord" | "topaz" | "typewriter" | "primary";
 
@@ -172,10 +179,24 @@ export interface AppSettings {
   fontSize: number;
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;
+  autoPairBrackets: boolean;
+  autoPairMarkdown: boolean;
+  readableLineLength: boolean;
+  showLineNumbers: boolean;
+  tabSize: number;
+  useTabs: boolean;
+  enableFolding: boolean;
+  spellcheck: boolean;
+  showIndentationGuides: boolean;
+  convertHtmlOnPaste: boolean;
   resourceFolder: string;
   wikiFolder: string;
   trashFolder: string;
   newNoteLocation: NewNoteLocation;
+  /** Relative path used when newNoteLocation === "specifiedFolder". */
+  newNoteFolder: string;
+  attachmentLocation: AttachmentLocation;
+  defaultViewMode: ViewMode;
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
   markdownStylePreset: MarkdownStylePreset;

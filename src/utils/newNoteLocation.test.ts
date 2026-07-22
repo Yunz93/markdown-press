@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeNewNoteFolder,
   normalizeNewNoteLocation,
   resolveNewNoteFolderPath,
 } from "./newNoteLocation";
@@ -14,6 +15,22 @@ describe("normalizeNewNoteLocation", () => {
     expect(normalizeNewNoteLocation("currentFileFolder")).toBe(
       "currentFileFolder",
     );
+  });
+
+  it("keeps specified-folder when valid", () => {
+    expect(normalizeNewNoteLocation("specifiedFolder")).toBe("specifiedFolder");
+  });
+});
+
+describe("normalizeNewNoteFolder", () => {
+  it("defaults invalid values to notes", () => {
+    expect(normalizeNewNoteFolder(undefined)).toBe("notes");
+    expect(normalizeNewNoteFolder("../etc")).toBe("notes");
+    expect(normalizeNewNoteFolder("")).toBe("notes");
+  });
+
+  it("sanitizes relative folder paths", () => {
+    expect(normalizeNewNoteFolder("  inbox/daily  ")).toBe("inbox/daily");
   });
 });
 
@@ -45,6 +62,27 @@ describe("resolveNewNoteFolderPath", () => {
         location: "currentFileFolder",
         rootFolderPath: "/vault",
         currentFilePath: "/vault/notes/a.md",
+      }),
+    ).toBe("/vault/notes");
+  });
+
+  it("joins root with sanitized newNoteFolder for specifiedFolder", () => {
+    expect(
+      resolveNewNoteFolderPath({
+        location: "specifiedFolder",
+        rootFolderPath: "/vault",
+        currentFilePath: "/vault/notes/a.md",
+        newNoteFolder: "inbox/daily",
+      }),
+    ).toBe("/vault/inbox/daily");
+  });
+
+  it("falls back to notes when specifiedFolder path is unsafe", () => {
+    expect(
+      resolveNewNoteFolderPath({
+        location: "specifiedFolder",
+        rootFolderPath: "/vault",
+        newNoteFolder: "../etc",
       }),
     ).toBe("/vault/notes");
   });
