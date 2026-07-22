@@ -36,9 +36,6 @@ export {
   exportLongImagePng,
 } from "./longImageExport";
 
-// Export plain text export
-export { exportToPlainText, downloadPlainText } from "./textExport";
-
 // Export image utilities
 export {
   hasUrlScheme,

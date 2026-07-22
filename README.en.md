@@ -45,7 +45,7 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 - **Local vault**: Folder-based library with tabs, sidebar, and search; notes and assets stay on disk under your control.
 - **Editor–preview parity**: Multiple writing layouts; preview renders Markdown plus common extensions (math, diagrams, highlighted code); outline for structure at a glance.
 - **Knowledge-base Markdown**: Familiar wiki links and `![[embeds]]`, configurable YAML metadata and templates, images handled in the same reference flow.
-- **Export & publish**: PDF, plain text, and a single long-image share from the preview; toolbar publishing to **simple-blog** (GitHub + Vercel) or **WeChat Official Account drafts**.
+- **Export & publish**: PDF, HTML, and a single long-image share from the preview; toolbar publishing to **simple-blog** (GitHub + Vercel) or **WeChat Official Account drafts**.
 - **Optional AI assist**: Switch between Gemini and an OpenAI-compatible API for polish, summaries, tags, and generating entries from a selection.
 
 ## Keyboard shortcuts
