@@ -96,6 +96,7 @@ export interface KnowledgeBaseMeta {
 export type ThemeMode = "light" | "dark";
 export type AppLanguage = "zh-CN" | "en";
 export type AttachmentPasteFormat = "markdown" | "obsidian";
+export type NewNoteLocation = "knowledgeBaseRoot" | "currentFileFolder";
 export type OrderedListMode = "strict" | "loose";
 export type MarkdownStylePreset = "nord" | "topaz" | "typewriter" | "primary";
 
@@ -174,6 +175,7 @@ export interface AppSettings {
   resourceFolder: string;
   wikiFolder: string;
   trashFolder: string;
+  newNoteLocation: NewNoteLocation;
   attachmentPasteFormat: AttachmentPasteFormat;
   orderedListMode: OrderedListMode;
   markdownStylePreset: MarkdownStylePreset;

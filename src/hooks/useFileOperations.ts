@@ -21,6 +21,10 @@ import {
 } from "../utils/fileTypes";
 import { normalizeSlashes } from "../utils/pathHelpers";
 import { clearDraftBackup, readDraftBackup } from "../utils/draftBackup";
+import {
+  normalizeNewNoteLocation,
+  resolveNewNoteFolderPath,
+} from "../utils/newNoteLocation";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -224,17 +228,31 @@ export function useFileOperations() {
         Object.keys(meta).length > 0 ? generateFrontmatter(meta) : "";
       const initialContent = `${frontmatterBlock}# ${documentTitle}\n\n`;
 
+      const storeState = useAppStore.getState();
+      const destinationFolderPath = resolveNewNoteFolderPath({
+        location: normalizeNewNoteLocation(settings.newNoteLocation),
+        rootFolderPath: storeState.rootFolderPath,
+        currentFilePath: storeState.currentFilePath,
+        explicitFolderPath: parentFolder?.path,
+      });
+
       const newFile = await createFile(
         finalFileName,
         initialContent,
-        parentFolder?.path,
+        destinationFolderPath,
       );
       if (newFile) {
         addTab(newFile.id, initialContent);
         setCurrentFilePath(newFile.path);
       }
     },
-    [settings.metadataFields, createFile, addTab, setCurrentFilePath],
+    [
+      settings.metadataFields,
+      settings.newNoteLocation,
+      createFile,
+      addTab,
+      setCurrentFilePath,
+    ],
   );
 
   const handleMoveToTrash = useCallback(

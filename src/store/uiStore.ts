@@ -19,6 +19,7 @@ import {
 import { DEFAULT_METADATA_FIELDS } from "../utils/metadataFields";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
 import { normalizeTrashFolder } from "../utils/trashFolder";
+import { normalizeNewNoteLocation } from "../utils/newNoteLocation";
 import { getPreferredShortcutModifierToken } from "../utils/shortcuts";
 
 function normalizeThemeMode(themeMode: unknown): AppSettings["themeMode"] {
@@ -140,6 +141,7 @@ export const defaultSettings: AppSettings = {
   resourceFolder: "resources",
   wikiFolder: "wiki",
   trashFolder: ".trash",
+  newNoteLocation: "knowledgeBaseRoot",
   attachmentPasteFormat: "obsidian",
   orderedListMode: "strict",
   markdownStylePreset: DEFAULT_MARKDOWN_STYLE_PRESET,
@@ -244,6 +246,7 @@ export function createUISlice(
           ),
           wikiFolder: normalizeWikiFolder(settings.wikiFolder),
           trashFolder: normalizeTrashFolder(settings.trashFolder),
+          newNoteLocation: normalizeNewNoteLocation(settings.newNoteLocation),
         },
       })),
 
@@ -273,6 +276,9 @@ export function createUISlice(
             ),
             trashFolder: normalizeTrashFolder(
               updates.trashFolder ?? state.settings.trashFolder,
+            ),
+            newNoteLocation: normalizeNewNoteLocation(
+              updates.newNoteLocation ?? state.settings.newNoteLocation,
             ),
           },
         };
