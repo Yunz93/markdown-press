@@ -36,7 +36,7 @@ export default {
   toolbar_publishingBlog: "发布博客中",
   toolbar_exportPdf: "导出 PDF",
   toolbar_export: "导出",
-  toolbar_exportPlainText: "导出纯文本",
+  toolbar_exportHtml: "导出 HTML",
   toolbar_shareLongImage: "长图分享",
 
   share_longImageTitle: "长图分享",
@@ -73,12 +73,14 @@ export default {
   wechatDraftDialog_submit: "发布到草稿箱",
 
   simpleBlogDialog_title: "发布到 Simple Blog",
-  simpleBlogDialog_desc: "发布前确认文章标题、Slug 与别名。博客仓库、令牌和站点域名请在设置中配置。",
+  simpleBlogDialog_desc:
+    "发布前确认文章标题、Slug 与别名。博客仓库、令牌和站点域名请在设置中配置。",
   simpleBlogDialog_titleLabel: "标题",
   simpleBlogDialog_slugLabel: "Slug",
   simpleBlogDialog_slugDesc: "决定文章地址；留空时回退到标题。",
   simpleBlogDialog_aliasesLabel: "别名",
-  simpleBlogDialog_aliasesDesc: "可选。多个别名用英文逗号分隔；留空时与标题相同。",
+  simpleBlogDialog_aliasesDesc:
+    "可选。多个别名用英文逗号分隔；留空时与标题相同。",
   simpleBlogDialog_submit: "发布到博客",
 
   ai_button: "AI 增强",
@@ -230,14 +232,14 @@ export default {
   export_title: "导出",
   export_format: "格式",
   export_options: "选项",
-  export_plainText: "纯文本",
+  export_html: "HTML",
   export_includeToc: "包含目录",
   export_lightTheme: "浅色主题",
   export_darkTheme: "深色主题",
   export_currentFile: "正在导出：{name}.md",
   export_exporting: "导出中...",
   export_pdfExported: "已导出 PDF",
-  export_plainTextExported: "已导出纯文本",
+  export_htmlExported: "已导出 HTML",
   export_failed: "导出失败",
 
   settings_title: "设置",
@@ -557,6 +559,8 @@ export default {
   notifications_noFileToExport: "没有可导出的文件",
   notifications_pdfExported: "PDF 已导出",
   notifications_exportPdfFailed: "导出 PDF 失败",
+  notifications_htmlExported: "HTML 已导出",
+  notifications_exportHtmlFailed: "导出 HTML 失败",
   notifications_longImageExported: "长图已保存",
   notifications_longImageExportFailed: "生成长图失败",
   notifications_longImageCopied: "图片已复制到剪贴板",

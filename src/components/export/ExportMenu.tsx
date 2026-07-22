@@ -1,11 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useAppStore, selectContent } from "../../store/appStore";
-import {
-  exportToHtml,
-  exportToPdf,
-  exportToPlainText,
-  downloadPlainText,
-} from "../../utils/export";
+import { exportToHtml, downloadHtml, exportToPdf } from "../../utils/export";
 import { getFileSystem } from "../../types/filesystem";
 import {
   buildCodeExportFontFamily,
@@ -20,7 +15,7 @@ interface ExportMenuProps {
   highlighter?: ShikiHighlighter | null;
 }
 
-export type ExportFormat = "pdf" | "plaintext";
+export type ExportFormat = "pdf" | "html";
 
 export const ExportMenu: React.FC<ExportMenuProps> = ({
   onClose,
@@ -49,20 +44,20 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
 
       try {
         const filename = activeFile?.name?.replace(".md", "") || "export";
+        const html = await exportToHtml(content, {
+          theme,
+          includeTOC,
+          fontFamily: previewFontFamily,
+          codeFontFamily,
+          fontSettings: settings,
+          fontSize: settings.fontSize,
+          codeFontSize: Math.max(12, settings.fontSize - 2),
+          highlighter,
+          markdownStylePreset: settings.markdownStylePreset,
+          orderedListMode: settings.orderedListMode,
+        });
 
         if (exportFormat === "pdf") {
-          const html = await exportToHtml(content, {
-            theme,
-            includeTOC,
-            fontFamily: previewFontFamily,
-            codeFontFamily,
-            fontSettings: settings,
-            fontSize: settings.fontSize,
-            codeFontSize: Math.max(12, settings.fontSize - 2),
-            highlighter,
-            markdownStylePreset: settings.markdownStylePreset,
-            orderedListMode: settings.orderedListMode,
-          });
           const savedPath = await exportToPdf(
             html,
             filename,
@@ -91,11 +86,26 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
               }
             }
           }
-        } else if (exportFormat === "plaintext") {
-          const text = exportToPlainText(content);
-          const saved = await downloadPlainText(text, filename);
-          if (saved) {
-            showNotification(t("export_plainTextExported"), "success");
+        } else if (exportFormat === "html") {
+          const savedPath = await downloadHtml(
+            html,
+            filename,
+            activeFile?.path,
+            {
+              files,
+              rootFolderPath,
+            },
+          );
+          if (savedPath !== null) {
+            showNotification(t("export_htmlExported"), "success");
+            if (savedPath) {
+              try {
+                const fs = await getFileSystem();
+                await fs.revealInExplorer?.(savedPath);
+              } catch {
+                /* best-effort */
+              }
+            }
           }
         }
       } catch (error) {
@@ -183,10 +193,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
             </button>
 
             <button
-              onClick={() => handleExport("plaintext")}
+              onClick={() => handleExport("html")}
               disabled={isExporting}
               className={`export-btn flex flex-col items-center gap-1 p-3 rounded-lg border transition-all ${
-                format === "plaintext"
+                format === "html"
                   ? "border-accent bg-accent/10 text-accent"
                   : "border-gray-200 dark:border-white/10 hover:border-accent/50"
               } disabled:opacity-50`}
@@ -198,12 +208,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
                 stroke="currentColor"
                 strokeWidth="2"
               >
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
               </svg>
-              <span className="text-xs">{t("export_plainText")}</span>
+              <span className="text-xs">{t("export_html")}</span>
             </button>
           </div>
         </div>

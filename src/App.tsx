@@ -58,10 +58,7 @@ import {
   type SimpleBlogPublishInput,
 } from "./utils/simpleBlogPublish";
 import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
-import {
-  isValidBlogRepoUrl,
-  isValidBlogSiteUrl,
-} from "./utils/blogRepo";
+import { isValidBlogRepoUrl, isValidBlogSiteUrl } from "./utils/blogRepo";
 import { isTauriEnvironment } from "./types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -161,11 +158,8 @@ const App: React.FC = () => {
   });
 
   const { forceSave, saveOpenTabIfDirty } = useAutoSave({ enabled: true });
-  const {
-    handleExportToPdf,
-    handleExportToPlainText,
-    buildLongImageSharePayload,
-  } = useExportActions(highlighter);
+  const { handleExportToPdf, handleExportToHtml, buildLongImageSharePayload } =
+    useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
     usePublishActions(forceSave);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
@@ -708,7 +702,7 @@ const App: React.FC = () => {
               themeMode={settings.themeMode}
               onPublish={handleOpenPublishDialog}
               onExportPdf={handleExportToPdf}
-              onExportPlainText={handleExportToPlainText}
+              onExportHtml={handleExportToHtml}
               onShareLongImage={() => {
                 setIsShareLongImageDialogOpen(true);
               }}
