@@ -1,10 +1,29 @@
-import { getPathDirname, normalizeSlashes } from "./pathHelpers";
+import {
+  getPathDirname,
+  joinFsPath,
+  normalizeSlashes,
+  sanitizeResourceFolder,
+} from "./pathHelpers";
 import type { NewNoteLocation } from "../types";
 
+export const DEFAULT_NEW_NOTE_FOLDER = "notes";
+
 export function normalizeNewNoteLocation(value: unknown): NewNoteLocation {
-  return value === "currentFileFolder"
-    ? "currentFileFolder"
-    : "knowledgeBaseRoot";
+  if (value === "currentFileFolder") return "currentFileFolder";
+  if (value === "specifiedFolder") return "specifiedFolder";
+  return "knowledgeBaseRoot";
+}
+
+export function normalizeNewNoteFolder(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_NEW_NOTE_FOLDER;
+  }
+
+  try {
+    return sanitizeResourceFolder(value) || DEFAULT_NEW_NOTE_FOLDER;
+  } catch {
+    return DEFAULT_NEW_NOTE_FOLDER;
+  }
 }
 
 /**
@@ -16,10 +35,21 @@ export function resolveNewNoteFolderPath(options: {
   rootFolderPath?: string | null;
   currentFilePath?: string | null;
   explicitFolderPath?: string | null;
+  newNoteFolder?: string | null;
 }): string | undefined {
   const explicit = options.explicitFolderPath?.trim();
   if (explicit) {
     return explicit;
+  }
+
+  if (options.location === "specifiedFolder") {
+    const rootFolderPath = options.rootFolderPath?.trim();
+    if (!rootFolderPath) {
+      return undefined;
+    }
+
+    const relativeFolder = normalizeNewNoteFolder(options.newNoteFolder);
+    return joinFsPath(rootFolderPath, relativeFolder);
   }
 
   if (options.location !== "currentFileFolder") {

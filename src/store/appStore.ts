@@ -16,10 +16,18 @@ import {
   normalizeLanguage,
   normalizeThemeMode,
 } from "./uiStore";
+import { normalizeAttachmentLocation } from "../utils/attachmentLocation";
+import {
+  normalizeDefaultViewMode,
+  normalizeTabSize,
+} from "../utils/editorPreferences";
 import { normalizeMetadataFields } from "../utils/metadataFields";
 import { normalizeTrashFolder } from "../utils/trashFolder";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
-import { normalizeNewNoteLocation } from "../utils/newNoteLocation";
+import {
+  normalizeNewNoteFolder,
+  normalizeNewNoteLocation,
+} from "../utils/newNoteLocation";
 import { normalizeMarkdownStylePreset } from "../utils/markdownStyle";
 import {
   resolveLocalizedPrompts,
@@ -124,6 +132,20 @@ export const useAppStore = create<AppState>()(
           newNoteLocation: normalizeNewNoteLocation(
             persistedSettings.newNoteLocation ??
               defaultSettings.newNoteLocation,
+          ),
+          newNoteFolder: normalizeNewNoteFolder(
+            persistedSettings.newNoteFolder ?? defaultSettings.newNoteFolder,
+          ),
+          attachmentLocation: normalizeAttachmentLocation(
+            persistedSettings.attachmentLocation ??
+              defaultSettings.attachmentLocation,
+          ),
+          tabSize: normalizeTabSize(
+            persistedSettings.tabSize ?? defaultSettings.tabSize,
+          ),
+          defaultViewMode: normalizeDefaultViewMode(
+            persistedSettings.defaultViewMode ??
+              defaultSettings.defaultViewMode,
           ),
           metadataFields: normalizeMetadataFields(
             persistedSettings.metadataFields,

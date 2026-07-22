@@ -234,6 +234,7 @@ export function useFileOperations() {
         rootFolderPath: storeState.rootFolderPath,
         currentFilePath: storeState.currentFilePath,
         explicitFolderPath: parentFolder?.path,
+        newNoteFolder: settings.newNoteFolder,
       });
 
       const newFile = await createFile(
@@ -249,6 +250,7 @@ export function useFileOperations() {
     [
       settings.metadataFields,
       settings.newNoteLocation,
+      settings.newNoteFolder,
       createFile,
       addTab,
       setCurrentFilePath,
