@@ -12,6 +12,7 @@ import {
 import { useI18n } from "../../../hooks/useI18n";
 import type { SettingsTabProps } from "../types";
 import { useFontOptions } from "../useFontOptions";
+import { SettingsSelect } from "../SettingsSelect";
 
 interface InterfaceTabProps extends SettingsTabProps {
   isOpen: boolean;
@@ -49,17 +50,19 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               {t("settings_languageLabel")}
             </label>
-            <select
+            <SettingsSelect
+              aria-label={t("settings_languageLabel")}
               value={language}
-              onChange={(e) => {
-                const nextLanguage = e.target.value as AppSettings["language"];
-                onUpdateSettings({ language: nextLanguage });
+              options={[
+                { value: "zh-CN", label: t("common_simplifiedChinese") },
+                { value: "en", label: t("common_english") },
+              ]}
+              onChange={(nextLanguage) => {
+                onUpdateSettings({
+                  language: nextLanguage as AppSettings["language"],
+                });
               }}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
-            >
-              <option value="zh-CN">{t("common_simplifiedChinese")}</option>
-              <option value="en">{t("common_english")}</option>
-            </select>
+            />
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("settings_interfaceDesc")}
             </p>
@@ -91,7 +94,7 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
                         });
                       }
                     }}
-                    className={`rounded-xl border px-3 py-2 text-sm transition-all ${
+                    className={`rounded-xl border px-3 py-2.5 text-sm transition-all ${
                       isSelected
                         ? "border-accent-DEFAULT bg-accent-DEFAULT/10 text-gray-900 dark:text-white ring-2 ring-accent-DEFAULT/20"
                         : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:border-accent-DEFAULT/60"
@@ -118,19 +121,12 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
                 </span>
               )}
             </div>
-            <select
+            <SettingsSelect
+              aria-label={t("settings_uiFont")}
               value={currentUiFontValue}
-              onChange={(e) =>
-                onUpdateSettings({ uiFontFamily: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
-            >
-              {uiFontOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={uiFontOptions}
+              onChange={(uiFontFamily) => onUpdateSettings({ uiFontFamily })}
+            />
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("settings_uiFontDesc")}
             </p>
