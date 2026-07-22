@@ -27,7 +27,7 @@ import { Sidebar } from "./components/sidebar/Sidebar";
 import { Toolbar } from "./components/toolbar/Toolbar";
 import { SplitView } from "./components/editor/SplitView";
 import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useCodeMirror";
-import { OutlinePanel } from "./components/outline/OutlinePanel";
+import { RightRail } from "./components/rightRail/RightRail";
 import { ContentSearch } from "./components/search/ContentSearch";
 import { TabBar } from "./components/tabs/TabBar";
 import { useExportActions } from "./hooks/useExportActions";
@@ -47,6 +47,7 @@ import { getResolvedEditorFontFamily } from "./utils/fontSettings";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
 import { useKnowledgeBaseWatch } from "./app/useKnowledgeBaseWatch";
+import { useVaultIndexLifecycle } from "./hooks/useVaultIndexLifecycle";
 import { useAppUpdater } from "./app/useAppUpdater";
 import { useWorkspaceLayout } from "./app/useWorkspaceLayout";
 import { useAttachmentCleanup } from "./app/useAttachmentCleanup";
@@ -238,6 +239,7 @@ const App: React.FC = () => {
     showNotification,
     t,
   });
+  useVaultIndexLifecycle();
   const {
     pendingCleanupAttachments,
     confirmCleanupUnusedAttachments,
@@ -418,6 +420,16 @@ const App: React.FC = () => {
 
       void fileOps.handleCreateFile(undefined, fileName);
       setIsNewNoteDialogOpen(false);
+    },
+    [fileOps],
+  );
+
+  const handleCreateMissingWikiNote = useCallback(
+    (targetRaw: string) => {
+      const trimmed = targetRaw.trim();
+      if (!trimmed) return;
+      const baseName = trimmed.split("/").filter(Boolean).pop() || trimmed;
+      void fileOps.handleCreateFile(undefined, baseName);
     },
     [fileOps],
   );
@@ -733,12 +745,21 @@ const App: React.FC = () => {
                 onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
               />
               {isOutlineVisible && (
-                <OutlinePanel
+                <RightRail
                   headings={outlineHeadings}
                   activeHeadingId={activeHeadingId}
                   onHeadingClick={handleHeadingClick}
                   width={responsiveOutlineWidth}
                   onWidthChange={handleOutlineWidthChange}
+                  onOpenPath={(path) => {
+                    void fileOps.handleFileSelect({
+                      id: path,
+                      name: path.split(/[/\\]/).pop() || path,
+                      type: "file",
+                      path,
+                    });
+                  }}
+                  onCreateMissingNote={handleCreateMissingWikiNote}
                 />
               )}
               {isSearchBarOpen && (

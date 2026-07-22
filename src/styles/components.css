@@ -213,6 +213,164 @@
   color: #64748b;
 }
 
+/* Right rail tabs + links panel */
+.right-rail-header {
+  gap: 8px;
+}
+
+.right-rail-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.right-rail-tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.right-rail-tab.active {
+  opacity: 1;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.dark .right-rail-tab.active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.right-rail-tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: #3b82f6;
+  vertical-align: middle;
+}
+
+.right-rail-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+.links-panel-body {
+  padding: 0 8px 12px;
+}
+
+.links-section {
+  margin-top: 8px;
+}
+
+.links-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.links-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.links-empty {
+  margin: 0 8px 10px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.links-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 4px 2px;
+  border-radius: 10px;
+}
+
+.links-row:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.dark .links-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.links-row.is-unresolved .links-row-title {
+  color: #e11d48;
+}
+
+.dark .links-row.is-unresolved .links-row-title {
+  color: #fb7185;
+}
+
+.links-row-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  color: inherit;
+}
+
+.links-row-main:disabled {
+  cursor: default;
+}
+
+.links-row-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.links-row-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.links-row-action {
+  flex-shrink: 0;
+  border: none;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  margin-right: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dark .links-row-action {
+  background: rgba(96, 165, 250, 0.16);
+  color: #93c5fd;
+}
+
 /* Writing Stats Styles */
 .writing-stats {
   background: transparent;
