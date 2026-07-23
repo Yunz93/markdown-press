@@ -120,6 +120,9 @@ export default {
   links_unresolvedEmpty: "No dead links",
   links_createNote: "Create",
   links_neighborhood: "Neighborhood",
+  links_neighborhoodExpand: "Expand neighborhood",
+  links_neighborhoodExpandHint: "Click to enlarge and show titles",
+  links_neighborhoodDialog: "Neighborhood graph",
 
   askVault_title: "Ask vault",
   askVault_short: "Ask",
