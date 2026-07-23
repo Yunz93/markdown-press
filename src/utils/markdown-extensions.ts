@@ -640,8 +640,10 @@ export async function renderMermaidDiagrams(
 
     const rect = el.getBoundingClientRect();
     if (rect.width < 4) {
+      el.dataset.mermaidPendingWidth = "true";
       continue;
     }
+    delete el.dataset.mermaidPendingWidth;
 
     const rendererKind = getMermaidRendererKind(def);
     const stable =

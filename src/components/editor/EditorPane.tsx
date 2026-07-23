@@ -73,6 +73,7 @@ import {
   resolveAttachmentTarget,
 } from "../../utils/attachmentResolver";
 import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
+import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -412,12 +413,32 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     );
 
     // CodeMirror hook
+    const livePreviewOptimizationMode = useMemo(() => {
+      const lines = countLines(content);
+      const chars = content.length;
+      if (
+        lines > LARGE_FILE_THRESHOLDS.LINE_COUNT ||
+        chars > LARGE_FILE_THRESHOLDS.CHAR_COUNT
+      ) {
+        return "large" as const;
+      }
+      if (
+        lines > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_LINE_COUNT ||
+        chars > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_CHAR_COUNT
+      ) {
+        return "heavy" as const;
+      }
+      return "normal" as const;
+    }, [content]);
+
     const livePreviewContext = useMemo(
       () => ({
         sourceFilePath: currentFilePath,
         rootFolderPath,
         files,
         themeMode: settings.themeMode as "light" | "dark",
+        markdownStylePreset: settings.markdownStylePreset,
+        highlighter: highlighter ?? null,
         onOpenWiki: (wikiTarget: string) => {
           void wikiNavigationRef.current.navigateToWikilink(wikiTarget);
         },
@@ -441,8 +462,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             const file = byPath ?? {
               id: filePath,
               name: filePath.split(/[\\/]/).pop() || filePath,
-              type: "file" as const,
               path: filePath,
+              type: "file" as const,
             };
             return await readFileRef.current(file);
           } catch {
@@ -450,7 +471,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           }
         },
       }),
-      [currentFilePath, rootFolderPath, files, settings.themeMode],
+      [
+        currentFilePath,
+        rootFolderPath,
+        files,
+        settings.themeMode,
+        settings.markdownStylePreset,
+        highlighter,
+      ],
     );
     const codeMirror = useCodeMirror({
       content,
@@ -954,6 +982,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             {t("toolbar_saving")}
           </div>
         )}
+
+        {viewMode === ViewMode.LIVE &&
+          livePreviewOptimizationMode !== "normal" && (
+            <div
+              className="live-preview-opt-banner"
+              role="status"
+              data-mode={livePreviewOptimizationMode}
+            >
+              {livePreviewOptimizationMode === "large"
+                ? t("editor_livePreviewLargeFileMode")
+                : t("editor_livePreviewHeavyFileMode")}
+            </div>
+          )}
 
         <div className="editor-pane-backdrop flex-1 min-h-0 overflow-hidden">
           <div className="editor-pane-scroll h-full overflow-hidden">

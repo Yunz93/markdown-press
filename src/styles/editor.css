@@ -1184,6 +1184,25 @@
   max-width: 100%;
 }
 
+.editor-pane-layout .live-preview-opt-banner {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--mp-doc-muted, #64748b);
+  background: color-mix(
+    in srgb,
+    var(--mp-doc-accent, #2563eb) 10%,
+    transparent
+  );
+  border-bottom: 1px solid
+    color-mix(
+      in srgb,
+      var(--mp-doc-border, rgba(148, 163, 184, 0.35)) 80%,
+      transparent
+    );
+}
+
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-math .katex {
   font-size: 1.05em;
 }

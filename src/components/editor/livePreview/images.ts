@@ -22,6 +22,7 @@ import {
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import { livePreviewImageQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import {
   collectWikiLinkRanges,
@@ -35,6 +36,7 @@ import {
 const imageResolvedEffect = StateEffect.define<{
   cacheKey: string;
   src: string;
+  failed?: boolean;
 }>();
 
 function isDirectDisplaySrc(url: string): boolean {
@@ -56,6 +58,7 @@ class MarkdownImageWidget extends WidgetType {
     readonly to: number,
     readonly urlFrom: number,
     readonly urlTo: number,
+    readonly failed = false,
   ) {
     super();
   }
@@ -68,7 +71,8 @@ class MarkdownImageWidget extends WidgetType {
       this.from === other.from &&
       this.to === other.to &&
       this.urlFrom === other.urlFrom &&
-      this.urlTo === other.urlTo
+      this.urlTo === other.urlTo &&
+      this.failed === other.failed
     );
   }
 
@@ -84,6 +88,14 @@ class MarkdownImageWidget extends WidgetType {
     img.draggable = false;
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
+      img.addEventListener("error", () => {
+        wrap.classList.remove("is-loading");
+        wrap.classList.add("is-error");
+        wrap.title = `Failed to load: ${this.rawSrc}`;
+      });
+    } else if (this.failed) {
+      wrap.classList.add("is-error");
+      wrap.title = `Failed to resolve: ${this.rawSrc}`;
     } else {
       wrap.classList.add("is-loading");
     }
@@ -177,6 +189,7 @@ export function buildLivePreviewImageDecorations(
   view: EditorView,
   resolvedCache: Map<string, string>,
   scheduleResolve: (cacheKey: string, rawSrc: string) => void,
+  failedCache: Set<string> = new Set(),
 ): DecorationSet {
   if (isLargeEditorState(view.state)) {
     return Decoration.none;
@@ -219,11 +232,12 @@ export function buildLivePreviewImageDecorations(
           resolvedCache.get(key) ??
           getCachedPreviewImageSrc(url, ctx.sourceFilePath ?? undefined) ??
           null;
+        const failed = !resolvedSrc && failedCache.has(key);
 
         if (!resolvedSrc && isDirectDisplaySrc(url)) {
           resolvedSrc = url;
           resolvedCache.set(key, url);
-        } else if (!resolvedSrc) {
+        } else if (!resolvedSrc && !failed) {
           scheduleResolve(key, url);
         }
 
@@ -239,6 +253,7 @@ export function buildLivePreviewImageDecorations(
               to,
               urlFrom,
               urlTo,
+              failed,
             ),
           }),
         );
@@ -253,7 +268,7 @@ export const livePreviewImages = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     private resolvedCache = new Map<string, string>();
-    private pending = new Set<string>();
+    private failedCache = new Set<string>();
 
     constructor(view: EditorView) {
       this.decorations = this.rebuild(view);
@@ -264,13 +279,11 @@ export const livePreviewImages = ViewPlugin.fromClass(
       cacheKey: string,
       rawSrc: string,
     ) {
-      if (this.pending.has(cacheKey) || this.resolvedCache.has(cacheKey)) {
+      if (this.resolvedCache.has(cacheKey) || this.failedCache.has(cacheKey)) {
         return;
       }
-      this.pending.add(cacheKey);
-
       const ctx = view.state.facet(livePreviewContextFacet);
-      void (async () => {
+      livePreviewImageQueue.enqueue(cacheKey, async () => {
         try {
           let pathOrSrc = rawSrc;
           if (!hasUriScheme(rawSrc)) {
@@ -289,6 +302,7 @@ export const livePreviewImages = ViewPlugin.fromClass(
             ctx.sourceFilePath ?? undefined,
           );
           this.resolvedCache.set(cacheKey, displaySrc);
+          this.failedCache.delete(cacheKey);
           if (view.dom.isConnected) {
             view.dispatch({
               effects: imageResolvedEffect.of({
@@ -298,11 +312,18 @@ export const livePreviewImages = ViewPlugin.fromClass(
             });
           }
         } catch {
-          // Keep placeholder until the user edits the source.
-        } finally {
-          this.pending.delete(cacheKey);
+          this.failedCache.add(cacheKey);
+          if (view.dom.isConnected) {
+            view.dispatch({
+              effects: imageResolvedEffect.of({
+                cacheKey,
+                src: "",
+                failed: true,
+              }),
+            });
+          }
         }
-      })();
+      });
     }
 
     private rebuild(view: EditorView) {
@@ -310,6 +331,7 @@ export const livePreviewImages = ViewPlugin.fromClass(
         view,
         this.resolvedCache,
         (cacheKey, rawSrc) => this.scheduleResolve(view, cacheKey, rawSrc),
+        this.failedCache,
       );
     }
 
@@ -318,7 +340,12 @@ export const livePreviewImages = ViewPlugin.fromClass(
       for (const tr of update.transactions) {
         for (const effect of tr.effects) {
           if (effect.is(imageResolvedEffect)) {
-            this.resolvedCache.set(effect.value.cacheKey, effect.value.src);
+            if (effect.value.failed) {
+              this.failedCache.add(effect.value.cacheKey);
+            } else if (effect.value.src) {
+              this.resolvedCache.set(effect.value.cacheKey, effect.value.src);
+              this.failedCache.delete(effect.value.cacheKey);
+            }
             resolved = true;
           }
         }

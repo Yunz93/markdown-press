@@ -11,13 +11,20 @@ import {
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { renderMarkdown } from "../../../utils/markdown";
-import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
 import {
   defineLivePreviewBlockDecorationField,
   getCachedMarkdownHtml,
   hasSkipAncestor,
   selectionTouchesRange,
+  type BlockDecorationBuild,
+  type CoverageRange,
 } from "./shared";
+import {
+  getLivePreviewOptimizationMode,
+  SoftOffPlaceholderWidget,
+  softOffReason,
+} from "./softOff";
+import { livePreviewContextFacet } from "./context";
 
 const CALLOUT_START = /^>\s*\[!([A-Za-z0-9_-]+)\]([+-]?)\s*(.*)$/;
 
@@ -139,23 +146,52 @@ class HorizontalRuleWidget extends WidgetType {
   }
 }
 
-export function buildCalloutDecorations(state: EditorState): DecorationSet {
-  if (isHeavyLivePreviewState(state)) {
-    return Decoration.none;
-  }
-
+export function buildCalloutDecorations(
+  state: EditorState,
+): BlockDecorationBuild {
+  const coverage: CoverageRange[] = [];
+  const mode = getLivePreviewOptimizationMode(state);
+  const reason = softOffReason(mode, "callout");
   const builder = new RangeSetBuilder<Decoration>();
   const docText = state.doc.toString();
+  const ctx = state.facet(livePreviewContextFacet);
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
   for (const callout of findCalloutRanges(docText)) {
+    coverage.push({ from: callout.from, to: callout.to });
     if (selectionTouchesRange(state, callout.from, callout.to)) continue;
     if (hasSkipAncestor(state, callout.from)) continue;
+
+    if (reason) {
+      ranges.push({
+        from: callout.from,
+        to: callout.to,
+        deco: Decoration.replace({
+          widget: new SoftOffPlaceholderWidget(
+            "callout",
+            reason,
+            callout.title,
+          ),
+          block: true,
+        }),
+      });
+      continue;
+    }
 
     let bodyHtml = "";
     if (callout.bodyMarkdown.trim()) {
       try {
-        bodyHtml = getCachedMarkdownHtml(callout.bodyMarkdown, renderMarkdown);
+        const renderOpts = {
+          themeMode: ctx.themeMode,
+          markdownStylePreset: ctx.markdownStylePreset,
+          highlighter: ctx.highlighter ?? null,
+        };
+        const cacheKey = `${callout.bodyMarkdown}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}`;
+        bodyHtml = getCachedMarkdownHtml(
+          callout.bodyMarkdown,
+          (source) => renderMarkdown(source, renderOpts),
+          cacheKey,
+        );
       } catch {
         bodyHtml = "";
       }
@@ -178,6 +214,7 @@ export function buildCalloutDecorations(state: EditorState): DecorationSet {
     to: state.doc.length,
     enter: (node) => {
       if (node.name !== "HorizontalRule") return;
+      coverage.push({ from: node.from, to: node.to });
       if (selectionTouchesRange(state, node.from, node.to)) return;
       if (hasSkipAncestor(state, node.from)) return;
       ranges.push({
@@ -199,14 +236,14 @@ export function buildCalloutDecorations(state: EditorState): DecorationSet {
     lastTo = range.to;
   }
 
-  return builder.finish();
+  return { decorations: builder.finish(), coverage };
 }
 
 /** @deprecated Prefer buildCalloutDecorations(state). */
 export function buildLivePreviewCalloutDecorations(
   view: EditorView,
 ): DecorationSet {
-  return buildCalloutDecorations(view.state);
+  return buildCalloutDecorations(view.state).decorations;
 }
 
 export const livePreviewCallouts = defineLivePreviewBlockDecorationField({

@@ -32,8 +32,12 @@ import {
   type MarkdownTable,
 } from "../../../utils/markdownTable";
 import { renderMarkdown } from "../../../utils/markdown";
-import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
 import { getCachedMarkdownHtml } from "./shared";
+import {
+  getLivePreviewOptimizationMode,
+  SoftOffPlaceholderWidget,
+  softOffReason,
+} from "./softOff";
 
 export type ActiveTableCell = {
   /** Document offset of the table header line start. */
@@ -508,14 +512,12 @@ function buildTableWidget(
 }
 
 export function buildTableDecorations(state: EditorState): DecorationSet {
-  if (isHeavyLivePreviewState(state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const lines = state.doc.toString().split("\n");
   const seen = new Set<number>();
   const active = state.field(activeTableCellField, false) ?? null;
+  const mode = getLivePreviewOptimizationMode(state);
+  const reason = softOffReason(mode, "table");
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
     if (seen.has(lineIndex)) continue;
@@ -528,6 +530,19 @@ export function buildTableDecorations(state: EditorState): DecorationSet {
 
     const from = state.doc.line(table.startLine + 1).from;
     const to = state.doc.line(table.endLine + 1).to;
+    if (reason) {
+      const summary = table.header.slice(0, 3).join(" | ");
+      builder.add(
+        from,
+        to,
+        Decoration.replace({
+          widget: new SoftOffPlaceholderWidget("table", reason, summary),
+          block: true,
+        }),
+      );
+      continue;
+    }
+
     builder.add(
       from,
       to,

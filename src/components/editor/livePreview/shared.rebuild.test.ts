@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { livePreviewShouldRebuild } from "./shared";
+import { livePreviewShouldRebuild, selectionAffectsCoverage } from "./shared";
 
 describe("livePreviewShouldRebuild", () => {
   it("rebuilds marks on any selection change, but not widgets on same-line caret moves", () => {
@@ -47,5 +47,22 @@ describe("livePreviewShouldRebuild", () => {
     expect(livePreviewShouldRebuild(shim, "widgets")).toBe(true);
     view.destroy();
     parent.remove();
+  });
+});
+
+describe("selectionAffectsCoverage", () => {
+  it("is false for caret nudges outside coverage", () => {
+    const doc = "hello $x$ world";
+    const start = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+    });
+    const next = EditorState.create({
+      doc,
+      selection: { anchor: 2 },
+    });
+    expect(selectionAffectsCoverage(start, next, [{ from: 6, to: 9 }])).toBe(
+      false,
+    );
   });
 });
