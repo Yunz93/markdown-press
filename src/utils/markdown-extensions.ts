@@ -51,6 +51,11 @@ function renderKatexCached(content: string, displayMode: boolean): string {
   return rendered;
 }
 
+/** Public KaTeX render helper for Live Preview widgets and other callers. */
+export function renderKatexHtml(content: string, displayMode = false): string {
+  return renderKatexCached(content, displayMode);
+}
+
 let beautifulMermaidModulePromise: Promise<
   typeof import("beautiful-mermaid")
 > | null = null;

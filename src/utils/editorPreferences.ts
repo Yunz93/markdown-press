@@ -22,6 +22,9 @@ export function normalizeDefaultViewMode(value: unknown): ViewMode {
   if (value === ViewMode.EDITOR || value === "EDITOR") {
     return ViewMode.EDITOR;
   }
+  if (value === ViewMode.LIVE || value === "LIVE") {
+    return ViewMode.LIVE;
+  }
   if (value === ViewMode.PREVIEW || value === "PREVIEW") {
     return ViewMode.PREVIEW;
   }

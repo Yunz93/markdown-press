@@ -38,6 +38,12 @@ import {
   handleListShiftTab,
 } from "./nestedListCommands";
 import type { EditorView } from "@codemirror/view";
+import {
+  handleTableEnter,
+  handleTableShiftTab,
+  handleTableTab,
+  isInMarkdownTable,
+} from "./tables";
 
 function handleFrontmatterEnter({
   state,
@@ -106,6 +112,11 @@ export const handleSmartEnter: StateCommand = ({
 
   if (isInsideFrontmatter(state, main.from)) {
     return handleFrontmatterEnter({ state, dispatch });
+  }
+
+  // GFM 表格：单元格内 Enter 也走表格逻辑（不必在行尾）
+  if (isInMarkdownTable(state, main.from)) {
+    return handleTableEnter({ state, dispatch });
   }
 
   const line = state.doc.lineAt(main.from);
@@ -311,6 +322,14 @@ export function createHandleSmartTab(
       return true;
     }
 
+    // GFM 表格：优先单元格导航
+    if (
+      !hasExpandedSelection &&
+      isInMarkdownTable(state, state.selection.main.from)
+    ) {
+      return handleTableTab({ state, dispatch });
+    }
+
     // 列表处理 - 使用新逻辑
     if (structured.list) {
       const cmd = handleListTab({ strictMode: orderedListMode === "strict" });
@@ -375,6 +394,14 @@ export function createHandleSmartShiftTab(
         const indent = getLeadingIndent(lineText);
         return `${removeIndentUnit(indent, getIndentUnit(state))}${lineText.slice(indent.length)}`;
       });
+    }
+
+    // GFM 表格：优先单元格导航
+    if (
+      state.selection.main.empty &&
+      isInMarkdownTable(state, state.selection.main.from)
+    ) {
+      return handleTableShiftTab({ state, dispatch });
     }
 
     // 列表处理 - 使用新逻辑

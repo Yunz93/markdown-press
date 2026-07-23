@@ -21,6 +21,7 @@ import { requestVaultLinkIndexRebuild } from "../../services/vault/linkIndexEven
 import type { AskVaultCitation } from "../../types/vaultIndex";
 import type { RetrieveHit } from "../../types/vaultIndex";
 import type { FileNode } from "../../types";
+import { AppSelect } from "../ui/AppSelect";
 
 interface AskVaultPanelProps {
   open: boolean;
@@ -385,19 +386,24 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         </div>
 
         <div className="ask-vault-controls">
-          <select
+          <AppSelect
             value={scope}
-            onChange={(e) => setScope(e.target.value as AskScope)}
             aria-label={t("askVault_scope")}
-          >
-            <option value="vault">{t("askVault_scopeVault")}</option>
-            <option value="folder" disabled={!currentFilePath}>
-              {t("askVault_scopeFolder")}
-            </option>
-            <option value="files" disabled={!currentFilePath}>
-              {t("askVault_scopeCurrent")}
-            </option>
-          </select>
+            options={[
+              { value: "vault", label: t("askVault_scopeVault") },
+              {
+                value: "folder",
+                label: t("askVault_scopeFolder"),
+                disabled: !currentFilePath,
+              },
+              {
+                value: "files",
+                label: t("askVault_scopeCurrent"),
+                disabled: !currentFilePath,
+              },
+            ]}
+            onChange={(next) => setScope(next as AskScope)}
+          />
           {scopeBlocked ? (
             <p className="ask-vault-scope-hint">
               {t("askVault_scopeNeedsNote")}

@@ -101,12 +101,15 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
-            ### 0.9.16
+            ### 0.9.17
 
             #### 新功能与改进
 
-            - 编辑器：新增 Minimal / Things / Catppuccin / Solarized 等 Obsidian 主流 Markdown 样式预设（编辑区与预览同步）。
-            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.15 相同限制）。
+            - 编辑器：新增 Obsidian 风格 **实时预览（Live Preview）**——同一编辑面内隐藏 Markdown 标记，并内嵌图片 / KaTeX / wiki 链接与任务勾选。
+            - 编辑器：Markdown 表格支持 Obsidian 风格结构化编辑（对齐、行列操作等）。
+            - 设置：设置窗口可拖拽调整尺寸；元数据列宽不再被截断。
+            - UI：下拉选择统一到共享 `AppSelect` 组件。
+            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.16 相同限制）。
 
             ### macOS 安装说明
 
@@ -207,12 +210,15 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
-            ### 0.9.16
+            ### 0.9.17
 
             #### 新功能与改进
 
-            - 编辑器：新增 Minimal / Things / Catppuccin / Solarized 等 Obsidian 主流 Markdown 样式预设（编辑区与预览同步）。
-            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.15 相同限制）。
+            - 编辑器：新增 Obsidian 风格 **实时预览（Live Preview）**——同一编辑面内隐藏 Markdown 标记，并内嵌图片 / KaTeX / wiki 链接与任务勾选。
+            - 编辑器：Markdown 表格支持 Obsidian 风格结构化编辑（对齐、行列操作等）。
+            - 设置：设置窗口可拖拽调整尺寸；元数据列宽不再被截断。
+            - UI：下拉选择统一到共享 `AppSelect` 组件。
+            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.16 相同限制）。
 
             ### macOS 安装说明
 

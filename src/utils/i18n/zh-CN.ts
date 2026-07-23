@@ -88,9 +88,10 @@ export default {
   ai_generateWiki: "AI 生成字段解读 Wiki",
   ai_generatingWiki: "正在生成 Wiki…",
 
-  view_editorOnly: "仅编辑",
+  view_editorOnly: "仅源码",
+  view_livePreview: "实时预览",
   view_split: "分屏",
-  view_preview: "预览",
+  view_preview: "阅读",
 
   split_toggleOutline: "切换目录",
   split_hideOutline: "隐藏侧栏",
@@ -448,8 +449,9 @@ export default {
   settings_defaultViewMode: "默认视图模式",
   settings_defaultViewModeDesc:
     "应用启动时的默认视图。选定后切换文件会保持当前视图，不会随文件变化。",
-  settings_defaultViewModeEditor: "编辑",
-  settings_defaultViewModePreview: "预览",
+  settings_defaultViewModeEditor: "源码",
+  settings_defaultViewModeLive: "实时预览",
+  settings_defaultViewModePreview: "阅读",
   settings_defaultViewModeSplit: "分屏",
   settings_attachmentLocation: "新建附件存放位置",
   settings_attachmentLocationDesc: "粘贴或插入附件时的默认保存位置。",
@@ -608,6 +610,10 @@ export default {
   settings_metadataNowHint: "使用 {now} 表示当前日期",
   settings_metadataTip:
     "提示：拖拽可重新排序。使用 {now} 表示日期，{nowDatetime} 表示时间戳。`status` 仅用于编辑状态；发布由 `is_publish` 控制。",
+  settings_resizeModal: "拖拽调整设置窗口大小",
+  settings_resizeNav: "拖拽调整设置导航宽度",
+  settings_resizeMetadataKeyColumn: "拖拽调整字段名列宽",
+  settings_resizeMetadataValueColumn: "拖拽调整默认值列宽",
 
   settings_publishingTitle: "发布设置",
   settings_publishingTabSimpleBlog: "simple-blog",

@@ -510,7 +510,6 @@
   gap: 8px;
 }
 
-.ask-vault-controls select,
 .ask-vault-controls textarea,
 .ask-vault-actions button {
   border-radius: 12px;
@@ -521,7 +520,6 @@
   font-size: 13px;
 }
 
-.dark .ask-vault-controls select,
 .dark .ask-vault-controls textarea,
 .dark .ask-vault-actions button {
   border-color: rgba(255, 255, 255, 0.1);
