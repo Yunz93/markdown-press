@@ -462,7 +462,8 @@ export default {
   settings_convertHtmlOnPasteDesc:
     "Convert HTML from web pages and similar sources to Markdown when pasting.",
   settings_defaultViewMode: "Default view mode",
-  settings_defaultViewModeDesc: "View mode used when opening a note.",
+  settings_defaultViewModeDesc:
+    "Initial view when the app starts. After you choose a mode, switching files keeps it.",
   settings_defaultViewModeEditor: "Editor",
   settings_defaultViewModePreview: "Preview",
   settings_defaultViewModeSplit: "Split",

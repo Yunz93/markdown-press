@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { useFileSystem } from "./useFileSystem";
-import { ViewMode, type FileNode } from "../types";
+import type { FileNode } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { clearAttachmentResolverCache } from "../utils/attachmentResolver";
 import { generateFrontmatter } from "../utils/frontmatter";
@@ -130,7 +130,6 @@ export function useFileOperations() {
     updateTabContent,
     markAsSaved,
     setCurrentFilePath,
-    setViewMode,
     showNotification,
   } = useAppStore();
 
@@ -162,7 +161,6 @@ export function useFileOperations() {
           return;
         }
 
-        const wasAlreadyOpen = openTabs.includes(file.id);
         addTab(file.id);
         setCurrentFilePath(file.path);
 
@@ -175,12 +173,8 @@ export function useFileOperations() {
             updateTabContent(file.id, "");
             markAsSaved(file.id);
           }
-          setViewMode(ViewMode.PREVIEW);
+          // View mode stays sticky; App forces PREVIEW only while this tab is active.
           return;
-        }
-
-        if (!wasAlreadyOpen) {
-          setViewMode(settings.defaultViewMode);
         }
 
         const cachedContent = fileContents[file.id];
@@ -219,13 +213,10 @@ export function useFileOperations() {
       readFile,
       addTab,
       setCurrentFilePath,
-      setViewMode,
       updateTabContent,
       markAsSaved,
       showNotification,
       fileContents,
-      openTabs,
-      settings.defaultViewMode,
       settings.language,
     ],
   );
@@ -266,18 +257,15 @@ export function useFileOperations() {
       if (newFile) {
         addTab(newFile.id, initialContent);
         setCurrentFilePath(newFile.path);
-        setViewMode(settings.defaultViewMode);
       }
     },
     [
       settings.metadataFields,
       settings.newNoteLocation,
       settings.newNoteFolder,
-      settings.defaultViewMode,
       createFile,
       addTab,
       setCurrentFilePath,
-      setViewMode,
     ],
   );
 

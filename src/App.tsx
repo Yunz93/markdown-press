@@ -18,6 +18,7 @@ import { useAutoSave } from "./hooks/useAutoSave";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useStoreHydration } from "./hooks/useStoreHydration";
+import { resolvePreviewOnlyViewModeTransition } from "./utils/viewModeSession";
 import { useShikiHighlighter } from "./hooks/useShikiHighlighter";
 import { useThemeSync } from "./hooks/useThemeSync";
 import { useSystemThemeFollow } from "./hooks/useSystemThemeFollow";
@@ -90,6 +91,7 @@ const App: React.FC = () => {
     activeTabId,
     currentFilePath,
     viewMode,
+    viewModeBeforePreviewOnly,
     isSidebarOpen,
     isSettingsOpen,
     isSaving,
@@ -122,6 +124,9 @@ const App: React.FC = () => {
     watchDirectory,
   } = useFileSystem();
   const { setViewMode } = useViewMode();
+  const setViewModeBeforePreviewOnly = useAppStore(
+    (state) => state.setViewModeBeforePreviewOnly,
+  );
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
   const { highlighter } = useShikiHighlighter(content);
@@ -359,11 +364,39 @@ const App: React.FC = () => {
     },
   );
 
+  const wasPreviewOnlyActiveFileRef = useRef(false);
+
   useEffect(() => {
-    if (isPreviewOnlyActiveFile && viewMode !== ViewMode.PREVIEW) {
-      setViewMode(ViewMode.PREVIEW, "direct");
+    const wasPreviewOnly = wasPreviewOnlyActiveFileRef.current;
+    wasPreviewOnlyActiveFileRef.current = isPreviewOnlyActiveFile;
+
+    const transition = resolvePreviewOnlyViewModeTransition({
+      wasPreviewOnly,
+      isPreviewOnly: isPreviewOnlyActiveFile,
+      currentViewMode: viewMode,
+      viewModeBeforePreviewOnly,
+    });
+
+    if (
+      transition.nextViewModeBeforePreviewOnly !== undefined &&
+      transition.nextViewModeBeforePreviewOnly !== viewModeBeforePreviewOnly
+    ) {
+      setViewModeBeforePreviewOnly(transition.nextViewModeBeforePreviewOnly);
     }
-  }, [isPreviewOnlyActiveFile, viewMode, setViewMode]);
+
+    if (
+      transition.nextViewMode !== undefined &&
+      transition.nextViewMode !== viewMode
+    ) {
+      setViewMode(transition.nextViewMode, "direct");
+    }
+  }, [
+    isPreviewOnlyActiveFile,
+    viewMode,
+    viewModeBeforePreviewOnly,
+    setViewMode,
+    setViewModeBeforePreviewOnly,
+  ]);
 
   const handleHeadingClick = useCallback(
     (id: string, line: number) => {

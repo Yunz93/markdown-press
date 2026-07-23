@@ -19,6 +19,8 @@ export interface EditorState {
   viewMode: ViewMode;
   lastNonSplitViewMode: ViewMode.EDITOR | ViewMode.PREVIEW;
   lastViewModeChangeSource: 'direct' | 'toggle';
+  /** Mode to restore after leaving a preview-only file (PDF/image/HTML). */
+  viewModeBeforePreviewOnly: ViewMode | null;
   fileHistories: Record<string, HistoryState>; // Per-file history
 }
 
@@ -29,6 +31,7 @@ export interface EditorActions {
   setContent: (content: string, skipHistory?: boolean) => void;
   setContentForFile: (fileId: string, content: string, skipHistory?: boolean) => void;
   setViewMode: (mode: ViewMode, source?: 'direct' | 'toggle') => void;
+  setViewModeBeforePreviewOnly: (mode: ViewMode | null) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -43,6 +46,7 @@ export const initialEditorState: EditorState = {
   viewMode: ViewMode.SPLIT,
   lastNonSplitViewMode: ViewMode.EDITOR,
   lastViewModeChangeSource: 'direct',
+  viewModeBeforePreviewOnly: null,
   fileHistories: {}, // Initialize as empty object, histories created per file
 };
 
@@ -122,6 +126,10 @@ export function createEditorSlice(
         ? state.lastNonSplitViewMode
         : mode,
       lastViewModeChangeSource: source,
+    })),
+
+    setViewModeBeforePreviewOnly: (mode) => set(() => ({
+      viewModeBeforePreviewOnly: mode,
     })),
 
     undo: () => set((state) => {
