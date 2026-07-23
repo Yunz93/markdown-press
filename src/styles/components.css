@@ -373,66 +373,49 @@
 
 .links-neighborhood-graph {
   display: block;
-  margin: 0 4px 8px;
+  margin: 0 2px 10px;
+  background: transparent;
 }
 
-.links-neighborhood-edge {
-  stroke: rgba(148, 163, 184, 0.7);
-  stroke-width: 1;
-}
-
-.links-neighborhood-edge.is-in {
-  stroke: rgba(59, 130, 246, 0.55);
-}
-
-.links-neighborhood-edge.is-out {
-  stroke: rgba(16, 185, 129, 0.55);
+.links-neighborhood-item:focus {
+  outline: none;
 }
 
 .links-neighborhood-node {
-  cursor: pointer;
-  fill: #e2e8f0;
-  stroke: #94a3b8;
-  stroke-width: 1;
+  fill: #555555;
+  stroke: none;
 }
 
-.links-neighborhood-node.is-in {
-  fill: rgba(59, 130, 246, 0.2);
-  stroke: #3b82f6;
-}
-
-.links-neighborhood-node.is-out {
-  fill: rgba(16, 185, 129, 0.2);
-  stroke: #10b981;
+.links-neighborhood-node.is-current {
+  fill: #2563eb;
 }
 
 .dark .links-neighborhood-node {
-  fill: #1e293b;
-  stroke: #64748b;
+  fill: #94a3b8;
 }
 
-.links-neighborhood-center {
-  fill: #0f172a;
-}
-
-.dark .links-neighborhood-center {
-  fill: #e2e8f0;
-}
-
-.links-neighborhood-center-label {
-  fill: #f8fafc;
-  font-size: 8px;
-  pointer-events: none;
-}
-
-.dark .links-neighborhood-center-label {
-  fill: #0f172a;
+.dark .links-neighborhood-node.is-current {
+  fill: #60a5fa;
 }
 
 .links-neighborhood-label {
-  fill: #64748b;
-  font-size: 8px;
-  cursor: pointer;
+  fill: #111827;
+  font-size: 9px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.links-neighborhood-label.is-current {
+  fill: #1d4ed8;
+  font-weight: 600;
+}
+
+.dark .links-neighborhood-label {
+  fill: #e2e8f0;
+}
+
+.dark .links-neighborhood-label.is-current {
+  fill: #93c5fd;
 }
 
 /* Ask Vault */
