@@ -42,6 +42,7 @@ function extractMessageContent(payload: DeepSeekChatCompletionPayload): string {
 export async function generateDeepSeekJson<T>(
   prompt: string,
   settings: AppSettings,
+  systemPrompt?: string,
 ): Promise<T> {
   const apiKey = settings.deepseekApiKey?.trim();
   if (!apiKey) {
@@ -64,7 +65,7 @@ export async function generateDeepSeekJson<T>(
       messages: [
         {
           role: "system",
-          content: resolveProviderSystemPrompt(settings),
+          content: systemPrompt ?? resolveProviderSystemPrompt(settings),
         },
         {
           role: "user",

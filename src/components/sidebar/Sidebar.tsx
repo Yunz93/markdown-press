@@ -279,6 +279,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     const {
       searchQuery,
       setSearchQuery,
+      searchMode,
+      setSearchMode,
       searchResults,
       isSearching,
       filteredFiles,
@@ -461,6 +463,25 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                   className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/70 dark:bg-[#141a25] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white/90 dark:focus:bg-[#181f2c]"
                 />
               </label>
+              <select
+                aria-label={t("search_mode_label")}
+                value={searchMode}
+                onChange={(e) =>
+                  setSearchMode(
+                    e.target.value as "keyword" | "semantic" | "hybrid",
+                  )
+                }
+                className="h-10 max-w-[5.5rem] shrink-0 rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] px-2 text-xs font-medium text-gray-700 dark:text-gray-200"
+                title={t("search_mode_label")}
+              >
+                <option value="keyword">
+                  {t("search_mode_keyword_short")}
+                </option>
+                <option value="semantic">
+                  {t("search_mode_semantic_short")}
+                </option>
+                <option value="hybrid">{t("search_mode_hybrid_short")}</option>
+              </select>
               <button
                 onClick={() => openNewFileDialog(undefined, t("app_untitled"))}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"

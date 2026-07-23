@@ -25,6 +25,19 @@ import {
   normalizeNewNoteLocation,
   resolveNewNoteFolderPath,
 } from "../utils/newNoteLocation";
+import { remapPathsInIndex } from "../services/vault/linkIndexService";
+import { remapPathsInChunkIndex } from "../services/vault/chunkIndexService";
+import { notifyVaultFileSaved } from "../services/vault/linkIndexEvents";
+import {
+  CHUNK_INDEX_FILE,
+  LINK_INDEX_FILE,
+  VECTOR_INDEX_FILE,
+  writeIndexJson,
+} from "../services/vault/indexStorage";
+import {
+  getActiveVectorStore,
+  setActiveChunkIndex,
+} from "../services/vault/semanticIndexRuntime";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -366,6 +379,38 @@ export function useFileOperations() {
     (pathMap: Record<string, string>) => {
       useAppStore.setState((state) => buildTabPathRemapState(state, pathMap));
       migrateDraftBackupKeys(pathMap);
+
+      if (Object.keys(pathMap).length === 0) return;
+
+      const state = useAppStore.getState();
+      const linkIndex = state.linkIndex;
+      if (linkIndex) {
+        const next = remapPathsInIndex(linkIndex, pathMap);
+        state.setLinkIndex(next);
+        void writeIndexJson(next.vaultRoot, LINK_INDEX_FILE, next);
+      }
+
+      const chunkIndex = state.chunkIndex;
+      if (chunkIndex) {
+        const { snapshot: nextChunks, idMap } = remapPathsInChunkIndex(
+          chunkIndex,
+          pathMap,
+        );
+        state.setChunkIndex(nextChunks);
+        setActiveChunkIndex(nextChunks);
+        void writeIndexJson(nextChunks.vaultRoot, CHUNK_INDEX_FILE, nextChunks);
+
+        const vectorStore = getActiveVectorStore();
+        if (vectorStore && Object.keys(idMap).length > 0) {
+          vectorStore.remapIds(idMap);
+          state.setSemanticStatus(vectorStore.size() > 0, vectorStore.size());
+          void writeIndexJson(
+            nextChunks.vaultRoot,
+            VECTOR_INDEX_FILE,
+            vectorStore.toSnapshot(),
+          );
+        }
+      }
     },
     [],
   );
@@ -431,6 +476,10 @@ export function useFileOperations() {
         });
 
         clearAttachmentResolverCache();
+
+        for (const mod of appliedMods) {
+          notifyVaultFileSaved(mod.path, mod.newContent);
+        }
 
         showNotification(
           t(settings.language, "notifications_linksUpdated", {

@@ -118,3 +118,43 @@ export function resolveProviderWikiTemplate(settings: AppSettings): {
     legacy: settings.wikiPromptTemplate,
   };
 }
+
+export interface AskVaultPromptChunk {
+  index: number;
+  path: string;
+  titlePath: string[];
+  startLine: number;
+  endLine: number;
+  text: string;
+}
+
+export function buildAskVaultPrompt(
+  question: string,
+  chunks: AskVaultPromptChunk[],
+): string {
+  const sources = chunks
+    .map(
+      (chunk) =>
+        `[${chunk.index}] ${chunk.path} (${chunk.titlePath.join(" > ") || "note"}; L${chunk.startLine}-L${chunk.endLine})\n${chunk.text}`,
+    )
+    .join("\n\n");
+
+  return `
+You answer questions ONLY using the numbered knowledge-base excerpts below.
+Rules:
+1. If the excerpts are insufficient, say you could not find enough information in the vault.
+2. Do not invent facts that are not supported by the excerpts.
+3. Cite sources using [n] markers that match excerpt numbers.
+4. Prefer concise Markdown answers.
+
+Return JSON with:
+- answerMarkdown: string (Markdown answer with [n] citations)
+- citationIndexes: number[] (the excerpt numbers you relied on)
+
+Question:
+${question}
+
+Excerpts:
+${sources || "(none)"}
+  `.trim();
+}

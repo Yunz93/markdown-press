@@ -16,6 +16,11 @@ import {
   normalizeLanguage,
   normalizeThemeMode,
 } from "./uiStore";
+import {
+  createVaultIndexSlice,
+  type VaultIndexState,
+  type VaultIndexActions,
+} from "./vaultIndexStore";
 import { normalizeAttachmentLocation } from "../utils/attachmentLocation";
 import {
   normalizeDefaultViewMode,
@@ -50,6 +55,8 @@ export type {
   EditorActions,
   UIState,
   UIActions,
+  VaultIndexState,
+  VaultIndexActions,
 };
 // Re-export selector for convenience
 export { selectContent };
@@ -71,10 +78,12 @@ export interface AppState
     TabState,
     EditorState,
     UIState,
+    VaultIndexState,
     FileActions,
     TabActions,
     EditorActions,
-    UIActions {}
+    UIActions,
+    VaultIndexActions {}
 
 /**
  * Create the combined store using slice pattern
@@ -87,6 +96,7 @@ export const useAppStore = create<AppState>()(
       ...createTabSlice(set as any, get as any),
       ...createEditorSlice(set as any, get as any),
       ...createUISlice(set as any, get as any),
+      ...createVaultIndexSlice(set as any, get as any),
     }),
     {
       name: "markdown-press-settings",
@@ -157,6 +167,12 @@ export const useAppStore = create<AppState>()(
           ...currentState,
           ...(persistedState as any),
           settings: mergedSettings,
+          // Never hydrate bulky/runtime link index from settings persist blob.
+          linkIndex: currentState.linkIndex,
+          linkIndexProgress: currentState.linkIndexProgress,
+          chunkIndex: currentState.chunkIndex,
+          semanticReady: currentState.semanticReady,
+          semanticVectorCount: currentState.semanticVectorCount,
         };
       },
     },

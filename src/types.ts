@@ -106,6 +106,8 @@ export type AttachmentLocation =
   | "subfolderUnderCurrent";
 export type OrderedListMode = "strict" | "loose";
 export type MarkdownStylePreset = "nord" | "topaz" | "typewriter" | "primary";
+export type SearchMode = "keyword" | "semantic" | "hybrid";
+export type EmbeddingProviderId = "none" | "openai-compatible";
 
 export type ImageHostingProvider =
   | "none"
@@ -219,6 +221,13 @@ export interface AppSettings {
   wikiPromptTemplate?: string;
   wikiPromptTemplateZh?: string;
   wikiPromptTemplateEn?: string;
+  /** Retrieval / embedding (Phase 2) */
+  searchModeDefault?: SearchMode;
+  embeddingProvider?: EmbeddingProviderId;
+  embeddingApiBaseUrl?: string;
+  embeddingApiKey?: string;
+  embeddingModel?: string;
+  privacyMode?: boolean;
   imageHosting: ImageHostingConfig;
   imageHostingGithubToken?: string;
   imageHostingS3SecretAccessKey?: string;

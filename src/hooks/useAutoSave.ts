@@ -212,6 +212,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         await fs.writeFile(node.path, tabContent);
         state.markAsSaved(tabId, tabContent);
         clearDraftBackup(tabId);
+        void import("../services/vault/linkIndexEvents").then(
+          ({ notifyVaultFileSaved }) => {
+            notifyVaultFileSaved(node.path, tabContent);
+          },
+        );
         return true;
       } catch (error) {
         console.error(`Failed to save tab ${tabId}:`, error);
@@ -323,6 +328,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           const latestState = useAppStore.getState();
           if (latestState.openTabs.includes(tabId)) {
             markAsSaved(tabId, contentToSave);
+            void import("../services/vault/linkIndexEvents").then(
+              ({ notifyVaultFileSaved }) => {
+                notifyVaultFileSaved(savePath, contentToSave);
+              },
+            );
           }
           isSavingRef.current = false;
           setSaving(false);
@@ -343,6 +353,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         markAsSaved(tabId, contentToSave);
         lastSavedContentRef.current = contentToSave;
         clearDraftBackup(tabId);
+        void import("../services/vault/linkIndexEvents").then(
+          ({ notifyVaultFileSaved }) => {
+            notifyVaultFileSaved(savePath, contentToSave);
+          },
+        );
         saveStateRef.current = {
           status: "saved",
           lastSavedAt: new Date(),
