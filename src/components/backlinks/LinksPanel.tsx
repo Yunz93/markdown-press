@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useAppStore } from "../../store/appStore";
 import { useI18n } from "../../hooks/useI18n";
 import {
@@ -7,6 +7,7 @@ import {
   getUnresolvedOutbounds,
 } from "../../services/vault/linkIndexService";
 import type { WikiOutboundLink } from "../../types/vaultIndex";
+import { Dialog } from "../ui/Dialog";
 
 function displayName(path: string): string {
   const normalized = path.replace(/\\/g, "/");
@@ -65,15 +66,17 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
-/** Stable scatter positions — no edges, labels beside dots. */
+/** Stable scatter positions — no edges. */
 function layoutScatterPoints(
   ids: string[],
   width: number,
   height: number,
   centerId: string,
+  options?: { labeled?: boolean },
 ): Array<{ id: string; x: number; y: number }> {
-  const padX = 28;
-  const padY = 22;
+  const labeled = options?.labeled ?? false;
+  const padX = labeled ? 56 : 18;
+  const padY = labeled ? 36 : 16;
   const minX = padX;
   const maxX = width - padX;
   const minY = padY;
@@ -88,8 +91,12 @@ function layoutScatterPoints(
     return { id, x, y };
   });
 
-  // Light repulsion so labels stay readable in the narrow rail.
-  for (let iter = 0; iter < 24; iter += 1) {
+  const baseMinDist = labeled ? 72 : 28;
+  const centerMinDist = labeled ? 88 : 34;
+  const iterations = labeled ? 36 : 18;
+  const pushScale = labeled ? 6 : 3.5;
+
+  for (let iter = 0; iter < iterations; iter += 1) {
     for (let i = 0; i < points.length; i += 1) {
       for (let j = i + 1; j < points.length; j += 1) {
         const a = points[i]!;
@@ -97,9 +104,10 @@ function layoutScatterPoints(
         let dx = b.x - a.x;
         let dy = b.y - a.y;
         const dist = Math.hypot(dx, dy) || 0.01;
-        const minDist = a.id === centerId || b.id === centerId ? 42 : 36;
+        const minDist =
+          a.id === centerId || b.id === centerId ? centerMinDist : baseMinDist;
         if (dist >= minDist) continue;
-        const push = ((minDist - dist) / minDist) * 4.5;
+        const push = ((minDist - dist) / minDist) * pushScale;
         dx = (dx / dist) * push;
         dy = (dy / dist) * push;
         if (a.id !== centerId) {
@@ -125,32 +133,70 @@ function layoutScatterPoints(
 const NeighborhoodGraph: React.FC<{
   centerPath: string;
   nodes: Array<{ path: string; kind: "in" | "out" }>;
-  onOpenPath: (path: string) => void;
-}> = ({ centerPath, nodes, onOpenPath }) => {
-  const width = 260;
-  const height = 200;
+  onOpenPath?: (path: string) => void;
+  showLabels?: boolean;
+  width?: number;
+  height?: number;
+  className?: string;
+  onSurfaceClick?: () => void;
+  ariaLabel?: string;
+}> = ({
+  centerPath,
+  nodes,
+  onOpenPath,
+  showLabels = true,
+  width = 260,
+  height = 200,
+  className = "links-neighborhood-graph",
+  onSurfaceClick,
+  ariaLabel,
+}) => {
   const ids = useMemo(
     () => [centerPath, ...nodes.map((node) => node.path)],
     [centerPath, nodes],
   );
   const points = useMemo(
-    () => layoutScatterPoints(ids, width, height, centerPath),
-    [ids, centerPath],
+    () =>
+      layoutScatterPoints(ids, width, height, centerPath, {
+        labeled: showLabels,
+      }),
+    [ids, centerPath, width, height, showLabels],
   );
 
   return (
     <svg
-      className="links-neighborhood-graph"
+      className={className}
       viewBox={`0 0 ${width} ${height}`}
       width="100%"
       height={height}
-      role="img"
-      aria-label={displayName(centerPath)}
+      role={onSurfaceClick ? "button" : "img"}
+      tabIndex={onSurfaceClick ? 0 : undefined}
+      aria-label={ariaLabel ?? displayName(centerPath)}
+      onClick={
+        onSurfaceClick
+          ? (event) => {
+              event.preventDefault();
+              onSurfaceClick();
+            }
+          : undefined
+      }
+      onKeyDown={
+        onSurfaceClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSurfaceClick();
+              }
+            }
+          : undefined
+      }
+      style={onSurfaceClick ? { cursor: "pointer" } : undefined}
     >
       {points.map((point) => {
         const isCurrent = point.id === centerPath;
         const label = displayName(point.id);
-        const labelY = point.y + (point.y > height * 0.72 ? -12 : 16);
+        const labelY = point.y + (point.y > height * 0.78 ? -14 : 18);
+        const canOpen = Boolean(onOpenPath) && !isCurrent && !onSurfaceClick;
         return (
           <g
             key={point.id}
@@ -159,15 +205,28 @@ const NeighborhoodGraph: React.FC<{
                 ? "links-neighborhood-item is-current"
                 : "links-neighborhood-item"
             }
-            onClick={() => {
-              if (!isCurrent) onOpenPath(point.id);
-            }}
-            style={{ cursor: isCurrent ? "default" : "pointer" }}
+            onClick={
+              canOpen
+                ? (event) => {
+                    event.stopPropagation();
+                    onOpenPath?.(point.id);
+                  }
+                : undefined
+            }
+            style={{ cursor: canOpen ? "pointer" : undefined }}
           >
             <circle
               cx={point.x}
               cy={point.y}
-              r={isCurrent ? 5.5 : 4.5}
+              r={
+                showLabels
+                  ? isCurrent
+                    ? 7
+                    : 5.5
+                  : isCurrent
+                    ? 5.5
+                    : 4.5
+              }
               className={
                 isCurrent
                   ? "links-neighborhood-node is-current"
@@ -176,18 +235,20 @@ const NeighborhoodGraph: React.FC<{
             >
               <title>{label}</title>
             </circle>
-            <text
-              x={point.x}
-              y={labelY}
-              textAnchor="middle"
-              className={
-                isCurrent
-                  ? "links-neighborhood-label is-current"
-                  : "links-neighborhood-label"
-              }
-            >
-              {label.length > 14 ? `${label.slice(0, 14)}…` : label}
-            </text>
+            {showLabels ? (
+              <text
+                x={point.x}
+                y={labelY}
+                textAnchor="middle"
+                className={
+                  isCurrent
+                    ? "links-neighborhood-label is-current"
+                    : "links-neighborhood-label"
+                }
+              >
+                {label.length > 22 ? `${label.slice(0, 22)}…` : label}
+              </text>
+            ) : null}
           </g>
         );
       })}
@@ -203,6 +264,7 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
   const currentFilePath = useAppStore((s) => s.currentFilePath);
   const linkIndex = useAppStore((s) => s.linkIndex);
   const progress = useAppStore((s) => s.linkIndexProgress);
+  const [neighborhoodOpen, setNeighborhoodOpen] = useState(false);
 
   const backlinks = useMemo(
     () => getBacklinks(linkIndex, currentFilePath),
@@ -269,11 +331,41 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
             {t("links_neighborhood")}
             <span className="links-count">{neighborhood.nodes.length}</span>
           </h3>
-          <NeighborhoodGraph
-            centerPath={neighborhood.center}
-            nodes={neighborhood.nodes}
-            onOpenPath={onOpenPath}
-          />
+          <div className="links-neighborhood-compact">
+            <NeighborhoodGraph
+              centerPath={neighborhood.center}
+              nodes={neighborhood.nodes}
+              showLabels={false}
+              width={260}
+              height={168}
+              onSurfaceClick={() => setNeighborhoodOpen(true)}
+              ariaLabel={t("links_neighborhoodExpand")}
+            />
+            <p className="links-neighborhood-hint">
+              {t("links_neighborhoodExpandHint")}
+            </p>
+          </div>
+          <Dialog
+            isOpen={neighborhoodOpen}
+            onClose={() => setNeighborhoodOpen(false)}
+            title={t("links_neighborhoodDialog")}
+            className="max-w-3xl"
+            contentScroll={false}
+          >
+            <NeighborhoodGraph
+              centerPath={neighborhood.center}
+              nodes={neighborhood.nodes}
+              showLabels
+              width={720}
+              height={480}
+              className="links-neighborhood-graph is-expanded"
+              onOpenPath={(path) => {
+                setNeighborhoodOpen(false);
+                onOpenPath(path);
+              }}
+              ariaLabel={t("links_neighborhoodDialog")}
+            />
+          </Dialog>
         </section>
       ) : null}
 

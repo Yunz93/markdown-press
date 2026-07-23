@@ -113,6 +113,9 @@ export default {
   links_unresolvedEmpty: "没有死链",
   links_createNote: "创建",
   links_neighborhood: "邻域",
+  links_neighborhoodExpand: "展开邻域图",
+  links_neighborhoodExpandHint: "点击放大查看文件标题",
+  links_neighborhoodDialog: "邻域图",
 
   askVault_title: "问知识库",
   askVault_short: "问库",
