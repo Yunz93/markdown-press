@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import type { HeadingNode } from "../../utils/outline";
 import { OutlinePanel } from "../outline/OutlinePanel";
 import { LinksPanel } from "../backlinks/LinksPanel";
@@ -10,6 +10,7 @@ const MIN_OUTLINE_WIDTH = 180;
 const MAX_OUTLINE_WIDTH = 360;
 
 interface RightRailProps {
+  isOpen: boolean;
   headings: HeadingNode[];
   activeHeadingId: string | null;
   onHeadingClick: (id: string, line: number) => void;
@@ -20,6 +21,7 @@ interface RightRailProps {
 }
 
 export const RightRail: React.FC<RightRailProps> = ({
+  isOpen,
   headings,
   activeHeadingId,
   onHeadingClick,
@@ -37,7 +39,7 @@ export const RightRail: React.FC<RightRailProps> = ({
 
   const handleResizeStart = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      if (window.innerWidth < 768) return;
+      if (!isOpen || window.innerWidth < 768) return;
       event.preventDefault();
 
       const handlePointerMove = (moveEvent: MouseEvent) => {
@@ -61,14 +63,25 @@ export const RightRail: React.FC<RightRailProps> = ({
       document.addEventListener("mousemove", handlePointerMove);
       document.addEventListener("mouseup", handlePointerUp);
     },
-    [onWidthChange],
+    [isOpen, onWidthChange],
+  );
+
+  const panelStyle = useMemo(
+    () =>
+      ({
+        "--outline-width": `${width}px`,
+      }) as React.CSSProperties,
+    [width],
   );
 
   return (
     <div
       ref={panelRef}
-      className={`outline-panel right-rail ui-scaled relative bg-transparent ${isCollapsed ? "collapsed" : ""}`}
-      style={{ width: `${width}px` }}
+      style={panelStyle}
+      aria-hidden={!isOpen}
+      className={`outline-panel right-rail ui-scaled relative bg-transparent ${
+        isOpen ? "" : "is-closed"
+      } ${isCollapsed ? "collapsed" : ""}`}
     >
       <div className="outline-header right-rail-header">
         <div className="right-rail-tabs" role="tablist">
@@ -78,6 +91,7 @@ export const RightRail: React.FC<RightRailProps> = ({
             aria-selected={rightRailTab === "outline"}
             className={`right-rail-tab ${rightRailTab === "outline" ? "active" : ""}`}
             onClick={() => setRightRailTab("outline")}
+            tabIndex={isOpen ? undefined : -1}
           >
             {t("outline_title")}
           </button>
@@ -87,6 +101,7 @@ export const RightRail: React.FC<RightRailProps> = ({
             aria-selected={rightRailTab === "links"}
             className={`right-rail-tab ${rightRailTab === "links" ? "active" : ""}`}
             onClick={() => setRightRailTab("links")}
+            tabIndex={isOpen ? undefined : -1}
           >
             {t("links_title")}
             {progress.phase === "building" || progress.phase === "updating" ? (
@@ -99,6 +114,7 @@ export const RightRail: React.FC<RightRailProps> = ({
             aria-selected={rightRailTab === "related"}
             className={`right-rail-tab ${rightRailTab === "related" ? "active" : ""}`}
             onClick={() => setRightRailTab("related")}
+            tabIndex={isOpen ? undefined : -1}
           >
             {t("related_tab")}
           </button>
@@ -107,6 +123,7 @@ export const RightRail: React.FC<RightRailProps> = ({
           className="collapse-btn"
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? t("outline_expand") : t("outline_collapse")}
+          tabIndex={isOpen ? undefined : -1}
         >
           <svg
             viewBox="0 0 24 24"
@@ -145,13 +162,15 @@ export const RightRail: React.FC<RightRailProps> = ({
         </div>
       )}
 
-      <div
-        className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
-        onMouseDown={handleResizeStart}
-        aria-hidden
-      >
-        <div className="absolute left-0 top-0 h-full w-px bg-gray-300/50 dark:bg-white/10" />
-      </div>
+      {isOpen ? (
+        <div
+          className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
+          onMouseDown={handleResizeStart}
+          aria-hidden
+        >
+          <div className="absolute left-0 top-0 h-full w-px bg-gray-300/50 dark:bg-white/10" />
+        </div>
+      ) : null}
     </div>
   );
 };
