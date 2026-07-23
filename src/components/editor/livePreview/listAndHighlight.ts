@@ -14,7 +14,11 @@ import {
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
-import { hasSkipAncestor, selectionTouchesRange } from "./shared";
+import {
+  hasSkipAncestor,
+  livePreviewShouldRebuild,
+  selectionTouchesRange,
+} from "./shared";
 
 class BulletWidget extends WidgetType {
   constructor(
@@ -204,12 +208,7 @@ export const livePreviewListMarkers = ViewPlugin.fromClass(
       this.decorations = buildLivePreviewListMarkerDecorations(view);
     }
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
-      ) {
+      if (livePreviewShouldRebuild(update, "marks")) {
         this.decorations = buildLivePreviewListMarkerDecorations(update.view);
       }
     }
@@ -224,7 +223,7 @@ export const livePreviewHighlights = ViewPlugin.fromClass(
       this.decorations = buildLivePreviewHighlightDecorations(view);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      if (livePreviewShouldRebuild(update, "marks")) {
         this.decorations = buildLivePreviewHighlightDecorations(update.view);
       }
     }

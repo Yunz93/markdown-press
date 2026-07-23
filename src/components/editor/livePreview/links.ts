@@ -20,6 +20,7 @@ import {
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
+  livePreviewShouldRebuild,
 } from "./shared";
 
 class MarkdownLinkWidget extends WidgetType {
@@ -139,11 +140,8 @@ export const livePreviewLinks = ViewPlugin.fromClass(
     }
     update(update: ViewUpdate) {
       if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        livePreviewContextChanged(update) ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        livePreviewShouldRebuild(update, "widgets") ||
+        livePreviewContextChanged(update)
       ) {
         this.decorations = buildLivePreviewLinkDecorations(update.view);
       }

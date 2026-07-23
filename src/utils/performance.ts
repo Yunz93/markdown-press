@@ -2,12 +2,15 @@
  * Performance utilities for optimizing UI rendering and large file handling
  */
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from "react";
 
 // Constants for large file handling
 export const LARGE_FILE_THRESHOLDS = {
-  LINE_COUNT: 5000,      // Lines
-  CHAR_COUNT: 500000,    // Characters
+  LINE_COUNT: 5000, // Lines
+  CHAR_COUNT: 500000, // Characters
+  /** Disable tables/callouts/mermaid above this to keep typing responsive. */
+  LIVE_PREVIEW_HEAVY_LINE_COUNT: 2000,
+  LIVE_PREVIEW_HEAVY_CHAR_COUNT: 200000,
   RENDER_CHUNK_SIZE: 1000, // Lines per chunk for incremental rendering
 } as const;
 
@@ -34,14 +37,20 @@ export function isLargeFile(content: string): boolean {
 /**
  * Get file size metrics
  */
-export function getFileMetrics(content: string): { lines: number; chars: number; isLarge: boolean } {
+export function getFileMetrics(content: string): {
+  lines: number;
+  chars: number;
+  isLarge: boolean;
+} {
   if (!content) return { lines: 0, chars: 0, isLarge: false };
   const lines = countLines(content);
   const chars = content.length;
   return {
     lines,
     chars,
-    isLarge: lines > LARGE_FILE_THRESHOLDS.LINE_COUNT || chars > LARGE_FILE_THRESHOLDS.CHAR_COUNT,
+    isLarge:
+      lines > LARGE_FILE_THRESHOLDS.LINE_COUNT ||
+      chars > LARGE_FILE_THRESHOLDS.CHAR_COUNT,
   };
 }
 
@@ -51,7 +60,10 @@ export function getFileMetrics(content: string): { lines: number; chars: number;
 export function useDebounce<T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number,
-  options: { leading?: boolean; trailing?: boolean } = { leading: false, trailing: true }
+  options: { leading?: boolean; trailing?: boolean } = {
+    leading: false,
+    trailing: true,
+  },
 ): T {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastArgsRef = useRef<Parameters<T> | null>(null);
@@ -65,28 +77,31 @@ export function useDebounce<T extends (...args: unknown[]) => void>(
     optionsRef.current = options;
   }, [callback, options]);
 
-  const debounced = useCallback((...args: Parameters<T>) => {
-    lastArgsRef.current = args;
+  const debounced = useCallback(
+    (...args: Parameters<T>) => {
+      lastArgsRef.current = args;
 
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    if (optionsRef.current.leading && !isLeadingCalledRef.current) {
-      isLeadingCalledRef.current = true;
-      callbackRef.current(...args);
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      if (optionsRef.current.trailing && lastArgsRef.current) {
-        if (!optionsRef.current.leading || !isLeadingCalledRef.current) {
-          callbackRef.current(...lastArgsRef.current);
-        }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-      isLeadingCalledRef.current = false;
-      timeoutRef.current = null;
-    }, delay);
-  }, [delay]);
+
+      if (optionsRef.current.leading && !isLeadingCalledRef.current) {
+        isLeadingCalledRef.current = true;
+        callbackRef.current(...args);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        if (optionsRef.current.trailing && lastArgsRef.current) {
+          if (!optionsRef.current.leading || !isLeadingCalledRef.current) {
+            callbackRef.current(...lastArgsRef.current);
+          }
+        }
+        isLeadingCalledRef.current = false;
+        timeoutRef.current = null;
+      }, delay);
+    },
+    [delay],
+  );
 
   // Cleanup on unmount
   useEffect(() => {
@@ -105,7 +120,7 @@ export function useDebounce<T extends (...args: unknown[]) => void>(
  */
 export function useThrottledResize(
   callback: (width: number, height: number) => void,
-  delay: number = 100
+  delay: number = 100,
 ) {
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,8 +150,10 @@ export function useThrottledResize(
       const { width, height } = entry.contentRect;
 
       // Skip if size hasn't changed significantly (> 1px)
-      if (Math.abs(width - lastSizeRef.current.width) < 1 &&
-          Math.abs(height - lastSizeRef.current.height) < 1) {
+      if (
+        Math.abs(width - lastSizeRef.current.width) < 1 &&
+        Math.abs(height - lastSizeRef.current.height) < 1
+      ) {
         return;
       }
 
@@ -231,7 +248,7 @@ export function hashContent(content: string): string {
   const len = Math.min(content.length, 10000); // Limit hash computation
   for (let i = 0; i < len; i++) {
     const char = content.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   return `${hash}_${content.length}`;
@@ -265,7 +282,7 @@ export async function processInBatches<T, R>(
   items: T[],
   processor: (item: T) => R | Promise<R>,
   batchSize: number = 10,
-  onBatchComplete?: (completed: number, total: number) => void
+  onBatchComplete?: (completed: number, total: number) => void,
 ): Promise<R[]> {
   const results: R[] = [];
 
@@ -280,7 +297,7 @@ export async function processInBatches<T, R>(
 
     // Yield to main thread
     if (i + batchSize < items.length) {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
 
@@ -292,14 +309,14 @@ export async function processInBatches<T, R>(
  */
 export function scheduleIdleWork(
   work: () => void,
-  timeout: number = 100
+  timeout: number = 100,
 ): () => void {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     work();
     return () => {};
   }
 
-  if ('requestIdleCallback' in window) {
+  if ("requestIdleCallback" in window) {
     const id = requestIdleCallback(work, { timeout });
     return () => cancelIdleCallback(id);
   } else {

@@ -34,6 +34,7 @@ import {
   hasSkipAncestor,
   livePreviewContextChanged,
   selectionTouchesRange,
+  livePreviewShouldRebuild,
 } from "./shared";
 
 const wikiImageResolvedEffect = StateEffect.define<{
@@ -170,7 +171,7 @@ class WikiNoteEmbedWidget extends WidgetType {
 
     if (this.bodyHtml.trim()) {
       const body = document.createElement("div");
-      body.className = "cm-live-preview-note-embed-body";
+      body.className = "cm-live-preview-note-embed-body markdown-body";
       body.innerHTML = this.bodyHtml;
       wrap.appendChild(body);
     }
@@ -439,11 +440,8 @@ export const livePreviewWiki = ViewPlugin.fromClass(
 
       if (
         resolved ||
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        livePreviewContextChanged(update) ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        livePreviewShouldRebuild(update, "widgets") ||
+        livePreviewContextChanged(update)
       ) {
         this.decorations = this.rebuild(update.view);
       }

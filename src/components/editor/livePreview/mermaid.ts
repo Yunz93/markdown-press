@@ -13,9 +13,13 @@ import {
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { renderMermaidDiagrams } from "../../../utils/markdown-extensions";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
-import { livePreviewContextChanged, selectionTouchesRange } from "./shared";
+import {
+  livePreviewContextChanged,
+  livePreviewShouldRebuild,
+  selectionTouchesRange,
+} from "./shared";
 
 const mermaidRenderedEffect = StateEffect.define<null>();
 
@@ -73,7 +77,7 @@ function extractFencedInfo(
 export function buildLivePreviewMermaidDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
+  if (isHeavyLivePreviewState(view.state)) {
     return Decoration.none;
   }
 
@@ -121,14 +125,11 @@ export const livePreviewMermaid = ViewPlugin.fromClass(
 
     update(update: ViewUpdate) {
       if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
+        livePreviewShouldRebuild(update, "widgets") ||
         livePreviewContextChanged(update) ||
         update.transactions.some((tr) =>
           tr.effects.some((e) => e.is(mermaidRenderedEffect)),
-        ) ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        )
       ) {
         this.decorations = buildLivePreviewMermaidDecorations(update.view);
       }

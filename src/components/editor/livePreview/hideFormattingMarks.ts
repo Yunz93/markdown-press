@@ -17,6 +17,7 @@ import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   collectWikiLinkRanges,
   hasSkipAncestor,
+  livePreviewShouldRebuild,
   rangesOverlap,
   selectionTouchesRange,
 } from "./shared";
@@ -121,8 +122,13 @@ export function buildLivePreviewHideDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
+  let parseTo = 0;
+  for (const { to } of view.visibleRanges) {
+    parseTo = Math.max(parseTo, to);
+  }
   const tree =
-    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
+    ensureSyntaxTree(state, Math.min(state.doc.length, parseTo + 500), 50) ??
+    syntaxTree(state);
   const docText = state.doc.toString();
   const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
     collectWikiLinkRanges(
@@ -131,7 +137,15 @@ export function buildLivePreviewHideDecorations(
       Math.min(docText.length, to + 2),
     ),
   );
-  const calloutRanges = findCalloutRanges(docText);
+  const viewFrom = view.visibleRanges.length
+    ? Math.min(...view.visibleRanges.map((range) => range.from))
+    : 0;
+  const viewTo = view.visibleRanges.length
+    ? Math.max(...view.visibleRanges.map((range) => range.to))
+    : state.doc.length;
+  const calloutRanges = findCalloutRanges(docText).filter(
+    (range) => range.to >= viewFrom && range.from <= viewTo,
+  );
 
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
@@ -193,12 +207,7 @@ export const livePreviewHideFormatting = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
-      ) {
+      if (livePreviewShouldRebuild(update, "marks")) {
         this.decorations = buildLivePreviewHideDecorations(update.view);
       }
     }
@@ -222,15 +231,16 @@ export const livePreviewTheme = EditorView.baseTheme({
     marginInline: "0.1em 0.35em",
     verticalAlign: "middle",
     cursor: "pointer",
-    border: "1.5px solid var(--mp-doc-list-marker, #94a3b8)",
+    border:
+      "1.5px solid var(--mp-doc-task-border, var(--mp-doc-list-marker, #94a3b8))",
     borderRadius: "0.25em",
     background: "transparent",
     padding: 0,
     color: "inherit",
   },
   ".cm-live-preview-task[data-checked='true']": {
-    background: "var(--mp-doc-accent, #2563eb)",
-    borderColor: "var(--mp-doc-accent, #2563eb)",
+    background: "var(--mp-doc-task-checked, var(--mp-doc-accent, #2563eb))",
+    borderColor: "var(--mp-doc-task-checked, var(--mp-doc-accent, #2563eb))",
   },
   ".cm-live-preview-task[data-checked='true']::after": {
     content: '""',
@@ -271,17 +281,17 @@ export const livePreviewTheme = EditorView.baseTheme({
     textAlign: "center",
   },
   ".cm-live-preview-wiki": {
-    color: "var(--mp-doc-accent, #2563eb)",
+    color: "var(--mp-doc-link, var(--mp-doc-accent, #2563eb))",
     textDecoration: "underline",
     textUnderlineOffset: "0.15em",
     cursor: "pointer",
   },
   ".cm-live-preview-wiki.is-unresolved": {
-    color: "var(--mp-doc-muted, #94a3b8)",
+    color: "var(--mp-doc-link-unresolved, var(--mp-doc-muted, #94a3b8))",
     textDecorationStyle: "dashed",
   },
   ".cm-live-preview-link": {
-    color: "var(--mp-doc-accent, #2563eb)",
+    color: "var(--mp-doc-link, var(--mp-doc-accent, #2563eb))",
     textDecoration: "underline",
     textUnderlineOffset: "0.15em",
     cursor: "pointer",
@@ -298,17 +308,18 @@ export const livePreviewTheme = EditorView.baseTheme({
     fontSize: "0.95em",
   },
   ".cm-live-preview-table th, .cm-live-preview-table td": {
-    border:
-      "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent)",
+    border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.35))",
     padding: "0.4em 0.65em",
     verticalAlign: "top",
     cursor: "text",
     minWidth: "2.5em",
   },
   ".cm-live-preview-table th": {
-    background:
-      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 12%, transparent)",
+    background: "var(--mp-doc-table-header-bg, rgba(148, 163, 184, 0.12))",
     fontWeight: "650",
+  },
+  ".cm-live-preview-table tbody tr:nth-child(even) td": {
+    background: "var(--mp-doc-table-row-alt-bg, transparent)",
   },
   ".cm-live-preview-table-cell-editing": {
     outline: "2px solid var(--mp-doc-accent, #2563eb)",
@@ -331,6 +342,10 @@ export const livePreviewTheme = EditorView.baseTheme({
     fontWeight: "700",
     marginBottom: "0.35em",
     textTransform: "capitalize",
+  },
+  ".cm-live-preview-callout-body.markdown-body": {
+    fontSize: "0.95em",
+    lineHeight: "1.7",
   },
   ".cm-live-preview-callout-warning, .cm-live-preview-callout-caution": {
     borderInlineStartColor: "#d97706",
@@ -359,7 +374,9 @@ export const livePreviewTheme = EditorView.baseTheme({
     textAlign: "right",
   },
   ".cm-live-preview-highlight": {
-    background: "color-mix(in srgb, #eab308 35%, transparent)",
+    background:
+      "var(--mp-doc-mark-bg, color-mix(in srgb, #eab308 35%, transparent))",
+    color: "var(--mp-doc-mark-text, inherit)",
     borderRadius: "0.15em",
     paddingInline: "0.1em",
   },
@@ -382,6 +399,10 @@ export const livePreviewTheme = EditorView.baseTheme({
       "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 30%, transparent)",
     background:
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 6%, transparent)",
+  },
+  ".cm-live-preview-note-embed-body.markdown-body": {
+    fontSize: "0.95em",
+    lineHeight: "1.7",
   },
   ".cm-live-preview-note-embed-title": {
     display: "inline-block",

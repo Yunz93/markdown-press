@@ -14,6 +14,7 @@ import {
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import { livePreviewShouldRebuild } from "./shared";
 
 class TaskCheckboxWidget extends WidgetType {
   constructor(
@@ -123,12 +124,7 @@ export const livePreviewTaskCheckboxes = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
-      ) {
+      if (livePreviewShouldRebuild(update, "marks")) {
         this.decorations = buildLivePreviewTaskDecorations(update.view);
       }
     }

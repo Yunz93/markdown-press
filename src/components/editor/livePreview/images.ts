@@ -29,6 +29,7 @@ import {
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
+  livePreviewShouldRebuild,
 } from "./shared";
 
 const imageResolvedEffect = StateEffect.define<{
@@ -254,11 +255,8 @@ export const livePreviewImages = ViewPlugin.fromClass(
 
       if (
         resolved ||
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        livePreviewContextChanged(update) ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        livePreviewShouldRebuild(update, "widgets") ||
+        livePreviewContextChanged(update)
       ) {
         this.decorations = this.rebuild(update.view);
       }

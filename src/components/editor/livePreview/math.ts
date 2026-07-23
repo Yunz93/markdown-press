@@ -20,6 +20,7 @@ import {
   hasSkipAncestor,
   rangesOverlap,
   selectionTouchesRange,
+  livePreviewShouldRebuild,
 } from "./shared";
 
 export interface MathRange {
@@ -201,12 +202,7 @@ export const livePreviewMath = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
-      ) {
+      if (livePreviewShouldRebuild(update, "widgets")) {
         this.decorations = buildLivePreviewMathDecorations(update.view);
       }
     }
