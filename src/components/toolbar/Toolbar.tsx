@@ -12,6 +12,7 @@ interface ToolbarProps {
   onViewModeChange: (mode: ViewMode) => void;
   onAIAnalyze: () => void;
   onAskVault?: () => void;
+  isAskVaultOpen?: boolean;
   isAnalyzing: boolean;
   isSaving: boolean;
   isPublishing?: boolean;
@@ -33,6 +34,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     onViewModeChange,
     onAIAnalyze,
     onAskVault,
+    isAskVaultOpen = false,
     isAnalyzing,
     isSaving,
     isPublishing = false,
@@ -228,7 +230,12 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                 type="button"
                 onClick={onAskVault}
                 disabled={isPreviewOnlyFile}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 dark:bg-white/[0.06] text-sky-600 dark:text-sky-300 hover:bg-white dark:hover:bg-white/10 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                aria-pressed={isAskVaultOpen}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
+                  isAskVaultOpen
+                    ? "bg-sky-100 text-sky-700 dark:bg-sky-400/20 dark:text-sky-200"
+                    : "bg-white/80 dark:bg-white/[0.06] text-sky-600 dark:text-sky-300 hover:bg-white dark:hover:bg-white/10"
+                }`}
                 title={t("askVault_title")}
                 aria-label={t("askVault_title")}
               >

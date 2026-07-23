@@ -1,4 +1,4 @@
-import { ViewMode } from '../types';
+import { ViewMode } from "../types";
 
 /**
  * Layout configuration constants
@@ -19,6 +19,13 @@ export const LAYOUT = {
     DEFAULT_WIDTH: 240,
     MIN_WIDTH: 180,
     MAX_WIDTH: 360,
+  },
+
+  /** Ask Vault docked module (right column) */
+  ASK_VAULT: {
+    DEFAULT_WIDTH: 400,
+    MIN_WIDTH: 320,
+    MAX_WIDTH: 560,
   },
 
   /** Minimum workspace widths for different view modes */
@@ -81,13 +88,15 @@ export const LAYOUT = {
 
   /** Storage keys for persisted layout settings */
   STORAGE_KEYS: {
-    SIDEBAR_WIDTH: 'markdown-press.sidebar-width',
-    OUTLINE_WIDTH: 'markdown-press.outline-width',
-    SETTINGS_MODAL_WIDTH: 'markdown-press.settings-modal-width',
-    SETTINGS_MODAL_HEIGHT: 'markdown-press.settings-modal-height',
-    SETTINGS_NAV_WIDTH: 'markdown-press.settings-nav-width',
-    SETTINGS_METADATA_KEY_WIDTH: 'markdown-press.settings-metadata-key-width',
-    SETTINGS_METADATA_VALUE_WIDTH: 'markdown-press.settings-metadata-value-width',
+    SIDEBAR_WIDTH: "markdown-press.sidebar-width",
+    OUTLINE_WIDTH: "markdown-press.outline-width",
+    ASK_VAULT_WIDTH: "markdown-press.ask-vault-width",
+    SETTINGS_MODAL_WIDTH: "markdown-press.settings-modal-width",
+    SETTINGS_MODAL_HEIGHT: "markdown-press.settings-modal-height",
+    SETTINGS_NAV_WIDTH: "markdown-press.settings-nav-width",
+    SETTINGS_METADATA_KEY_WIDTH: "markdown-press.settings-metadata-key-width",
+    SETTINGS_METADATA_VALUE_WIDTH:
+      "markdown-press.settings-metadata-value-width",
   },
 } as const;
 
@@ -105,9 +114,9 @@ export function getStoredPanelWidth(
   storageKey: string,
   fallback: number,
   min: number,
-  max: number
+  max: number,
 ): number {
-  if (typeof window === 'undefined') return fallback;
+  if (typeof window === "undefined") return fallback;
 
   const rawValue = window.localStorage.getItem(storageKey);
   const parsedValue = rawValue ? Number(rawValue) : Number.NaN;
@@ -132,7 +141,7 @@ export function getMinimumWorkspaceWidth(viewMode: ViewMode): number {
  * Calculate minimum workspace width with outline panel
  */
 export function getMinimumWorkspaceWidthWithOutline(
-  viewMode: ViewMode
+  viewMode: ViewMode,
 ): number {
   if (viewMode === ViewMode.SPLIT) {
     return LAYOUT.WORKSPACE.WITH_OUTLINE.SPLIT;

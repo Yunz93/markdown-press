@@ -792,7 +792,14 @@ const App: React.FC = () => {
               viewMode={viewMode}
               onViewModeChange={handleToolbarViewModeChange}
               onAIAnalyze={handleAIAnalyze}
-              onAskVault={() => setIsAskVaultOpen(true)}
+              onAskVault={() => {
+                setIsAskVaultOpen((prev) => {
+                  const next = !prev;
+                  if (next) setIsOutlineOpen(false);
+                  return next;
+                });
+              }}
+              isAskVaultOpen={isAskVaultOpen}
               isAnalyzing={isAnalyzing}
               isSaving={isSaving}
               isPublishing={isPublishing}
@@ -824,9 +831,23 @@ const App: React.FC = () => {
                 canShowOutline={canShowOutlinePanel}
                 canShowOutlineToggle={canShowOutlineToggle}
                 contentDensity={contentDensity}
-                onToggleOutline={() => setIsOutlineOpen(!isOutlineOpen)}
+                onToggleOutline={() => {
+                  if (isAskVaultOpen) {
+                    setIsAskVaultOpen(false);
+                    setIsOutlineOpen(true);
+                    return;
+                  }
+                  setIsOutlineOpen(!isOutlineOpen);
+                }}
               />
-              {isOutlineVisible && (
+              {isAskVaultOpen ? (
+                <AskVaultPanel
+                  open
+                  onClose={() => setIsAskVaultOpen(false)}
+                  onOpenFile={fileOps.handleFileSelect}
+                  readFile={readFile}
+                />
+              ) : isOutlineVisible ? (
                 <RightRail
                   headings={outlineHeadings}
                   activeHeadingId={activeHeadingId}
@@ -843,20 +864,13 @@ const App: React.FC = () => {
                   }}
                   onCreateMissingNote={handleCreateMissingWikiNote}
                 />
-              )}
+              ) : null}
               {isSearchBarOpen && (
                 <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
               )}
             </div>
           </main>
         </div>
-
-        <AskVaultPanel
-          open={isAskVaultOpen}
-          onClose={() => setIsAskVaultOpen(false)}
-          onOpenFile={fileOps.handleFileSelect}
-          readFile={readFile}
-        />
 
         <AppDialogs
           isSettingsOpen={isSettingsOpen}

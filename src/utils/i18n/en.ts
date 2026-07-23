@@ -123,6 +123,9 @@ export default {
 
   askVault_title: "Ask vault",
   askVault_short: "Ask",
+  askVault_moduleHint:
+    "Works beside the editor: retrieve, answer, jump to sources",
+  askVault_resize: "Resize Ask vault panel",
   askVault_scope: "Search scope",
   askVault_scopeVault: "Entire vault",
   askVault_scopeFolder: "Current folder",
