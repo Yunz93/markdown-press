@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { AppSettings } from "../../types";
 import { useI18n } from "../../hooks/useI18n";
 import type { TranslationKey } from "../../utils/i18n";
@@ -12,6 +12,7 @@ import { PublishingTab } from "./tabs/PublishingTab";
 import { ImageHostingTab } from "./tabs/ImageHostingTab";
 import { UpdatesTab } from "./tabs/UpdatesTab";
 import { IndexTab } from "./tabs/IndexTab";
+import { useSettingsModalLayout } from "./useSettingsModalLayout";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -53,6 +54,34 @@ function getTabs(
   ];
 }
 
+function beginPointerDrag(
+  event: React.MouseEvent,
+  cursor: string,
+  onMove: (deltaX: number, deltaY: number) => void,
+) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const startX = event.clientX;
+  const startY = event.clientY;
+
+  const handlePointerMove = (moveEvent: MouseEvent) => {
+    onMove(moveEvent.clientX - startX, moveEvent.clientY - startY);
+  };
+
+  const handlePointerUp = () => {
+    document.removeEventListener("mousemove", handlePointerMove);
+    document.removeEventListener("mouseup", handlePointerUp);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  };
+
+  document.body.style.cursor = cursor;
+  document.body.style.userSelect = "none";
+  document.addEventListener("mousemove", handlePointerMove);
+  document.addEventListener("mouseup", handlePointerUp);
+}
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -65,6 +94,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const clearSettingsFocusTab = useAppStore((s) => s.clearSettingsFocusTab);
   const [activeTab, setActiveTab] = useState<SettingsTab>("editor");
   const tabs = getTabs(t);
+  const {
+    width,
+    height,
+    navWidth,
+    metadataKeyWidth,
+    metadataValueWidth,
+    updateSize,
+    updateNavWidth,
+    updateMetadataKeyWidth,
+    updateMetadataValueWidth,
+  } = useSettingsModalLayout();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -91,6 +131,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [isOpen, onClose]);
+
+  const handleModalResizeStart = useCallback(
+    (event: React.MouseEvent) => {
+      const startWidth = width;
+      const startHeight = height;
+      beginPointerDrag(event, "nwse-resize", (deltaX, deltaY) => {
+        updateSize(startWidth + deltaX, startHeight + deltaY);
+      });
+    },
+    [height, updateSize, width],
+  );
+
+  const handleNavResizeStart = useCallback(
+    (event: React.MouseEvent) => {
+      const startWidth = navWidth;
+      beginPointerDrag(event, "col-resize", (deltaX) => {
+        updateNavWidth(startWidth + deltaX);
+      });
+    },
+    [navWidth, updateNavWidth],
+  );
 
   if (!isOpen) return null;
 
@@ -125,6 +186,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <MetadataTab
             settings={settings}
             onUpdateSettings={onUpdateSettings}
+            keyColumnWidth={metadataKeyWidth}
+            valueColumnWidth={metadataValueWidth}
+            onKeyColumnWidthChange={updateMetadataKeyWidth}
+            onValueColumnWidthChange={updateMetadataValueWidth}
           />
         );
       case "shortcuts":
@@ -161,13 +226,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       style={uiScaleStyle}
     >
       <div
-        className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-scale-in flex h-[600px] max-h-[90vh] border border-gray-200/50 dark:border-white/10"
+        className="relative flex overflow-hidden rounded-2xl border border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl transition-shadow animate-scale-in dark:border-white/10 dark:bg-gray-900/95"
+        style={{
+          width,
+          height,
+          maxWidth: "calc(100vw - 2rem)",
+          maxHeight: "calc(100vh - 2rem)",
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={t("settings_title")}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-56 bg-gray-50/50 dark:bg-black/20 border-r border-gray-200/50 dark:border-white/5 flex min-h-0 flex-col shrink-0 p-3">
+        <div
+          className="relative flex min-h-0 shrink-0 flex-col border-r border-gray-200/50 bg-gray-50/50 p-3 dark:border-white/5 dark:bg-black/20"
+          style={{ width: navWidth }}
+        >
           <div className="mb-2 shrink-0 px-3 py-4">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {t("settings_title")}
@@ -190,20 +264,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             ))}
           </nav>
+
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t("settings_resizeNav")}
+            title={t("settings_resizeNav")}
+            className="absolute inset-y-0 right-0 z-10 hidden w-1 cursor-col-resize md:block"
+            onMouseDown={handleNavResizeStart}
+          />
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 bg-transparent">
+        <div className="flex min-w-0 flex-1 flex-col bg-transparent">
           <div className="settings-panel flex-1 overflow-y-auto p-8 scrollbar-hide">
             {renderActiveTab()}
           </div>
 
-          <div className="p-4 border-t border-gray-200/50 dark:border-white/10 flex justify-end">
+          <div className="flex justify-end border-t border-gray-200/50 p-4 dark:border-white/10">
             <button
               onClick={onClose}
-              className="inline-flex items-center gap-1.5 px-6 py-2 bg-black dark:bg-white text-white dark:text-black text-sm font-medium rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-6 py-2 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 active:scale-95 dark:bg-white dark:text-black"
             >
               <svg
-                className="w-4 h-4"
+                className="h-4 w-4"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -215,6 +298,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
         </div>
+
+        <button
+          type="button"
+          aria-label={t("settings_resizeModal")}
+          title={t("settings_resizeModal")}
+          className="absolute bottom-1.5 right-1.5 z-20 hidden h-4 w-4 cursor-nwse-resize rounded-sm border border-gray-300/80 bg-white/90 shadow-sm md:block dark:border-white/20 dark:bg-gray-800/90"
+          onMouseDown={handleModalResizeStart}
+        >
+          <span className="pointer-events-none absolute inset-[3px] border-b border-r border-gray-400/80 dark:border-gray-300/50" />
+        </button>
       </div>
     </div>
   );

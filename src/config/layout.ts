@@ -60,10 +60,34 @@ export const LAYOUT = {
     ALIGN_TOP_RATIO: 0.18,
   },
 
+  /** Settings modal dimensions and constraints */
+  SETTINGS_MODAL: {
+    DEFAULT_WIDTH: 960,
+    DEFAULT_HEIGHT: 720,
+    MIN_WIDTH: 720,
+    MAX_WIDTH: 1280,
+    MIN_HEIGHT: 480,
+    MAX_HEIGHT: 920,
+    NAV_DEFAULT_WIDTH: 224,
+    NAV_MIN_WIDTH: 160,
+    NAV_MAX_WIDTH: 320,
+    METADATA_KEY_DEFAULT_WIDTH: 120,
+    METADATA_KEY_MIN_WIDTH: 88,
+    METADATA_KEY_MAX_WIDTH: 220,
+    METADATA_VALUE_DEFAULT_WIDTH: 180,
+    METADATA_VALUE_MIN_WIDTH: 120,
+    METADATA_VALUE_MAX_WIDTH: 360,
+  },
+
   /** Storage keys for persisted layout settings */
   STORAGE_KEYS: {
     SIDEBAR_WIDTH: 'markdown-press.sidebar-width',
     OUTLINE_WIDTH: 'markdown-press.outline-width',
+    SETTINGS_MODAL_WIDTH: 'markdown-press.settings-modal-width',
+    SETTINGS_MODAL_HEIGHT: 'markdown-press.settings-modal-height',
+    SETTINGS_NAV_WIDTH: 'markdown-press.settings-nav-width',
+    SETTINGS_METADATA_KEY_WIDTH: 'markdown-press.settings-metadata-key-width',
+    SETTINGS_METADATA_VALUE_WIDTH: 'markdown-press.settings-metadata-value-width',
   },
 } as const;
 
