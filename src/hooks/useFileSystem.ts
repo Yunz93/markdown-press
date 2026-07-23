@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { getFileSystem } from "../types/filesystem";
 import { useAppStore } from "../store/appStore";
 import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
-import { ViewMode } from "../types";
 import type { FileNode } from "../types";
 import type { FileWatchEvent, DirectoryWatchEvent } from "../types/filesystem";
 import { localizeKnownError, t } from "../utils/i18n";
@@ -212,7 +211,6 @@ export function useFileSystem() {
     showNotification,
     addTab,
     activateTab,
-    setViewMode,
     settings,
   } = useAppStore();
 
@@ -431,10 +429,6 @@ export function useFileSystem() {
         });
         if (!result) return null;
 
-        if (result.openedPreviewOnly) {
-          setViewMode(ViewMode.PREVIEW);
-        }
-
         updateKnowledgeBaseMetadata(result.dirPath);
         if (!options?.silentSuccess) {
           showNotification(
@@ -461,7 +455,6 @@ export function useFileSystem() {
       setCurrentFilePath,
       setFiles,
       setRootFolderPath,
-      setViewMode,
       showNotification,
       handleFileSystemError,
       updateKnowledgeBaseMetadata,

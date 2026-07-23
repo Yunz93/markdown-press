@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { ViewMode } from "../types";
 import { createFileSlice, type FileState, type FileActions } from "./fileStore";
 import { createTabSlice, type TabState, type TabActions } from "./tabStore";
 import {
@@ -173,6 +174,13 @@ export const useAppStore = create<AppState>()(
           chunkIndex: currentState.chunkIndex,
           semanticReady: currentState.semanticReady,
           semanticVectorCount: currentState.semanticVectorCount,
+          // Session starts from the configured default; file switches keep the live mode.
+          viewMode: mergedSettings.defaultViewMode,
+          lastNonSplitViewMode:
+            mergedSettings.defaultViewMode === ViewMode.PREVIEW
+              ? ViewMode.PREVIEW
+              : ViewMode.EDITOR,
+          viewModeBeforePreviewOnly: null,
         };
       },
     },

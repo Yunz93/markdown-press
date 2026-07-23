@@ -433,8 +433,9 @@ export default {
   settings_autoPairMarkdown: "自动配对 Markdown 语法",
   settings_convertHtmlOnPaste: "粘贴时将 HTML 转为 Markdown",
   settings_convertHtmlOnPasteDesc: "从网页等来源粘贴时自动转换为 Markdown。",
-  settings_defaultViewMode: "默认打开视图",
-  settings_defaultViewModeDesc: "打开笔记时默认使用的视图模式。",
+  settings_defaultViewMode: "默认视图模式",
+  settings_defaultViewModeDesc:
+    "应用启动时的默认视图。选定后切换文件会保持当前视图，不会随文件变化。",
   settings_defaultViewModeEditor: "编辑",
   settings_defaultViewModePreview: "预览",
   settings_defaultViewModeSplit: "分屏",
