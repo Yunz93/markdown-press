@@ -86,7 +86,12 @@ export {
   findMathRangesInText,
   livePreviewMath,
 } from "./math";
-export { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
+export {
+  buildLivePreviewWikiDecorations,
+  livePreviewWiki,
+  clearLivePreviewWikiCaches,
+  invalidateLivePreviewWikiCachesForPath,
+} from "./wiki";
 export { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
 export {
   buildLivePreviewCalloutDecorations,

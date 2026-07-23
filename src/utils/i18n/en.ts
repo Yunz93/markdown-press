@@ -756,6 +756,8 @@ export default {
     "Enabled only for the Windows desktop build. New versions show a reminder without interrupting your current work.",
   settings_updatesCheckNow: "Check now",
   settings_updatesChecking: "Checking for updates...",
+  settings_updatesArtifactsDisabled:
+    "This build does not ship in-app updater artifacts. Download from GitHub Releases instead.",
   settings_updatesUpToDate: "You are already on the latest version.",
   settings_updatesAvailableStatus: "Update {version} is available.",
   settings_updatesPreparingInstall: "Preparing to install {version}...",

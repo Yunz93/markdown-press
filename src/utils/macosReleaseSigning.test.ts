@@ -37,10 +37,14 @@ describe("macOS release signing configuration", () => {
     expect(workflow).toContain("APPLE_ID: ${{ secrets.APPLE_ID }}");
   });
 
-  it("keeps updater plugin endpoints configured for Windows in-app updates", () => {
+  it("keeps updater plugin endpoints configured for Windows in-app updates", async () => {
     const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, "utf8"));
+    const { UPDATER_ARTIFACTS_ENABLED } =
+      await import("../services/updaterCapabilities");
 
-    expect([true, false]).toContain(tauriConfig.bundle.createUpdaterArtifacts);
+    expect(tauriConfig.bundle.createUpdaterArtifacts).toBe(
+      UPDATER_ARTIFACTS_ENABLED,
+    );
     expect(tauriConfig.plugins?.updater?.endpoints).toEqual([
       "https://github.com/Yunz93/markdown-press/releases/latest/download/latest.json",
     ]);

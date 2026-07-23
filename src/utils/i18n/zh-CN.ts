@@ -704,6 +704,8 @@ export default {
     "仅在 Windows 桌面版启用。发现新版本后会给出提示，但不会立刻打断当前写作。",
   settings_updatesCheckNow: "立即检查",
   settings_updatesChecking: "正在检查更新...",
+  settings_updatesArtifactsDisabled:
+    "当前版本未发布应用内更新产物，请从 GitHub Releases 手动下载。",
   settings_updatesUpToDate: "当前已经是最新版本。",
   settings_updatesAvailableStatus: "发现新版本 {version}。",
   settings_updatesPreparingInstall: "正在准备安装 {version}...",
