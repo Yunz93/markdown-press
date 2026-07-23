@@ -201,6 +201,8 @@ export function createMarkdownKeyBindings(
     { key: "Alt-Shift-Enter", run: insertTableRowAbove },
     { key: "Alt-Mod-ArrowLeft", run: insertTableColumnLeft },
     { key: "Alt-Mod-ArrowRight", run: insertTableColumnRight },
+    { key: "Mod-Shift-Backspace", run: deleteTableRow },
+    { key: "Alt-Mod-Backspace", run: deleteTableColumn },
     { key: "Mod-`", run: toggleInlineCode },
     { key: "Mod-Shift-l", run: toggleUnorderedList },
     { key: "Mod-Shift-o", run: createToggleOrderedList(orderedListMode) },

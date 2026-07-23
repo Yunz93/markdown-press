@@ -22,7 +22,11 @@ import {
 } from "@codemirror/view";
 import {
   findTableAt,
+  insertColumn,
+  insertRowAbove,
   insertRowBelow,
+  deleteColumn,
+  deleteRow,
   logicalRowCount,
   nextCell,
   prevCell,
@@ -32,12 +36,19 @@ import {
   type MarkdownTable,
 } from "../../../utils/markdownTable";
 import { renderMarkdown } from "../../../utils/markdown";
+import { useAppStore } from "../../../store/appStore";
+import { t } from "../../../utils/i18n";
 import { getCachedMarkdownHtml } from "./shared";
 import {
   getLivePreviewOptimizationMode,
   SoftOffPlaceholderWidget,
   softOffReason,
 } from "./softOff";
+import {
+  closeLiveTableContextMenu,
+  openLiveTableContextMenu,
+  type LiveTableStructureOp,
+} from "./tableContextMenu";
 
 export type ActiveTableCell = {
   /** Document offset of the table header line start. */
@@ -168,6 +179,76 @@ function commitCellValue(
         : null,
     };
   });
+}
+
+function applyLiveTableStructureOp(
+  view: EditorView,
+  tableFrom: number,
+  logicalRow: number,
+  col: number,
+  value: string,
+  op: LiveTableStructureOp,
+): boolean {
+  return dispatchTableRewrite(view, tableFrom, (table) => {
+    const withValue = setTableCell(table, logicalRow, col, value);
+    let nextTable: MarkdownTable | null = withValue;
+    let nextRow = logicalRow;
+    let nextCol = col;
+
+    switch (op) {
+      case "insertRowAbove": {
+        nextTable = insertRowAbove(withValue, logicalRow);
+        nextRow = logicalRow <= 0 ? 1 : logicalRow;
+        break;
+      }
+      case "insertRowBelow": {
+        nextTable = insertRowBelow(withValue, logicalRow);
+        nextRow = logicalRow + 1;
+        break;
+      }
+      case "deleteRow": {
+        nextTable = deleteRow(withValue, logicalRow);
+        if (!nextTable) return { table: withValue, active: null };
+        nextRow = Math.min(
+          logicalRow,
+          Math.max(0, logicalRowCount(nextTable) - 1),
+        );
+        nextCol = Math.min(col, nextTable.columnCount - 1);
+        break;
+      }
+      case "insertColumnLeft": {
+        nextTable = insertColumn(withValue, col, "left");
+        break;
+      }
+      case "insertColumnRight": {
+        nextTable = insertColumn(withValue, col, "right");
+        nextCol = col + 1;
+        break;
+      }
+      case "deleteColumn": {
+        nextTable = deleteColumn(withValue, col);
+        if (!nextTable) return { table: withValue, active: null };
+        nextCol = Math.min(col, nextTable.columnCount - 1);
+        break;
+      }
+      default:
+        break;
+    }
+
+    return {
+      table: nextTable,
+      active: {
+        from: tableFrom,
+        to: tableFrom,
+        logicalRow: nextRow,
+        col: nextCol,
+      },
+    };
+  });
+}
+
+function isMod(event: KeyboardEvent): boolean {
+  return event.metaKey || event.ctrlKey;
 }
 
 function readEditingCellValue(cell: HTMLElement): string {
@@ -319,7 +400,64 @@ class TableWidget extends WidgetType {
       cell.innerHTML = html || "&nbsp;";
     }
 
+    const language = useAppStore.getState().settings.language;
+    cell.title = t(language, "table_cellHint");
+
+    cell.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const located = tableAtDocPos(view, this.from);
+      if (!located) return;
+      const editing =
+        cell.contentEditable === "true"
+          ? cell
+          : (cell
+              .closest(".cm-live-preview-table-wrap")
+              ?.querySelector(
+                ".cm-live-preview-table-cell-editing",
+              ) as HTMLElement | null);
+      const value = editing
+        ? readEditingCellValue(editing)
+        : (located.table.body[logicalRow - 1]?.[col] ??
+          (logicalRow === 0 ? (located.table.header[col] ?? "") : ""));
+
+      // Ensure this cell is active before mutating.
+      if (cell.contentEditable !== "true") {
+        this.activateCell(
+          view,
+          logicalRow,
+          col,
+          cell.closest(".cm-live-preview-table-wrap"),
+        );
+      }
+
+      openLiveTableContextMenu(event, {
+        view,
+        tableFrom: this.from,
+        logicalRow,
+        col,
+        canDeleteColumn: located.table.columnCount > 1,
+        readValue: () => {
+          const current = view.dom.querySelector(
+            `.cm-live-preview-table-cell-editing`,
+          ) as HTMLElement | null;
+          return current ? readEditingCellValue(current) : value;
+        },
+        apply: (op, nextValue) => {
+          applyLiveTableStructureOp(
+            view,
+            this.from,
+            logicalRow,
+            col,
+            nextValue,
+            op,
+          );
+        },
+      });
+    });
+
     cell.addEventListener("mousedown", (event) => {
+      if (event.button === 2) return;
       if (isEditing) {
         event.stopPropagation();
         return;
@@ -381,10 +519,92 @@ class TableWidget extends WidgetType {
   ) {
     if (event.isComposing) return;
     const value = readEditingCellValue(cell);
+    const mod = isMod(event);
+
+    // Structural shortcuts (same as source Phase A + delete).
+    if (event.key === "Enter" && mod && event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyLiveTableStructureOp(
+        view,
+        this.from,
+        logicalRow,
+        col,
+        value,
+        "insertRowBelow",
+      );
+      return;
+    }
+    if (event.key === "Enter" && event.altKey && event.shiftKey && !mod) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyLiveTableStructureOp(
+        view,
+        this.from,
+        logicalRow,
+        col,
+        value,
+        "insertRowAbove",
+      );
+      return;
+    }
+    if (event.key === "ArrowLeft" && event.altKey && mod) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyLiveTableStructureOp(
+        view,
+        this.from,
+        logicalRow,
+        col,
+        value,
+        "insertColumnLeft",
+      );
+      return;
+    }
+    if (event.key === "ArrowRight" && event.altKey && mod) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyLiveTableStructureOp(
+        view,
+        this.from,
+        logicalRow,
+        col,
+        value,
+        "insertColumnRight",
+      );
+      return;
+    }
+    if (event.key === "Backspace" && mod && event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyLiveTableStructureOp(
+        view,
+        this.from,
+        logicalRow,
+        col,
+        value,
+        "deleteRow",
+      );
+      return;
+    }
+    if (event.key === "Backspace" && event.altKey && mod && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyLiveTableStructureOp(
+        view,
+        this.from,
+        logicalRow,
+        col,
+        value,
+        "deleteColumn",
+      );
+      return;
+    }
 
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      closeLiveTableContextMenu();
       commitCellValue(view, this.from, logicalRow, col, value, null);
       view.focus();
       return;
@@ -438,7 +658,7 @@ class TableWidget extends WidgetType {
       return;
     }
 
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey && !mod && !event.altKey) {
       event.preventDefault();
       event.stopPropagation();
       const located = tableAtDocPos(view, this.from);
@@ -474,6 +694,7 @@ class TableWidget extends WidgetType {
       type === "mousedown" ||
       type === "mouseup" ||
       type === "click" ||
+      type === "contextmenu" ||
       type === "keydown" ||
       type === "keyup" ||
       type === "keypress" ||

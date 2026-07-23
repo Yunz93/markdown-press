@@ -11,17 +11,19 @@
 | ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------- |
 | Phase A 源码结构化       | **已实现** | `src/utils/markdownTable.ts` · `src/components/editor/behavior/tables.ts` · Tab/Enter 接入 `input.ts` |
 | Phase B 美化/粘贴/可发现 | 未做       | Format 命令已有；HTML 粘贴与命令面板仍缺                                                              |
-| Phase C Live 叠层        | **已增强** | `tables.ts`：编辑时保持表格渲染，单元格内 contenteditable 就地改（Tab/Enter 导航）                    |
+| Phase C Live 叠层        | **已增强** | `tables.ts`：单元格编辑 + Tab/Enter 导航；右键菜单与快捷键增删行列                                    |
 
 ### Phase A 快捷键
 
-| 操作                             | 快捷键                                |
-| -------------------------------- | ------------------------------------- |
-| 插入表格                         | `Mod-Shift-T`                         |
-| 单元格前进 / 后退                | `Tab` / `Shift-Tab`（表内）           |
-| 下一行同列 / 末行加行 / 空行退出 | `Enter`（表内）                       |
-| 下方 / 上方插入行                | `Mod-Shift-Enter` / `Alt-Shift-Enter` |
-| 左侧 / 右侧插入列                | `Alt-Mod-←` / `Alt-Mod-→`             |
+| 操作                             | 快捷键                                      |
+| -------------------------------- | ------------------------------------------- |
+| 插入表格                         | `Mod-Shift-T`                               |
+| 单元格前进 / 后退                | `Tab` / `Shift-Tab`（表内）                 |
+| 下一行同列 / 末行加行 / 空行退出 | `Enter`（表内）                             |
+| 下方 / 上方插入行                | `Mod-Shift-Enter` / `Alt-Shift-Enter`       |
+| 左侧 / 右侧插入列                | `Alt-Mod-←` / `Alt-Mod-→`                   |
+| 删除行 / 删除列                  | `Mod-Shift-Backspace` / `Alt-Mod-Backspace` |
+| Live：右键菜单增删行列           | 单元格上右键                                |
 
 ## 1. 问题与目标
 
