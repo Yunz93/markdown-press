@@ -152,6 +152,8 @@ export default {
   askVault_statusBlocked: "尚未就绪",
   askVault_failed: "知识库问答失败",
   askVault_noHits: "未检索到相关片段，可换个问法或配置 Embedding。",
+  askVault_sourcesStale: "检索片段已失效（文件已移动或删除），请重新检索。",
+  askVault_sourcesRefreshed: "部分来源已失效，已用剩余片段继续生成。",
   askVault_needVault: "请先打开知识库。",
   askVault_needAi: "尚未配置 AI。",
   askVault_openAiSettings: "去配置 AI",

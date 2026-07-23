@@ -162,6 +162,10 @@ export default {
   askVault_failed: "Ask vault failed",
   askVault_noHits:
     "No relevant snippets found. Try another question or configure embeddings.",
+  askVault_sourcesStale:
+    "Retrieved snippets are stale (files moved or deleted). Please retrieve again.",
+  askVault_sourcesRefreshed:
+    "Some sources are gone; continuing with the remaining snippets.",
   askVault_needVault: "Open a knowledge base first.",
   askVault_needAi: "AI is not configured.",
   askVault_openAiSettings: "Configure AI",
