@@ -15,7 +15,7 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { renderMermaidDiagrams } from "../../../utils/markdown-extensions";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
-import { selectionTouchesRange } from "./shared";
+import { livePreviewContextChanged, selectionTouchesRange } from "./shared";
 
 const mermaidRenderedEffect = StateEffect.define<null>();
 
@@ -124,6 +124,7 @@ export const livePreviewMermaid = ViewPlugin.fromClass(
         update.docChanged ||
         update.selectionSet ||
         update.viewportChanged ||
+        livePreviewContextChanged(update) ||
         update.transactions.some((tr) =>
           tr.effects.some((e) => e.is(mermaidRenderedEffect)),
         ) ||

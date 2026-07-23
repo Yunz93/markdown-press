@@ -134,7 +134,7 @@ function dispatchTableRewrite(
           }
         : null,
     ),
-    scrollIntoView: true,
+    scrollIntoView: false,
   });
   return true;
 }
@@ -360,7 +360,8 @@ class TableWidget extends WidgetType {
         logicalRow,
         col,
       }),
-      scrollIntoView: true,
+      // Keep viewport stable — scrollIntoView yanked tall tables to the top.
+      scrollIntoView: false,
     });
   }
 

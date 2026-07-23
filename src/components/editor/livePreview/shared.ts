@@ -1,6 +1,8 @@
 import type { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
+import type { ViewUpdate } from "@codemirror/view";
 import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
+import { livePreviewContextFacet } from "./context";
 
 const SKIP_ANCESTOR_NODES = new Set([
   "FencedCode",
@@ -72,4 +74,12 @@ export function rangesOverlap(
   bTo: number,
 ): boolean {
   return aFrom < bTo && bFrom < aTo;
+}
+
+/** True when live-preview context facet identity changed (files/theme/callbacks). */
+export function livePreviewContextChanged(update: ViewUpdate): boolean {
+  return (
+    update.startState.facet(livePreviewContextFacet) !==
+    update.state.facet(livePreviewContextFacet)
+  );
 }

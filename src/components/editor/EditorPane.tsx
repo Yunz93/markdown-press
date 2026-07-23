@@ -263,7 +263,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const editorRootRef = useRef<HTMLDivElement>(null);
     const layoutRef = useRef<HTMLDivElement>(null);
     const lastResetTabIdRef = useRef<string | null>(null);
-    const tabResetFrameRef = useRef<number | null>(null);
 
     // Pane layout state
     const [paneWidth, setPaneWidth] = useState(0);
@@ -881,41 +880,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     }, [viewMode, scrollSync]);
 
     useEffect(() => {
-      const view = codeMirror.view;
       if (!activeTabId) {
         lastResetTabIdRef.current = null;
         return;
       }
-      if (!view) return;
       if (lastResetTabIdRef.current === activeTabId) return;
 
       lastResetTabIdRef.current = activeTabId;
-      tabResetFrameRef.current = window.requestAnimationFrame(() => {
-        tabResetFrameRef.current = null;
-        if (codeMirror.view !== view) return;
-
-        const mainSelection = view.state.selection.main;
-        const shouldResetSelection =
-          !mainSelection.empty || mainSelection.from !== 0;
-
-        if (shouldResetSelection) {
-          view.dispatch({
-            selection: { anchor: 0, head: 0 },
-          });
-        }
-
-        view.scrollDOM.scrollTo({ top: 0, left: 0 });
-        scrollSync.cancelScrollSync();
-        closeSelectionMenu();
-      });
-
-      return () => {
-        if (tabResetFrameRef.current !== null) {
-          cancelAnimationFrame(tabResetFrameRef.current);
-          tabResetFrameRef.current = null;
-        }
-      };
-    }, [activeTabId, closeSelectionMenu, codeMirror.view, scrollSync]);
+      // Cancel in-flight sync only. Do not zero selection/scroll here — that
+      // fought the per-tab CodeMirror cache and SplitView percentage restore,
+      // and could look like a click jump when timing overlapped with focus.
+      scrollSync.cancelScrollSync();
+      closeSelectionMenu();
+    }, [activeTabId, closeSelectionMenu, scrollSync]);
 
     if (!activeTabId) {
       return (

@@ -48,8 +48,12 @@ import {
   markdownListDecorations,
   markdownHighlightStyle,
 } from "../decorations";
-import { createLivePreviewExtensions } from "../livePreview";
+import {
+  createLivePreviewContextExtension,
+  createLivePreviewPluginExtensions,
+} from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
+import { clearPendingEditorRangeFocus } from "../../../utils/editorSelectionBridge";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
@@ -67,6 +71,7 @@ interface EditorCompartments {
   darkTheme: Compartment;
   markdown: Compartment;
   livePreview: Compartment;
+  livePreviewContext: Compartment;
 }
 
 export interface CreateEditorExtensionsContext {
@@ -202,12 +207,20 @@ export function createEditorExtensions(
     fencedCodeDecorations,
     markdownListDecorations,
     compartments.livePreview.of(
-      livePreviewEnabled ? createLivePreviewExtensions(livePreviewContext) : [],
+      livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
+    ),
+    compartments.livePreviewContext.of(
+      createLivePreviewContextExtension(livePreviewContext),
     ),
     compartments.wrap.of(wordWrap ? EditorView.lineWrapping : []),
     syntaxHighlighting(markdownHighlightStyle),
     compartments.placeholder.of(cmPlaceholder(placeholder)),
     EditorView.domEventHandlers({
+      mousedown: () => {
+        // User intent wins over stale outline/search focus requests.
+        clearPendingEditorRangeFocus();
+        return false;
+      },
       scroll: (() => {
         // 每帧合并多次 scroll，避免时间节流丢掉末次位置导致分屏联动偶发不同步
         let rafScheduled = false;

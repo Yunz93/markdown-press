@@ -40,7 +40,10 @@ import {
   createEditorPreferenceCompartments,
   type EditorPreferenceOptions,
 } from "./editorPreferenceExtensions";
-import { createLivePreviewExtensions } from "../livePreview";
+import {
+  createLivePreviewContextExtension,
+  createLivePreviewPluginExtensions,
+} from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
 import { EMPTY_LIVE_PREVIEW_CONTEXT } from "../livePreview";
 
@@ -181,6 +184,7 @@ export function useCodeMirror(
       darkTheme: new Compartment(),
       markdown: new Compartment(),
       livePreview: new Compartment(),
+      livePreviewContext: new Compartment(),
     }),
     [],
   );
@@ -226,14 +230,25 @@ export function useCodeMirror(
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    const scrollTop = view.scrollDOM.scrollTop;
     view.dispatch({
       effects: compartments.livePreview.reconfigure(
-        livePreviewEnabled
-          ? createLivePreviewExtensions(livePreviewContext)
-          : [],
+        livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
       ),
     });
-  }, [compartments.livePreview, livePreviewEnabled, livePreviewContext]);
+    // Remounting widgets changes document height; keep the user's place.
+    view.scrollDOM.scrollTop = scrollTop;
+  }, [compartments.livePreview, livePreviewEnabled]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.livePreviewContext.reconfigure(
+        createLivePreviewContextExtension(livePreviewContext),
+      ),
+    });
+  }, [compartments.livePreviewContext, livePreviewContext]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -522,6 +537,7 @@ export function useCodeMirror(
       }
 
       // Re-apply live compartments so restored states pick up current theme/wrap.
+      const scrollTop = view.scrollDOM.scrollTop;
       view.dispatch({
         effects: [
           compartments.darkTheme.reconfigure(
@@ -531,9 +547,10 @@ export function useCodeMirror(
             wordWrap ? EditorView.lineWrapping : [],
           ),
           compartments.livePreview.reconfigure(
-            livePreviewEnabled
-              ? createLivePreviewExtensions(livePreviewContext)
-              : [],
+            livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
+          ),
+          compartments.livePreviewContext.reconfigure(
+            createLivePreviewContextExtension(livePreviewContext),
           ),
           compartments.keymap.reconfigure(
             Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
@@ -542,6 +559,7 @@ export function useCodeMirror(
           ...buildEditorPreferenceEffects(preferenceCompartments, preferences),
         ],
       });
+      view.scrollDOM.scrollTop = scrollTop;
 
       isSyncingContentRef.current = false;
       previousDocumentKeyRef.current = documentKey;
@@ -602,6 +620,7 @@ export function useCodeMirror(
     compartments.darkTheme,
     compartments.wrap,
     compartments.livePreview,
+    compartments.livePreviewContext,
     compartments.keymap,
     compartments.placeholder,
     preferenceCompartments,

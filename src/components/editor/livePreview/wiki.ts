@@ -32,6 +32,7 @@ import { livePreviewContextFacet } from "./context";
 import {
   collectWikiLinkRanges,
   hasSkipAncestor,
+  livePreviewContextChanged,
   selectionTouchesRange,
 } from "./shared";
 
@@ -441,6 +442,7 @@ export const livePreviewWiki = ViewPlugin.fromClass(
         update.docChanged ||
         update.selectionSet ||
         update.viewportChanged ||
+        livePreviewContextChanged(update) ||
         syntaxTree(update.startState) !== syntaxTree(update.state)
       ) {
         this.decorations = this.rebuild(update.view);

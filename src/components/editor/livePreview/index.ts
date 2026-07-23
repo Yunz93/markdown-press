@@ -24,12 +24,20 @@ import { livePreviewLinks } from "./links";
 export type { LivePreviewContext };
 export { EMPTY_LIVE_PREVIEW_CONTEXT, livePreviewContextFacet };
 
-/** Full Live Preview extension set for CodeMirror. */
-export function createLivePreviewExtensions(
+/** Context facet only — update without remounting Live Preview plugins. */
+export function createLivePreviewContextExtension(
   context: LivePreviewContext = EMPTY_LIVE_PREVIEW_CONTEXT,
 ): Extension {
+  return livePreviewContextFacet.of(context);
+}
+
+/**
+ * Stable Live Preview ViewPlugins / theme.
+ * Keep these in a separate compartment from context so file-tree / callback
+ * churn does not destroy widgets and yank scroll/caret on click.
+ */
+export function createLivePreviewPluginExtensions(): Extension[] {
   return [
-    livePreviewContextFacet.of(context),
     livePreviewTheme,
     livePreviewHideFormatting,
     livePreviewTaskCheckboxes,
@@ -42,6 +50,16 @@ export function createLivePreviewExtensions(
     livePreviewCallouts,
     livePreviewMermaid,
     livePreviewHighlights,
+  ];
+}
+
+/** Full Live Preview extension set for CodeMirror (initial mount). */
+export function createLivePreviewExtensions(
+  context: LivePreviewContext = EMPTY_LIVE_PREVIEW_CONTEXT,
+): Extension[] {
+  return [
+    createLivePreviewContextExtension(context),
+    ...createLivePreviewPluginExtensions(),
   ];
 }
 
