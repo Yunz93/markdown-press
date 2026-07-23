@@ -107,7 +107,7 @@ export type AttachmentLocation =
 export type OrderedListMode = "strict" | "loose";
 export type MarkdownStylePreset = "nord" | "topaz" | "typewriter" | "primary";
 export type SearchMode = "keyword" | "semantic" | "hybrid";
-export type EmbeddingProviderId = "none" | "openai-compatible";
+export type EmbeddingProviderId = "none" | "builtin" | "openai-compatible";
 
 export type ImageHostingProvider =
   | "none"

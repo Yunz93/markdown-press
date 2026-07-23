@@ -78,7 +78,7 @@ export function useVaultIndexLifecycle(): {
   const rootFolderPath = useAppStore((s) => s.rootFolderPath);
   const files = useAppStore((s) => s.files);
   const embeddingProvider = useAppStore(
-    (s) => s.settings.embeddingProvider ?? "none",
+    (s) => s.settings.embeddingProvider ?? "builtin",
   );
   const generationRef = useRef(0);
   const buildingRef = useRef(false);
@@ -99,7 +99,7 @@ export function useVaultIndexLifecycle(): {
       setActiveChunkIndex(chunkIndex);
       await writeIndexJson(vaultRoot, CHUNK_INDEX_FILE, chunkIndex);
 
-      const provider = state.settings.embeddingProvider ?? "none";
+      const provider = state.settings.embeddingProvider ?? "builtin";
       const store = ensureActiveVectorStore(vaultRoot);
       if (provider === "none") {
         store.load(null);

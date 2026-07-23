@@ -1,5 +1,6 @@
 import { normalizeBaseUrl } from "../ai/http";
 import type { EmbeddingProviderId } from "../../types/vaultIndex";
+import { BuiltinEmbeddingProvider } from "./builtinEmbedding";
 
 export interface EmbeddingProvider {
   id: EmbeddingProviderId;
@@ -80,9 +81,12 @@ export function createEmbeddingProvider(settings: {
   embeddingModel?: string;
   privacyMode?: boolean;
 }): EmbeddingProvider {
-  const provider = settings.embeddingProvider ?? "none";
+  const provider = settings.embeddingProvider ?? "builtin";
   if (provider === "none") {
     return new NoneEmbeddingProvider();
+  }
+  if (provider === "builtin") {
+    return new BuiltinEmbeddingProvider();
   }
 
   const baseUrl =

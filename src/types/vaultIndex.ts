@@ -43,7 +43,7 @@ export interface BacklinkGroup {
 }
 
 export type SearchMode = "keyword" | "semantic" | "hybrid";
-export type EmbeddingProviderId = "none" | "openai-compatible";
+export type EmbeddingProviderId = "none" | "builtin" | "openai-compatible";
 
 export interface TextChunk {
   id: string;

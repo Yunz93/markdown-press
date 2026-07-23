@@ -35,6 +35,9 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    optimizeDeps: {
+      exclude: ["@huggingface/transformers"],
+    },
     // Tauri 构建配置
     build: {
       target: "esnext",
@@ -92,6 +95,13 @@ export default defineConfig(({ mode }) => {
 
             if (id.includes("/@google/genai/")) {
               return "ai-vendor";
+            }
+
+            if (
+              id.includes("/@huggingface/transformers") ||
+              id.includes("/onnxruntime-web/")
+            ) {
+              return "embedding-vendor";
             }
 
             if (id.includes("/@tauri-apps/")) {

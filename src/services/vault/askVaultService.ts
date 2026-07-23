@@ -106,7 +106,7 @@ export async function retrieveAskVaultHits(
 ): Promise<RetrieveHit[]> {
   const chunkIndex = getActiveChunkIndex();
   const mode =
-    (request.settings.embeddingProvider ?? "none") === "none"
+    (request.settings.embeddingProvider ?? "builtin") === "none"
       ? "keyword"
       : (request.settings.searchModeDefault ?? "hybrid");
 

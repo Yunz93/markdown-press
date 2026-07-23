@@ -1,5 +1,6 @@
 import type { AppSettings, FileNode } from "../../types";
 import type { ChunkIndexSnapshot, TextChunk } from "../../types/vaultIndex";
+import { BUILTIN_EMBEDDING_MODEL } from "./builtinEmbedding";
 import { createEmbeddingProvider } from "./embeddingProvider";
 import { diffChunks } from "./chunkService";
 import {
@@ -10,6 +11,7 @@ import {
 import type { VectorStore, VectorStoreSnapshot } from "./vectorStore";
 
 const EMBED_BATCH = 16;
+const BUILTIN_EMBED_BATCH = 4;
 
 export async function embedChunkIndex(options: {
   chunkIndex: ChunkIndexSnapshot;
@@ -25,8 +27,13 @@ export async function embedChunkIndex(options: {
     return;
   }
 
-  const model = options.settings.embeddingModel?.trim() || "nomic-embed-text";
+  const model =
+    provider.id === "builtin"
+      ? `builtin:${BUILTIN_EMBEDDING_MODEL}`
+      : options.settings.embeddingModel?.trim() || "nomic-embed-text";
   options.vectorStore.model = model;
+  const batchSize =
+    provider.id === "builtin" ? BUILTIN_EMBED_BATCH : EMBED_BATCH;
   options.vectorStore.vaultRoot = options.chunkIndex.vaultRoot;
 
   const upsertChunks: TextChunk[] = [];
@@ -64,9 +71,9 @@ export async function embedChunkIndex(options: {
     options.vectorStore.remove(removeIds);
   }
 
-  for (let index = 0; index < upsertChunks.length; index += EMBED_BATCH) {
+  for (let index = 0; index < upsertChunks.length; index += batchSize) {
     if (options.shouldCancel?.()) return;
-    const batch = upsertChunks.slice(index, index + EMBED_BATCH);
+    const batch = upsertChunks.slice(index, index + batchSize);
     options.onProgress?.(index, upsertChunks.length);
     const vectors = await provider.embed(batch.map((chunk) => chunk.text));
     options.vectorStore.upsert(
