@@ -10,6 +10,10 @@ import { buildLivePreviewImageDecorations } from "./images";
 import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
 import { buildLivePreviewWikiDecorations } from "./wiki";
+import { buildLivePreviewTableDecorations } from "./tables";
+import { findCalloutRanges } from "./callouts";
+import { findHighlightRanges, findCommentRanges } from "./listAndHighlight";
+import { buildLivePreviewLinkDecorations } from "./links";
 
 function createView(doc: string, cursor = 0) {
   const state = EditorState.create({
@@ -134,7 +138,30 @@ describe("live preview hide formatting", () => {
       view,
       new Map(),
       () => undefined,
+      () => undefined,
     );
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(1);
+  });
+
+  it("replaces inactive tables with widgets", () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewTableDecorations(view);
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(1);
+  });
+
+  it("replaces inactive markdown links with widgets", () => {
+    const doc = "go [here](https://example.com)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewLinkDecorations(view);
     let widgetCount = 0;
     deco.between(0, view.state.doc.length, (_from, _to, value) => {
       if (value.spec.widget) widgetCount += 1;
@@ -159,5 +186,27 @@ describe("findMathRangesInText", () => {
 
   it("skips empty math", () => {
     expect(findMathRangesInText("$$  $$\n$ $")).toEqual([]);
+  });
+});
+
+describe("callouts / highlight / comments", () => {
+  it("parses callout blocks", () => {
+    const text = "> [!note] Title\n> body\n\npara";
+    const ranges = findCalloutRanges(text);
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]).toMatchObject({
+      type: "note",
+      title: "Title",
+      bodyMarkdown: "body",
+    });
+  });
+
+  it("finds highlights and comments", () => {
+    expect(findHighlightRanges("a ==hi== b", 0, 10)).toEqual([
+      { from: 2, to: 8, content: "hi" },
+    ]);
+    expect(findCommentRanges("a %%hidden%% b", 0, 14)).toEqual([
+      { from: 2, to: 12 },
+    ]);
   });
 });

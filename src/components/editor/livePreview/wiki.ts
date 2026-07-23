@@ -1,5 +1,5 @@
 /**
- * Live Preview widgets for `[[wiki]]` links and `![[embed]]` image embeds.
+ * Live Preview widgets for `[[wiki]]` links and `![[embed]]` image/note embeds.
  */
 
 import { RangeSetBuilder, StateEffect } from "@codemirror/state";
@@ -21,7 +21,9 @@ import {
   getCachedPreviewImageSrc,
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
+import { renderMarkdown } from "../../../utils/markdown";
 import {
+  extractWikiNoteFragment,
   parseWikiLinkReference,
   resolveWikiLinkFile,
 } from "../../../utils/wikiLinks";
@@ -38,30 +40,47 @@ const wikiImageResolvedEffect = StateEffect.define<{
   src: string;
 }>();
 
+const NOTE_EMBED_MAX_CHARS = 2400;
+
 class WikiLinkWidget extends WidgetType {
   constructor(
     readonly label: string,
+    readonly target: string,
     readonly resolved: boolean,
   ) {
     super();
   }
 
   eq(other: WikiLinkWidget) {
-    return this.label === other.label && this.resolved === other.resolved;
+    return (
+      this.label === other.label &&
+      this.target === other.target &&
+      this.resolved === other.resolved
+    );
   }
 
-  toDOM() {
-    const el = document.createElement("span");
+  toDOM(view: EditorView) {
+    const el = document.createElement("a");
     el.className = this.resolved
       ? "cm-live-preview-wiki"
       : "cm-live-preview-wiki is-unresolved";
+    el.href = "#";
     el.setAttribute("contenteditable", "false");
     el.textContent = this.label;
+    el.addEventListener("mousedown", (event) => {
+      if (event.button === 0) event.preventDefault();
+    });
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const ctx = view.state.facet(livePreviewContextFacet);
+      void ctx.onOpenWiki?.(this.target);
+    });
     return el;
   }
 
-  ignoreEvent() {
-    return true;
+  ignoreEvent(event: Event) {
+    return event.type !== "click" && event.type !== "mousedown";
   }
 }
 
@@ -111,14 +130,103 @@ class WikiImageWidget extends WidgetType {
   }
 }
 
+class WikiNoteEmbedWidget extends WidgetType {
+  constructor(
+    readonly title: string,
+    readonly target: string,
+    readonly bodyHtml: string,
+  ) {
+    super();
+  }
+
+  eq(other: WikiNoteEmbedWidget) {
+    return (
+      this.title === other.title &&
+      this.target === other.target &&
+      this.bodyHtml === other.bodyHtml
+    );
+  }
+
+  toDOM(view: EditorView) {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-live-preview-note-embed";
+    wrap.setAttribute("contenteditable", "false");
+
+    const title = document.createElement("a");
+    title.className = "cm-live-preview-note-embed-title";
+    title.href = "#";
+    title.textContent = this.title;
+    title.addEventListener("mousedown", (event) => {
+      if (event.button === 0) event.preventDefault();
+    });
+    title.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const ctx = view.state.facet(livePreviewContextFacet);
+      void ctx.onOpenWiki?.(this.target);
+    });
+    wrap.appendChild(title);
+
+    if (this.bodyHtml.trim()) {
+      const body = document.createElement("div");
+      body.className = "cm-live-preview-note-embed-body";
+      body.innerHTML = this.bodyHtml;
+      wrap.appendChild(body);
+    }
+
+    return wrap;
+  }
+
+  ignoreEvent(event: Event) {
+    return event.type !== "click" && event.type !== "mousedown";
+  }
+}
+
 function cacheKeyFor(sourceFilePath: string | null, raw: string): string {
   return `wiki::${sourceFilePath ?? ""}::${raw}`;
 }
+
+async function resolveNoteEmbedHtml(
+  view: EditorView,
+  raw: string,
+  matchedPath: string | null,
+): Promise<{ title: string; html: string }> {
+  const ctx = view.state.facet(livePreviewContextFacet);
+  let content: string | null = null;
+  if (matchedPath && ctx.getFileContent) {
+    content = await ctx.getFileContent(matchedPath);
+  }
+  if (!content) {
+    return { title: parseWikiLinkReference(raw).displayText, html: "" };
+  }
+  const fragment = extractWikiNoteFragment(content, raw);
+  let markdown = fragment.markdown ?? "";
+  if (markdown.length > NOTE_EMBED_MAX_CHARS) {
+    markdown = `${markdown.slice(0, NOTE_EMBED_MAX_CHARS).trimEnd()}\n\n…`;
+  }
+  let html = "";
+  try {
+    html = markdown.trim() ? renderMarkdown(markdown) : "";
+  } catch {
+    html = "";
+  }
+  return {
+    title: fragment.title || parseWikiLinkReference(raw).displayText,
+    html,
+  };
+}
+
+const noteEmbedCache = new Map<string, { title: string; html: string }>();
 
 export function buildLivePreviewWikiDecorations(
   view: EditorView,
   resolvedCache: Map<string, string>,
   scheduleResolve: (cacheKey: string, path: string) => void,
+  scheduleNoteEmbed: (
+    cacheKey: string,
+    raw: string,
+    path: string | null,
+  ) => void,
 ): DecorationSet {
   if (isLargeEditorState(view.state)) {
     return Decoration.none;
@@ -147,14 +255,14 @@ export function buildLivePreviewWikiDecorations(
     if (!range.raw) continue;
 
     const parsed = parseWikiLinkReference(range.raw, { embed: range.embed });
+    const matched = resolveWikiLinkFile(
+      ctx.files,
+      parsed.path || parsed.target,
+      ctx.rootFolderPath,
+      ctx.sourceFilePath,
+    );
 
     if (range.embed) {
-      const matched = resolveWikiLinkFile(
-        ctx.files,
-        parsed.path || parsed.target,
-        ctx.rootFolderPath,
-        ctx.sourceFilePath,
-      );
       const looksLikeImage =
         isImageAttachment(parsed.path) ||
         isImageAttachment(parsed.target) ||
@@ -189,29 +297,37 @@ export function buildLivePreviewWikiDecorations(
         continue;
       }
 
-      // Non-image embeds: show a compact chip (full note embed is too heavy).
+      const noteKey = `note::${ctx.sourceFilePath ?? ""}::${range.raw}`;
+      const cached = noteEmbedCache.get(noteKey);
+      if (!cached) {
+        scheduleNoteEmbed(noteKey, range.raw, matched?.path ?? null);
+      }
+
       builder.add(
         range.from,
         range.to,
         Decoration.replace({
-          widget: new WikiLinkWidget(`↗ ${parsed.displayText}`, true),
+          widget: new WikiNoteEmbedWidget(
+            cached?.title ?? parsed.displayText,
+            parsed.target,
+            cached?.html ?? "",
+          ),
+          block: true,
         }),
       );
       lastTo = range.to;
       continue;
     }
 
-    const matched = resolveWikiLinkFile(
-      ctx.files,
-      parsed.path || parsed.target,
-      ctx.rootFolderPath,
-      ctx.sourceFilePath,
-    );
     builder.add(
       range.from,
       range.to,
       Decoration.replace({
-        widget: new WikiLinkWidget(parsed.displayText, Boolean(matched)),
+        widget: new WikiLinkWidget(
+          parsed.displayText,
+          parsed.target,
+          Boolean(matched),
+        ),
       }),
     );
     lastTo = range.to;
@@ -271,11 +387,39 @@ export const livePreviewWiki = ViewPlugin.fromClass(
       })();
     }
 
+    private scheduleNoteEmbed(
+      view: EditorView,
+      cacheKey: string,
+      raw: string,
+      path: string | null,
+    ) {
+      if (this.pending.has(cacheKey) || noteEmbedCache.has(cacheKey)) return;
+      this.pending.add(cacheKey);
+      void (async () => {
+        try {
+          const result = await resolveNoteEmbedHtml(view, raw, path);
+          noteEmbedCache.set(cacheKey, result);
+          if (view.dom.isConnected) {
+            view.dispatch({
+              effects: wikiImageResolvedEffect.of({
+                cacheKey,
+                src: "note",
+              }),
+            });
+          }
+        } finally {
+          this.pending.delete(cacheKey);
+        }
+      })();
+    }
+
     private rebuild(view: EditorView) {
       return buildLivePreviewWikiDecorations(
         view,
         this.resolvedCache,
         (cacheKey, path) => this.scheduleResolve(view, cacheKey, path),
+        (cacheKey, raw, path) =>
+          this.scheduleNoteEmbed(view, cacheKey, raw, path),
       );
     }
 
@@ -284,7 +428,9 @@ export const livePreviewWiki = ViewPlugin.fromClass(
       for (const tr of update.transactions) {
         for (const effect of tr.effects) {
           if (effect.is(wikiImageResolvedEffect)) {
-            this.resolvedCache.set(effect.value.cacheKey, effect.value.src);
+            if (effect.value.src !== "note") {
+              this.resolvedCache.set(effect.value.cacheKey, effect.value.src);
+            }
             resolved = true;
           }
         }

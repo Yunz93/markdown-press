@@ -44,11 +44,15 @@ import {
   getUiFontScale,
 } from "../../utils/uiFontSize";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { useFileOperations } from "../../hooks/useFileOperations";
+import { openExternalUrl } from "../../utils/externalLinks";
+import { hasUriScheme } from "./preview/previewMedia";
 import {
   useCodeMirror,
   useWikiLinks,
   useImagePaste,
   useScrollSync,
+  useWikiLinkNavigation,
 } from "./hooks";
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
 import type { WikiLinkPreviewData } from "./hooks";
@@ -236,6 +240,25 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       [settings.codeFontFamily],
     );
     const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
+    const { handleFileSelect } = useFileOperations();
+    const wikiNavigation = useWikiLinkNavigation({
+      content,
+      currentFilePath,
+      rootFolderPath,
+      files,
+      activeTabId,
+      isMarkdownPreview: true,
+      showNotification,
+      handleFileSelect,
+    });
+    const wikiNavigationRef = useRef(wikiNavigation);
+    wikiNavigationRef.current = wikiNavigation;
+    const filesRef = useRef(files);
+    filesRef.current = files;
+    const fileContentsRef = useRef(fileContents);
+    fileContentsRef.current = fileContents;
+    const readFileRef = useRef(readFile);
+    readFileRef.current = readFile;
 
     const editorRootRef = useRef<HTMLDivElement>(null);
     const layoutRef = useRef<HTMLDivElement>(null);
@@ -390,8 +413,40 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         sourceFilePath: currentFilePath,
         rootFolderPath,
         files,
+        themeMode: settings.themeMode as "light" | "dark",
+        onOpenWiki: (wikiTarget: string) => {
+          void wikiNavigationRef.current.navigateToWikilink(wikiTarget);
+        },
+        onOpenLink: async (href: string) => {
+          const trimmed = href.trim();
+          if (!trimmed) return;
+          if (hasUriScheme(trimmed) || trimmed.startsWith("//")) {
+            await openExternalUrl(trimmed);
+            return;
+          }
+          void wikiNavigationRef.current.navigateToWikilink(
+            trimmed.replace(/^\.\//, "").replace(/\.md$/i, ""),
+          );
+        },
+        getFileContent: async (filePath: string) => {
+          const byPath = filesRef.current.find((f) => f.path === filePath);
+          if (byPath && fileContentsRef.current[byPath.id] != null) {
+            return fileContentsRef.current[byPath.id] ?? null;
+          }
+          try {
+            const file = byPath ?? {
+              id: filePath,
+              name: filePath.split(/[\\/]/).pop() || filePath,
+              type: "file" as const,
+              path: filePath,
+            };
+            return await readFileRef.current(file);
+          } catch {
+            return null;
+          }
+        },
       }),
-      [currentFilePath, rootFolderPath, files],
+      [currentFilePath, rootFolderPath, files, settings.themeMode],
     );
     const codeMirror = useCodeMirror({
       content,
@@ -400,7 +455,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       wordWrap: settings.wordWrap,
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
-      livePreviewEnabled: viewMode === ViewMode.LIVE,
+      livePreviewEnabled:
+        viewMode === ViewMode.LIVE || viewMode === ViewMode.SPLIT,
       livePreviewContext,
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
@@ -888,7 +944,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             ? " show-editor-gutters"
             : ""
         }`}
-        data-live-preview={viewMode === ViewMode.LIVE ? "true" : undefined}
+        data-live-preview={
+          viewMode === ViewMode.LIVE || viewMode === ViewMode.SPLIT
+            ? "true"
+            : undefined
+        }
         style={layoutStyle}
       >
         {isSaving && (

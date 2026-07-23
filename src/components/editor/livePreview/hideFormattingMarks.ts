@@ -20,6 +20,7 @@ import {
   rangesOverlap,
   selectionTouchesRange,
 } from "./shared";
+import { findCalloutRanges } from "./callouts";
 
 const HIDEABLE_MARK_NODES = new Set([
   "HeaderMark",
@@ -101,8 +102,8 @@ function shouldHideUrl(state: EditorState, from: number, to: number): boolean {
   }
 
   const parent = findInlineParent(state, from, to);
-  // Inactive images are fully replaced by the image widget — skip partial hides.
-  if (parent?.name === "Image") {
+  // Inactive images/links are fully replaced by widgets — skip partial hides.
+  if (parent?.name === "Image" || parent?.name === "Link") {
     return false;
   }
   if (parent) {
@@ -130,6 +131,7 @@ export function buildLivePreviewHideDecorations(
       Math.min(docText.length, to + 2),
     ),
   );
+  const calloutRanges = findCalloutRanges(docText);
 
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
@@ -143,13 +145,16 @@ export function buildLivePreviewHideDecorations(
         if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
           return;
         }
+        if (calloutRanges.some((c) => rangesOverlap(from, to, c.from, c.to))) {
+          return;
+        }
 
         if (HIDEABLE_MARK_NODES.has(name)) {
           if (hasSkipAncestor(state, from)) return;
           const parent = findInlineParent(state, from, to);
-          // Image widgets replace the whole construct when inactive.
+          // Image/Link widgets replace the whole construct when inactive.
           if (
-            parent?.name === "Image" &&
+            (parent?.name === "Image" || parent?.name === "Link") &&
             !selectionTouchesRange(state, parent.from, parent.to)
           ) {
             return;
@@ -269,10 +274,116 @@ export const livePreviewTheme = EditorView.baseTheme({
     color: "var(--mp-doc-accent, #2563eb)",
     textDecoration: "underline",
     textUnderlineOffset: "0.15em",
-    cursor: "default",
+    cursor: "pointer",
   },
   ".cm-live-preview-wiki.is-unresolved": {
     color: "var(--mp-doc-muted, #94a3b8)",
     textDecorationStyle: "dashed",
+  },
+  ".cm-live-preview-link": {
+    color: "var(--mp-doc-accent, #2563eb)",
+    textDecoration: "underline",
+    textUnderlineOffset: "0.15em",
+    cursor: "pointer",
+  },
+  ".cm-live-preview-table-wrap": {
+    display: "block",
+    width: "100%",
+    overflowX: "auto",
+    marginBlock: "0.75em",
+  },
+  ".cm-live-preview-table": {
+    borderCollapse: "collapse",
+    width: "100%",
+    fontSize: "0.95em",
+  },
+  ".cm-live-preview-table th, .cm-live-preview-table td": {
+    border:
+      "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent)",
+    padding: "0.4em 0.65em",
+    verticalAlign: "top",
+  },
+  ".cm-live-preview-table th": {
+    background:
+      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 12%, transparent)",
+    fontWeight: "650",
+  },
+  ".cm-live-preview-callout": {
+    display: "block",
+    marginBlock: "0.75em",
+    padding: "0.65em 0.85em",
+    borderRadius: "0.45rem",
+    borderInlineStart: "4px solid var(--mp-doc-accent, #2563eb)",
+    background:
+      "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
+  },
+  ".cm-live-preview-callout-title": {
+    fontWeight: "700",
+    marginBottom: "0.35em",
+    textTransform: "capitalize",
+  },
+  ".cm-live-preview-callout-warning, .cm-live-preview-callout-caution": {
+    borderInlineStartColor: "#d97706",
+    background: "color-mix(in srgb, #d97706 10%, transparent)",
+  },
+  ".cm-live-preview-callout-error, .cm-live-preview-callout-danger, .cm-live-preview-callout-bug":
+    {
+      borderInlineStartColor: "#dc2626",
+      background: "color-mix(in srgb, #dc2626 10%, transparent)",
+    },
+  ".cm-live-preview-callout-success, .cm-live-preview-callout-tip": {
+    borderInlineStartColor: "#16a34a",
+    background: "color-mix(in srgb, #16a34a 10%, transparent)",
+  },
+  ".cm-live-preview-hr": {
+    border: "none",
+    borderTop:
+      "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 45%, transparent)",
+    marginBlock: "1em",
+  },
+  ".cm-live-preview-list-marker": {
+    display: "inline-block",
+    minWidth: "1.1em",
+    marginInlineEnd: "0.35em",
+    color: "var(--mp-doc-list-marker, #94a3b8)",
+    textAlign: "right",
+  },
+  ".cm-live-preview-highlight": {
+    background: "color-mix(in srgb, #eab308 35%, transparent)",
+    borderRadius: "0.15em",
+    paddingInline: "0.1em",
+  },
+  ".cm-live-preview-mermaid": {
+    display: "block",
+    width: "100%",
+    overflowX: "auto",
+    marginBlock: "0.75em",
+    padding: "0.5em",
+    borderRadius: "0.45rem",
+    background:
+      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 8%, transparent)",
+  },
+  ".cm-live-preview-note-embed": {
+    display: "block",
+    marginBlock: "0.75em",
+    padding: "0.65em 0.85em",
+    borderRadius: "0.45rem",
+    border:
+      "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 30%, transparent)",
+    background:
+      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 6%, transparent)",
+  },
+  ".cm-live-preview-note-embed-title": {
+    display: "inline-block",
+    fontWeight: "650",
+    color: "var(--mp-doc-accent, #2563eb)",
+    textDecoration: "underline",
+    textUnderlineOffset: "0.15em",
+    marginBottom: "0.35em",
+    cursor: "pointer",
+  },
+  ".cm-live-preview-note-embed-body": {
+    fontSize: "0.95em",
+    opacity: "0.92",
   },
 });
