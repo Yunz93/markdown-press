@@ -45,6 +45,9 @@ import {
   livePreviewContextChanged,
   livePreviewShouldRebuild,
   selectionTouchesRange,
+  bindLivePreviewImageMeasure,
+  bindLivePreviewMediaMeasure,
+  scheduleLivePreviewMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
   type WikiLinkRange,
@@ -140,12 +143,17 @@ class WikiImageWidget extends WidgetType {
     if (this.height) img.style.height = `${this.height}px`;
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
+      bindLivePreviewImageMeasure(view, img, () => {
+        wrap.classList.remove("is-loading");
+      });
       img.addEventListener("error", () => {
         wrap.classList.remove("is-loading");
         wrap.classList.add("is-error");
+        scheduleLivePreviewMeasure(view);
       });
     } else if (this.failed) {
       wrap.classList.add("is-error");
+      queueMicrotask(() => scheduleLivePreviewMeasure(view));
     } else {
       wrap.classList.add("is-loading");
     }
@@ -220,6 +228,9 @@ class WikiNoteEmbedWidget extends WidgetType {
       body.className = "cm-live-preview-note-embed-body markdown-body";
       body.innerHTML = this.bodyHtml;
       wrap.appendChild(body);
+      bindLivePreviewMediaMeasure(view, body);
+    } else {
+      queueMicrotask(() => scheduleLivePreviewMeasure(view));
     }
 
     return wrap;

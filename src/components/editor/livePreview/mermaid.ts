@@ -18,6 +18,7 @@ import { livePreviewContextFacet } from "./context";
 import {
   defineLivePreviewBlockDecorationField,
   selectionTouchesRange,
+  scheduleLivePreviewMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -39,7 +40,11 @@ class MermaidWidget extends WidgetType {
     return this.source === other.source && this.themeMode === other.themeMode;
   }
 
-  toDOM() {
+  get estimatedHeight() {
+    return 160;
+  }
+
+  toDOM(view: EditorView) {
     const wrap = document.createElement("div");
     wrap.className = "cm-live-preview-mermaid is-loading";
     wrap.setAttribute("contenteditable", "false");
@@ -60,6 +65,22 @@ class MermaidWidget extends WidgetType {
     let rendering = false;
     let resizeObserver: ResizeObserver | null = null;
     let intersectionObserver: IntersectionObserver | null = null;
+    let lastMeasuredHeight = -1;
+
+    const remasure = () => {
+      if (cancelled || !view.dom.isConnected) return;
+      const height = wrap.getBoundingClientRect().height;
+      if (Math.abs(height - lastMeasuredHeight) < 0.5) {
+        // Still schedule once after first layout so CM picks up initial size.
+        if (lastMeasuredHeight < 0) {
+          lastMeasuredHeight = height;
+          scheduleLivePreviewMeasure(view);
+        }
+        return;
+      }
+      lastMeasuredHeight = height;
+      scheduleLivePreviewMeasure(view);
+    };
 
     const setStatus = (
       next: "loading" | "ready" | "error" | "pending-width",
@@ -80,6 +101,7 @@ class MermaidWidget extends WidgetType {
               ? "Waiting for layout…"
               : "Rendering Mermaid…");
       status.hidden = next === "ready";
+      remasure();
     };
 
     const tryRender = () => {
@@ -112,6 +134,7 @@ class MermaidWidget extends WidgetType {
         })
         .finally(() => {
           rendering = false;
+          remasure();
         });
     };
 
@@ -129,7 +152,14 @@ class MermaidWidget extends WidgetType {
     });
 
     if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(() => tryRender());
+      resizeObserver = new ResizeObserver(() => {
+        const current = wrap.getAttribute("data-mermaid-status");
+        if (current === "ready" || current === "error") {
+          remasure();
+          return;
+        }
+        tryRender();
+      });
       resizeObserver.observe(wrap);
     }
     if (typeof IntersectionObserver !== "undefined") {

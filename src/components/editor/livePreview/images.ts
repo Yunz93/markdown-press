@@ -31,6 +31,8 @@ import {
   rangesOverlap,
   selectionTouchesRange,
   livePreviewShouldRebuild,
+  bindLivePreviewImageMeasure,
+  scheduleLivePreviewMeasure,
 } from "./shared";
 
 const imageResolvedEffect = StateEffect.define<{
@@ -76,6 +78,10 @@ class MarkdownImageWidget extends WidgetType {
     );
   }
 
+  get estimatedHeight() {
+    return 48;
+  }
+
   toDOM(view: EditorView) {
     const wrap = document.createElement("span");
     wrap.className = "cm-live-preview-image-wrap";
@@ -88,14 +94,19 @@ class MarkdownImageWidget extends WidgetType {
     img.draggable = false;
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
+      bindLivePreviewImageMeasure(view, img, () => {
+        wrap.classList.remove("is-loading");
+      });
       img.addEventListener("error", () => {
         wrap.classList.remove("is-loading");
         wrap.classList.add("is-error");
         wrap.title = `Failed to load: ${this.rawSrc}`;
+        scheduleLivePreviewMeasure(view);
       });
     } else if (this.failed) {
       wrap.classList.add("is-error");
       wrap.title = `Failed to resolve: ${this.rawSrc}`;
+      queueMicrotask(() => scheduleLivePreviewMeasure(view));
     } else {
       wrap.classList.add("is-loading");
     }
