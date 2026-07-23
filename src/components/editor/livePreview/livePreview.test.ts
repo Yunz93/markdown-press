@@ -5,7 +5,10 @@ import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it, afterEach } from "vitest";
 import { livePreviewContextFacet } from "./context";
-import { buildLivePreviewHideDecorations } from "./hideFormattingMarks";
+import {
+  buildLivePreviewHideDecorations,
+  livePreviewTheme,
+} from "./hideFormattingMarks";
 import { buildLivePreviewImageDecorations } from "./images";
 import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
@@ -236,6 +239,40 @@ describe("live preview hide formatting", () => {
     });
     expect(widgetCount).toBe(1);
     expect(view.dom.querySelector(".cm-live-preview-table")).not.toBeNull();
+  });
+
+  it("sizes CJK table columns to content instead of crushing short headers", () => {
+    const doc = [
+      "| 模块 | 需求 | 优先级 | 说明 |",
+      "| --- | --- | --- | --- |",
+      "| 资源概览 | 首页总览页 | P0 | 展示项目规模、进度与风险汇总 |",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1, [
+      livePreviewTheme,
+      livePreviewTables,
+    ]);
+    const table = view.dom.querySelector(
+      ".cm-live-preview-table",
+    ) as HTMLTableElement | null;
+    expect(table).not.toBeNull();
+
+    const headerTexts = Array.from(table!.querySelectorAll("th")).map(
+      (th) => th.textContent?.replace(/\s+/g, "") ?? "",
+    );
+    expect(headerTexts).toEqual(["模块", "需求", "优先级", "说明"]);
+
+    // Theme must opt out of `.cm-lineWrapping { overflow-wrap: anywhere }`,
+    // which otherwise stacks CJK one glyph per line in squeezed columns.
+    const sheetText = Array.from(document.querySelectorAll("style"))
+      .map((node) => node.textContent ?? "")
+      .join("\n");
+    expect(sheetText).toMatch(/cm-live-preview-table[^}]*max-content/);
+    expect(sheetText).toMatch(/word-break:\s*keep-all/);
+    expect(sheetText).toMatch(
+      /cm-live-preview-table th\s*\{[^}]*white-space:\s*nowrap/,
+    );
   });
 
   it("edits a table cell in place without revealing pipe source", async () => {

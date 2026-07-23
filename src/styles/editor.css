@@ -1184,6 +1184,40 @@
   max-width: 100%;
 }
 
+/* Live table: content-sized columns + CJK-friendly wrapping.
+   Avoids short headers being crushed to one glyph per line by
+   `.cm-lineWrapping { overflow-wrap: anywhere }` + width:100%. */
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
+  overflow-x: auto;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
+  width: max-content;
+  max-width: 100%;
+  table-layout: auto;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table td {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  min-width: 3.5em;
+  max-width: 28em;
+  line-height: 1.45;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th {
+  white-space: nowrap;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-table-cell-editing {
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
 .editor-pane-layout .live-preview-opt-banner {
   flex: 0 0 auto;
   padding: 0.4rem 0.85rem;
