@@ -2,7 +2,7 @@
  * Live Preview widgets for `[[wiki]]` links and `![[embed]]` image/note embeds.
  */
 
-import { RangeSetBuilder, StateEffect } from "@codemirror/state";
+import { RangeSetBuilder, StateEffect, type EditorState } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -11,7 +11,6 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
 import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
@@ -31,10 +30,11 @@ import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import {
   collectWikiLinkRanges,
+  defineLivePreviewBlockDecorationField,
   hasSkipAncestor,
   livePreviewContextChanged,
-  selectionTouchesRange,
   livePreviewShouldRebuild,
+  selectionTouchesRange,
 } from "./shared";
 
 const wikiImageResolvedEffect = StateEffect.define<{
@@ -244,33 +244,27 @@ async function resolveNoteEmbedHtml(
 }
 
 const noteEmbedCache = new Map<string, { title: string; html: string }>();
+const wikiImageResolvedCache = new Map<string, string>();
+const wikiPending = new Set<string>();
 
-export function buildLivePreviewWikiDecorations(
-  view: EditorView,
-  resolvedCache: Map<string, string>,
-  scheduleResolve: (cacheKey: string, path: string) => void,
+export function buildWikiDecorations(
+  state: EditorState,
+  scheduleResolve: (cacheKey: string, path: string) => void = () => {},
   scheduleNoteEmbed: (
     cacheKey: string,
     raw: string,
     path: string | null,
-  ) => void,
+  ) => void = () => {},
+  resolvedCache: Map<string, string> = wikiImageResolvedCache,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
+  if (isLargeEditorState(state)) {
     return Decoration.none;
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);
   const docText = state.doc.toString();
-
-  const ranges = view.visibleRanges.flatMap(({ from, to }) =>
-    collectWikiLinkRanges(
-      docText,
-      Math.max(0, from - 2),
-      Math.min(docText.length, to + 2),
-    ),
-  );
+  const ranges = collectWikiLinkRanges(docText, 0, docText.length);
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;
@@ -365,25 +359,42 @@ export function buildLivePreviewWikiDecorations(
   return builder.finish();
 }
 
-export const livePreviewWiki = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    private resolvedCache = new Map<string, string>();
-    private pending = new Set<string>();
+/** Test/helper wrapper — schedules are optional no-ops by default. */
+export function buildLivePreviewWikiDecorations(
+  view: EditorView,
+  resolvedCache: Map<string, string> = wikiImageResolvedCache,
+  scheduleResolve: (cacheKey: string, path: string) => void = () => {},
+  scheduleNoteEmbed: (
+    cacheKey: string,
+    raw: string,
+    path: string | null,
+  ) => void = () => {},
+): DecorationSet {
+  return buildWikiDecorations(
+    view.state,
+    scheduleResolve,
+    scheduleNoteEmbed,
+    resolvedCache,
+  );
+}
 
+const wikiDecorationsField = defineLivePreviewBlockDecorationField({
+  create: (state) => buildWikiDecorations(state),
+  rebuildOn: (tr) =>
+    tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),
+});
+
+const wikiAsyncPlugin = ViewPlugin.fromClass(
+  class {
     constructor(view: EditorView) {
-      this.decorations = this.rebuild(view);
+      this.scan(view);
     }
 
-    private scheduleResolve(
-      view: EditorView,
-      cacheKey: string,
-      pathHint: string,
-    ) {
-      if (this.pending.has(cacheKey) || this.resolvedCache.has(cacheKey)) {
+    private scheduleResolve(view: EditorView, cacheKey: string, pathHint: string) {
+      if (wikiPending.has(cacheKey) || wikiImageResolvedCache.has(cacheKey)) {
         return;
       }
-      this.pending.add(cacheKey);
+      wikiPending.add(cacheKey);
       const ctx = view.state.facet(livePreviewContextFacet);
 
       void (async () => {
@@ -399,7 +410,7 @@ export const livePreviewWiki = ViewPlugin.fromClass(
             pathOrSrc,
             ctx.sourceFilePath ?? undefined,
           );
-          this.resolvedCache.set(cacheKey, displaySrc);
+          wikiImageResolvedCache.set(cacheKey, displaySrc);
           if (view.dom.isConnected) {
             view.dispatch({
               effects: wikiImageResolvedEffect.of({
@@ -411,7 +422,7 @@ export const livePreviewWiki = ViewPlugin.fromClass(
         } catch {
           // Keep loading placeholder.
         } finally {
-          this.pending.delete(cacheKey);
+          wikiPending.delete(cacheKey);
         }
       })();
     }
@@ -422,8 +433,8 @@ export const livePreviewWiki = ViewPlugin.fromClass(
       raw: string,
       path: string | null,
     ) {
-      if (this.pending.has(cacheKey) || noteEmbedCache.has(cacheKey)) return;
-      this.pending.add(cacheKey);
+      if (wikiPending.has(cacheKey) || noteEmbedCache.has(cacheKey)) return;
+      wikiPending.add(cacheKey);
       void (async () => {
         try {
           const result = await resolveNoteEmbedHtml(view, raw, path);
@@ -437,15 +448,15 @@ export const livePreviewWiki = ViewPlugin.fromClass(
             });
           }
         } finally {
-          this.pending.delete(cacheKey);
+          wikiPending.delete(cacheKey);
         }
       })();
     }
 
-    private rebuild(view: EditorView) {
-      return buildLivePreviewWikiDecorations(
-        view,
-        this.resolvedCache,
+    private scan(view: EditorView) {
+      if (isLargeEditorState(view.state)) return;
+      buildWikiDecorations(
+        view.state,
         (cacheKey, path) => this.scheduleResolve(view, cacheKey, path),
         (cacheKey, raw, path) =>
           this.scheduleNoteEmbed(view, cacheKey, raw, path),
@@ -453,28 +464,17 @@ export const livePreviewWiki = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      let resolved = false;
-      for (const tr of update.transactions) {
-        for (const effect of tr.effects) {
-          if (effect.is(wikiImageResolvedEffect)) {
-            if (effect.value.src !== "note") {
-              this.resolvedCache.set(effect.value.cacheKey, effect.value.src);
-            }
-            resolved = true;
-          }
-        }
-      }
-
       if (
-        resolved ||
         livePreviewShouldRebuild(update, "marks") ||
-        livePreviewContextChanged(update)
+        livePreviewContextChanged(update) ||
+        update.transactions.some((tr) =>
+          tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),
+        )
       ) {
-        this.decorations = this.rebuild(update.view);
+        this.scan(update.view);
       }
     }
   },
-  {
-    decorations: (plugin) => plugin.decorations,
-  },
 );
+
+export const livePreviewWiki = [wikiDecorationsField, wikiAsyncPlugin];

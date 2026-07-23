@@ -1,6 +1,11 @@
-import type { EditorState } from "@codemirror/state";
+import type { EditorState, Extension, Transaction } from "@codemirror/state";
+import { StateField } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import type { EditorView, ViewUpdate } from "@codemirror/view";
+import {
+  EditorView,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
 import { LRUCache } from "../../../utils/performance";
 import { livePreviewContextFacet } from "./context";
@@ -145,4 +150,43 @@ export function getCachedMarkdownHtml(
   const html = render(markdown);
   inlineHtmlCache.set(markdown, html);
   return html;
+}
+
+/**
+ * CodeMirror forbids `block: true` decorations from ViewPlugins.
+ * Provide them from a StateField instead (same pattern as Live Preview tables).
+ */
+export function defineLivePreviewBlockDecorationField(options: {
+  create: (state: EditorState) => DecorationSet;
+  /** Extra rebuild triggers (async resolve effects, etc.). */
+  rebuildOn?: (tr: Transaction) => boolean;
+  /** Map through changes when not rebuilding (default true). */
+  mapWhenIdle?: boolean;
+}): Extension {
+  const field = StateField.define<DecorationSet>({
+    create: options.create,
+    update(deco, tr) {
+      const contextChanged =
+        tr.startState.facet(livePreviewContextFacet) !==
+        tr.state.facet(livePreviewContextFacet);
+      const shouldRebuild =
+        tr.docChanged ||
+        Boolean(tr.selection) ||
+        contextChanged ||
+        options.rebuildOn?.(tr) === true;
+
+      if (shouldRebuild) {
+        return options.create(tr.state);
+      }
+      if (options.mapWhenIdle === false) {
+        return deco;
+      }
+      return deco.map(tr.changes);
+    },
+    provide: (value) => [
+      EditorView.decorations.from(value),
+      EditorView.atomicRanges.of((view) => view.state.field(value)),
+    ],
+  });
+  return field;
 }

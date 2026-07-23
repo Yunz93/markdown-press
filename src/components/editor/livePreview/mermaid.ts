@@ -2,26 +2,21 @@
  * Live Preview Mermaid widgets for ```mermaid fenced blocks.
  */
 
-import { RangeSetBuilder, StateEffect } from "@codemirror/state";
+import { RangeSetBuilder, type EditorState } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
-  ViewPlugin,
   WidgetType,
   type DecorationSet,
-  type ViewUpdate,
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { renderMermaidDiagrams } from "../../../utils/markdown-extensions";
 import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import {
-  livePreviewContextChanged,
-  livePreviewShouldRebuild,
+  defineLivePreviewBlockDecorationField,
   selectionTouchesRange,
 } from "./shared";
-
-const mermaidRenderedEffect = StateEffect.define<null>();
 
 class MermaidWidget extends WidgetType {
   constructor(
@@ -74,68 +69,49 @@ function extractFencedInfo(
   return { lang, body };
 }
 
-export function buildLivePreviewMermaidDecorations(
-  view: EditorView,
-): DecorationSet {
-  if (isHeavyLivePreviewState(view.state)) {
+export function buildMermaidDecorations(state: EditorState): DecorationSet {
+  if (isHeavyLivePreviewState(state)) {
     return Decoration.none;
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);
   const themeMode = ctx.themeMode ?? "light";
   const tree =
     ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
 
-  for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
-    tree.iterate({
-      from: viewportFrom,
-      to: viewportTo,
-      enter: (node) => {
-        if (node.name !== "FencedCode") return;
-        const { from, to } = node;
-        if (selectionTouchesRange(state, from, to)) return;
-        const { lang, body } = extractFencedInfo(state, from, to);
-        if (lang !== "mermaid" && lang !== "mmd") return;
-        if (!body.trim()) return;
+  tree.iterate({
+    from: 0,
+    to: state.doc.length,
+    enter: (node) => {
+      if (node.name !== "FencedCode") return;
+      const { from, to } = node;
+      if (selectionTouchesRange(state, from, to)) return;
+      const { lang, body } = extractFencedInfo(state, from, to);
+      if (lang !== "mermaid" && lang !== "mmd") return;
+      if (!body.trim()) return;
 
-        builder.add(
-          from,
-          to,
-          Decoration.replace({
-            widget: new MermaidWidget(body, themeMode),
-            block: true,
-          }),
-        );
-      },
-    });
-  }
+      builder.add(
+        from,
+        to,
+        Decoration.replace({
+          widget: new MermaidWidget(body, themeMode),
+          block: true,
+        }),
+      );
+    },
+  });
 
   return builder.finish();
 }
 
-export const livePreviewMermaid = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+/** @deprecated Prefer buildMermaidDecorations(state). */
+export function buildLivePreviewMermaidDecorations(
+  view: EditorView,
+): DecorationSet {
+  return buildMermaidDecorations(view.state);
+}
 
-    constructor(view: EditorView) {
-      this.decorations = buildLivePreviewMermaidDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (
-        livePreviewShouldRebuild(update, "widgets") ||
-        livePreviewContextChanged(update) ||
-        update.transactions.some((tr) =>
-          tr.effects.some((e) => e.is(mermaidRenderedEffect)),
-        )
-      ) {
-        this.decorations = buildLivePreviewMermaidDecorations(update.view);
-      }
-    }
-  },
-  {
-    decorations: (plugin) => plugin.decorations,
-  },
-);
+export const livePreviewMermaid = defineLivePreviewBlockDecorationField({
+  create: buildMermaidDecorations,
+});

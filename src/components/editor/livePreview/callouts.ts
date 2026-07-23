@@ -2,22 +2,20 @@
  * Live Preview: Callouts `> [!type] Title` and horizontal rules.
  */
 
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, type EditorState } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
-  ViewPlugin,
   WidgetType,
   type DecorationSet,
-  type ViewUpdate,
 } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { renderMarkdown } from "../../../utils/markdown";
 import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
 import {
+  defineLivePreviewBlockDecorationField,
   getCachedMarkdownHtml,
   hasSkipAncestor,
-  livePreviewShouldRebuild,
   selectionTouchesRange,
 } from "./shared";
 
@@ -141,26 +139,16 @@ class HorizontalRuleWidget extends WidgetType {
   }
 }
 
-export function buildLivePreviewCalloutDecorations(
-  view: EditorView,
-): DecorationSet {
-  if (isHeavyLivePreviewState(view.state)) {
+export function buildCalloutDecorations(state: EditorState): DecorationSet {
+  if (isHeavyLivePreviewState(state)) {
     return Decoration.none;
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const { state } = view;
   const docText = state.doc.toString();
-  const viewFrom = view.visibleRanges.length
-    ? Math.min(...view.visibleRanges.map((range) => range.from))
-    : 0;
-  const viewTo = view.visibleRanges.length
-    ? Math.max(...view.visibleRanges.map((range) => range.to))
-    : state.doc.length;
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
   for (const callout of findCalloutRanges(docText)) {
-    if (callout.to < viewFrom || callout.from > viewTo) continue;
     if (selectionTouchesRange(state, callout.from, callout.to)) continue;
     if (hasSkipAncestor(state, callout.from)) continue;
 
@@ -183,18 +171,24 @@ export function buildLivePreviewCalloutDecorations(
     });
   }
 
-  // Horizontal rules via lezer HorizontalRule or --- lines
-  treeIterateHr(view, (from, to) => {
-    if (selectionTouchesRange(state, from, to)) return;
-    if (hasSkipAncestor(state, from)) return;
-    ranges.push({
-      from,
-      to,
-      deco: Decoration.replace({
-        widget: new HorizontalRuleWidget(),
-        block: true,
-      }),
-    });
+  const tree =
+    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
+  tree.iterate({
+    from: 0,
+    to: state.doc.length,
+    enter: (node) => {
+      if (node.name !== "HorizontalRule") return;
+      if (selectionTouchesRange(state, node.from, node.to)) return;
+      if (hasSkipAncestor(state, node.from)) return;
+      ranges.push({
+        from: node.from,
+        to: node.to,
+        deco: Decoration.replace({
+          widget: new HorizontalRuleWidget(),
+          block: true,
+        }),
+      });
+    },
   });
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
@@ -208,40 +202,13 @@ export function buildLivePreviewCalloutDecorations(
   return builder.finish();
 }
 
-function treeIterateHr(
+/** @deprecated Prefer buildCalloutDecorations(state). */
+export function buildLivePreviewCalloutDecorations(
   view: EditorView,
-  visit: (from: number, to: number) => void,
-) {
-  const { state } = view;
-  const tree = syntaxTree(state);
-  for (const { from, to } of view.visibleRanges) {
-    tree.iterate({
-      from,
-      to,
-      enter: (node) => {
-        if (node.name === "HorizontalRule") {
-          visit(node.from, node.to);
-        }
-      },
-    });
-  }
+): DecorationSet {
+  return buildCalloutDecorations(view.state);
 }
 
-export const livePreviewCallouts = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-
-    constructor(view: EditorView) {
-      this.decorations = buildLivePreviewCalloutDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (livePreviewShouldRebuild(update, "widgets")) {
-        this.decorations = buildLivePreviewCalloutDecorations(update.view);
-      }
-    }
-  },
-  {
-    decorations: (plugin) => plugin.decorations,
-  },
-);
+export const livePreviewCallouts = defineLivePreviewBlockDecorationField({
+  create: buildCalloutDecorations,
+});
