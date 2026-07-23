@@ -1,11 +1,49 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import type { MetadataField } from "../../../types";
 import { useI18n } from "../../../hooks/useI18n";
 import type { SettingsTabProps } from "../types";
 
-export const MetadataTab: React.FC<SettingsTabProps> = ({
+interface MetadataTabProps extends SettingsTabProps {
+  keyColumnWidth: number;
+  valueColumnWidth: number;
+  onKeyColumnWidthChange: (width: number) => void;
+  onValueColumnWidthChange: (width: number) => void;
+}
+
+function beginColumnResize(
+  event: React.MouseEvent,
+  startWidth: number,
+  onChange: (width: number) => void,
+) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const startX = event.clientX;
+
+  const handlePointerMove = (moveEvent: MouseEvent) => {
+    onChange(startWidth + (moveEvent.clientX - startX));
+  };
+
+  const handlePointerUp = () => {
+    document.removeEventListener("mousemove", handlePointerMove);
+    document.removeEventListener("mouseup", handlePointerUp);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  };
+
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  document.addEventListener("mousemove", handlePointerMove);
+  document.addEventListener("mouseup", handlePointerUp);
+}
+
+export const MetadataTab: React.FC<MetadataTabProps> = ({
   settings,
   onUpdateSettings,
+  keyColumnWidth,
+  valueColumnWidth,
+  onKeyColumnWidthChange,
+  onValueColumnWidthChange,
 }) => {
   const { t } = useI18n();
   const [draggingMetadataIndex, setDraggingMetadataIndex] = useState<
@@ -52,24 +90,38 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
     onUpdateSettings({ metadataFields: newFields });
   };
 
+  const handleKeyResizeStart = useCallback(
+    (event: React.MouseEvent) => {
+      beginColumnResize(event, keyColumnWidth, onKeyColumnWidthChange);
+    },
+    [keyColumnWidth, onKeyColumnWidthChange],
+  );
+
+  const handleValueResizeStart = useCallback(
+    (event: React.MouseEvent) => {
+      beginColumnResize(event, valueColumnWidth, onValueColumnWidthChange);
+    },
+    [onValueColumnWidthChange, valueColumnWidth],
+  );
+
   return (
     <div className="space-y-6 animate-fade-in-02s">
       <div>
-        <div className="flex justify-between items-center mb-4">
-          <div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">
               {t("settings_metadataTemplate")}
             </h3>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="mt-1 text-xs text-gray-500">
               {t("settings_metadataTemplateDesc")}
             </p>
           </div>
           <button
             onClick={handleAddMetadata}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-black"
           >
             <svg
-              className="w-3.5 h-3.5"
+              className="h-3.5 w-3.5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -82,22 +134,24 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
           </button>
         </div>
 
-        <div className="mb-2 hidden gap-2 px-2 text-[11px] font-medium uppercase tracking-wide text-gray-400 sm:flex">
+        <div className="mb-2 hidden items-center gap-1 px-2 text-[11px] font-medium uppercase tracking-wide text-gray-400 sm:flex">
           <span className="w-8 shrink-0" aria-hidden />
-          <span className="w-28 shrink-0">
+          <span className="shrink-0" style={{ width: keyColumnWidth }}>
             {t("settings_metadataKeyLabel")}
           </span>
           <span className="w-3 shrink-0" aria-hidden />
-          <span className="min-w-0 flex-1">
+          <span className="w-3 shrink-0" aria-hidden />
+          <span className="shrink-0" style={{ width: valueColumnWidth }}>
             {t("settings_metadataValueLabel")}
           </span>
-          <span className="min-w-0 flex-[1.15]">
+          <span className="w-3 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">
             {t("settings_metadataDescriptionLabel")}
           </span>
           <span className="w-8 shrink-0" aria-hidden />
         </div>
 
-        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+        <div className="space-y-2 pr-1">
           {settings.metadataFields.map((field, idx) => (
             <div
               key={`${field.key}-${idx}`}
@@ -110,7 +164,7 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
                 handleMoveMetadata(draggingMetadataIndex, idx);
                 setDraggingMetadataIndex(null);
               }}
-              className={`flex gap-2 items-center bg-gray-50 dark:bg-white/5 p-2 rounded-xl border transition-colors group ${
+              className={`group flex items-start gap-1 rounded-xl border bg-gray-50 p-2 transition-colors dark:bg-white/5 ${
                 draggingMetadataIndex === idx
                   ? "border-accent-DEFAULT/50 bg-accent-DEFAULT/5"
                   : "border-gray-100 dark:border-white/5"
@@ -119,10 +173,10 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
               <button
                 type="button"
                 title={t("settings_dragToReorder")}
-                className="p-2 text-gray-400 cursor-grab active:cursor-grabbing hover:text-gray-600 dark:hover:text-gray-200"
+                className="mt-1 cursor-grab p-2 text-gray-400 hover:text-gray-600 active:cursor-grabbing dark:hover:text-gray-200"
               >
                 <svg
-                  className="w-3.5 h-3.5"
+                  className="h-3.5 w-3.5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -144,9 +198,20 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
                 }
                 placeholder={t("settings_metadataKeyPlaceholder")}
                 aria-label={t("settings_metadataKeyLabel")}
-                className="w-28 shrink-0 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
+                title={field.key}
+                className="shrink-0 rounded-lg border border-transparent bg-white px-3 py-2 text-sm transition-colors focus:border-accent-DEFAULT focus:outline-none dark:bg-black/20"
+                style={{ width: keyColumnWidth }}
               />
-              <span className="text-gray-400">:</span>
+              <button
+                type="button"
+                aria-label={t("settings_resizeMetadataKeyColumn")}
+                title={t("settings_resizeMetadataKeyColumn")}
+                className="mt-1 hidden h-8 w-3 shrink-0 cursor-col-resize items-center justify-center rounded hover:bg-black/5 md:flex dark:hover:bg-white/10"
+                onMouseDown={handleKeyResizeStart}
+              >
+                <span className="h-4 w-px bg-gray-300 dark:bg-white/20" />
+              </button>
+              <span className="mt-2 text-gray-400">:</span>
               <input
                 type="text"
                 value={field.defaultValue}
@@ -155,26 +220,37 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
                 }
                 placeholder={t("settings_metadataValuePlaceholder")}
                 aria-label={t("settings_metadataValueLabel")}
-                className="min-w-0 flex-1 bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
-                title={t("settings_metadataNowHint")}
+                title={field.defaultValue || t("settings_metadataNowHint")}
+                className="shrink-0 rounded-lg border border-transparent bg-white px-3 py-2 text-sm transition-colors focus:border-accent-DEFAULT focus:outline-none dark:bg-black/20"
+                style={{ width: valueColumnWidth }}
               />
-              <input
-                type="text"
+              <button
+                type="button"
+                aria-label={t("settings_resizeMetadataValueColumn")}
+                title={t("settings_resizeMetadataValueColumn")}
+                className="mt-1 hidden h-8 w-3 shrink-0 cursor-col-resize items-center justify-center rounded hover:bg-black/5 md:flex dark:hover:bg-white/10"
+                onMouseDown={handleValueResizeStart}
+              >
+                <span className="h-4 w-px bg-gray-300 dark:bg-white/20" />
+              </button>
+              <textarea
                 value={field.description ?? ""}
                 onChange={(e) =>
                   handleUpdateMetadata(idx, { description: e.target.value })
                 }
                 placeholder={t("settings_metadataDescriptionPlaceholder")}
                 aria-label={t("settings_metadataDescriptionLabel")}
-                className="min-w-0 flex-[1.15] bg-white dark:bg-black/20 px-3 py-2 rounded-lg text-sm border border-transparent focus:border-accent-DEFAULT focus:outline-none transition-colors"
+                title={field.description || undefined}
+                rows={2}
+                className="min-h-[2.75rem] min-w-0 flex-1 resize-y rounded-lg border border-transparent bg-white px-3 py-2 text-sm leading-5 transition-colors focus:border-accent-DEFAULT focus:outline-none dark:bg-black/20"
               />
               <button
                 onClick={() => handleRemoveMetadata(idx)}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                className="mt-1 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
                 aria-label={`Remove ${field.key}`}
               >
                 <svg
-                  className="w-3.5 h-3.5"
+                  className="h-3.5 w-3.5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -187,9 +263,9 @@ export const MetadataTab: React.FC<SettingsTabProps> = ({
             </div>
           ))}
         </div>
-        <div className="mt-4 text-xs text-gray-400 flex items-center gap-1">
+        <div className="mt-4 flex items-center gap-1 text-xs text-gray-400">
           <svg
-            className="w-3 h-3"
+            className="h-3 w-3"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

@@ -651,6 +651,10 @@ export default {
   settings_metadataNowHint: "Use {now} for the current date",
   settings_metadataTip:
     "Tip: drag to reorder. Use {now} for the date and {nowDatetime} for the timestamp. `status` is only for editorial state; publishing is controlled by `is_publish`.",
+  settings_resizeModal: "Drag to resize the settings window",
+  settings_resizeNav: "Drag to resize the settings navigation",
+  settings_resizeMetadataKeyColumn: "Drag to resize the key column",
+  settings_resizeMetadataValueColumn: "Drag to resize the value column",
 
   settings_publishingTitle: "Publishing",
   settings_publishingTabSimpleBlog: "simple-blog",
