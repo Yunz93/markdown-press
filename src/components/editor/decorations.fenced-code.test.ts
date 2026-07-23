@@ -1,5 +1,7 @@
 /** @vitest-environment happy-dom */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -52,5 +54,46 @@ describe('markdownListDecorations', () => {
     expect(view.dom.querySelector('.cm-markdown-list-marker')).not.toBeNull();
 
     view.destroy();
+  });
+
+  it('keeps editor content inset in list hang padding-left', () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: '1. 列表正文',
+        extensions: [markdownListDecorations],
+      }),
+      parent: document.createElement('div'),
+    });
+
+    const plugin = view.plugin(markdownListDecorations);
+    const hangStyles: string[] = [];
+    plugin?.decorations.between(0, view.state.doc.length, (_from, _to, value) => {
+      const style = value.spec?.attributes?.style;
+      if (typeof style === 'string' && style.includes('padding-left')) {
+        hangStyles.push(style);
+      }
+    });
+
+    expect(hangStyles.length).toBeGreaterThan(0);
+    expect(hangStyles[0]).toContain('var(--pane-content-px');
+    expect(hangStyles[0]).toContain('var(--mp-editor-list-hang-em-per-char');
+
+    view.destroy();
+  });
+});
+
+describe('editor fenced-code selection styles', () => {
+  it('keeps fenced code backgrounds translucent for drawSelection', () => {
+    const css = readFileSync(resolve(__dirname, '../../styles/editor.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.editor-pane-layout\s+\.cm-fenced-code-line\s*\{[^}]*color-mix\([^)]*var\(--editor-code-block-bg\)[^)]*transparent/s,
+    );
+    expect(css).toMatch(
+      /\.editor-pane-layout\s+\.cm-content\s*\{[^}]*padding:\s*var\(--pane-content-top\)\s+0/s,
+    );
+    expect(css).toMatch(
+      /\.editor-pane-layout\s+\.cm-line\s*\{[^}]*padding-left:\s*var\(--pane-content-px\)/s,
+    );
   });
 });
