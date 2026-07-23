@@ -196,9 +196,10 @@ export default {
   search_mode_keyword: "Keyword",
   search_mode_semantic: "Semantic",
   search_mode_hybrid: "Hybrid",
-  search_mode_keyword_short: "Key",
-  search_mode_semantic_short: "Sem",
-  search_mode_hybrid_short: "Hyb",
+  search_mode_keyword_short: "Keyword",
+  search_mode_semantic_short: "Semantic",
+  search_mode_hybrid_short: "Hybrid",
+  search_mode_cycleHint: "Click to switch",
 
   related_tab: "Related",
   related_title: "Related notes",

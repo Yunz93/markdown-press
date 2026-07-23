@@ -441,7 +441,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             </div>
 
             <div className="flex items-center gap-2 md:mt-1">
-              <label className="relative flex-1">
+              <label className="relative flex-1 min-w-0">
                 <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                   <svg
                     className="h-4 w-4"
@@ -460,28 +460,53 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t("sidebar_search")}
-                  className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/70 dark:bg-[#141a25] py-2 pl-9 pr-3 text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white/90 dark:focus:bg-[#181f2c]"
+                  className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/70 dark:bg-[#141a25] py-2 pl-9 pr-[5.75rem] text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white/90 dark:focus:bg-[#181f2c]"
                 />
+                <button
+                  type="button"
+                  className="absolute inset-y-1 right-1 inline-flex max-w-[5.5rem] items-center gap-0.5 rounded-lg px-1.5 text-[11px] font-medium text-gray-500 hover:text-gray-800 hover:bg-black/[0.04] dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors"
+                  title={`${t("search_mode_label")}: ${
+                    searchMode === "keyword"
+                      ? t("search_mode_keyword")
+                      : searchMode === "semantic"
+                        ? t("search_mode_semantic")
+                        : t("search_mode_hybrid")
+                  } — ${t("search_mode_cycleHint")}`}
+                  aria-label={`${t("search_mode_label")}: ${
+                    searchMode === "keyword"
+                      ? t("search_mode_keyword")
+                      : searchMode === "semantic"
+                        ? t("search_mode_semantic")
+                        : t("search_mode_hybrid")
+                  }`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    const order = ["keyword", "semantic", "hybrid"] as const;
+                    const next =
+                      order[(order.indexOf(searchMode) + 1) % order.length]!;
+                    setSearchMode(next);
+                  }}
+                >
+                  <span>
+                    {searchMode === "keyword"
+                      ? t("search_mode_keyword")
+                      : searchMode === "semantic"
+                        ? t("search_mode_semantic")
+                        : t("search_mode_hybrid")}
+                  </span>
+                  <svg
+                    className="h-3 w-3 opacity-60"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden
+                  >
+                    <polyline points="17 8 12 3 7 8" />
+                    <polyline points="7 16 12 21 17 16" />
+                  </svg>
+                </button>
               </label>
-              <select
-                aria-label={t("search_mode_label")}
-                value={searchMode}
-                onChange={(e) =>
-                  setSearchMode(
-                    e.target.value as "keyword" | "semantic" | "hybrid",
-                  )
-                }
-                className="h-10 max-w-[5.5rem] shrink-0 rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] px-2 text-xs font-medium text-gray-700 dark:text-gray-200"
-                title={t("search_mode_label")}
-              >
-                <option value="keyword">
-                  {t("search_mode_keyword_short")}
-                </option>
-                <option value="semantic">
-                  {t("search_mode_semantic_short")}
-                </option>
-                <option value="hybrid">{t("search_mode_hybrid_short")}</option>
-              </select>
               <button
                 onClick={() => openNewFileDialog(undefined, t("app_untitled"))}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"
