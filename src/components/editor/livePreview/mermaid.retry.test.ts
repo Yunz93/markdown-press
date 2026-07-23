@@ -122,4 +122,33 @@ describe("live preview mermaid observers", () => {
 
     expect(mocked.mock.calls.length).toBeGreaterThan(0);
   });
+
+  it("ignores editor click handling so posAtCoords cannot yank the caret", async () => {
+    const { buildMermaidDecorations } = await import("./mermaid");
+    const doc = "```mermaid\nflowchart TD\n  A-->B\n```\n\naway";
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: doc.length - 1 },
+      extensions: [
+        markdown({ base: markdownLanguage }),
+        livePreviewContextFacet.of({
+          sourceFilePath: null,
+          rootFolderPath: null,
+          files: [],
+          themeMode: "light",
+        }),
+      ],
+    });
+
+    let widget: { ignoreEvent: (event: Event) => boolean } | null = null;
+    const deco = buildMermaidDecorations(state).decorations;
+    deco.between(0, state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        widget = value.spec.widget as typeof widget;
+      }
+    });
+    expect(widget).not.toBeNull();
+    expect(widget!.ignoreEvent(new MouseEvent("click"))).toBe(true);
+    expect(widget!.ignoreEvent(new MouseEvent("mousedown"))).toBe(true);
+  });
 });

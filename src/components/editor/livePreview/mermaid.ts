@@ -19,7 +19,7 @@ import {
   defineLivePreviewBlockDecorationField,
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
-  bindLivePreviewWidgetCaret,
+  cancelPendingLivePreviewReveals,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -157,6 +157,31 @@ class MermaidWidget extends WidgetType {
       retry();
     });
 
+    // Passive block caret — but skip while in error/retry so mousedown does
+    // not select `from` (which would reveal source and destroy this widget
+    // before the click retry handler runs).
+    wrap.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "a, button, input, textarea, select, [contenteditable='true']",
+        )
+      ) {
+        return;
+      }
+      cancelPendingLivePreviewReveals();
+      event.preventDefault();
+      event.stopPropagation();
+      if (wrap.getAttribute("data-mermaid-status") === "error") return;
+      const pos = Math.max(0, Math.min(this.from, view.state.doc.length));
+      view.focus();
+      view.dispatch({
+        selection: { anchor: pos },
+        scrollIntoView: false,
+      });
+    });
+
     if (typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver(() => {
         const current = wrap.getAttribute("data-mermaid-status");
@@ -194,12 +219,14 @@ class MermaidWidget extends WidgetType {
       }
     });
 
-    bindLivePreviewWidgetCaret(view, wrap, this.from);
     return wrap;
   }
 
-  ignoreEvent(event: Event) {
-    return event.type !== "click";
+  ignoreEvent() {
+    // Passive block: caret/retry are handled on the widget DOM. Letting CM
+    // handle click re-runs posAtCoords and can yank the caret on tall
+    // diagrams after async SVG layout.
+    return true;
   }
 }
 
