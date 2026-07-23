@@ -448,7 +448,7 @@
   fill: #93c5fd;
 }
 
-/* Ask Vault — docked workspace module */
+/* Ask Vault — docked module aligned with RightRail */
 .ask-vault-module {
   position: relative;
   height: 100%;
@@ -457,13 +457,14 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  border-left: 1px solid rgba(226, 232, 240, 0.95);
-  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+  background: transparent;
+  font-size: 13px;
 }
 
 .dark .ask-vault-module {
-  border-left-color: rgba(255, 255, 255, 0.08);
-  background: rgba(9, 13, 21, 0.92);
+  color: #cbd5e1;
+  background: transparent;
 }
 
 .ask-vault-resize-handle {
@@ -483,56 +484,127 @@
 
 .ask-vault-module-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  gap: 8px;
+  padding: 14px 16px 12px;
   flex-shrink: 0;
 }
 
-.dark .ask-vault-module-header {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+.ask-vault-tab-count {
+  display: inline-block;
+  margin-left: 4px;
+  min-width: 1.1em;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  vertical-align: middle;
+  background: rgba(15, 23, 42, 0.08);
+  color: inherit;
+  opacity: 0.85;
 }
 
-.ask-vault-module-header h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
+.dark .ask-vault-tab-count {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.ask-vault-module-subtitle {
-  margin: 4px 0 0;
-  font-size: 11px;
-  line-height: 1.4;
-  opacity: 0.7;
+.ask-vault-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.65;
+  padding: 0 2px;
+  flex-shrink: 0;
 }
 
-.ask-vault-module-body {
+.ask-vault-close:hover {
+  opacity: 1;
+}
+
+.ask-vault-ask-layout {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  padding: 12px 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .ask-vault-readiness {
-  margin: 0;
-  padding: 10px 12px;
+  margin: 0 10px 8px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--color-border, #e5e7eb) 55%, transparent);
-  font-size: 0.8125rem;
+  background: rgba(15, 23, 42, 0.04);
+  font-size: 12px;
   line-height: 1.45;
+  flex-shrink: 0;
 }
 
-.ask-vault-readiness p {
+.dark .ask-vault-readiness {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ask-vault-readiness-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.ask-vault-readiness-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #94a3b8;
+}
+
+.ask-vault-readiness-dot.is-ok {
+  background: #22c55e;
+}
+
+.ask-vault-readiness-dot.is-warn {
+  background: #f59e0b;
+}
+
+.ask-vault-readiness-dot.is-blocked {
+  background: #ef4444;
+}
+
+.ask-vault-readiness-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ask-vault-readiness-chevron {
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.ask-vault-readiness-detail {
+  padding: 0 10px 8px;
+}
+
+.ask-vault-readiness-detail p {
   margin: 0;
 }
 
-.ask-vault-readiness button {
-  margin-left: 0.35rem;
+.ask-vault-readiness-detail button {
+  margin-left: 0.25rem;
   text-decoration: underline;
   background: none;
   border: none;
@@ -546,53 +618,106 @@
   opacity: 0.85;
 }
 
-.ask-vault-scope-hint,
-.ask-vault-sources-hint {
-  margin: 0;
-  font-size: 0.8rem;
-  opacity: 0.8;
+.ask-vault-ask-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.ask-vault-close {
+.ask-vault-secondary-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 10px 6px;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.04);
+  flex-shrink: 0;
+}
+
+.dark .ask-vault-secondary-tabs {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ask-vault-secondary-tab {
+  flex: 1;
   border: none;
   background: transparent;
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
   color: inherit;
-  opacity: 0.7;
-  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.65;
 }
 
-.ask-vault-close:hover {
+.ask-vault-secondary-tab.active {
   opacity: 1;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-.ask-vault-controls {
+.dark .ask-vault-secondary-tab.active {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.ask-vault-ask-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 10px;
+}
+
+.ask-vault-composer {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 10px 12px 14px;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  background: transparent;
 }
 
-.ask-vault-controls textarea,
+.dark .ask-vault-composer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.ask-vault-composer textarea,
 .ask-vault-actions button {
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(203, 213, 225, 0.9);
-  background: rgba(248, 250, 252, 0.9);
+  background: rgba(248, 250, 252, 0.85);
   color: inherit;
   padding: 8px 10px;
   font-size: 13px;
 }
 
-.dark .ask-vault-controls textarea,
+.dark .ask-vault-composer textarea,
 .dark .ask-vault-actions button {
   border-color: rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
 }
 
-.ask-vault-controls textarea {
+.ask-vault-composer textarea {
   resize: vertical;
-  min-height: 88px;
+  min-height: 72px;
+  max-height: 160px;
+}
+
+.ask-vault-scope-hint,
+.ask-vault-sources-hint,
+.ask-vault-empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.ask-vault-empty {
+  padding: 16px 4px;
 }
 
 .ask-vault-actions {
@@ -614,7 +739,6 @@
 }
 
 .ask-vault-answer,
-.ask-vault-history,
 .ask-vault-sources-preview,
 .ask-vault-citations {
   display: flex;
@@ -622,49 +746,132 @@
   gap: 8px;
 }
 
-.ask-vault-answer h3,
-.ask-vault-history h3,
-.ask-vault-sources-preview h3,
-.ask-vault-citations h4 {
-  margin: 0;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #94a3b8;
-}
-
 .ask-vault-answer-body {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
-.ask-vault-citation,
-.ask-vault-history-item {
+.ask-vault-answer-body.markdown-body {
+  background: transparent;
+  padding: 0;
+}
+
+.ask-vault-answer-body.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.ask-vault-answer-body.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.ask-vault-sources-preview pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: inherit;
+}
+
+.dark .ask-vault-sources-preview pre {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ask-vault-citation {
   display: block;
   width: 100%;
   text-align: left;
   border: none;
-  background: rgba(15, 23, 42, 0.04);
-  border-radius: 12px;
-  padding: 8px 10px;
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px;
   cursor: pointer;
   color: inherit;
   font: inherit;
 }
 
-.dark .ask-vault-citation,
-.dark .ask-vault-history-item {
+.ask-vault-citation:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.dark .ask-vault-citation:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.ask-vault-citation span,
-.ask-vault-sources-preview pre {
+.ask-vault-citation span {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: #64748b;
+  color: #94a3b8;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.ask-vault-history-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+
+.ask-vault-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ask-vault-history-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 8px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.ask-vault-history-item:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.dark .ask-vault-history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ask-vault-history-question {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-vault-history-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ask-vault-history-snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.8;
 }
 
 /* Writing Stats Styles */

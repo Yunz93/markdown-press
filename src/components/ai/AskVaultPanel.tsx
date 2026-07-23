@@ -18,6 +18,7 @@ import {
 } from "../../services/vault/askVaultService";
 import { hydrateSensitiveSettingsIntoStore } from "../../services/secureSettingsService";
 import { localizeKnownError } from "../../utils/i18n";
+import { renderMarkdown } from "../../utils/markdown";
 import {
   getActiveEditorSelection,
   requestEditorRangeFocus,
@@ -38,6 +39,8 @@ interface AskVaultPanelProps {
 }
 
 type AskScope = "vault" | "folder" | "files";
+type PrimaryTab = "ask" | "history";
+type SecondaryTab = "answer" | "sources";
 
 function isAiConfigured(settings: {
   aiProvider?: string;
@@ -50,6 +53,19 @@ function isAiConfigured(settings: {
   if (settings.aiProvider === "deepseek")
     return Boolean(settings.deepseekApiKey?.trim());
   return Boolean(settings.geminiApiKey?.trim());
+}
+
+function formatHistoryTime(at: number, language: string): string {
+  try {
+    return new Date(at).toLocaleString(language === "en" ? "en-US" : "zh-CN", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
 }
 
 export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
@@ -80,13 +96,16 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     ),
   );
 
+  const [primaryTab, setPrimaryTab] = useState<PrimaryTab>("ask");
+  const [secondaryTab, setSecondaryTab] = useState<SecondaryTab>("answer");
+  const [readinessExpanded, setReadinessExpanded] = useState(false);
+
   const [question, setQuestion] = useState("");
   const [scope, setScope] = useState<AskScope>("vault");
   const [retrieving, setRetrieving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [pendingHits, setPendingHits] = useState<RetrieveHit[]>([]);
   const [previewSnippets, setPreviewSnippets] = useState<string[]>([]);
-  const [showSourcesPreview, setShowSourcesPreview] = useState(true);
   const [answerMarkdown, setAnswerMarkdown] = useState("");
   const [citations, setCitations] = useState<AskVaultCitation[]>([]);
   const [history, setHistory] = useState<AskVaultHistoryItem[]>([]);
@@ -107,6 +126,8 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     linkIndexProgress.phase === "updating";
   const keywordOnly = (settings.embeddingProvider ?? "builtin") === "none";
   const aiReady = isAiConfigured(settings);
+  const blocked =
+    !rootFolderPath || !aiReady || indexBuilding || chunkCount === 0;
   const canAsk =
     Boolean(rootFolderPath) &&
     aiReady &&
@@ -117,6 +138,15 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
   const scopeNeedsFile = scope === "folder" || scope === "files";
   const scopeBlocked = scopeNeedsFile && !currentFilePath;
+  const showReadinessDetail = blocked || readinessExpanded || keywordOnly;
+
+  const answerHtml = useMemo(() => {
+    if (!answerMarkdown.trim()) return "";
+    return renderMarkdown(answerMarkdown, {
+      themeMode: settings.themeMode,
+      markdownStylePreset: settings.markdownStylePreset,
+    });
+  }, [answerMarkdown, settings.themeMode, settings.markdownStylePreset]);
 
   useEffect(() => {
     if (!open || !rootFolderPath) return;
@@ -213,6 +243,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     setRetrieving(true);
     setAnswerMarkdown("");
     setCitations([]);
+    setPrimaryTab("ask");
     try {
       const activeSettings = await resolveHydratedSettings();
       try {
@@ -233,7 +264,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
       setPendingHits(hits);
       setPreviewSnippets(hitsToPreviewSnippets(hits));
-      setShowSourcesPreview(true);
+      setSecondaryTab("sources");
       if (hits.length === 0) {
         showNotification(t("askVault_noHits"), "info");
       }
@@ -266,6 +297,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     if (!trimmed || !rootFolderPath || pendingHits.length === 0) return;
 
     setGenerating(true);
+    setPrimaryTab("ask");
     try {
       const activeSettings = await resolveHydratedSettings();
       const result = await answerAskVaultFromHits(
@@ -275,6 +307,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       );
       setAnswerMarkdown(result.answerMarkdown);
       setCitations(result.citations);
+      setSecondaryTab("answer");
 
       const historyItem: AskVaultHistoryItem = {
         id: `${Date.now()}`,
@@ -376,7 +409,72 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     t,
   ]);
 
+  const restoreHistoryItem = useCallback((item: AskVaultHistoryItem) => {
+    setQuestion(item.question);
+    setAnswerMarkdown(item.answer.answerMarkdown);
+    setCitations(item.answer.citations);
+    setPreviewSnippets(
+      item.answer.citations.map(
+        (c) => `[${c.index}] ${c.relPath}\n${c.snippet}`,
+      ),
+    );
+    setPendingHits([]);
+    setPrimaryTab("ask");
+    setSecondaryTab("answer");
+  }, []);
+
   if (!open) return null;
+
+  const readinessBody = !rootFolderPath ? (
+    <p>{t("askVault_needVault")}</p>
+  ) : !aiReady ? (
+    <p>
+      {t("askVault_needAi")}{" "}
+      <button type="button" onClick={() => setSettingsOpen(true, "ai")}>
+        {t("askVault_openAiSettings")}
+      </button>
+    </p>
+  ) : indexBuilding ? (
+    <p>
+      {t("askVault_indexBuilding", {
+        done: linkIndexProgress.done,
+        total: Math.max(linkIndexProgress.total, 1),
+      })}
+    </p>
+  ) : chunkCount === 0 ? (
+    <p>
+      {t("askVault_indexEmpty")}{" "}
+      <button
+        type="button"
+        onClick={() => {
+          void requestVaultLinkIndexRebuild().catch(() => {
+            setSettingsOpen(true, "index");
+          });
+        }}
+      >
+        {t("askVault_rebuildIndex")}
+      </button>
+    </p>
+  ) : keywordOnly ? (
+    <p>
+      {t("askVault_keywordOnly")}{" "}
+      <button type="button" onClick={() => setSettingsOpen(true, "index")}>
+        {t("askVault_openIndexSettings")}
+      </button>
+    </p>
+  ) : semanticReady ? (
+    <p className="ask-vault-ready">{t("askVault_ready")}</p>
+  ) : (
+    <p>{t("askVault_readyKeyword")}</p>
+  );
+
+  const readinessSummary = blocked
+    ? t("askVault_statusBlocked")
+    : keywordOnly
+      ? t("askVault_statusKeyword")
+      : semanticReady
+        ? t("askVault_statusReady")
+        : t("askVault_statusKeyword");
 
   return (
     <aside
@@ -393,12 +491,34 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         aria-label={t("askVault_resize")}
       />
 
-      <div className="ask-vault-module-header">
-        <div>
-          <h2>{t("askVault_title")}</h2>
-          <p className="ask-vault-module-subtitle">
-            {t("askVault_moduleHint")}
-          </p>
+      <div className="ask-vault-module-header right-rail-header">
+        <div className="right-rail-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={primaryTab === "ask"}
+            className={`right-rail-tab ${primaryTab === "ask" ? "active" : ""}`}
+            onClick={() => setPrimaryTab("ask")}
+          >
+            {t("askVault_tabAsk")}
+            {answerMarkdown || pendingHits.length > 0 ? (
+              <span className="right-rail-tab-dot" aria-hidden />
+            ) : null}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={primaryTab === "history"}
+            className={`right-rail-tab ${primaryTab === "history" ? "active" : ""}`}
+            onClick={() => setPrimaryTab("history")}
+          >
+            {t("askVault_history")}
+            {history.length > 0 ? (
+              <span className="ask-vault-tab-count" aria-hidden>
+                {Math.min(history.length, 99)}
+              </span>
+            ) : null}
+          </button>
         </div>
         <button
           type="button"
@@ -410,196 +530,216 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         </button>
       </div>
 
-      <div className="ask-vault-module-body">
-        <div className="ask-vault-readiness">
-          {!rootFolderPath ? (
-            <p>{t("askVault_needVault")}</p>
-          ) : !aiReady ? (
-            <p>
-              {t("askVault_needAi")}{" "}
-              <button type="button" onClick={() => setSettingsOpen(true, "ai")}>
-                {t("askVault_openAiSettings")}
-              </button>
-            </p>
-          ) : indexBuilding ? (
-            <p>
-              {t("askVault_indexBuilding", {
-                done: linkIndexProgress.done,
-                total: Math.max(linkIndexProgress.total, 1),
-              })}
-            </p>
-          ) : chunkCount === 0 ? (
-            <p>
-              {t("askVault_indexEmpty")}{" "}
+      {primaryTab === "ask" ? (
+        <div className="ask-vault-ask-layout">
+          <div className="ask-vault-readiness">
+            <button
+              type="button"
+              className="ask-vault-readiness-toggle"
+              aria-expanded={showReadinessDetail}
+              onClick={() => setReadinessExpanded((v) => !v)}
+            >
+              <span
+                className={`ask-vault-readiness-dot ${blocked ? "is-blocked" : keywordOnly ? "is-warn" : "is-ok"}`}
+              />
+              <span className="ask-vault-readiness-summary">
+                {readinessSummary}
+              </span>
+              <span className="ask-vault-readiness-chevron" aria-hidden>
+                {showReadinessDetail ? "▾" : "▸"}
+              </span>
+            </button>
+            {showReadinessDetail ? (
+              <div className="ask-vault-readiness-detail">{readinessBody}</div>
+            ) : null}
+          </div>
+
+          <div className="ask-vault-ask-main">
+            <div className="ask-vault-secondary-tabs" role="tablist">
               <button
                 type="button"
-                onClick={() => {
-                  void requestVaultLinkIndexRebuild().catch(() => {
-                    setSettingsOpen(true, "index");
-                  });
-                }}
+                role="tab"
+                aria-selected={secondaryTab === "answer"}
+                className={`ask-vault-secondary-tab ${secondaryTab === "answer" ? "active" : ""}`}
+                onClick={() => setSecondaryTab("answer")}
               >
-                {t("askVault_rebuildIndex")}
+                {t("askVault_answer")}
               </button>
-            </p>
-          ) : keywordOnly ? (
-            <p>
-              {t("askVault_keywordOnly")}{" "}
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true, "index")}
+                role="tab"
+                aria-selected={secondaryTab === "sources"}
+                className={`ask-vault-secondary-tab ${secondaryTab === "sources" ? "active" : ""}`}
+                onClick={() => setSecondaryTab("sources")}
               >
-                {t("askVault_openIndexSettings")}
+                {t("askVault_sourcesTab")}
+                {previewSnippets.length > 0 ? (
+                  <span className="ask-vault-tab-count" aria-hidden>
+                    {previewSnippets.length}
+                  </span>
+                ) : null}
               </button>
-            </p>
-          ) : semanticReady ? (
-            <p className="ask-vault-ready">{t("askVault_ready")}</p>
-          ) : (
-            <p>{t("askVault_readyKeyword")}</p>
-          )}
-        </div>
-
-        <div className="ask-vault-controls">
-          <AppSelect
-            value={scope}
-            aria-label={t("askVault_scope")}
-            options={[
-              { value: "vault", label: t("askVault_scopeVault") },
-              {
-                value: "folder",
-                label: t("askVault_scopeFolder"),
-                disabled: !currentFilePath,
-              },
-              {
-                value: "files",
-                label: t("askVault_scopeCurrent"),
-                disabled: !currentFilePath,
-              },
-            ]}
-            onChange={(next) => setScope(next as AskScope)}
-          />
-          {scopeBlocked ? (
-            <p className="ask-vault-scope-hint">
-              {t("askVault_scopeNeedsNote")}
-            </p>
-          ) : null}
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder={t("askVault_placeholder")}
-            rows={4}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                event.preventDefault();
-                void handleRetrieve();
-              }
-            }}
-          />
-          <div className="ask-vault-actions">
-            <button
-              type="button"
-              onClick={() => setShowSourcesPreview((v) => !v)}
-              disabled={previewSnippets.length === 0}
-            >
-              {t("askVault_toggleSources")}
-            </button>
-            <button
-              type="button"
-              className="ask-vault-primary"
-              disabled={!canAsk || !question.trim() || scopeBlocked}
-              onClick={() => void handleRetrieve()}
-            >
-              {retrieving ? t("askVault_retrieving") : t("askVault_retrieve")}
-            </button>
-            <button
-              type="button"
-              className="ask-vault-primary"
-              disabled={
-                generating || retrieving || pendingHits.length === 0 || !aiReady
-              }
-              onClick={() => void handleGenerate()}
-            >
-              {generating ? t("askVault_asking") : t("askVault_ask")}
-            </button>
-          </div>
-        </div>
-
-        {showSourcesPreview && previewSnippets.length > 0 ? (
-          <div className="ask-vault-sources-preview">
-            <h3>{t("askVault_sourcesPreview")}</h3>
-            <p className="ask-vault-sources-hint">
-              {t("askVault_sourcesHint")}
-            </p>
-            {previewSnippets.map((snippet, index) => (
-              <pre key={`${index}-${snippet.slice(0, 12)}`}>{snippet}</pre>
-            ))}
-          </div>
-        ) : null}
-
-        {answerMarkdown ? (
-          <div className="ask-vault-answer">
-            <h3>{t("askVault_answer")}</h3>
-            <div className="ask-vault-answer-body whitespace-pre-wrap">
-              {answerMarkdown}
             </div>
+
+            <div className="ask-vault-ask-scroll">
+              {secondaryTab === "answer" ? (
+                answerMarkdown ? (
+                  <div className="ask-vault-answer">
+                    <div
+                      className="ask-vault-answer-body markdown-body"
+                      dangerouslySetInnerHTML={{ __html: answerHtml }}
+                    />
+                    <div className="ask-vault-actions">
+                      <button
+                        type="button"
+                        onClick={handleInsertAnswer}
+                        disabled={!currentFilePath}
+                        title={
+                          !currentFilePath
+                            ? t("askVault_insertNeedsNote")
+                            : undefined
+                        }
+                      >
+                        {t("askVault_insert")}
+                      </button>
+                    </div>
+                    {citations.length > 0 ? (
+                      <div className="ask-vault-citations">
+                        <h4 className="links-section-title">
+                          {t("askVault_citations")}
+                        </h4>
+                        {citations.map((citation) => (
+                          <button
+                            key={`${citation.index}-${citation.path}`}
+                            type="button"
+                            className="ask-vault-citation"
+                            onClick={() => void handleOpenCitation(citation)}
+                          >
+                            <strong>[{citation.index}]</strong>{" "}
+                            {citation.relPath}
+                            <span>{citation.snippet}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="ask-vault-empty">{t("askVault_answerEmpty")}</p>
+                )
+              ) : previewSnippets.length > 0 ? (
+                <div className="ask-vault-sources-preview">
+                  <p className="ask-vault-sources-hint">
+                    {t("askVault_sourcesHint")}
+                  </p>
+                  {previewSnippets.map((snippet, index) => (
+                    <pre key={`${index}-${snippet.slice(0, 12)}`}>
+                      {snippet}
+                    </pre>
+                  ))}
+                </div>
+              ) : (
+                <p className="ask-vault-empty">{t("askVault_sourcesEmpty")}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="ask-vault-composer">
+            <AppSelect
+              value={scope}
+              aria-label={t("askVault_scope")}
+              options={[
+                { value: "vault", label: t("askVault_scopeVault") },
+                {
+                  value: "folder",
+                  label: t("askVault_scopeFolder"),
+                  disabled: !currentFilePath,
+                },
+                {
+                  value: "files",
+                  label: t("askVault_scopeCurrent"),
+                  disabled: !currentFilePath,
+                },
+              ]}
+              onChange={(next) => setScope(next as AskScope)}
+            />
+            {scopeBlocked ? (
+              <p className="ask-vault-scope-hint">
+                {t("askVault_scopeNeedsNote")}
+              </p>
+            ) : null}
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder={t("askVault_placeholder")}
+              rows={3}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  void handleRetrieve();
+                }
+              }}
+            />
             <div className="ask-vault-actions">
               <button
                 type="button"
-                onClick={handleInsertAnswer}
-                disabled={!currentFilePath}
-                title={
-                  !currentFilePath ? t("askVault_insertNeedsNote") : undefined
-                }
+                className="ask-vault-primary"
+                disabled={!canAsk || !question.trim() || scopeBlocked}
+                onClick={() => void handleRetrieve()}
               >
-                {t("askVault_insert")}
+                {retrieving ? t("askVault_retrieving") : t("askVault_retrieve")}
+              </button>
+              <button
+                type="button"
+                className="ask-vault-primary"
+                disabled={
+                  generating ||
+                  retrieving ||
+                  pendingHits.length === 0 ||
+                  !aiReady
+                }
+                onClick={() => void handleGenerate()}
+              >
+                {generating ? t("askVault_asking") : t("askVault_ask")}
               </button>
             </div>
-            {citations.length > 0 ? (
-              <div className="ask-vault-citations">
-                <h4>{t("askVault_citations")}</h4>
-                {citations.map((citation) => (
+          </div>
+        </div>
+      ) : (
+        <div className="ask-vault-history-pane">
+          {history.length === 0 ? (
+            <p className="ask-vault-empty">{t("askVault_historyEmpty")}</p>
+          ) : (
+            <ul className="ask-vault-history-list">
+              {history.map((item) => (
+                <li key={item.id}>
                   <button
-                    key={`${citation.index}-${citation.path}`}
                     type="button"
-                    className="ask-vault-citation"
-                    onClick={() => void handleOpenCitation(citation)}
+                    className="ask-vault-history-item"
+                    onClick={() => restoreHistoryItem(item)}
                   >
-                    <strong>[{citation.index}]</strong> {citation.relPath}
-                    <span>{citation.snippet}</span>
+                    <span className="ask-vault-history-question">
+                      {item.question}
+                    </span>
+                    <span className="ask-vault-history-meta">
+                      {formatHistoryTime(item.at, language)}
+                      {item.answer.citations.length > 0
+                        ? ` · ${t("askVault_historyCitations", {
+                            count: item.answer.citations.length,
+                          })}`
+                        : ""}
+                    </span>
+                    <span className="ask-vault-history-snippet">
+                      {item.answer.answerMarkdown
+                        .replace(/\s+/g, " ")
+                        .slice(0, 120)}
+                    </span>
                   </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {history.length > 0 ? (
-          <div className="ask-vault-history">
-            <h3>{t("askVault_history")}</h3>
-            {history.slice(0, 8).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="ask-vault-history-item"
-                onClick={() => {
-                  setQuestion(item.question);
-                  setAnswerMarkdown(item.answer.answerMarkdown);
-                  setCitations(item.answer.citations);
-                  setPreviewSnippets(
-                    item.answer.citations.map(
-                      (c) => `[${c.index}] ${c.relPath}\n${c.snippet}`,
-                    ),
-                  );
-                  setPendingHits([]);
-                  setShowSourcesPreview(true);
-                }}
-              >
-                {item.question}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </aside>
   );
 };
