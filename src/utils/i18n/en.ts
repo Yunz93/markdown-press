@@ -162,6 +162,10 @@ export default {
   askVault_failed: "Ask vault failed",
   askVault_noHits:
     "No relevant snippets found. Try another question or configure embeddings.",
+  askVault_sourcesStale:
+    "Retrieved snippets are stale (files moved or deleted). Please retrieve again.",
+  askVault_sourcesRefreshed:
+    "Some sources are gone; continuing with the remaining snippets.",
   askVault_needVault: "Open a knowledge base first.",
   askVault_needAi: "AI is not configured.",
   askVault_openAiSettings: "Configure AI",
@@ -756,6 +760,8 @@ export default {
     "Enabled only for the Windows desktop build. New versions show a reminder without interrupting your current work.",
   settings_updatesCheckNow: "Check now",
   settings_updatesChecking: "Checking for updates...",
+  settings_updatesArtifactsDisabled:
+    "This build does not ship in-app updater artifacts. Download from GitHub Releases instead.",
   settings_updatesUpToDate: "You are already on the latest version.",
   settings_updatesAvailableStatus: "Update {version} is available.",
   settings_updatesPreparingInstall: "Preparing to install {version}...",

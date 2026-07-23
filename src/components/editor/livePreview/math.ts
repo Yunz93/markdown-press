@@ -47,7 +47,12 @@ export function findMathRangesInText(text: string): MathRange[] {
 
     if (text[i] === "$" && text[i + 1] === "$") {
       const close = text.indexOf("$$", i + 2);
-      if (close < 0) break;
+      if (close < 0) {
+        // Unclosed display fence — skip the opener and keep scanning so later
+        // valid $inline$ / $$display$$ ranges are not silently dropped.
+        i += 2;
+        continue;
+      }
       const content = text.slice(i + 2, close);
       if (content.trim()) {
         ranges.push({

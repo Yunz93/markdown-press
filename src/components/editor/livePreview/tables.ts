@@ -22,6 +22,7 @@ import {
 } from "@codemirror/view";
 import {
   findTableAt,
+  isTablePartLine,
   insertColumn,
   insertRowAbove,
   insertRowBelow,
@@ -114,13 +115,41 @@ function tableAtDocPos(
   view: EditorView,
   tableFrom: number,
 ): { table: MarkdownTable; from: number; to: number } | null {
-  const lineIndex = view.state.doc.lineAt(tableFrom).number - 1;
-  const lines = view.state.doc.toString().split("\n");
-  const table = findTableAt(lines, lineIndex);
-  if (!table) return null;
-  const from = view.state.doc.line(table.startLine + 1).from;
-  const to = view.state.doc.line(table.endLine + 1).to;
-  return { table, from, to };
+  const doc = view.state.doc;
+  if (doc.length === 0) return null;
+  const anchor = doc.lineAt(Math.max(0, Math.min(tableFrom, doc.length)));
+  if (!isTablePartLine(anchor.text)) return null;
+
+  // Walk only the contiguous table block — avoid doc.toString().split("\n").
+  let start = anchor.number;
+  while (start > 1 && isTablePartLine(doc.line(start - 1).text)) {
+    start -= 1;
+  }
+  let end = anchor.number;
+  while (end < doc.lines && isTablePartLine(doc.line(end + 1).text)) {
+    end += 1;
+  }
+
+  const lines: string[] = [];
+  for (let n = start; n <= end; n += 1) {
+    lines.push(doc.line(n).text);
+  }
+  const local = findTableAt(lines, anchor.number - start);
+  if (!local) return null;
+
+  const absStartLine = start - 1 + local.startLine;
+  const absEndLine = start - 1 + local.endLine;
+  const from = doc.line(absStartLine + 1).from;
+  const to = doc.line(absEndLine + 1).to;
+  return {
+    table: {
+      ...local,
+      startLine: absStartLine,
+      endLine: absEndLine,
+    },
+    from,
+    to,
+  };
 }
 
 function dispatchTableRewrite(
@@ -375,14 +404,14 @@ class TableWidget extends WidgetType {
       cell.addEventListener("blur", () => {
         window.setTimeout(() => {
           if (!cell.isConnected) return;
-          const active = document.activeElement as HTMLElement | null;
+          const activeField = view.state.field(activeTableCellField, false);
+          // Tab / click already moved the active cell — value was committed there.
           if (
-            active?.closest?.(".cm-live-preview-table-wrap") ===
-            cell.closest(".cm-live-preview-table-wrap")
+            !activeField ||
+            activeField.from !== this.from ||
+            activeField.logicalRow !== logicalRow ||
+            activeField.col !== col
           ) {
-            return;
-          }
-          if (view.state.field(activeTableCellField)?.from !== this.from) {
             return;
           }
           commitCellValue(

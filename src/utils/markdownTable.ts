@@ -39,7 +39,7 @@ export interface TableCursorPos {
   cellTo: number;
 }
 
-function isTablePartLine(line: string): boolean {
+export function isTablePartLine(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed === "") return false;
   return (

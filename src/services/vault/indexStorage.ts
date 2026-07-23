@@ -88,7 +88,10 @@ export async function writeIndexJson(
     const { join } = await import("@tauri-apps/api/path");
     await mkdir(dir, { recursive: true });
     const target = await join(dir, fileName);
-    const tmp = await join(dir, `${fileName}.${Date.now()}.tmp`);
+    const tmp = await join(
+      dir,
+      `${fileName}.${Date.now()}.${Math.random().toString(36).slice(2, 10)}.tmp`,
+    );
     await writeTextFile(tmp, payload);
     try {
       await rename(tmp, target);

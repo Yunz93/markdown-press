@@ -37,6 +37,7 @@ import {
 } from "../services/vault/semanticIndexRuntime";
 import { embedChunkIndex } from "../services/vault/semanticEmbedService";
 import type { VectorStoreSnapshot } from "../services/vault/vectorStore";
+import { invalidateLivePreviewWikiCachesForPath } from "../components/editor/livePreview/wiki";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -82,6 +83,7 @@ export function useVaultIndexLifecycle(): {
   );
   const generationRef = useRef(0);
   const buildingRef = useRef(false);
+  const semanticEmbedGenerationRef = useRef(0);
   const prevPathsRef = useRef<string>("");
 
   const syncSemanticStatus = useCallback((vectorCount: number) => {
@@ -91,19 +93,32 @@ export function useVaultIndexLifecycle(): {
   const refreshSemanticForChunkIndex = useCallback(
     async (
       chunkIndex: ChunkIndexSnapshot,
-      options?: { previousByPath?: ChunkIndexSnapshot["byPath"] },
+      options?: {
+        previousByPath?: ChunkIndexSnapshot["byPath"];
+        /** When set, abort if vault generation moved on (rebuild / vault switch). */
+        linkGeneration?: number;
+      },
     ) => {
+      const embedGeneration = ++semanticEmbedGenerationRef.current;
       const state = useAppStore.getState();
       const vaultRoot = chunkIndex.vaultRoot;
+      const isCurrent = () =>
+        embedGeneration === semanticEmbedGenerationRef.current &&
+        (options?.linkGeneration == null ||
+          options.linkGeneration === generationRef.current) &&
+        normalizePath(useAppStore.getState().rootFolderPath ?? "") ===
+          normalizePath(vaultRoot);
+
       state.setChunkIndex(chunkIndex);
       setActiveChunkIndex(chunkIndex);
       await writeIndexJson(vaultRoot, CHUNK_INDEX_FILE, chunkIndex);
+      if (!isCurrent()) return;
 
       const provider = state.settings.embeddingProvider ?? "builtin";
       const store = ensureActiveVectorStore(vaultRoot);
       if (provider === "none") {
         store.load(null);
-        syncSemanticStatus(0);
+        if (isCurrent()) syncSemanticStatus(0);
         return;
       }
 
@@ -113,8 +128,9 @@ export function useVaultIndexLifecycle(): {
           vectorStore: store,
           settings: state.settings,
           previousByPath: options?.previousByPath,
-          shouldCancel: () => false,
+          shouldCancel: () => !isCurrent(),
         });
+        if (!isCurrent()) return;
         if (store.size() > 0) {
           await writeIndexJson(
             vaultRoot,
@@ -122,8 +138,9 @@ export function useVaultIndexLifecycle(): {
             store.toSnapshot(),
           );
         }
-        syncSemanticStatus(store.size());
+        if (isCurrent()) syncSemanticStatus(store.size());
       } catch (error) {
+        if (!isCurrent()) return;
         console.warn("Failed to embed chunk index:", error);
         syncSemanticStatus(store.size());
       }
@@ -185,6 +202,7 @@ export function useVaultIndexLifecycle(): {
       if (generation !== generationRef.current) return;
       await refreshSemanticForChunkIndex(chunkIndex, {
         previousByPath: previousChunks,
+        linkGeneration: generation,
       });
 
       prevPathsRef.current = buildFileTreeSignature(state.files);
@@ -291,6 +309,7 @@ export function useVaultIndexLifecycle(): {
         await refreshSemanticForChunkIndex(nextChunks, {
           previousByPath: previousChunks?.byPath,
         });
+        invalidateLivePreviewWikiCachesForPath(path);
       } catch (error) {
         console.warn("Failed to update link index for file:", path, error);
       }
@@ -311,6 +330,8 @@ export function useVaultIndexLifecycle(): {
   }, [rebuildLinkIndex]);
 
   useEffect(() => {
+    // Bump embed generation so in-flight jobs cannot write status for the old vault.
+    semanticEmbedGenerationRef.current += 1;
     generationRef.current += 1;
     if (!rootFolderPath) {
       const state = useAppStore.getState();

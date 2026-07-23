@@ -298,6 +298,63 @@ const noteEmbedCache = new Map<string, { title: string; html: string }>();
 const wikiImageResolvedCache = new Map<string, string>();
 const wikiImageFailedCache = new Set<string>();
 
+/** Drop Live Preview wiki embed/image caches (e.g. after target note edits). */
+export function clearLivePreviewWikiCaches(): void {
+  noteEmbedCache.clear();
+  wikiImageResolvedCache.clear();
+  wikiImageFailedCache.clear();
+}
+
+/** Invalidate caches that may reference a specific vault path. */
+export function invalidateLivePreviewWikiCachesForPath(path: string): void {
+  const norm = path.replace(/\\/g, "/").toLowerCase();
+  const pathTail = norm.split("/").pop() ?? norm;
+
+  for (const key of [...noteEmbedCache.keys()]) {
+    const lower = key.toLowerCase();
+    if (lower.includes(norm) || (pathTail && lower.includes(pathTail))) {
+      noteEmbedCache.delete(key);
+    }
+  }
+  for (const key of [...wikiImageResolvedCache.keys()]) {
+    const lower = key.toLowerCase();
+    if (lower.includes(norm) || (pathTail && lower.includes(pathTail))) {
+      wikiImageResolvedCache.delete(key);
+    }
+  }
+  // Failed image lookups should always be allowed to retry after vault changes.
+  wikiImageFailedCache.clear();
+}
+
+/** Test helper — seed caches without going through async resolve. */
+export function seedLivePreviewWikiCachesForTest(options: {
+  noteKey?: string;
+  imageKey?: string;
+  failedKey?: string;
+}): void {
+  if (options.noteKey) {
+    noteEmbedCache.set(options.noteKey, { title: "t", html: "<p>x</p>" });
+  }
+  if (options.imageKey) {
+    wikiImageResolvedCache.set(options.imageKey, "blob:test");
+  }
+  if (options.failedKey) {
+    wikiImageFailedCache.add(options.failedKey);
+  }
+}
+
+export function livePreviewWikiCacheStatsForTest(): {
+  notes: number;
+  images: number;
+  failed: number;
+} {
+  return {
+    notes: noteEmbedCache.size,
+    images: wikiImageResolvedCache.size,
+    failed: wikiImageFailedCache.size,
+  };
+}
+
 export interface WikiAsyncJob {
   kind: "image" | "note";
   cacheKey: string;
@@ -350,7 +407,7 @@ export function collectWikiAsyncJobs(state: EditorState): WikiAsyncJob[] {
       continue;
     }
 
-    const noteKey = `note::${ctx.sourceFilePath ?? ""}::${range.raw}`;
+    const noteKey = `note::${ctx.sourceFilePath ?? ""}::${matched?.path ?? ""}::${range.raw}`;
     if (noteEmbedCache.has(noteKey)) continue;
     jobs.push({
       kind: "note",
@@ -438,7 +495,7 @@ export function buildWikiDecorations(
         continue;
       }
 
-      const noteKey = `note::${ctx.sourceFilePath ?? ""}::${range.raw}`;
+      const noteKey = `note::${ctx.sourceFilePath ?? ""}::${matched?.path ?? ""}::${range.raw}`;
       const cached = noteEmbedCache.get(noteKey);
 
       builder.add(
@@ -564,6 +621,11 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
+      if (livePreviewContextChanged(update)) {
+        // File tree / theme / source path churn — allow failed images to retry
+        // and drop stale note embeds keyed by previous tree.
+        wikiImageFailedCache.clear();
+      }
       if (
         livePreviewShouldRebuild(update, "widgets") ||
         livePreviewContextChanged(update) ||

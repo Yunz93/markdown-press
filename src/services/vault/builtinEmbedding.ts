@@ -46,6 +46,10 @@ type FeaturePipeline = (
 let pipelinePromise: Promise<FeaturePipeline> | null = null;
 let extractor: FeaturePipeline | null = null;
 let loadedHub: string | null = null;
+/** Preference used for the in-flight (or last started) pipeline load. */
+let loadingHubPreference: BuiltinEmbeddingHub | null = null;
+/** Bumped on reset so abandoned downloads cannot commit a stale extractor. */
+let pipelineGeneration = 0;
 
 function setStatus(patch: Partial<BuiltinEmbeddingStatus>): void {
   status = { ...status, ...patch };
@@ -74,9 +78,11 @@ export function subscribeBuiltinEmbeddingStatus(
 
 /** Drop cached pipeline so the next call re-downloads / switches hub. */
 export function resetBuiltinEmbeddingPipeline(): void {
+  pipelineGeneration += 1;
   pipelinePromise = null;
   extractor = null;
   loadedHub = null;
+  loadingHubPreference = null;
   setStatus({
     phase: "idle",
     progress: 0,
@@ -242,10 +248,24 @@ async function loadPipelineFromHub(
 async function loadPipeline(
   hubPreference?: BuiltinEmbeddingHub,
 ): Promise<FeaturePipeline> {
+  const preference = resolveHubPreference(hubPreference);
   if (extractor) return extractor;
+
+  // A download may already be in flight for a different hub preference.
+  // Drop it so the new preference is honored instead of silently ignored.
+  if (
+    pipelinePromise &&
+    loadingHubPreference !== null &&
+    loadingHubPreference !== preference
+  ) {
+    resetBuiltinEmbeddingPipeline();
+  }
+
   if (pipelinePromise) return pipelinePromise;
 
-  const preference = resolveHubPreference(hubPreference);
+  loadingHubPreference = preference;
+  const startedPreference = preference;
+  const startedGeneration = pipelineGeneration;
 
   pipelinePromise = (async () => {
     let tried = listBuiltinEmbeddingHubsToTry(preference);
@@ -255,9 +275,15 @@ async function loadPipeline(
 
     let lastError: unknown = null;
     for (let index = 0; index < tried.length; index += 1) {
+      if (pipelineGeneration !== startedGeneration) {
+        throw new Error("Embedding hub preference changed during download");
+      }
       const hub = tried[index]!;
       try {
         const loaded = await loadPipelineFromHub(hub);
+        if (pipelineGeneration !== startedGeneration) {
+          throw new Error("Embedding hub preference changed during download");
+        }
         extractor = loaded;
         loadedHub = hub;
         setStatus({
@@ -271,6 +297,12 @@ async function loadPipeline(
         lastError = error;
         extractor = null;
         loadedHub = null;
+        if (
+          error instanceof Error &&
+          error.message.includes("preference changed")
+        ) {
+          throw error;
+        }
         const canRetry =
           index < tried.length - 1 && isLikelyNetworkError(error);
         if (!canRetry) break;
@@ -283,10 +315,17 @@ async function loadPipeline(
       }
     }
 
-    pipelinePromise = null;
-    const message = formatLoadError(lastError, tried);
-    setStatus({ phase: "error", progress: 0, error: message, hub: null });
-    throw new Error(message);
+    if (pipelineGeneration === startedGeneration) {
+      pipelinePromise = null;
+      loadingHubPreference = null;
+      const message = formatLoadError(lastError, tried);
+      setStatus({ phase: "error", progress: 0, error: message, hub: null });
+    }
+    throw new Error(
+      pipelineGeneration === startedGeneration
+        ? formatLoadError(lastError, tried)
+        : "Embedding hub preference changed during download",
+    );
   })();
 
   return pipelinePromise;
@@ -296,14 +335,23 @@ async function loadPipeline(
 export async function ensureBuiltinEmbeddingReady(
   hubPreference?: BuiltinEmbeddingHub,
 ): Promise<void> {
-  // If preference changed since last success, force reload.
-  if (
-    extractor &&
+  const preference = resolveHubPreference(hubPreference);
+
+  // Reload when preference diverges from a ready extractor…
+  const readyMismatch =
+    !!extractor &&
     hubPreference &&
     hubPreference !== "auto" &&
-    loadedHub &&
-    BUILTIN_EMBEDDING_HUBS[hubPreference] !== loadedHub
-  ) {
+    !!loadedHub &&
+    BUILTIN_EMBEDDING_HUBS[hubPreference] !== loadedHub;
+
+  // …or from an in-flight download started under a different preference.
+  const inflightMismatch =
+    !!pipelinePromise &&
+    loadingHubPreference !== null &&
+    loadingHubPreference !== preference;
+
+  if (readyMismatch || inflightMismatch) {
     resetBuiltinEmbeddingPipeline();
   }
   await loadPipeline(hubPreference);

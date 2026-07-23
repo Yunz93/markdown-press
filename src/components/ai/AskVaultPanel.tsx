@@ -28,6 +28,7 @@ import { requestVaultLinkIndexRebuild } from "../../services/vault/linkIndexEven
 import type { AskVaultCitation } from "../../types/vaultIndex";
 import type { RetrieveHit } from "../../types/vaultIndex";
 import type { FileNode } from "../../types";
+import { findFileInTree } from "../../utils/fileTree";
 import { AppSelect } from "../ui/AppSelect";
 import { LAYOUT, clamp, getStoredPanelWidth } from "../../config/layout";
 
@@ -42,6 +43,22 @@ type AskScope = "vault" | "folder" | "files";
 type PrimaryTab = "ask" | "history";
 type SecondaryTab = "answer" | "sources";
 
+function hitPathStillExists(files: FileNode[], path: string): boolean {
+  if (findFileInTree(files, path)) return true;
+  const norm = path.replace(/\\/g, "/").toLowerCase();
+  const stack = [...files];
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (
+      node.type === "file" &&
+      node.path.replace(/\\/g, "/").toLowerCase() === norm
+    ) {
+      return true;
+    }
+    if (node.children?.length) stack.push(...node.children);
+  }
+  return false;
+}
 function isAiConfigured(settings: {
   aiProvider?: string;
   geminiApiKey?: string;
@@ -296,13 +313,27 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     const trimmed = question.trim();
     if (!trimmed || !rootFolderPath || pendingHits.length === 0) return;
 
+    const files = useAppStore.getState().files;
+    const freshHits = pendingHits.filter((hit) =>
+      hitPathStillExists(files, hit.chunk.path),
+    );
+    if (freshHits.length === 0) {
+      setPendingHits([]);
+      showNotification(t("askVault_sourcesStale"), "info");
+      return;
+    }
+    if (freshHits.length !== pendingHits.length) {
+      setPendingHits(freshHits);
+      showNotification(t("askVault_sourcesRefreshed"), "info");
+    }
+
     setGenerating(true);
     setPrimaryTab("ask");
     try {
       const activeSettings = await resolveHydratedSettings();
       const result = await answerAskVaultFromHits(
         trimmed,
-        pendingHits,
+        freshHits,
         activeSettings,
       );
       setAnswerMarkdown(result.answerMarkdown);

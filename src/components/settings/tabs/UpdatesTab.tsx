@@ -11,6 +11,7 @@ import {
   downloadAndInstallUpdate,
   getInstalledAppVersion,
   RELEASES_PAGE_URL,
+  areUpdaterArtifactsEnabled,
   type AvailableUpdate,
   type UpdateDownloadEvent,
 } from "../../../services/updaterService";
@@ -110,6 +111,14 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     setDownloadSize(null);
 
     try {
+      if (!areUpdaterArtifactsEnabled()) {
+        await replaceAvailableUpdate(null);
+        setStatusTone("neutral");
+        setStatusMessage(t("settings_updatesArtifactsDisabled"));
+        showNotification(t("settings_updatesArtifactsDisabled"), "info");
+        return null;
+      }
+
       const update = await checkForAppUpdate();
       onUpdateSettings({ lastUpdateCheckAt: new Date().toISOString() });
       await replaceAvailableUpdate(update);

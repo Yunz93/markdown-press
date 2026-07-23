@@ -408,6 +408,15 @@ describe("findMathRangesInText", () => {
   it("skips empty math", () => {
     expect(findMathRangesInText("$$  $$\n$ $")).toEqual([]);
   });
+
+  it("keeps scanning after an unclosed display fence", () => {
+    const ranges = findMathRangesInText("$$\nunclosed\n\nlater $x^2$ ok\n");
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]).toMatchObject({
+      content: "x^2",
+      displayMode: false,
+    });
+  });
 });
 
 describe("callouts / highlight / comments", () => {
