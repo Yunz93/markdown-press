@@ -250,11 +250,19 @@ export const livePreviewTheme = EditorView.baseTheme({
     borderBottom: "2px solid #fff",
     transform: "rotate(40deg) translate(-0.05em, -0.08em)",
   },
+  ".cm-live-preview-image": {
+    display: "block",
+    maxWidth: "100%",
+    height: "auto",
+    borderRadius: "0.35rem",
+    cursor: "text",
+  },
   ".cm-live-preview-image-wrap": {
     display: "inline-block",
     maxWidth: "100%",
     verticalAlign: "middle",
     marginBlock: "0.35em",
+    cursor: "text",
   },
   ".cm-live-preview-image-wrap.is-loading": {
     minWidth: "4rem",
@@ -262,12 +270,6 @@ export const livePreviewTheme = EditorView.baseTheme({
     background:
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 18%, transparent)",
     borderRadius: "0.4rem",
-  },
-  ".cm-live-preview-image": {
-    display: "block",
-    maxWidth: "100%",
-    height: "auto",
-    borderRadius: "0.35rem",
   },
   ".cm-live-preview-math": {
     display: "inline-block",

@@ -52,6 +52,10 @@ class MarkdownImageWidget extends WidgetType {
     readonly alt: string,
     readonly rawSrc: string,
     readonly resolvedSrc: string | null,
+    readonly from: number,
+    readonly to: number,
+    readonly urlFrom: number,
+    readonly urlTo: number,
   ) {
     super();
   }
@@ -60,14 +64,19 @@ class MarkdownImageWidget extends WidgetType {
     return (
       this.alt === other.alt &&
       this.rawSrc === other.rawSrc &&
-      this.resolvedSrc === other.resolvedSrc
+      this.resolvedSrc === other.resolvedSrc &&
+      this.from === other.from &&
+      this.to === other.to &&
+      this.urlFrom === other.urlFrom &&
+      this.urlTo === other.urlTo
     );
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const wrap = document.createElement("span");
     wrap.className = "cm-live-preview-image-wrap";
     wrap.setAttribute("contenteditable", "false");
+    wrap.title = this.rawSrc;
 
     const img = document.createElement("img");
     img.className = "cm-live-preview-image";
@@ -79,11 +88,48 @@ class MarkdownImageWidget extends WidgetType {
       wrap.classList.add("is-loading");
     }
     wrap.appendChild(img);
+
+    const revealSource = () => {
+      const urlFrom = this.urlFrom;
+      const urlTo = this.urlTo;
+      const from = this.from;
+      const to = this.to;
+      view.focus();
+      // Cover the whole image construct so replace widgets drop on rebuild.
+      // Selecting a sub-range inside an active replace decoration collapses.
+      view.dispatch({
+        selection: { anchor: from, head: to },
+        scrollIntoView: true,
+      });
+      if (urlFrom < urlTo) {
+        requestAnimationFrame(() => {
+          if (!view.dom.isConnected) return;
+          view.dispatch({
+            selection: { anchor: urlFrom, head: urlTo },
+            scrollIntoView: true,
+          });
+        });
+      }
+    };
+
+    wrap.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      // Prevent CM from applying a DOM selection inside the replaced range.
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    wrap.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      // Defer past CM's DOM selection flush from this click.
+      window.setTimeout(revealSource, 0);
+    });
+
     return wrap;
   }
 
-  ignoreEvent() {
-    return true;
+  ignoreEvent(event: Event) {
+    return event.type !== "mousedown" && event.type !== "click";
   }
 }
 
@@ -91,9 +137,11 @@ function extractImageParts(
   state: Parameters<typeof syntaxTree>[0],
   imageFrom: number,
   imageTo: number,
-): { alt: string; url: string } {
+): { alt: string; url: string; urlFrom: number; urlTo: number } {
   const tree = syntaxTree(state);
   let url = "";
+  let urlFrom = imageFrom;
+  let urlTo = imageFrom;
 
   tree.iterate({
     from: imageFrom,
@@ -101,13 +149,28 @@ function extractImageParts(
     enter: (node) => {
       if (node.name === "URL") {
         url = state.doc.sliceString(node.from, node.to);
+        urlFrom = node.from;
+        urlTo = node.to;
       }
     },
   });
 
   const full = state.doc.sliceString(imageFrom, imageTo);
   const altMatch = full.match(/^!\[([^\]]*)\]/);
-  return { alt: altMatch?.[1] ?? "", url: url.trim() };
+  if (!url) {
+    const paren = full.match(/\(([^)]*)\)\s*$/);
+    if (paren) {
+      url = paren[1].trim();
+      urlFrom = imageFrom + (paren.index ?? 0) + 1;
+      urlTo = urlFrom + paren[1].length;
+    }
+  }
+  return {
+    alt: altMatch?.[1] ?? "",
+    url: url.trim(),
+    urlFrom,
+    urlTo,
+  };
 }
 
 export function buildLivePreviewImageDecorations(
@@ -148,7 +211,7 @@ export function buildLivePreviewImageDecorations(
           return;
         }
 
-        const { alt, url } = extractImageParts(state, from, to);
+        const { alt, url, urlFrom, urlTo } = extractImageParts(state, from, to);
         if (!url) return;
 
         const key = cacheKeyFor(ctx.sourceFilePath, url);
@@ -168,7 +231,15 @@ export function buildLivePreviewImageDecorations(
           from,
           to,
           Decoration.replace({
-            widget: new MarkdownImageWidget(alt, url, resolvedSrc),
+            widget: new MarkdownImageWidget(
+              alt,
+              url,
+              resolvedSrc,
+              from,
+              to,
+              urlFrom,
+              urlTo,
+            ),
           }),
         );
       },
@@ -255,7 +326,9 @@ export const livePreviewImages = ViewPlugin.fromClass(
 
       if (
         resolved ||
-        livePreviewShouldRebuild(update, "widgets") ||
+        // Selection must rebuild immediately so click-to-reveal source works
+        // on the same line as the image widget.
+        livePreviewShouldRebuild(update, "marks") ||
         livePreviewContextChanged(update)
       ) {
         this.decorations = this.rebuild(update.view);
