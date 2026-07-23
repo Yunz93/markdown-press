@@ -1,8 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AppSettings, EmbeddingProviderId } from "../../../types";
 import { useAppStore } from "../../../store/appStore";
 import { useI18n } from "../../../hooks/useI18n";
 import { requestVaultLinkIndexRebuild } from "../../../services/vault/linkIndexEvents";
+import {
+  BUILTIN_EMBEDDING_MODEL,
+  ensureBuiltinEmbeddingReady,
+  getBuiltinEmbeddingStatus,
+  subscribeBuiltinEmbeddingStatus,
+  type BuiltinEmbeddingStatus,
+} from "../../../services/vault/builtinEmbedding";
 import { useSecureSettings } from "../useSecureSettings";
 
 interface IndexTabProps {
@@ -23,8 +30,15 @@ export const IndexTab: React.FC<IndexTabProps> = ({
   const rootFolderPath = useAppStore((s) => s.rootFolderPath);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [builtinStatus, setBuiltinStatus] = useState<BuiltinEmbeddingStatus>(
+    () => getBuiltinEmbeddingStatus(),
+  );
   const { handleSecureSettingChange, renderSecureSaveState } =
     useSecureSettings(onUpdateSettings);
+
+  useEffect(() => {
+    return subscribeBuiltinEmbeddingStatus(setBuiltinStatus);
+  }, []);
 
   const noteCount = linkIndex ? Object.keys(linkIndex.outbounds).length : 0;
   const chunkCount = useMemo(
@@ -134,20 +148,83 @@ export const IndexTab: React.FC<IndexTabProps> = ({
           </span>
           <select
             className="mt-1 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-3 py-2"
-            value={settings.embeddingProvider ?? "none"}
+            value={settings.embeddingProvider ?? "builtin"}
             onChange={(event) =>
               onUpdateSettings({
                 embeddingProvider: event.target.value as EmbeddingProviderId,
               })
             }
           >
+            <option value="builtin">{t("index_embeddingBuiltin")}</option>
             <option value="none">{t("index_embeddingNone")}</option>
             <option value="openai-compatible">
               {t("index_embeddingOpenAICompatible")}
             </option>
           </select>
         </label>
-        {(settings.embeddingProvider ?? "none") !== "none" ? (
+
+        {(settings.embeddingProvider ?? "builtin") === "builtin" ? (
+          <div className="rounded-xl border border-gray-200/70 dark:border-white/10 p-3 space-y-2 text-sm">
+            <div className="flex justify-between gap-3 text-gray-600 dark:text-gray-300">
+              <span>{t("index_embeddingBuiltinModel")}</span>
+              <span className="font-medium text-gray-900 dark:text-white text-right break-all">
+                {BUILTIN_EMBEDDING_MODEL}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3 text-gray-600 dark:text-gray-300">
+              <span>{t("index_embeddingBuiltinStatus")}</span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                {builtinStatus.phase === "ready"
+                  ? t("index_embeddingBuiltinReady")
+                  : builtinStatus.phase === "loading"
+                    ? t("index_embeddingBuiltinLoading", {
+                        percent: Math.round(builtinStatus.progress * 100),
+                      })
+                    : builtinStatus.phase === "error"
+                      ? t("index_embeddingBuiltinError")
+                      : t("index_embeddingBuiltinIdle")}
+              </span>
+            </div>
+            {builtinStatus.phase === "loading" ? (
+              <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                <div
+                  className="h-full bg-sky-500 transition-[width]"
+                  style={{
+                    width: `${Math.max(4, Math.round(builtinStatus.progress * 100))}%`,
+                  }}
+                />
+              </div>
+            ) : null}
+            {builtinStatus.error ? (
+              <p className="text-rose-500 text-xs">{builtinStatus.error}</p>
+            ) : null}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("index_embeddingBuiltinHint")}
+            </p>
+            <button
+              type="button"
+              disabled={builtinStatus.phase === "loading"}
+              onClick={() => {
+                void ensureBuiltinEmbeddingReady()
+                  .then(() => setMessage(t("index_embeddingBuiltinReady")))
+                  .catch((error) =>
+                    setMessage(
+                      error instanceof Error
+                        ? error.message
+                        : t("index_embeddingBuiltinError"),
+                    ),
+                  );
+              }}
+              className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-black/[0.03] dark:hover:bg-white/10 disabled:opacity-50"
+            >
+              {builtinStatus.phase === "ready"
+                ? t("index_embeddingBuiltinReload")
+                : t("index_embeddingBuiltinDownload")}
+            </button>
+          </div>
+        ) : null}
+
+        {(settings.embeddingProvider ?? "none") === "openai-compatible" ? (
           <>
             <label className="block text-sm">
               <span className="text-gray-600 dark:text-gray-300">

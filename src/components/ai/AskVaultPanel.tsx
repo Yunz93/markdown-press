@@ -87,7 +87,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   const indexBuilding =
     linkIndexProgress.phase === "building" ||
     linkIndexProgress.phase === "updating";
-  const keywordOnly = (settings.embeddingProvider ?? "none") === "none";
+  const keywordOnly = (settings.embeddingProvider ?? "builtin") === "none";
   const aiReady = isAiConfigured(settings);
   const canAsk =
     Boolean(rootFolderPath) &&

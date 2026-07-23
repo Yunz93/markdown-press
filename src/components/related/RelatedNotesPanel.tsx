@@ -43,7 +43,7 @@ export const RelatedNotesPanel: React.FC<RelatedNotesPanelProps> = ({
             .trim()
             .slice(0, 500) || displayName(currentFilePath);
         const mode =
-          (settings.embeddingProvider ?? "none") === "none"
+          (settings.embeddingProvider ?? "builtin") === "none"
             ? "keyword"
             : (settings.searchModeDefault ?? "hybrid");
         const results = await retrieve({
