@@ -45,23 +45,58 @@ export function listChunks(
   });
 }
 
+/** Tokenize NL queries for keyword fallback (spaces + CJK bigrams). */
+export function tokenizeSearchQuery(query: string): string[] {
+  const normalized = normalizeSearchTarget(query);
+  if (!normalized) return [];
+
+  const tokens = new Set<string>();
+  if (normalized.length >= 2) tokens.add(normalized);
+
+  for (const part of normalized.split(" ").filter(Boolean)) {
+    if (part.length >= 2) tokens.add(part);
+    if (/[\u4e00-\u9fff]/.test(part)) {
+      for (let i = 0; i < part.length - 1; i += 1) {
+        tokens.add(part.slice(i, i + 2));
+      }
+      if (part.length >= 3) tokens.add(part);
+    }
+  }
+
+  return [...tokens].filter((token) => token.length >= 2);
+}
+
 export function keywordSearchChunks(
   chunks: TextChunk[],
   query: string,
   topK = 12,
 ): RetrieveHit[] {
-  const normalizedQuery = normalizeSearchTarget(query);
-  if (!normalizedQuery) return [];
+  const tokens = tokenizeSearchQuery(query);
+  if (tokens.length === 0) return [];
 
+  const fullQuery = normalizeSearchTarget(query);
   const hits: RetrieveHit[] = [];
   for (const chunk of chunks) {
     const haystack = normalizeSearchTarget(
       `${chunk.titlePath.join(" ")} ${chunk.text}`,
     );
-    const index = haystack.indexOf(normalizedQuery);
-    if (index < 0) continue;
-    // Prefer earlier / denser matches lightly.
-    const score = 1 / (1 + index / Math.max(haystack.length, 1));
+    let matched = 0;
+    let firstIndex = haystack.length;
+    for (const token of tokens) {
+      const index = haystack.indexOf(token);
+      if (index < 0) continue;
+      matched += 1;
+      firstIndex = Math.min(firstIndex, index);
+    }
+    if (matched === 0) continue;
+
+    const coverage = matched / tokens.length;
+    // Require at least one real token hit; prefer higher coverage + earlier match.
+    const fullBonus = fullQuery && haystack.includes(fullQuery) ? 0.35 : 0;
+    const score =
+      coverage * 0.75 +
+      fullBonus +
+      0.25 / (1 + firstIndex / Math.max(haystack.length, 1));
     hits.push({ chunk, score, source: "keyword" });
   }
   hits.sort((a, b) => b.score - a.score);

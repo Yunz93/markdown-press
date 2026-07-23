@@ -100,8 +100,8 @@ export default {
   view_preview: "Preview",
 
   split_toggleOutline: "Toggle outline",
-  split_hideOutline: "Hide Outline",
-  split_showOutline: "Show Outline",
+  split_hideOutline: "Hide side panel",
+  split_showOutline: "Outline / Links",
 
   outline_title: "Outline",
   outline_empty: "No headings found",
@@ -126,21 +126,41 @@ export default {
   askVault_scopeVault: "Entire vault",
   askVault_scopeFolder: "Current folder",
   askVault_scopeCurrent: "Current note",
+  askVault_scopeNeedsNote:
+    "Open a note first to use current folder / current note scope.",
   askVault_placeholder:
     "Ask in natural language, e.g. What was the last conclusion about the release process?",
-  askVault_ask: "Ask",
-  askVault_asking: "Retrieving and answering…",
-  askVault_toggleSources: "Show retrieved snippets",
-  askVault_sourcesPreview: "Retrieved snippets",
+  askVault_retrieve: "Retrieve snippets",
+  askVault_retrieving: "Retrieving…",
+  askVault_ask: "Generate answer",
+  askVault_asking: "Generating…",
+  askVault_toggleSources: "Show snippets to send",
+  askVault_sourcesPreview: "Snippets to send",
+  askVault_sourcesHint:
+    "Review these snippets, then click Generate. They will be sent to your configured AI.",
   askVault_answer: "Answer",
   askVault_insert: "Insert into current note (confirm required)",
+  askVault_insertNeedsNote: "Open a note before inserting.",
   askVault_citations: "Sources",
   askVault_history: "History",
   askVault_failed: "Ask vault failed",
+  askVault_noHits:
+    "No relevant snippets found. Try another question or configure embeddings.",
+  askVault_needVault: "Open a knowledge base first.",
+  askVault_needAi: "AI is not configured.",
+  askVault_openAiSettings: "Configure AI",
+  askVault_openIndexSettings: "Configure embeddings",
+  askVault_indexBuilding: "Building index… ({done}/{total})",
+  askVault_indexEmpty: "Index is empty.",
+  askVault_rebuildIndex: "Rebuild index",
+  askVault_keywordOnly:
+    "Keyword mode only — natural-language questions work better with embeddings.",
+  askVault_ready: "Ready (semantic retrieval available)",
+  askVault_readyKeyword: "Ready (keyword retrieval)",
 
   index_title: "Vault index",
   index_desc:
-    "The link index powers backlinks and outgoing links. It is cached locally and can be rebuilt anytime without changing your Markdown files.",
+    "Link and chunk indexes power backlinks, sidebar search, related notes, and Ask vault. Cached locally and rebuildable anytime without changing your Markdown. Ask vault also needs a model under AI settings.",
   index_status: "Status",
   index_statusReady: "Ready",
   index_statusBuilding: "Building ({done}/{total})",
@@ -493,7 +513,7 @@ export default {
 
   settings_aiContentEnhance: "AI Content Enhancement",
   settings_aiContentEnhanceDesc:
-    "Choose an AI provider for full-note enhancement and wiki generation from selected text.",
+    "Choose an AI provider for note enhancement, wiki generation from selection, and Ask vault. Ask vault also needs the Index tab (chunks / embeddings).",
   settings_aiProvider: "AI provider",
   settings_geminiApiKey: "Gemini API key",
   settings_secureSaving: "Saving to the system keychain...",

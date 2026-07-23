@@ -84,6 +84,20 @@ export class VectorStore {
     this.builtAt = Date.now();
   }
 
+  /** Remap vector record ids (e.g. after note rename changes `relPath#n`). */
+  remapIds(idMap: Record<string, string>): void {
+    const entries = Object.entries(idMap);
+    if (entries.length === 0) return;
+    for (const [from, to] of entries) {
+      if (!to || from === to) continue;
+      const record = this.records.get(from);
+      if (!record) continue;
+      this.records.delete(from);
+      this.records.set(to, { ...record, id: to });
+    }
+    this.builtAt = Date.now();
+  }
+
   get(id: string): VectorRecord | undefined {
     return this.records.get(id);
   }

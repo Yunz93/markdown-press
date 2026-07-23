@@ -166,16 +166,18 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
     }
     const nodes: Array<{ path: string; kind: "in" | "out" }> = [];
     const seen = new Set<string>();
+    const center = currentFilePath.replace(/\\/g, "/");
     for (const group of backlinks) {
-      if (seen.has(group.sourcePath)) continue;
-      seen.add(group.sourcePath);
+      const path = group.sourcePath.replace(/\\/g, "/");
+      if (seen.has(path)) continue;
+      seen.add(path);
       nodes.push({ path: group.sourcePath, kind: "in" });
     }
     for (const link of resolvedOutbounds) {
-      const path = link.resolvedPath!;
-      if (path === currentFilePath || seen.has(path)) continue;
+      const path = link.resolvedPath!.replace(/\\/g, "/");
+      if (path === center || seen.has(path)) continue;
       seen.add(path);
-      nodes.push({ path, kind: "out" });
+      nodes.push({ path: link.resolvedPath!, kind: "out" });
     }
     return { center: currentFilePath, nodes: nodes.slice(0, 8) };
   }, [backlinks, currentFilePath, resolvedOutbounds]);

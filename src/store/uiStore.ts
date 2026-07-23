@@ -54,6 +54,8 @@ export interface PendingAiResult {
 export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
+  /** When opening settings, jump to this tab once (then cleared). */
+  settingsFocusTab: "ai" | "index" | "editor" | null;
   isSaving: boolean;
   isAnalyzing: boolean;
   isPublishing: boolean;
@@ -72,7 +74,11 @@ export interface UIState {
  */
 export interface UIActions {
   setSidebarOpen: (open: boolean) => void;
-  setSettingsOpen: (open: boolean) => void;
+  setSettingsOpen: (
+    open: boolean,
+    focusTab?: UIState["settingsFocusTab"],
+  ) => void;
+  clearSettingsFocusTab: () => void;
   setSaving: (saving: boolean) => void;
   setAnalyzing: (analyzing: boolean) => void;
   setPublishing: (publishing: boolean) => void;
@@ -225,6 +231,7 @@ export const defaultSettings: AppSettings = {
 export const initialUIState: UIState = {
   isSidebarOpen: true,
   isSettingsOpen: false,
+  settingsFocusTab: null,
   isSaving: false,
   isAnalyzing: false,
   isPublishing: false,
@@ -251,7 +258,13 @@ export function createUISlice(
 
     setSidebarOpen: (open) => set(() => ({ isSidebarOpen: open })),
 
-    setSettingsOpen: (open) => set(() => ({ isSettingsOpen: open })),
+    setSettingsOpen: (open, focusTab) =>
+      set(() => ({
+        isSettingsOpen: open,
+        settingsFocusTab: open ? (focusTab ?? null) : null,
+      })),
+
+    clearSettingsFocusTab: () => set(() => ({ settingsFocusTab: null })),
 
     setSaving: (saving) => set(() => ({ isSaving: saving })),
 

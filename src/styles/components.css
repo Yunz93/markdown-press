@@ -436,6 +436,41 @@
 }
 
 /* Ask Vault */
+.ask-vault-readiness {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-border, #e5e7eb) 55%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.ask-vault-readiness p {
+  margin: 0;
+}
+
+.ask-vault-readiness button {
+  margin-left: 0.35rem;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ask-vault-ready {
+  opacity: 0.85;
+}
+
+.ask-vault-scope-hint,
+.ask-vault-sources-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
 .ask-vault-overlay {
   position: fixed;
   inset: 0;

@@ -172,6 +172,23 @@ export async function generateGeminiJson<T>({
   );
 }
 
+export async function buildAskVaultGeminiSchema(): Promise<
+  Record<string, unknown>
+> {
+  const { Type } = await loadGenAIModule();
+  return {
+    type: Type.OBJECT,
+    properties: {
+      answerMarkdown: { type: Type.STRING },
+      citationIndexes: {
+        type: Type.ARRAY,
+        items: { type: Type.NUMBER },
+      },
+    },
+    required: ["answerMarkdown", "citationIndexes"],
+  };
+}
+
 export async function generateGeminiWikiArticle(
   prompt: string,
   apiKey: string,

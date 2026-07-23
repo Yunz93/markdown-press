@@ -57,6 +57,7 @@ function extractOutputText(payload: CodexResponsePayload): string {
 export async function generateCodexJson<T>(
   prompt: string,
   settings: AppSettings,
+  systemPrompt?: string,
 ): Promise<T> {
   const apiKey = settings.codexApiKey?.trim();
   if (!apiKey) {
@@ -75,7 +76,7 @@ export async function generateCodexJson<T>(
     },
     body: JSON.stringify({
       model: settings.codexModel?.trim() || "gpt-5.2-codex",
-      instructions: resolveProviderSystemPrompt(settings),
+      instructions: systemPrompt ?? resolveProviderSystemPrompt(settings),
       input: `${prompt}\n\nReturn JSON only.`,
       reasoning: {
         effort: "medium",

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { AppSettings } from "../../types";
 import { useI18n } from "../../hooks/useI18n";
 import type { TranslationKey } from "../../utils/i18n";
+import { useAppStore } from "../../store/appStore";
 import { InterfaceTab } from "./tabs/InterfaceTab";
 import { EditorTab } from "./tabs/EditorTab";
 import { AITab } from "./tabs/AITab";
@@ -60,8 +61,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   uiScaleStyle,
 }) => {
   const { t } = useI18n();
+  const settingsFocusTab = useAppStore((s) => s.settingsFocusTab);
+  const clearSettingsFocusTab = useAppStore((s) => s.clearSettingsFocusTab);
   const [activeTab, setActiveTab] = useState<SettingsTab>("editor");
   const tabs = getTabs(t);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (
+      settingsFocusTab === "ai" ||
+      settingsFocusTab === "index" ||
+      settingsFocusTab === "editor"
+    ) {
+      setActiveTab(settingsFocusTab);
+      clearSettingsFocusTab();
+    }
+  }, [isOpen, settingsFocusTab, clearSettingsFocusTab]);
 
   useEffect(() => {
     if (!isOpen) return;

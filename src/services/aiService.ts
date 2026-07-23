@@ -18,7 +18,7 @@ import {
   resolveProviderWikiTemplate,
   type WikiPromptOptions,
 } from "./ai/prompts";
-import { generateGeminiJson } from "./geminiService";
+import { generateGeminiJson, buildAskVaultGeminiSchema } from "./geminiService";
 import { generateCodexJson } from "./codexService";
 import { generateDeepSeekJson } from "./deepseekService";
 
@@ -152,24 +152,34 @@ export async function generateWikiFromSelectionWithProvider(
 export async function completeJsonWithProvider<T>(
   prompt: string,
   settings: AppSettings,
-  geminiSchema?: Record<string, unknown>,
+  options?: {
+    systemPrompt?: string;
+    geminiSchema?: Record<string, unknown>;
+    useAskVaultGeminiSchema?: boolean;
+  },
 ): Promise<T> {
   ensureAIConfiguration(settings);
   const providerId = resolveProviderId(settings);
+  const systemPrompt =
+    options?.systemPrompt ?? resolveProviderSystemPrompt(settings);
+
   if (providerId === "gemini") {
+    const schema = options?.useAskVaultGeminiSchema
+      ? await buildAskVaultGeminiSchema()
+      : (options?.geminiSchema ?? {
+          type: "object",
+          properties: {},
+        });
     return generateGeminiJson<T>({
       apiKey: settings.geminiApiKey || "",
       modelName: settings.geminiModel || "gemini-2.0-flash-exp",
       prompt,
-      systemPrompt: resolveProviderSystemPrompt(settings),
-      schema: geminiSchema ?? {
-        type: "object",
-        properties: {},
-      },
+      systemPrompt,
+      schema,
     });
   }
   if (providerId === "codex") {
-    return generateCodexJson<T>(prompt, settings);
+    return generateCodexJson<T>(prompt, settings, systemPrompt);
   }
-  return generateDeepSeekJson<T>(prompt, settings);
+  return generateDeepSeekJson<T>(prompt, settings, systemPrompt);
 }

@@ -158,15 +158,3 @@ Excerpts:
 ${sources || "(none)"}
   `.trim();
 }
-
-export const ASK_VAULT_GEMINI_SCHEMA = {
-  type: "object",
-  properties: {
-    answerMarkdown: { type: "string" },
-    citationIndexes: {
-      type: "array",
-      items: { type: "number" },
-    },
-  },
-  required: ["answerMarkdown", "citationIndexes"],
-} as const;

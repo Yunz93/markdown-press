@@ -106,3 +106,70 @@ export function removeChunkPaths(
     byPath,
   };
 }
+
+function getRelPath(path: string, vaultRoot: string): string {
+  const normalizedPath = normalizePath(path);
+  const root = normalizePath(vaultRoot).replace(/\/+$/, "");
+  if (root && normalizedPath.startsWith(`${root}/`)) {
+    return normalizedPath.slice(root.length + 1);
+  }
+  return normalizedPath;
+}
+
+function remapChunk(
+  chunk: TextChunk,
+  nextPath: string,
+  vaultRoot: string,
+): TextChunk {
+  const relPath = getRelPath(nextPath, vaultRoot);
+  const hashIndex = chunk.id.lastIndexOf("#");
+  const ordinal = hashIndex >= 0 ? chunk.id.slice(hashIndex + 1) : "0";
+  return {
+    ...chunk,
+    id: `${relPath}#${ordinal}`,
+    path: nextPath,
+    relPath,
+  };
+}
+
+/**
+ * Remap absolute paths (and derived chunk ids) after rename/move.
+ * Returns the next snapshot plus old→new chunk id map for vector remapping.
+ */
+export function remapPathsInChunkIndex(
+  snapshot: ChunkIndexSnapshot,
+  mapping: Record<string, string>,
+): { snapshot: ChunkIndexSnapshot; idMap: Record<string, string> } {
+  const normalizedMapping = Object.fromEntries(
+    Object.entries(mapping).map(([from, to]) => [
+      normalizePath(from),
+      normalizePath(to),
+    ]),
+  );
+  if (Object.keys(normalizedMapping).length === 0) {
+    return { snapshot, idMap: {} };
+  }
+
+  const byPath: Record<string, TextChunk[]> = {};
+  const idMap: Record<string, string> = {};
+
+  for (const [sourcePath, chunks] of Object.entries(snapshot.byPath)) {
+    const nextPath = normalizedMapping[sourcePath] ?? sourcePath;
+    byPath[nextPath] = chunks.map((chunk) => {
+      const next = remapChunk(chunk, nextPath, snapshot.vaultRoot);
+      if (chunk.id !== next.id) {
+        idMap[chunk.id] = next.id;
+      }
+      return next;
+    });
+  }
+
+  return {
+    snapshot: {
+      ...snapshot,
+      builtAt: Date.now(),
+      byPath,
+    },
+    idMap,
+  };
+}

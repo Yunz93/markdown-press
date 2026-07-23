@@ -156,6 +156,21 @@ export function insertTextAtCursor(text: string): boolean {
   return true;
 }
 
+/** Current main selection in the registered editor, if any. */
+export function getActiveEditorSelection(): {
+  tabId: string | null;
+  from: number;
+  to: number;
+} | null {
+  if (!activeEditorView) return null;
+  const selection = activeEditorView.state.selection.main;
+  return {
+    tabId: activeEditorTabId,
+    from: selection.from,
+    to: selection.to,
+  };
+}
+
 export function focusEditorRangeByOffset(
   start: number,
   end: number = start,
