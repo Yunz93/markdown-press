@@ -11,7 +11,7 @@
 | ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------- |
 | Phase A 源码结构化       | **已实现** | `src/utils/markdownTable.ts` · `src/components/editor/behavior/tables.ts` · Tab/Enter 接入 `input.ts` |
 | Phase B 美化/粘贴/可发现 | 未做       | Format 命令已有；HTML 粘贴与命令面板仍缺                                                              |
-| Phase C Live 叠层        | 未做       | —                                                                                                     |
+| Phase C Live 叠层        | **已实现** | `src/components/editor/livePreview/tables.ts`（点格跳入源码编辑）                                     |
 
 ### Phase A 快捷键
 
