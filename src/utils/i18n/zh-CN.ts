@@ -875,6 +875,10 @@ export default {
 
   editor_emptyState: "选择文件开始编辑",
   editor_placeholder: "开始输入...",
+  editor_livePreviewHeavyFileMode:
+    "已进入大文件优化模式：表格 / Callout / Mermaid 显示占位，详情见组件提示。",
+  editor_livePreviewLargeFileMode:
+    "已进入超大文件优化模式：公式、图片、Wiki 等 Live 组件已关闭，源码仍可编辑。",
   editor_uploadToHosting: "上传到图床",
   preview_loading: "加载中...",
   preview_doubleClickReveal: "双击可在 Finder 中定位",

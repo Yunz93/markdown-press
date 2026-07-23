@@ -18,6 +18,8 @@ import {
   hasSkipAncestor,
   rangesOverlap,
   selectionTouchesRange,
+  type BlockDecorationBuild,
+  type CoverageRange,
 } from "./shared";
 
 export interface MathRange {
@@ -123,9 +125,12 @@ class MathWidget extends WidgetType {
   }
 }
 
-export function buildMathDecorations(state: EditorState): DecorationSet {
+export function buildMathDecorations(state: EditorState): BlockDecorationBuild {
+  const coverage: CoverageRange[] = [];
+
+  // Large-file mode: keep source visible; banner explains why widgets are off.
   if (isLargeEditorState(state)) {
-    return Decoration.none;
+    return { decorations: Decoration.none, coverage };
   }
 
   const builder = new RangeSetBuilder<Decoration>();
@@ -139,7 +144,6 @@ export function buildMathDecorations(state: EditorState): DecorationSet {
   for (const range of candidates) {
     if (range.from < lastTo) continue;
     if (range.from >= range.to) continue;
-    if (selectionTouchesRange(state, range.from, range.to)) continue;
     if (hasSkipAncestor(state, range.from)) continue;
     if (
       wikiRanges.some((w) => rangesOverlap(range.from, range.to, w.from, w.to))
@@ -147,10 +151,18 @@ export function buildMathDecorations(state: EditorState): DecorationSet {
       continue;
     }
 
+    coverage.push({ from: range.from, to: range.to });
+
+    if (selectionTouchesRange(state, range.from, range.to)) {
+      lastTo = range.to;
+      continue;
+    }
+
     let html: string;
     try {
       html = renderKatexHtml(range.content, range.displayMode);
     } catch {
+      lastTo = range.to;
       continue;
     }
 
@@ -165,14 +177,14 @@ export function buildMathDecorations(state: EditorState): DecorationSet {
     lastTo = range.to;
   }
 
-  return builder.finish();
+  return { decorations: builder.finish(), coverage };
 }
 
 /** @deprecated Prefer buildMathDecorations(state). */
 export function buildLivePreviewMathDecorations(
   view: EditorView,
 ): DecorationSet {
-  return buildMathDecorations(view.state);
+  return buildMathDecorations(view.state).decorations;
 }
 
 export const livePreviewMath = defineLivePreviewBlockDecorationField({

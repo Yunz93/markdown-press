@@ -1,5 +1,6 @@
 import { Facet } from "@codemirror/state";
-import type { FileNode } from "../../../types";
+import type { FileNode, MarkdownStylePreset, ThemeMode } from "../../../types";
+import type { ShikiHighlighter } from "../../../hooks/useShikiHighlighter";
 
 export interface LivePreviewContext {
   sourceFilePath: string | null;
@@ -11,7 +12,9 @@ export interface LivePreviewContext {
   onOpenLink?: (href: string) => void | Promise<void>;
   /** Sync/async note body lookup for embeds (by absolute file path). */
   getFileContent?: (filePath: string) => string | null | Promise<string | null>;
-  themeMode?: "light" | "dark";
+  themeMode?: ThemeMode;
+  markdownStylePreset?: MarkdownStylePreset;
+  highlighter?: ShikiHighlighter | null;
 }
 
 export const EMPTY_LIVE_PREVIEW_CONTEXT: LivePreviewContext = {

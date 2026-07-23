@@ -1,8 +1,16 @@
 /**
  * Live Preview widgets for `[[wiki]]` links and `![[embed]]` image/note embeds.
+ *
+ * Decorations come from a StateField (block embeds). Async image/note resolves
+ * run through a separate ViewPlugin that scans wiki ranges once — it does not
+ * rebuild decorations (avoids a second full-doc decoration pass).
  */
 
-import { RangeSetBuilder, StateEffect, type EditorState } from "@codemirror/state";
+import {
+  RangeSetBuilder,
+  StateEffect,
+  type EditorState,
+} from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -27,14 +35,19 @@ import {
   resolveWikiLinkFile,
 } from "../../../utils/wikiLinks";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import { livePreviewWikiQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import {
   collectWikiLinkRanges,
   defineLivePreviewBlockDecorationField,
+  getCachedMarkdownHtml,
   hasSkipAncestor,
   livePreviewContextChanged,
   livePreviewShouldRebuild,
   selectionTouchesRange,
+  type BlockDecorationBuild,
+  type CoverageRange,
+  type WikiLinkRange,
 } from "./shared";
 
 const wikiImageResolvedEffect = StateEffect.define<{
@@ -95,6 +108,7 @@ class WikiImageWidget extends WidgetType {
     readonly to: number,
     readonly width?: number,
     readonly height?: number,
+    readonly failed = false,
   ) {
     super();
   }
@@ -107,7 +121,8 @@ class WikiImageWidget extends WidgetType {
       this.from === other.from &&
       this.to === other.to &&
       this.width === other.width &&
-      this.height === other.height
+      this.height === other.height &&
+      this.failed === other.failed
     );
   }
 
@@ -125,6 +140,12 @@ class WikiImageWidget extends WidgetType {
     if (this.height) img.style.height = `${this.height}px`;
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
+      img.addEventListener("error", () => {
+        wrap.classList.remove("is-loading");
+        wrap.classList.add("is-error");
+      });
+    } else if (this.failed) {
+      wrap.classList.add("is-error");
     } else {
       wrap.classList.add("is-loading");
     }
@@ -233,7 +254,19 @@ async function resolveNoteEmbedHtml(
   }
   let html = "";
   try {
-    html = markdown.trim() ? renderMarkdown(markdown) : "";
+    if (markdown.trim()) {
+      const renderOpts = {
+        themeMode: ctx.themeMode,
+        markdownStylePreset: ctx.markdownStylePreset,
+        highlighter: ctx.highlighter ?? null,
+      };
+      const cacheKey = `${markdown}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}`;
+      html = getCachedMarkdownHtml(
+        markdown,
+        (source) => renderMarkdown(source, renderOpts),
+        cacheKey,
+      );
+    }
   } catch {
     html = "";
   }
@@ -245,35 +278,104 @@ async function resolveNoteEmbedHtml(
 
 const noteEmbedCache = new Map<string, { title: string; html: string }>();
 const wikiImageResolvedCache = new Map<string, string>();
-const wikiPending = new Set<string>();
+const wikiImageFailedCache = new Set<string>();
+
+export interface WikiAsyncJob {
+  kind: "image" | "note";
+  cacheKey: string;
+  pathHint: string | null;
+  raw: string;
+}
+
+/** Collect wiki async jobs without building decorations (single-scan helper). */
+export function collectWikiAsyncJobs(state: EditorState): WikiAsyncJob[] {
+  if (isLargeEditorState(state)) return [];
+  const jobs: WikiAsyncJob[] = [];
+  const ctx = state.facet(livePreviewContextFacet);
+  const docText = state.doc.toString();
+  const ranges = collectWikiLinkRanges(docText, 0, docText.length);
+
+  for (const range of ranges) {
+    if (!range.raw || !range.embed) continue;
+    if (hasSkipAncestor(state, range.from)) continue;
+
+    const parsed = parseWikiLinkReference(range.raw, { embed: true });
+    const matched = resolveWikiLinkFile(
+      ctx.files,
+      parsed.path || parsed.target,
+      ctx.rootFolderPath,
+      ctx.sourceFilePath,
+    );
+    const looksLikeImage =
+      isImageAttachment(parsed.path) ||
+      isImageAttachment(parsed.target) ||
+      (matched ? isImageAttachment(matched.name) : false);
+
+    if (looksLikeImage) {
+      const key = cacheKeyFor(ctx.sourceFilePath, range.raw);
+      if (
+        wikiImageResolvedCache.has(key) ||
+        wikiImageFailedCache.has(key) ||
+        getCachedPreviewImageSrc(
+          matched?.path ?? (parsed.path || parsed.target),
+          ctx.sourceFilePath ?? undefined,
+        )
+      ) {
+        continue;
+      }
+      jobs.push({
+        kind: "image",
+        cacheKey: key,
+        pathHint: matched?.path ?? (parsed.path || parsed.target),
+        raw: range.raw,
+      });
+      continue;
+    }
+
+    const noteKey = `note::${ctx.sourceFilePath ?? ""}::${range.raw}`;
+    if (noteEmbedCache.has(noteKey)) continue;
+    jobs.push({
+      kind: "note",
+      cacheKey: noteKey,
+      pathHint: matched?.path ?? null,
+      raw: range.raw,
+    });
+  }
+
+  return jobs;
+}
+
+function iterWikiRanges(state: EditorState): WikiLinkRange[] {
+  const docText = state.doc.toString();
+  return collectWikiLinkRanges(docText, 0, docText.length);
+}
 
 export function buildWikiDecorations(
   state: EditorState,
-  scheduleResolve: (cacheKey: string, path: string) => void = () => {},
-  scheduleNoteEmbed: (
-    cacheKey: string,
-    raw: string,
-    path: string | null,
-  ) => void = () => {},
   resolvedCache: Map<string, string> = wikiImageResolvedCache,
-): DecorationSet {
+): BlockDecorationBuild {
+  const coverage: CoverageRange[] = [];
   if (isLargeEditorState(state)) {
-    return Decoration.none;
+    return { decorations: Decoration.none, coverage };
   }
 
   const builder = new RangeSetBuilder<Decoration>();
   const ctx = state.facet(livePreviewContextFacet);
-  const docText = state.doc.toString();
-  const ranges = collectWikiLinkRanges(docText, 0, docText.length);
+  const ranges = iterWikiRanges(state);
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;
 
   for (const range of ranges) {
     if (range.from < lastTo) continue;
-    if (selectionTouchesRange(state, range.from, range.to)) continue;
     if (hasSkipAncestor(state, range.from)) continue;
     if (!range.raw) continue;
+
+    coverage.push({ from: range.from, to: range.to });
+    if (selectionTouchesRange(state, range.from, range.to)) {
+      lastTo = range.to;
+      continue;
+    }
 
     const parsed = parseWikiLinkReference(range.raw, { embed: range.embed });
     const matched = resolveWikiLinkFile(
@@ -296,10 +398,7 @@ export function buildWikiDecorations(
           resolvedCache.get(key) ??
           getCachedPreviewImageSrc(pathHint, ctx.sourceFilePath ?? undefined) ??
           null;
-
-        if (!resolvedSrc) {
-          scheduleResolve(key, pathHint);
-        }
+        const failed = !resolvedSrc && wikiImageFailedCache.has(key);
 
         builder.add(
           range.from,
@@ -313,6 +412,7 @@ export function buildWikiDecorations(
               range.to,
               parsed.embedSize?.width,
               parsed.embedSize?.height,
+              failed,
             ),
           }),
         );
@@ -322,9 +422,6 @@ export function buildWikiDecorations(
 
       const noteKey = `note::${ctx.sourceFilePath ?? ""}::${range.raw}`;
       const cached = noteEmbedCache.get(noteKey);
-      if (!cached) {
-        scheduleNoteEmbed(noteKey, range.raw, matched?.path ?? null);
-      }
 
       builder.add(
         range.from,
@@ -356,26 +453,15 @@ export function buildWikiDecorations(
     lastTo = range.to;
   }
 
-  return builder.finish();
+  return { decorations: builder.finish(), coverage };
 }
 
-/** Test/helper wrapper — schedules are optional no-ops by default. */
+/** Test/helper wrapper. */
 export function buildLivePreviewWikiDecorations(
   view: EditorView,
   resolvedCache: Map<string, string> = wikiImageResolvedCache,
-  scheduleResolve: (cacheKey: string, path: string) => void = () => {},
-  scheduleNoteEmbed: (
-    cacheKey: string,
-    raw: string,
-    path: string | null,
-  ) => void = () => {},
 ): DecorationSet {
-  return buildWikiDecorations(
-    view.state,
-    scheduleResolve,
-    scheduleNoteEmbed,
-    resolvedCache,
-  );
+  return buildWikiDecorations(view.state, resolvedCache).decorations;
 }
 
 const wikiDecorationsField = defineLivePreviewBlockDecorationField({
@@ -387,91 +473,86 @@ const wikiDecorationsField = defineLivePreviewBlockDecorationField({
 const wikiAsyncPlugin = ViewPlugin.fromClass(
   class {
     constructor(view: EditorView) {
-      this.scan(view);
+      this.scheduleJobs(view);
     }
 
-    private scheduleResolve(view: EditorView, cacheKey: string, pathHint: string) {
-      if (wikiPending.has(cacheKey) || wikiImageResolvedCache.has(cacheKey)) {
-        return;
+    private scheduleJobs(view: EditorView) {
+      for (const job of collectWikiAsyncJobs(view.state)) {
+        if (job.kind === "image") {
+          const pathHint = job.pathHint ?? job.raw;
+          livePreviewWikiQueue.enqueue(job.cacheKey, async () => {
+            const ctx = view.state.facet(livePreviewContextFacet);
+            try {
+              const resolverCtx = createAttachmentResolverContext(
+                ctx.files,
+                ctx.rootFolderPath,
+                ctx.sourceFilePath,
+              );
+              const resolved = await resolveAttachmentTarget(
+                resolverCtx,
+                pathHint,
+              );
+              const pathOrSrc = resolved?.path ?? pathHint;
+              const displaySrc = await resolvePreviewSource(
+                pathOrSrc,
+                ctx.sourceFilePath ?? undefined,
+              );
+              wikiImageResolvedCache.set(job.cacheKey, displaySrc);
+              wikiImageFailedCache.delete(job.cacheKey);
+              if (view.dom.isConnected) {
+                view.dispatch({
+                  effects: wikiImageResolvedEffect.of({
+                    cacheKey: job.cacheKey,
+                    src: displaySrc,
+                  }),
+                });
+              }
+            } catch {
+              wikiImageFailedCache.add(job.cacheKey);
+              if (view.dom.isConnected) {
+                view.dispatch({
+                  effects: wikiImageResolvedEffect.of({
+                    cacheKey: job.cacheKey,
+                    src: "",
+                  }),
+                });
+              }
+            }
+          });
+        } else {
+          livePreviewWikiQueue.enqueue(job.cacheKey, async () => {
+            try {
+              const result = await resolveNoteEmbedHtml(
+                view,
+                job.raw,
+                job.pathHint,
+              );
+              noteEmbedCache.set(job.cacheKey, result);
+              if (view.dom.isConnected) {
+                view.dispatch({
+                  effects: wikiImageResolvedEffect.of({
+                    cacheKey: job.cacheKey,
+                    src: "note",
+                  }),
+                });
+              }
+            } catch {
+              // Leave empty embed body.
+            }
+          });
+        }
       }
-      wikiPending.add(cacheKey);
-      const ctx = view.state.facet(livePreviewContextFacet);
-
-      void (async () => {
-        try {
-          const resolverCtx = createAttachmentResolverContext(
-            ctx.files,
-            ctx.rootFolderPath,
-            ctx.sourceFilePath,
-          );
-          const resolved = await resolveAttachmentTarget(resolverCtx, pathHint);
-          const pathOrSrc = resolved?.path ?? pathHint;
-          const displaySrc = await resolvePreviewSource(
-            pathOrSrc,
-            ctx.sourceFilePath ?? undefined,
-          );
-          wikiImageResolvedCache.set(cacheKey, displaySrc);
-          if (view.dom.isConnected) {
-            view.dispatch({
-              effects: wikiImageResolvedEffect.of({
-                cacheKey,
-                src: displaySrc,
-              }),
-            });
-          }
-        } catch {
-          // Keep loading placeholder.
-        } finally {
-          wikiPending.delete(cacheKey);
-        }
-      })();
-    }
-
-    private scheduleNoteEmbed(
-      view: EditorView,
-      cacheKey: string,
-      raw: string,
-      path: string | null,
-    ) {
-      if (wikiPending.has(cacheKey) || noteEmbedCache.has(cacheKey)) return;
-      wikiPending.add(cacheKey);
-      void (async () => {
-        try {
-          const result = await resolveNoteEmbedHtml(view, raw, path);
-          noteEmbedCache.set(cacheKey, result);
-          if (view.dom.isConnected) {
-            view.dispatch({
-              effects: wikiImageResolvedEffect.of({
-                cacheKey,
-                src: "note",
-              }),
-            });
-          }
-        } finally {
-          wikiPending.delete(cacheKey);
-        }
-      })();
-    }
-
-    private scan(view: EditorView) {
-      if (isLargeEditorState(view.state)) return;
-      buildWikiDecorations(
-        view.state,
-        (cacheKey, path) => this.scheduleResolve(view, cacheKey, path),
-        (cacheKey, raw, path) =>
-          this.scheduleNoteEmbed(view, cacheKey, raw, path),
-      );
     }
 
     update(update: ViewUpdate) {
       if (
-        livePreviewShouldRebuild(update, "marks") ||
+        livePreviewShouldRebuild(update, "widgets") ||
         livePreviewContextChanged(update) ||
         update.transactions.some((tr) =>
           tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),
         )
       ) {
-        this.scan(update.view);
+        this.scheduleJobs(update.view);
       }
     }
   },

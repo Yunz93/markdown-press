@@ -11,10 +11,7 @@ import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
 import { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
-import {
-  findCalloutRanges,
-  livePreviewCallouts,
-} from "./callouts";
+import { findCalloutRanges, livePreviewCallouts } from "./callouts";
 import { findHighlightRanges, findCommentRanges } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 import { livePreviewMermaid } from "./mermaid";
@@ -210,12 +207,7 @@ describe("live preview hide formatting", () => {
 
   it("replaces wiki links with widgets when inactive", () => {
     const view = mount("see [[Note]] please\n\naway", 22);
-    const deco = buildLivePreviewWikiDecorations(
-      view,
-      new Map(),
-      () => undefined,
-      () => undefined,
-    );
+    const deco = buildLivePreviewWikiDecorations(view, new Map());
     let widgetCount = 0;
     deco.between(0, view.state.doc.length, (_from, _to, value) => {
       if (value.spec.widget) widgetCount += 1;

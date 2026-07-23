@@ -32,25 +32,32 @@ export function createLivePreviewContextExtension(
 }
 
 /**
- * Stable Live Preview ViewPlugins / theme.
+ * Stable Live Preview extensions, grouped into three pipelines:
+ * 1) Viewport inline marks/widgets (hide marks, tasks, lists, highlights, links, images)
+ * 2) Incremental block index (math, wiki, tables, callouts, mermaid StateFields)
+ * 3) Async resource queues (image/wiki resolve plugins attached to those modules)
+ *
  * Keep these in a separate compartment from context so file-tree / callback
  * churn does not destroy widgets and yank scroll/caret on click.
  */
 export function createLivePreviewPluginExtensions(): Extension[] {
-  return [
+  const viewportInline: Extension[] = [
     livePreviewTheme,
     livePreviewHideFormatting,
     livePreviewTaskCheckboxes,
     livePreviewListMarkers,
     livePreviewImages,
     livePreviewLinks,
+    livePreviewHighlights,
+  ];
+  const incrementalBlocks: Extension[] = [
     livePreviewMath,
     livePreviewWiki,
     livePreviewTables,
     livePreviewCallouts,
     livePreviewMermaid,
-    livePreviewHighlights,
   ];
+  return [...viewportInline, ...incrementalBlocks];
 }
 
 /** Full Live Preview extension set for CodeMirror (initial mount). */
@@ -93,3 +100,14 @@ export {
   livePreviewListMarkers,
 } from "./listAndHighlight";
 export { buildLivePreviewLinkDecorations, livePreviewLinks } from "./links";
+export {
+  getLivePreviewOptimizationMode,
+  SoftOffPlaceholderWidget,
+  softOffReason,
+} from "./softOff";
+export {
+  selectionAffectsCoverage,
+  defineLivePreviewBlockDecorationField,
+  collectChangedRanges,
+  expandRangesToBlocks,
+} from "./shared";

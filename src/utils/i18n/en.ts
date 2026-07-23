@@ -956,6 +956,10 @@ export default {
 
   editor_emptyState: "Select a file to start editing",
   editor_placeholder: "Start writing...",
+  editor_livePreviewHeavyFileMode:
+    "Large-file optimization: tables, callouts, and Mermaid show placeholders.",
+  editor_livePreviewLargeFileMode:
+    "Very large file mode: math, images, and wiki Live widgets are off; source remains editable.",
   editor_uploadToHosting: "Upload to hosting",
   preview_loading: "Loading...",
   preview_doubleClickReveal: "Double-click to reveal in Finder",

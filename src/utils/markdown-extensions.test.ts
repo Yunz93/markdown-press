@@ -440,6 +440,7 @@ describe("renderMermaidDiagrams edge cases", () => {
     await renderMermaidDiagrams(container, { themeMode: "light" });
 
     expect(renderMermaidSVG).not.toHaveBeenCalled();
+    expect(el.dataset.mermaidPendingWidth).toBe("true");
   });
 
   it("logs error when official Mermaid run throws but continues processing", async () => {

@@ -271,6 +271,49 @@ export const livePreviewTheme = EditorView.baseTheme({
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 18%, transparent)",
     borderRadius: "0.4rem",
   },
+  ".cm-live-preview-image-wrap.is-error": {
+    minWidth: "4rem",
+    minHeight: "2.5rem",
+    outline: "1px dashed color-mix(in srgb, #ef4444 55%, transparent)",
+    borderRadius: "0.4rem",
+    opacity: "0.85",
+  },
+  ".cm-live-preview-mermaid-status": {
+    fontSize: "0.8em",
+    color: "var(--mp-doc-muted, #94a3b8)",
+    marginBottom: "0.35em",
+  },
+  ".cm-live-preview-mermaid.is-error": {
+    cursor: "pointer",
+    outline: "1px dashed color-mix(in srgb, #ef4444 55%, transparent)",
+  },
+  ".cm-live-preview-soft-off": {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.2em",
+    width: "100%",
+    marginBlock: "0.55em",
+    padding: "0.55em 0.7em",
+    borderRadius: "0.4rem",
+    border:
+      "1px dashed color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 55%, transparent)",
+    background:
+      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 10%, transparent)",
+    color: "var(--mp-doc-muted, #64748b)",
+    fontSize: "0.85em",
+    lineHeight: "1.35",
+  },
+  ".cm-live-preview-soft-off-label": {
+    fontWeight: "650",
+    color: "var(--mp-doc-text, inherit)",
+  },
+  ".cm-live-preview-soft-off-summary": {
+    opacity: "0.9",
+  },
+  ".cm-live-preview-soft-off-hint": {
+    opacity: "0.75",
+    fontSize: "0.92em",
+  },
   ".cm-live-preview-math": {
     display: "inline-block",
     verticalAlign: "middle",
