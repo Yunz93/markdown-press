@@ -18,6 +18,7 @@ import {
   hasSkipAncestor,
   rangesOverlap,
   selectionTouchesRange,
+  scheduleLivePreviewMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -110,13 +111,18 @@ class MathWidget extends WidgetType {
     );
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const el = document.createElement(this.displayMode ? "div" : "span");
     el.className = this.displayMode
       ? "cm-live-preview-math cm-live-preview-math-display katex-display"
       : "cm-live-preview-math cm-live-preview-math-inline";
     el.setAttribute("contenteditable", "false");
     el.innerHTML = this.html;
+    // KaTeX metrics can settle after font load; refresh CM height maps.
+    queueMicrotask(() => scheduleLivePreviewMeasure(view));
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      void document.fonts.ready.then(() => scheduleLivePreviewMeasure(view));
+    }
     return el;
   }
 

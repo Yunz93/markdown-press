@@ -350,3 +350,50 @@ export function defineLivePreviewBlockDecorationField(options: {
 export function emptyBlockDecorationBuild(): BlockDecorationBuild {
   return { decorations: Decoration.none, coverage: [] };
 }
+
+/**
+ * Ask CodeMirror to refresh block height maps after a Live Preview widget
+ * changes size asynchronously (image decode, Mermaid SVG, embed HTML, …).
+ * Without this, `posAtCoords` can map clicks to the wrong document position.
+ */
+export function scheduleLivePreviewMeasure(view: EditorView): void {
+  if (typeof view.requestMeasure !== "function") return;
+  if (!view.dom.isConnected) return;
+  view.requestMeasure();
+}
+
+/**
+ * Bind img load/error (and already-complete images) to a remasure.
+ * Also remasures once on the next microtask for sync layout settles.
+ */
+export function bindLivePreviewMediaMeasure(
+  view: EditorView,
+  root: HTMLElement,
+): void {
+  const remasure = () => scheduleLivePreviewMeasure(view);
+  for (const node of root.querySelectorAll("img")) {
+    const img = node as HTMLImageElement;
+    if (img.complete) continue;
+    img.addEventListener("load", remasure, { once: true });
+    img.addEventListener("error", remasure, { once: true });
+  }
+  queueMicrotask(remasure);
+}
+
+/** Convenience for a single Live Preview `<img>` widget. */
+export function bindLivePreviewImageMeasure(
+  view: EditorView,
+  img: HTMLImageElement,
+  onSettle?: () => void,
+): void {
+  const settle = () => {
+    onSettle?.();
+    scheduleLivePreviewMeasure(view);
+  };
+  if (img.complete && img.naturalHeight > 0) {
+    queueMicrotask(settle);
+    return;
+  }
+  img.addEventListener("load", settle, { once: true });
+  img.addEventListener("error", settle, { once: true });
+}

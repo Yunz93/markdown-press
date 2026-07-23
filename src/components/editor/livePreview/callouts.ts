@@ -16,6 +16,7 @@ import {
   getCachedMarkdownHtml,
   hasSkipAncestor,
   selectionTouchesRange,
+  bindLivePreviewMediaMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -104,7 +105,7 @@ class CalloutWidget extends WidgetType {
     );
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const wrap = document.createElement("div");
     wrap.className = `cm-live-preview-callout cm-live-preview-callout-${this.type}`;
     wrap.setAttribute("contenteditable", "false");
@@ -120,6 +121,7 @@ class CalloutWidget extends WidgetType {
       body.className = "cm-live-preview-callout-body markdown-body";
       body.innerHTML = this.bodyHtml;
       wrap.appendChild(body);
+      bindLivePreviewMediaMeasure(view, body);
     }
 
     return wrap;
