@@ -19,7 +19,16 @@ describe('markdownStyle', () => {
   });
 
   it('keeps all supported presets and exposes light/dark tokens', () => {
-    expect(MARKDOWN_STYLE_PRESETS).toEqual(['nord', 'topaz', 'typewriter', 'primary']);
+    expect(MARKDOWN_STYLE_PRESETS).toEqual([
+      'nord',
+      'topaz',
+      'typewriter',
+      'primary',
+      'minimal',
+      'things',
+      'catppuccin',
+      'solarized',
+    ]);
 
     for (const preset of MARKDOWN_STYLE_PRESETS) {
       for (const themeMode of THEME_MODES) {

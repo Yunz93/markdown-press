@@ -583,6 +583,10 @@ export default {
   settings_markdownStyleTopaz: "Topaz Inspired",
   settings_markdownStyleTypewriter: "Typewriter Inspired",
   settings_markdownStylePrimary: "Primary Inspired",
+  settings_markdownStyleMinimal: "Minimal Inspired",
+  settings_markdownStyleThings: "Things Inspired",
+  settings_markdownStyleCatppuccin: "Catppuccin Inspired",
+  settings_markdownStyleSolarized: "Solarized Inspired",
   settings_markdownStyleDesc:
     "Controls Markdown reading styles for the editor, preview, and exported document. Each style supports both light and dark themes.",
   settings_englishFont: "English font",
