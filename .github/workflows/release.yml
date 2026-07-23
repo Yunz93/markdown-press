@@ -101,21 +101,12 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
-            ### 0.9.15
+            ### 0.9.16
 
             #### 新功能与改进
 
-            - 知识库：反向链接面板，以及 Wiki 链接索引重建设置。
-            - 知识库：语义分块、混合检索与相关笔记。
-            - 知识库：Ask Vault 问答（基于本地库检索回答）。
-            - 编辑器：选定编辑/预览/分屏后，切换文件保持当前视图。
-            - 文档：补充知识层实施方案与路线图交叉引用。
-            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.14 相同限制）。
-
-            #### 修复
-
-            - 代码块内文本选中高亮被背景遮挡、左侧出现错位蓝条。
-            - macOS 叠加标题栏红绿灯旁不再显示窗口标题文字。
+            - 编辑器：新增 Minimal / Things / Catppuccin / Solarized 等 Obsidian 主流 Markdown 样式预设（编辑区与预览同步）。
+            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.15 相同限制）。
 
             ### macOS 安装说明
 
@@ -216,21 +207,12 @@ jobs:
           releaseBody: |
             See the assets to download this version and install.
 
-            ### 0.9.15
+            ### 0.9.16
 
             #### 新功能与改进
 
-            - 知识库：反向链接面板，以及 Wiki 链接索引重建设置。
-            - 知识库：语义分块、混合检索与相关笔记。
-            - 知识库：Ask Vault 问答（基于本地库检索回答）。
-            - 编辑器：选定编辑/预览/分屏后，切换文件保持当前视图。
-            - 文档：补充知识层实施方案与路线图交叉引用。
-            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.14 相同限制）。
-
-            #### 修复
-
-            - 代码块内文本选中高亮被背景遮挡、左侧出现错位蓝条。
-            - macOS 叠加标题栏红绿灯旁不再显示窗口标题文字。
+            - 编辑器：新增 Minimal / Things / Catppuccin / Solarized 等 Obsidian 主流 Markdown 样式预设（编辑区与预览同步）。
+            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.15 相同限制）。
 
             ### macOS 安装说明
 
