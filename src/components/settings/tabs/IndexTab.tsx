@@ -11,6 +11,7 @@ import {
   type BuiltinEmbeddingStatus,
 } from "../../../services/vault/builtinEmbedding";
 import { useSecureSettings } from "../useSecureSettings";
+import { AppSelect } from "../../ui/AppSelect";
 
 interface IndexTabProps {
   settings: AppSettings;
@@ -143,24 +144,26 @@ export const IndexTab: React.FC<IndexTabProps> = ({
           {t("index_embeddingDesc")}
         </p>
         <label className="block text-sm">
-          <span className="text-gray-600 dark:text-gray-300">
+          <span className="mb-1 block text-gray-600 dark:text-gray-300">
             {t("index_embeddingProvider")}
           </span>
-          <select
-            className="mt-1 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-3 py-2"
+          <AppSelect
+            aria-label={t("index_embeddingProvider")}
             value={settings.embeddingProvider ?? "builtin"}
-            onChange={(event) =>
+            options={[
+              { value: "builtin", label: t("index_embeddingBuiltin") },
+              { value: "none", label: t("index_embeddingNone") },
+              {
+                value: "openai-compatible",
+                label: t("index_embeddingOpenAICompatible"),
+              },
+            ]}
+            onChange={(embeddingProvider) =>
               onUpdateSettings({
-                embeddingProvider: event.target.value as EmbeddingProviderId,
+                embeddingProvider: embeddingProvider as EmbeddingProviderId,
               })
             }
-          >
-            <option value="builtin">{t("index_embeddingBuiltin")}</option>
-            <option value="none">{t("index_embeddingNone")}</option>
-            <option value="openai-compatible">
-              {t("index_embeddingOpenAICompatible")}
-            </option>
-          </select>
+          />
         </label>
 
         {(settings.embeddingProvider ?? "builtin") === "builtin" ? (
@@ -274,23 +277,24 @@ export const IndexTab: React.FC<IndexTabProps> = ({
         ) : null}
 
         <label className="block text-sm">
-          <span className="text-gray-600 dark:text-gray-300">
+          <span className="mb-1 block text-gray-600 dark:text-gray-300">
             {t("index_searchModeDefault")}
           </span>
-          <select
-            className="mt-1 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-3 py-2"
+          <AppSelect
+            aria-label={t("index_searchModeDefault")}
             value={settings.searchModeDefault ?? "keyword"}
-            onChange={(event) =>
+            options={[
+              { value: "keyword", label: t("search_mode_keyword") },
+              { value: "semantic", label: t("search_mode_semantic") },
+              { value: "hybrid", label: t("search_mode_hybrid") },
+            ]}
+            onChange={(searchModeDefault) =>
               onUpdateSettings({
-                searchModeDefault: event.target
-                  .value as AppSettings["searchModeDefault"],
+                searchModeDefault:
+                  searchModeDefault as AppSettings["searchModeDefault"],
               })
             }
-          >
-            <option value="keyword">{t("search_mode_keyword")}</option>
-            <option value="semantic">{t("search_mode_semantic")}</option>
-            <option value="hybrid">{t("search_mode_hybrid")}</option>
-          </select>
+          />
         </label>
 
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
