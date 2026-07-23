@@ -455,8 +455,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       wordWrap: settings.wordWrap,
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
-      livePreviewEnabled:
-        viewMode === ViewMode.LIVE || viewMode === ViewMode.SPLIT,
+      livePreviewEnabled: viewMode === ViewMode.LIVE,
       livePreviewContext,
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
@@ -944,11 +943,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             ? " show-editor-gutters"
             : ""
         }`}
-        data-live-preview={
-          viewMode === ViewMode.LIVE || viewMode === ViewMode.SPLIT
-            ? "true"
-            : undefined
-        }
+        data-live-preview={viewMode === ViewMode.LIVE ? "true" : undefined}
         style={layoutStyle}
       >
         {isSaving && (

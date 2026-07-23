@@ -75,7 +75,7 @@ function seedSplitViewStore(
   overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
 ) {
   useAppStore.setState({
-    viewMode: ViewMode.SPLIT,
+    viewMode: ViewMode.LIVE,
     activeTabId: "tab-a",
     settings: {
       language: "en",
@@ -122,44 +122,11 @@ describe("SplitView scroll handshake", () => {
     vi.unstubAllGlobals();
     useAppStore.setState({
       activeTabId: null,
-      viewMode: ViewMode.SPLIT,
+      viewMode: ViewMode.LIVE,
     } as never);
   });
 
-  it("syncs preview scroll immediately when the editor scrolls in split mode", async () => {
-    renderSplitView();
-
-    await waitFor(() => {
-      expect(editorOnScroll).toBeTypeOf("function");
-    });
-
-    act(() => {
-      editorOnScroll?.(0.42);
-    });
-
-    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.42, {
-      immediate: true,
-    });
-  });
-
-  it("syncs editor scroll immediately when the preview scrolls in split mode", async () => {
-    renderSplitView();
-
-    await waitFor(() => {
-      expect(previewOnScroll).toBeTypeOf("function");
-    });
-
-    act(() => {
-      previewOnScroll?.(0.55);
-    });
-
-    expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.55, {
-      immediate: true,
-    });
-  });
-
-  it("does not sync preview scroll when only the editor pane is visible", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
+  it("does not sync preview scroll in live preview mode", async () => {
     renderSplitView();
 
     await waitFor(() => {
@@ -173,8 +140,23 @@ describe("SplitView scroll handshake", () => {
     expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
   });
 
-  it("marks preview layout inactive in editor-only mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
+  it("does not sync editor scroll from preview in reading mode", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
+    renderSplitView();
+
+    await waitFor(() => {
+      expect(previewOnScroll).toBeTypeOf("function");
+    });
+
+    act(() => {
+      previewOnScroll?.(0.55);
+    });
+
+    expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
+  });
+
+  it("marks preview layout inactive in live preview mode", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.LIVE });
     renderSplitView();
 
     await waitFor(() => {
@@ -185,8 +167,8 @@ describe("SplitView scroll handshake", () => {
     });
   });
 
-  it("re-anchors both panes to the editor position when entering split mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
+  it("re-anchors the reading pane when switching from live to reading", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.LIVE });
     renderSplitView();
 
     await waitFor(() => {
@@ -201,20 +183,17 @@ describe("SplitView scroll handshake", () => {
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ viewMode: ViewMode.SPLIT } as never);
+      useAppStore.setState({ viewMode: ViewMode.PREVIEW } as never);
     });
 
     await waitFor(() => {
       expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.25, {
         immediate: true,
       });
-      expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.25, {
-        immediate: true,
-      });
     });
   });
 
-  it("re-anchors both panes to the preview position when leaving preview-only mode", async () => {
+  it("re-anchors the editor when leaving reading mode", async () => {
     seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
     renderSplitView();
 
@@ -230,13 +209,10 @@ describe("SplitView scroll handshake", () => {
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ viewMode: ViewMode.SPLIT } as never);
+      useAppStore.setState({ viewMode: ViewMode.LIVE } as never);
     });
 
     await waitFor(() => {
-      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.7, {
-        immediate: true,
-      });
       expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.7, {
         immediate: true,
       });
@@ -262,7 +238,7 @@ describe("SplitView scroll handshake", () => {
     });
 
     await waitFor(() => {
-      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0, {
+      expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0, {
         immediate: true,
       });
     });
@@ -275,15 +251,15 @@ describe("SplitView scroll handshake", () => {
     });
 
     await waitFor(() => {
-      expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.6, {
+      expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.6, {
         immediate: true,
       });
     });
   });
 
-  it("resyncs panes after the width transition completes", () => {
+  it("resyncs the reading pane after the width transition completes", () => {
     vi.useFakeTimers();
-    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
+    seedSplitViewStore({ viewMode: ViewMode.LIVE });
     renderSplitView();
 
     act(() => {
@@ -294,7 +270,7 @@ describe("SplitView scroll handshake", () => {
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ viewMode: ViewMode.SPLIT } as never);
+      useAppStore.setState({ viewMode: ViewMode.PREVIEW } as never);
     });
 
     act(() => {
@@ -304,12 +280,9 @@ describe("SplitView scroll handshake", () => {
     expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.33, {
       immediate: true,
     });
-    expect(mockEditorSyncScrollTo).toHaveBeenCalledWith(0.33, {
-      immediate: true,
-    });
   });
 
-  it("restores preview scroll anchor for tabs last viewed in preview-only mode", async () => {
+  it("restores preview scroll anchor for tabs last viewed in reading mode", async () => {
     seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
     renderSplitView();
 
@@ -342,7 +315,7 @@ describe("SplitView scroll handshake", () => {
     expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
   });
 
-  it("suppresses split percentage sync while outline heading navigation is locked", async () => {
+  it("suppresses percentage sync while outline heading navigation is locked", async () => {
     renderSplitView();
 
     await waitFor(() => {

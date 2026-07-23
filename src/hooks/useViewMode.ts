@@ -1,23 +1,20 @@
-import { useCallback } from "react";
-import { useAppStore } from "../store/appStore";
-import { ViewMode } from "../types";
-import { getNextViewMode } from "../utils/viewMode";
-
 /**
  * Hook for view mode management
  *
- * Toggle cycle: edit-solo (LIVE/EDITOR) -> SPLIT -> PREVIEW -> SPLIT -> LIVE
+ * Toggle cycle: Live Preview ↔ Reading
  */
+
+import { useCallback } from "react";
+import { useAppStore } from "../store/appStore";
+import { ViewMode } from "../types";
+import { getNextViewMode, normalizeSessionViewMode } from "../utils/viewMode";
+
 export function useViewMode() {
-  const { viewMode, lastNonSplitViewMode, setViewMode } = useAppStore();
+  const { viewMode, setViewMode } = useAppStore();
 
   const toggleViewMode = useCallback(() => {
-    setViewMode(getNextViewMode(viewMode, lastNonSplitViewMode), "toggle");
-  }, [viewMode, lastNonSplitViewMode, setViewMode]);
-
-  const setEditorOnly = useCallback(() => {
-    setViewMode(ViewMode.EDITOR, "direct");
-  }, [setViewMode]);
+    setViewMode(getNextViewMode(viewMode), "toggle");
+  }, [viewMode, setViewMode]);
 
   const setLivePreview = useCallback(() => {
     setViewMode(ViewMode.LIVE, "direct");
@@ -27,21 +24,15 @@ export function useViewMode() {
     setViewMode(ViewMode.PREVIEW, "direct");
   }, [setViewMode]);
 
-  const setSplitView = useCallback(() => {
-    setViewMode(ViewMode.SPLIT, "direct");
-  }, [setViewMode]);
+  const normalized = normalizeSessionViewMode(viewMode);
 
   return {
-    viewMode,
+    viewMode: normalized,
     setViewMode,
     toggleViewMode,
-    setEditorOnly,
     setLivePreview,
     setPreviewOnly,
-    setSplitView,
-    isEditorOnly: viewMode === ViewMode.EDITOR,
-    isLivePreview: viewMode === ViewMode.LIVE,
-    isPreviewOnly: viewMode === ViewMode.PREVIEW,
-    isSplitView: viewMode === ViewMode.SPLIT,
+    isLivePreview: normalized === ViewMode.LIVE,
+    isPreviewOnly: normalized === ViewMode.PREVIEW,
   };
 }

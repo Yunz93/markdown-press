@@ -1,6 +1,6 @@
 import { ViewMode } from "../types";
 import {
-  isNonSplitViewMode,
+  normalizeSessionViewMode,
   resolveLastNonSplitViewMode,
   type NonSplitViewMode,
 } from "../utils/viewMode";
@@ -52,7 +52,7 @@ export interface EditorActions {
  * Initial editor state
  */
 export const initialEditorState: EditorState = {
-  viewMode: ViewMode.SPLIT,
+  viewMode: ViewMode.LIVE,
   lastNonSplitViewMode: ViewMode.LIVE,
   lastViewModeChangeSource: "direct",
   viewModeBeforePreviewOnly: null,
@@ -139,20 +139,19 @@ export function createEditorSlice(
       set((state) => buildContentUpdate(state, fileId, content, skipHistory)),
 
     setViewMode: (mode, source = "direct") =>
-      set((state) => ({
-        viewMode: mode,
-        lastNonSplitViewMode:
-          mode === ViewMode.SPLIT
-            ? state.lastNonSplitViewMode
-            : isNonSplitViewMode(mode)
-              ? mode
-              : resolveLastNonSplitViewMode(mode),
-        lastViewModeChangeSource: source,
-      })),
+      set(() => {
+        const normalized = normalizeSessionViewMode(mode);
+        return {
+          viewMode: normalized,
+          lastNonSplitViewMode: resolveLastNonSplitViewMode(normalized),
+          lastViewModeChangeSource: source,
+        };
+      }),
 
     setViewModeBeforePreviewOnly: (mode) =>
       set(() => ({
-        viewModeBeforePreviewOnly: mode,
+        viewModeBeforePreviewOnly:
+          mode === null ? null : normalizeSessionViewMode(mode),
       })),
 
     undo: () =>

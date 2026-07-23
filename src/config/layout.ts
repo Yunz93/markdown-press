@@ -131,10 +131,8 @@ export function getStoredPanelWidth(
 /**
  * Calculate minimum workspace width based on view mode
  */
-export function getMinimumWorkspaceWidth(viewMode: ViewMode): number {
-  return viewMode === ViewMode.SPLIT
-    ? LAYOUT.WORKSPACE.SPLIT_MIN
-    : LAYOUT.WORKSPACE.SINGLE_VIEW_MIN;
+export function getMinimumWorkspaceWidth(_viewMode: ViewMode): number {
+  return LAYOUT.WORKSPACE.SINGLE_VIEW_MIN;
 }
 
 /**
@@ -143,10 +141,6 @@ export function getMinimumWorkspaceWidth(viewMode: ViewMode): number {
 export function getMinimumWorkspaceWidthWithOutline(
   viewMode: ViewMode,
 ): number {
-  if (viewMode === ViewMode.SPLIT) {
-    return LAYOUT.WORKSPACE.WITH_OUTLINE.SPLIT;
-  }
-
   if (viewMode === ViewMode.PREVIEW) {
     return LAYOUT.WORKSPACE.WITH_OUTLINE.PREVIEW;
   }

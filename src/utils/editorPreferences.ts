@@ -19,19 +19,21 @@ export function normalizeTabSize(value: unknown): 2 | 4 {
 }
 
 export function normalizeDefaultViewMode(value: unknown): ViewMode {
-  if (value === ViewMode.EDITOR || value === "EDITOR") {
-    return ViewMode.EDITOR;
-  }
-  if (value === ViewMode.LIVE || value === "LIVE") {
-    return ViewMode.LIVE;
-  }
   if (value === ViewMode.PREVIEW || value === "PREVIEW") {
     return ViewMode.PREVIEW;
   }
-  if (value === ViewMode.SPLIT || value === "SPLIT") {
-    return ViewMode.SPLIT;
+  // LIVE is the writing mode; legacy EDITOR / SPLIT map here.
+  if (
+    value === ViewMode.LIVE ||
+    value === "LIVE" ||
+    value === ViewMode.EDITOR ||
+    value === "EDITOR" ||
+    value === ViewMode.SPLIT ||
+    value === "SPLIT"
+  ) {
+    return ViewMode.LIVE;
   }
-  return ViewMode.SPLIT;
+  return ViewMode.LIVE;
 }
 
 /** Indent string used by Tab / list nesting for the current settings. */

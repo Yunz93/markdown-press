@@ -1,4 +1,5 @@
-import { ViewMode } from '../types';
+import { ViewMode } from "../types";
+import { normalizeSessionViewMode } from "./viewMode";
 
 export interface PreviewOnlyViewModeTransitionInput {
   wasPreviewOnly: boolean;
@@ -13,7 +14,7 @@ export interface PreviewOnlyViewModeTransitionResult {
 }
 
 /**
- * Keep the user's chosen editor/preview/split mode sticky across file switches.
+ * Keep the user's chosen live/reading mode sticky across file switches.
  * Preview-only assets (PDF/image/HTML) temporarily force PREVIEW, then restore.
  */
 export function resolvePreviewOnlyViewModeTransition(
@@ -29,13 +30,15 @@ export function resolvePreviewOnlyViewModeTransition(
   if (isPreviewOnly && !wasPreviewOnly) {
     return {
       nextViewMode: ViewMode.PREVIEW,
-      nextViewModeBeforePreviewOnly: currentViewMode,
+      nextViewModeBeforePreviewOnly: normalizeSessionViewMode(currentViewMode),
     };
   }
 
   if (!isPreviewOnly && wasPreviewOnly) {
     return {
-      nextViewMode: viewModeBeforePreviewOnly ?? currentViewMode,
+      nextViewMode: normalizeSessionViewMode(
+        viewModeBeforePreviewOnly ?? currentViewMode,
+      ),
       nextViewModeBeforePreviewOnly: null,
     };
   }
@@ -43,8 +46,9 @@ export function resolvePreviewOnlyViewModeTransition(
   if (isPreviewOnly && currentViewMode !== ViewMode.PREVIEW) {
     return {
       nextViewMode: ViewMode.PREVIEW,
-      nextViewModeBeforePreviewOnly:
+      nextViewModeBeforePreviewOnly: normalizeSessionViewMode(
         viewModeBeforePreviewOnly ?? currentViewMode,
+      ),
     };
   }
 

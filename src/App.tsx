@@ -416,7 +416,7 @@ const App: React.FC = () => {
         });
       }
 
-      if (viewMode !== ViewMode.EDITOR && viewMode !== ViewMode.LIVE) {
+      if (viewMode !== ViewMode.LIVE) {
         requestPreviewHeadingScroll(activeTabId, id, {
           alignMode: "center",
           behavior: "auto",

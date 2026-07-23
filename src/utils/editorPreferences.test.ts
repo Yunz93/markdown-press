@@ -18,15 +18,15 @@ describe("normalizeTabSize", () => {
 });
 
 describe("normalizeDefaultViewMode", () => {
-  it("defaults unknown values to split", () => {
-    expect(normalizeDefaultViewMode(undefined)).toBe(ViewMode.SPLIT);
-    expect(normalizeDefaultViewMode("nope")).toBe(ViewMode.SPLIT);
+  it("defaults unknown values to live", () => {
+    expect(normalizeDefaultViewMode(undefined)).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode("nope")).toBe(ViewMode.LIVE);
   });
 
-  it("keeps valid view modes", () => {
-    expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.EDITOR);
+  it("keeps live/preview and maps legacy modes to live", () => {
+    expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.LIVE);
     expect(normalizeDefaultViewMode(ViewMode.PREVIEW)).toBe(ViewMode.PREVIEW);
-    expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.SPLIT);
+    expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.LIVE);
     expect(normalizeDefaultViewMode("LIVE")).toBe(ViewMode.LIVE);
     expect(normalizeDefaultViewMode(ViewMode.LIVE)).toBe(ViewMode.LIVE);
   });

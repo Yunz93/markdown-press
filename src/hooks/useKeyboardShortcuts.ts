@@ -2,9 +2,8 @@ import { useEffect, useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { type ShortcutConfig } from "../types";
 import { isShortcutCaptureActive } from "../utils/shortcutCaptureGate";
-import { getNextViewMode, type NonSplitViewMode } from "../utils/viewMode";
+import { getNextViewMode } from "../utils/viewMode";
 
-export type { NonSplitViewMode };
 export { getNextViewMode };
 
 interface UseKeyboardShortcutsOptions {
@@ -156,8 +155,7 @@ function useShortcutListener(
   options: UseKeyboardShortcutsOptions,
   saveHandler?: (() => void) | null,
 ) {
-  const { settings, viewMode, lastNonSplitViewMode, setViewMode } =
-    useAppStore();
+  const { settings, viewMode, setViewMode } = useAppStore();
 
   return useCallback(
     (event: KeyboardEvent) => {
@@ -167,11 +165,7 @@ function useShortcutListener(
         save: saveHandler ?? options.onSave,
         toggleView:
           options.onToggleView ??
-          (() =>
-            setViewMode(
-              getNextViewMode(viewMode, lastNonSplitViewMode),
-              "toggle",
-            )),
+          (() => setViewMode(getNextViewMode(viewMode), "toggle")),
         aiAnalyze: options.onAIAnalyze,
         search: options.onSearch,
         sidebarSearch: options.onSidebarSearch,
@@ -232,7 +226,6 @@ function useShortcutListener(
       options.onToggleTheme,
       options.onToggleView,
       settings.shortcuts,
-      lastNonSplitViewMode,
       setViewMode,
       viewMode,
       saveHandler,
