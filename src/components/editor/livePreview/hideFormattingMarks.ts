@@ -349,19 +349,30 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-table": {
     borderCollapse: "collapse",
-    width: "100%",
+    // Size to content (like reading preview) instead of stretching to 100%,
+    // which squeezes short CJK columns into one-glyph-per-line stacks.
+    width: "max-content",
+    maxWidth: "100%",
+    tableLayout: "auto",
     fontSize: "0.95em",
   },
   ".cm-live-preview-table th, .cm-live-preview-table td": {
     border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.35))",
-    padding: "0.4em 0.65em",
+    padding: "0.45em 0.75em",
     verticalAlign: "top",
     cursor: "text",
-    minWidth: "2.5em",
+    minWidth: "3.5em",
+    maxWidth: "28em",
+    lineHeight: "1.45",
+    // Override `.cm-lineWrapping { overflow-wrap: anywhere }` inheritance.
+    whiteSpace: "normal",
+    wordBreak: "keep-all",
+    overflowWrap: "break-word",
   },
   ".cm-live-preview-table th": {
     background: "var(--mp-doc-table-header-bg, rgba(148, 163, 184, 0.12))",
     fontWeight: "650",
+    whiteSpace: "nowrap",
   },
   ".cm-live-preview-table tbody tr:nth-child(even) td": {
     background: "var(--mp-doc-table-row-alt-bg, transparent)",
@@ -372,6 +383,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     background:
       "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
     whiteSpace: "pre-wrap",
+    wordBreak: "normal",
+    overflowWrap: "anywhere",
     caretColor: "var(--mp-doc-accent, #2563eb)",
   },
   ".cm-live-preview-callout": {
