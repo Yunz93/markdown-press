@@ -178,6 +178,19 @@ export const EditorTab: React.FC<EditorTabProps> = ({
                   label: t("settings_markdownStyleTypewriter"),
                 },
                 { value: "primary", label: t("settings_markdownStylePrimary") },
+                {
+                  value: "minimal",
+                  label: t("settings_markdownStyleMinimal"),
+                },
+                { value: "things", label: t("settings_markdownStyleThings") },
+                {
+                  value: "catppuccin",
+                  label: t("settings_markdownStyleCatppuccin"),
+                },
+                {
+                  value: "solarized",
+                  label: t("settings_markdownStyleSolarized"),
+                },
               ]}
               onChange={(markdownStylePreset) =>
                 onUpdateSettings({

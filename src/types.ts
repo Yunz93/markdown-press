@@ -105,7 +105,15 @@ export type AttachmentLocation =
   | "sameAsCurrent"
   | "subfolderUnderCurrent";
 export type OrderedListMode = "strict" | "loose";
-export type MarkdownStylePreset = "nord" | "topaz" | "typewriter" | "primary";
+export type MarkdownStylePreset =
+  | "nord"
+  | "topaz"
+  | "typewriter"
+  | "primary"
+  | "minimal"
+  | "things"
+  | "catppuccin"
+  | "solarized";
 export type SearchMode = "keyword" | "semantic" | "hybrid";
 export type EmbeddingProviderId = "none" | "builtin" | "openai-compatible";
 

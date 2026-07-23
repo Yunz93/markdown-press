@@ -549,6 +549,10 @@ export default {
   settings_markdownStyleTopaz: "Topaz Inspired",
   settings_markdownStyleTypewriter: "Typewriter Inspired",
   settings_markdownStylePrimary: "Primary Inspired",
+  settings_markdownStyleMinimal: "Minimal Inspired",
+  settings_markdownStyleThings: "Things Inspired",
+  settings_markdownStyleCatppuccin: "Catppuccin Inspired",
+  settings_markdownStyleSolarized: "Solarized Inspired",
   settings_markdownStyleDesc:
     "控制编辑区、预览区和导出文档的 Markdown 阅读样式；每种样式都同时支持浅色和深色主题。",
   settings_englishFont: "英文字体",
