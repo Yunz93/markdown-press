@@ -56,16 +56,87 @@ function formatOutboundMeta(link: WikiOutboundLink): string {
   return parts.join(" · ");
 }
 
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Stable scatter positions — no edges, labels beside dots. */
+function layoutScatterPoints(
+  ids: string[],
+  width: number,
+  height: number,
+  centerId: string,
+): Array<{ id: string; x: number; y: number }> {
+  const padX = 28;
+  const padY = 22;
+  const minX = padX;
+  const maxX = width - padX;
+  const minY = padY;
+  const maxY = height - padY;
+  const points = ids.map((id) => {
+    if (id === centerId) {
+      return { id, x: width * 0.48, y: height * 0.46 };
+    }
+    const h = hashString(id);
+    const x = minX + ((h % 1000) / 1000) * (maxX - minX);
+    const y = minY + (((h >>> 10) % 1000) / 1000) * (maxY - minY);
+    return { id, x, y };
+  });
+
+  // Light repulsion so labels stay readable in the narrow rail.
+  for (let iter = 0; iter < 24; iter += 1) {
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const a = points[i]!;
+        const b = points[j]!;
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) || 0.01;
+        const minDist = a.id === centerId || b.id === centerId ? 42 : 36;
+        if (dist >= minDist) continue;
+        const push = ((minDist - dist) / minDist) * 4.5;
+        dx = (dx / dist) * push;
+        dy = (dy / dist) * push;
+        if (a.id !== centerId) {
+          a.x -= dx;
+          a.y -= dy;
+        }
+        if (b.id !== centerId) {
+          b.x += dx;
+          b.y += dy;
+        }
+      }
+    }
+    for (const point of points) {
+      if (point.id === centerId) continue;
+      point.x = Math.min(maxX, Math.max(minX, point.x));
+      point.y = Math.min(maxY, Math.max(minY, point.y));
+    }
+  }
+
+  return points;
+}
+
 const NeighborhoodGraph: React.FC<{
   centerPath: string;
   nodes: Array<{ path: string; kind: "in" | "out" }>;
   onOpenPath: (path: string) => void;
 }> = ({ centerPath, nodes, onOpenPath }) => {
-  const width = 220;
-  const height = 140;
-  const cx = width / 2;
-  const cy = height / 2;
-  const radius = 48;
+  const width = 260;
+  const height = 200;
+  const ids = useMemo(
+    () => [centerPath, ...nodes.map((node) => node.path)],
+    [centerPath, nodes],
+  );
+  const points = useMemo(
+    () => layoutScatterPoints(ids, width, height, centerPath),
+    [ids, centerPath],
+  );
 
   return (
     <svg
@@ -74,59 +145,52 @@ const NeighborhoodGraph: React.FC<{
       width="100%"
       height={height}
       role="img"
+      aria-label={displayName(centerPath)}
     >
-      {nodes.map((node, index) => {
-        const angle =
-          (Math.PI * 2 * index) / Math.max(nodes.length, 1) - Math.PI / 2;
-        const x = cx + Math.cos(angle) * radius;
-        const y = cy + Math.sin(angle) * radius;
+      {points.map((point) => {
+        const isCurrent = point.id === centerPath;
+        const label = displayName(point.id);
+        const labelY = point.y + (point.y > height * 0.72 ? -12 : 16);
         return (
-          <g key={node.path}>
-            <line
-              x1={cx}
-              y1={cy}
-              x2={x}
-              y2={y}
-              className={
-                node.kind === "in"
-                  ? "links-neighborhood-edge is-in"
-                  : "links-neighborhood-edge is-out"
-              }
-            />
+          <g
+            key={point.id}
+            className={
+              isCurrent
+                ? "links-neighborhood-item is-current"
+                : "links-neighborhood-item"
+            }
+            onClick={() => {
+              if (!isCurrent) onOpenPath(point.id);
+            }}
+            style={{ cursor: isCurrent ? "default" : "pointer" }}
+          >
             <circle
-              cx={x}
-              cy={y}
-              r={10}
+              cx={point.x}
+              cy={point.y}
+              r={isCurrent ? 5.5 : 4.5}
               className={
-                node.kind === "in"
-                  ? "links-neighborhood-node is-in"
-                  : "links-neighborhood-node is-out"
+                isCurrent
+                  ? "links-neighborhood-node is-current"
+                  : "links-neighborhood-node"
               }
-              onClick={() => onOpenPath(node.path)}
             >
-              <title>{displayName(node.path)}</title>
+              <title>{label}</title>
             </circle>
             <text
-              x={x}
-              y={y + 22}
+              x={point.x}
+              y={labelY}
               textAnchor="middle"
-              className="links-neighborhood-label"
-              onClick={() => onOpenPath(node.path)}
+              className={
+                isCurrent
+                  ? "links-neighborhood-label is-current"
+                  : "links-neighborhood-label"
+              }
             >
-              {displayName(node.path).slice(0, 8)}
+              {label.length > 14 ? `${label.slice(0, 14)}…` : label}
             </text>
           </g>
         );
       })}
-      <circle cx={cx} cy={cy} r={14} className="links-neighborhood-center" />
-      <text
-        x={cx}
-        y={cy + 4}
-        textAnchor="middle"
-        className="links-neighborhood-center-label"
-      >
-        {displayName(centerPath).slice(0, 6)}
-      </text>
     </svg>
   );
 };
