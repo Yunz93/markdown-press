@@ -149,9 +149,26 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
-  if (!workflow.includes("scripts/install-macos.sh")) {
+  const releaseBodyPath = join(projectRoot, ".github", "release-body.md");
+  const releaseBody = existsSync(releaseBodyPath)
+    ? readFileSync(releaseBodyPath, "utf8")
+    : "";
+  const documentsInstallScript =
+    workflow.includes("scripts/install-macos.sh") ||
+    releaseBody.includes("scripts/install-macos.sh");
+  if (!documentsInstallScript) {
     console.error(
-      "release.yml must document the macOS one-line install script scripts/install-macos.sh.",
+      "release.yml or .github/release-body.md must document the macOS one-line install script scripts/install-macos.sh.",
+    );
+    process.exit(1);
+  }
+  if (
+    releaseBody &&
+    !workflow.includes(".github/release-body.md") &&
+    !workflow.includes("release-body.md")
+  ) {
+    console.error(
+      "release.yml must compose the GitHub release body from .github/release-body.md when that file exists.",
     );
     process.exit(1);
   }
