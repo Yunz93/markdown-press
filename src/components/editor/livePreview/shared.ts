@@ -1,7 +1,8 @@
 import type { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import type { ViewUpdate } from "@codemirror/view";
+import type { EditorView, ViewUpdate } from "@codemirror/view";
 import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
+import { LRUCache } from "../../../utils/performance";
 import { livePreviewContextFacet } from "./context";
 
 const SKIP_ANCESTOR_NODES = new Set([
@@ -82,4 +83,66 @@ export function livePreviewContextChanged(update: ViewUpdate): boolean {
     update.startState.facet(livePreviewContextFacet) !==
     update.state.facet(livePreviewContextFacet)
   );
+}
+
+/**
+ * Decide whether a Live Preview decoration plugin should rebuild.
+ * - `marks`: rebuild on every selection change (hide/reveal formatting).
+ * - `widgets`: rebuild when selection crosses a line or becomes non-empty,
+ *   not on every caret nudge within a line (avoids KaTeX/markdown-it thrash).
+ */
+export function livePreviewShouldRebuild(
+  update: ViewUpdate,
+  mode: "marks" | "widgets" = "widgets",
+): boolean {
+  if (update.docChanged || update.viewportChanged) return true;
+  if (syntaxTree(update.startState) !== syntaxTree(update.state)) return true;
+  if (!update.selectionSet) return false;
+  if (mode === "marks") return true;
+
+  const prev = update.startState.selection.main;
+  const next = update.state.selection.main;
+  if (prev.empty !== next.empty) return true;
+  if (!next.empty || !prev.empty) return true;
+  try {
+    const prevLine = update.startState.doc.lineAt(prev.head).number;
+    const nextLine = update.state.doc.lineAt(next.head).number;
+    return prevLine !== nextLine;
+  } catch {
+    return true;
+  }
+}
+
+/** Viewport union padded for decoration builds. */
+export function getPaddedVisibleRange(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+  pad = 200,
+): { from: number; to: number } {
+  let from = view.state.doc.length;
+  let to = 0;
+  for (const range of view.visibleRanges) {
+    from = Math.min(from, range.from);
+    to = Math.max(to, range.to);
+  }
+  if (to < from) {
+    return { from: 0, to: view.state.doc.length };
+  }
+  return {
+    from: Math.max(0, from - pad),
+    to: Math.min(view.state.doc.length, to + pad),
+  };
+}
+
+const inlineHtmlCache = new LRUCache<string, string>(256);
+
+/** Cache markdown-it HTML for Live Preview widgets. */
+export function getCachedMarkdownHtml(
+  markdown: string,
+  render: (source: string) => string,
+): string {
+  const cached = inlineHtmlCache.get(markdown);
+  if (cached !== undefined) return cached;
+  const html = render(markdown);
+  inlineHtmlCache.set(markdown, html);
+  return html;
 }

@@ -32,7 +32,8 @@ import {
   type MarkdownTable,
 } from "../../../utils/markdownTable";
 import { renderMarkdown } from "../../../utils/markdown";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
+import { getCachedMarkdownHtml } from "./shared";
 
 export type ActiveTableCell = {
   /** Document offset of the table header line start. */
@@ -76,9 +77,11 @@ function renderInlineCell(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
   try {
-    const html = renderMarkdown(trimmed);
-    const match = html.match(/<p>([\s\S]*?)<\/p>/i);
-    return match?.[1] ?? html;
+    return getCachedMarkdownHtml(trimmed, (source) => {
+      const html = renderMarkdown(source);
+      const match = html.match(/<p>([\s\S]*?)<\/p>/i);
+      return match?.[1] ?? html;
+    });
   } catch {
     return escapeHtml(trimmed);
   }
@@ -505,7 +508,7 @@ function buildTableWidget(
 }
 
 export function buildTableDecorations(state: EditorState): DecorationSet {
-  if (isLargeEditorState(state)) {
+  if (isHeavyLivePreviewState(state)) {
     return Decoration.none;
   }
 

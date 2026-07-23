@@ -34,6 +34,7 @@ import {
   hasSkipAncestor,
   livePreviewContextChanged,
   selectionTouchesRange,
+  livePreviewShouldRebuild,
 } from "./shared";
 
 const wikiImageResolvedEffect = StateEffect.define<{
@@ -90,6 +91,8 @@ class WikiImageWidget extends WidgetType {
     readonly label: string,
     readonly rawSrc: string,
     readonly resolvedSrc: string | null,
+    readonly from: number,
+    readonly to: number,
     readonly width?: number,
     readonly height?: number,
   ) {
@@ -101,15 +104,18 @@ class WikiImageWidget extends WidgetType {
       this.label === other.label &&
       this.rawSrc === other.rawSrc &&
       this.resolvedSrc === other.resolvedSrc &&
+      this.from === other.from &&
+      this.to === other.to &&
       this.width === other.width &&
       this.height === other.height
     );
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const wrap = document.createElement("span");
     wrap.className = "cm-live-preview-image-wrap cm-live-preview-wiki-embed";
     wrap.setAttribute("contenteditable", "false");
+    wrap.title = `![[${this.rawSrc}]]`;
 
     const img = document.createElement("img");
     img.className = "cm-live-preview-image";
@@ -123,11 +129,31 @@ class WikiImageWidget extends WidgetType {
       wrap.classList.add("is-loading");
     }
     wrap.appendChild(img);
+
+    wrap.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    wrap.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const from = this.from;
+      const to = this.to;
+      window.setTimeout(() => {
+        view.focus();
+        view.dispatch({
+          selection: { anchor: from, head: to },
+          scrollIntoView: true,
+        });
+      }, 0);
+    });
+
     return wrap;
   }
 
-  ignoreEvent() {
-    return true;
+  ignoreEvent(event: Event) {
+    return event.type !== "mousedown" && event.type !== "click";
   }
 }
 
@@ -170,7 +196,7 @@ class WikiNoteEmbedWidget extends WidgetType {
 
     if (this.bodyHtml.trim()) {
       const body = document.createElement("div");
-      body.className = "cm-live-preview-note-embed-body";
+      body.className = "cm-live-preview-note-embed-body markdown-body";
       body.innerHTML = this.bodyHtml;
       wrap.appendChild(body);
     }
@@ -289,6 +315,8 @@ export function buildLivePreviewWikiDecorations(
               parsed.displayText,
               range.raw,
               resolvedSrc,
+              range.from,
+              range.to,
               parsed.embedSize?.width,
               parsed.embedSize?.height,
             ),
@@ -439,11 +467,8 @@ export const livePreviewWiki = ViewPlugin.fromClass(
 
       if (
         resolved ||
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        livePreviewContextChanged(update) ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        livePreviewShouldRebuild(update, "marks") ||
+        livePreviewContextChanged(update)
       ) {
         this.decorations = this.rebuild(update.view);
       }

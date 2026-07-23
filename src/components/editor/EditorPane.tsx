@@ -37,6 +37,7 @@ import { EditorView } from "@codemirror/view";
 import {
   getResolvedCodeFontFamily,
   getResolvedEditorFontFamily,
+  getResolvedPreviewFontFamily,
 } from "../../utils/fontSettings";
 import {
   getScaledCodeFontSize,
@@ -234,6 +235,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const editorFontFamily = useMemo(
       () => getResolvedEditorFontFamily(settings),
       [settings.editorFontFamily],
+    );
+    const previewFontFamily = useMemo(
+      () => getResolvedPreviewFontFamily(settings),
+      [settings.previewFontFamily],
     );
     const codeFontFamily = useMemo(
       () => getResolvedCodeFontFamily(settings),
@@ -687,6 +692,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--editor-content-bottom": `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
           "--editor-font-family": editorFontFamily,
           "--editor-font-size": `${scaledEditorFontSize}px`,
+          "--preview-font-family":
+            viewMode === ViewMode.LIVE ? previewFontFamily : editorFontFamily,
+          "--preview-font-size": `${scaledEditorFontSize}px`,
           "--editor-code-font-family": codeFontFamily,
           "--editor-code-font-size": `${scaledCodeFontSize}px`,
           "--editor-line-height": String(EDITOR_LINE_HEIGHT),
@@ -695,11 +703,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       [
         layoutMetrics,
         editorFontFamily,
+        previewFontFamily,
         scaledEditorFontSize,
         scaledCodeFontSize,
         codeFontFamily,
         settings.readableLineLength,
         settings.tabSize,
+        viewMode,
       ],
     );
 

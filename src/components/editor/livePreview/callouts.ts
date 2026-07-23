@@ -13,8 +13,13 @@ import {
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { renderMarkdown } from "../../../utils/markdown";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
-import { hasSkipAncestor, selectionTouchesRange } from "./shared";
+import { isHeavyLivePreviewState } from "../hooks/codeMirrorHelpers";
+import {
+  getCachedMarkdownHtml,
+  hasSkipAncestor,
+  livePreviewShouldRebuild,
+  selectionTouchesRange,
+} from "./shared";
 
 const CALLOUT_START = /^>\s*\[!([A-Za-z0-9_-]+)\]([+-]?)\s*(.*)$/;
 
@@ -107,7 +112,7 @@ class CalloutWidget extends WidgetType {
 
     if (this.bodyHtml.trim()) {
       const body = document.createElement("div");
-      body.className = "cm-live-preview-callout-body";
+      body.className = "cm-live-preview-callout-body markdown-body";
       body.innerHTML = this.bodyHtml;
       wrap.appendChild(body);
     }
@@ -139,23 +144,30 @@ class HorizontalRuleWidget extends WidgetType {
 export function buildLivePreviewCalloutDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
+  if (isHeavyLivePreviewState(view.state)) {
     return Decoration.none;
   }
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const docText = state.doc.toString();
+  const viewFrom = view.visibleRanges.length
+    ? Math.min(...view.visibleRanges.map((range) => range.from))
+    : 0;
+  const viewTo = view.visibleRanges.length
+    ? Math.max(...view.visibleRanges.map((range) => range.to))
+    : state.doc.length;
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
   for (const callout of findCalloutRanges(docText)) {
+    if (callout.to < viewFrom || callout.from > viewTo) continue;
     if (selectionTouchesRange(state, callout.from, callout.to)) continue;
     if (hasSkipAncestor(state, callout.from)) continue;
 
     let bodyHtml = "";
     if (callout.bodyMarkdown.trim()) {
       try {
-        bodyHtml = renderMarkdown(callout.bodyMarkdown);
+        bodyHtml = getCachedMarkdownHtml(callout.bodyMarkdown, renderMarkdown);
       } catch {
         bodyHtml = "";
       }
@@ -224,12 +236,7 @@ export const livePreviewCallouts = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
-      ) {
+      if (livePreviewShouldRebuild(update, "widgets")) {
         this.decorations = buildLivePreviewCalloutDecorations(update.view);
       }
     }

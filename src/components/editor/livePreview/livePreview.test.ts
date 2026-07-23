@@ -15,7 +15,11 @@ import { findCalloutRanges } from "./callouts";
 import { findHighlightRanges, findCommentRanges } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 
-function createView(doc: string, cursor = 0, withTables = false) {
+function createView(
+  doc: string,
+  cursor = 0,
+  extras: import("@codemirror/state").Extension[] = [],
+) {
   const state = EditorState.create({
     doc,
     selection: { anchor: cursor },
@@ -27,7 +31,7 @@ function createView(doc: string, cursor = 0, withTables = false) {
         rootFolderPath: null,
         files: [],
       }),
-      ...(withTables ? [livePreviewTables] : []),
+      ...extras,
     ],
   });
   const parent = document.createElement("div");
@@ -47,8 +51,12 @@ describe("live preview hide formatting", () => {
     }
   });
 
-  function mount(doc: string, cursor = 0, withTables = false) {
-    const view = createView(doc, cursor, withTables);
+  function mount(
+    doc: string,
+    cursor = 0,
+    extras: import("@codemirror/state").Extension[] = [],
+  ) {
+    const view = createView(doc, cursor, extras);
     views.push(view);
     return view;
   }
@@ -123,6 +131,37 @@ describe("live preview hide formatting", () => {
     expect(widgetCount).toBe(1);
   });
 
+  it("image widgets expose source URL ranges for click-to-reveal", () => {
+    const doc = "see ![cat](https://example.com/cat.png)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewImageDecorations(
+      view,
+      new Map(),
+      () => undefined,
+    );
+    let widget: {
+      from: number;
+      to: number;
+      urlFrom: number;
+      urlTo: number;
+      ignoreEvent: (event: Event) => boolean;
+    } | null = null;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        widget = value.spec.widget as typeof widget;
+      }
+    });
+    expect(widget).not.toBeNull();
+    expect(doc.slice(widget!.from, widget!.to)).toBe(
+      "![cat](https://example.com/cat.png)",
+    );
+    expect(doc.slice(widget!.urlFrom, widget!.urlTo)).toBe(
+      "https://example.com/cat.png",
+    );
+    expect(widget!.ignoreEvent(new MouseEvent("click"))).toBe(false);
+    expect(widget!.ignoreEvent(new MouseEvent("mousedown"))).toBe(false);
+  });
+
   it("replaces inactive math with widgets", () => {
     const view = mount("area $E=mc^2$ done\n\naway", 22);
     const deco = buildLivePreviewMathDecorations(view);
@@ -161,7 +200,7 @@ describe("live preview hide formatting", () => {
 
   it("keeps the table widget when the selection is inside the table", () => {
     const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
-    const view = mount(doc, 2, true);
+    const view = mount(doc, 2, [livePreviewTables]);
     const deco = buildLivePreviewTableDecorations(view);
     let widgetCount = 0;
     deco.between(0, view.state.doc.length, (_from, _to, value) => {
@@ -173,7 +212,7 @@ describe("live preview hide formatting", () => {
 
   it("edits a table cell in place without revealing pipe source", async () => {
     const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
-    const view = mount(doc, doc.length - 1, true);
+    const view = mount(doc, doc.length - 1, [livePreviewTables]);
     const cell = view.dom.querySelector(
       'td[data-mp-row="1"][data-mp-col="0"]',
     ) as HTMLElement | null;
