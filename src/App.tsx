@@ -840,15 +840,9 @@ const App: React.FC = () => {
                   setIsOutlineOpen(!isOutlineOpen);
                 }}
               />
-              {isAskVaultOpen ? (
-                <AskVaultPanel
-                  open
-                  onClose={() => setIsAskVaultOpen(false)}
-                  onOpenFile={fileOps.handleFileSelect}
-                  readFile={readFile}
-                />
-              ) : isOutlineVisible ? (
+              {activeTabId ? (
                 <RightRail
+                  isOpen={isOutlineVisible && !isAskVaultOpen}
                   headings={outlineHeadings}
                   activeHeadingId={activeHeadingId}
                   onHeadingClick={handleHeadingClick}
@@ -863,6 +857,14 @@ const App: React.FC = () => {
                     });
                   }}
                   onCreateMissingNote={handleCreateMissingWikiNote}
+                />
+              ) : null}
+              {isAskVaultOpen ? (
+                <AskVaultPanel
+                  open
+                  onClose={() => setIsAskVaultOpen(false)}
+                  onOpenFile={fileOps.handleFileSelect}
+                  readFile={readFile}
                 />
               ) : null}
               {isSearchBarOpen && (

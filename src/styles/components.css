@@ -12,7 +12,8 @@
 
 /* Outline Panel Styles - Modern Flat Design */
 .outline-panel {
-  width: clamp(200px, 18vw, 250px);
+  --outline-width: 240px;
+  width: var(--outline-width);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -22,6 +23,16 @@
   color: #475569;
   background: transparent;
   font-size: 13px;
+  opacity: 1;
+  transition:
+    width 300ms cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 300ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.outline-panel.is-closed {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .dark .outline-panel {
@@ -35,12 +46,6 @@
   align-items: center;
   justify-content: center;
   color: #999;
-}
-
-@media (max-width: 1180px) {
-  .outline-panel {
-    width: 200px;
-  }
 }
 
 .outline-header {
