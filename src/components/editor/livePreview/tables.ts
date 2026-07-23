@@ -757,7 +757,7 @@ export function buildTableDecorations(state: EditorState): DecorationSet {
         from,
         to,
         Decoration.replace({
-          widget: new SoftOffPlaceholderWidget("table", reason, summary),
+          widget: new SoftOffPlaceholderWidget("table", reason, summary, from),
           block: true,
         }),
       );

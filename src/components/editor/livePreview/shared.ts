@@ -9,6 +9,7 @@ import { syntaxTree } from "@codemirror/language";
 import {
   Decoration,
   EditorView,
+  ViewPlugin,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -396,4 +397,96 @@ export function bindLivePreviewImageMeasure(
   }
   img.addEventListener("load", settle, { once: true });
   img.addEventListener("error", settle, { once: true });
+}
+
+/**
+ * Generation token for deferred click-to-reveal selection.
+ * A later reveal / cancel bumps the token so stale timeouts cannot yank the
+ * caret after the user has already clicked elsewhere.
+ */
+let livePreviewRevealGeneration = 0;
+
+/** Invalidate any pending image/wiki click-to-reveal selection work. */
+export function cancelPendingLivePreviewReveals(): void {
+  livePreviewRevealGeneration += 1;
+}
+
+export function isLivePreviewRevealCurrent(generation: number): boolean {
+  return generation === livePreviewRevealGeneration;
+}
+
+/**
+ * Schedule a click-to-reveal selection after CM's DOM selection flush.
+ * Bumps the generation so only the latest scheduled reveal can apply.
+ */
+export function scheduleLivePreviewReveal(
+  view: EditorView,
+  apply: (generation: number) => void,
+): number {
+  const generation = ++livePreviewRevealGeneration;
+  window.setTimeout(() => {
+    if (!isLivePreviewRevealCurrent(generation)) return;
+    if (!view.dom.isConnected) return;
+    apply(generation);
+  }, 0);
+  return generation;
+}
+
+/**
+ * Remasure height maps when Live Preview mounts and when webfonts settle.
+ * Heading/font metric changes otherwise leave `posAtCoords` 1–2 lines off.
+ */
+export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
+  class {
+    private disposed = false;
+
+    constructor(view: EditorView) {
+      scheduleLivePreviewMeasure(view);
+      queueMicrotask(() => {
+        if (this.disposed || !view.dom.isConnected) return;
+        scheduleLivePreviewMeasure(view);
+      });
+      if (typeof document !== "undefined" && document.fonts?.ready) {
+        void document.fonts.ready.then(() => {
+          if (this.disposed || !view.dom.isConnected) return;
+          scheduleLivePreviewMeasure(view);
+        });
+      }
+    }
+
+    destroy() {
+      this.disposed = true;
+    }
+  },
+);
+
+/**
+ * Place a collapsed caret at `from` when clicking a passive replace widget
+ * (`ignoreEvent() === true` otherwise leaves the previous selection in place).
+ */
+export function bindLivePreviewWidgetCaret(
+  view: EditorView,
+  el: HTMLElement,
+  from: number,
+): void {
+  el.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "a, button, input, textarea, select, [contenteditable='true']",
+      )
+    ) {
+      return;
+    }
+    cancelPendingLivePreviewReveals();
+    event.preventDefault();
+    event.stopPropagation();
+    const pos = Math.max(0, Math.min(from, view.state.doc.length));
+    view.focus();
+    view.dispatch({
+      selection: { anchor: pos },
+      scrollIntoView: false,
+    });
+  });
 }

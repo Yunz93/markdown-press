@@ -19,6 +19,7 @@ import {
   rangesOverlap,
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
+  bindLivePreviewWidgetCaret,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -101,13 +102,16 @@ class MathWidget extends WidgetType {
     readonly content: string,
     readonly displayMode: boolean,
     readonly html: string,
+    readonly from: number,
   ) {
     super();
   }
 
   eq(other: MathWidget) {
     return (
-      this.content === other.content && this.displayMode === other.displayMode
+      this.content === other.content &&
+      this.displayMode === other.displayMode &&
+      this.from === other.from
     );
   }
 
@@ -123,6 +127,7 @@ class MathWidget extends WidgetType {
     if (typeof document !== "undefined" && document.fonts?.ready) {
       void document.fonts.ready.then(() => scheduleLivePreviewMeasure(view));
     }
+    bindLivePreviewWidgetCaret(view, el, this.from);
     return el;
   }
 
@@ -176,7 +181,12 @@ export function buildMathDecorations(state: EditorState): BlockDecorationBuild {
       range.from,
       range.to,
       Decoration.replace({
-        widget: new MathWidget(range.content, range.displayMode, html),
+        widget: new MathWidget(
+          range.content,
+          range.displayMode,
+          html,
+          range.from,
+        ),
         block: range.displayMode,
       }),
     );

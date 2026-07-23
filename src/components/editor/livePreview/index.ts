@@ -20,6 +20,7 @@ import {
   livePreviewListMarkers,
 } from "./listAndHighlight";
 import { livePreviewLinks } from "./links";
+import { livePreviewGeometryRemeasure } from "./shared";
 
 export type { LivePreviewContext };
 export { EMPTY_LIVE_PREVIEW_CONTEXT, livePreviewContextFacet };
@@ -43,6 +44,7 @@ export function createLivePreviewContextExtension(
 export function createLivePreviewPluginExtensions(): Extension[] {
   const viewportInline: Extension[] = [
     livePreviewTheme,
+    livePreviewGeometryRemeasure,
     livePreviewHideFormatting,
     livePreviewTaskCheckboxes,
     livePreviewListMarkers,
@@ -110,4 +112,7 @@ export {
   defineLivePreviewBlockDecorationField,
   collectChangedRanges,
   expandRangesToBlocks,
+  scheduleLivePreviewMeasure,
+  cancelPendingLivePreviewReveals,
+  livePreviewGeometryRemeasure,
 } from "./shared";
