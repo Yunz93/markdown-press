@@ -15,7 +15,6 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
 use tauri::Manager;
-use tauri::TitleBarStyle;
 use tauri_plugin_fs::FsExt;
 
 #[derive(Debug, Clone)]
@@ -199,14 +198,21 @@ fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), St
     let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
     let (width, height) = resolve_file_window_size(main_window_logical_size(&app));
 
-    // Match main window chrome: overlay titlebar with no visible title text.
-    let window = tauri::WebviewWindowBuilder::new(&app, label, url)
+    // Match main window chrome. Overlay titlebar APIs are macOS-only.
+    let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title("")
-        .hidden_title(true)
-        .title_bar_style(TitleBarStyle::Overlay)
         .inner_size(width, height)
         .min_inner_size(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
-        .resizable(true)
+        .resizable(true);
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .hidden_title(true)
+            .title_bar_style(tauri::TitleBarStyle::Overlay);
+    }
+
+    let window = builder
         .build()
         .map_err(|e| format!("Failed to create window: {}", e))?;
 
