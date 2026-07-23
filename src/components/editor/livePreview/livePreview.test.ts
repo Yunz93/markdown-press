@@ -9,11 +9,16 @@ import { buildLivePreviewHideDecorations } from "./hideFormattingMarks";
 import { buildLivePreviewImageDecorations } from "./images";
 import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
-import { buildLivePreviewWikiDecorations } from "./wiki";
+import { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
-import { findCalloutRanges } from "./callouts";
+import {
+  findCalloutRanges,
+  livePreviewCallouts,
+} from "./callouts";
 import { findHighlightRanges, findCommentRanges } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
+import { livePreviewMermaid } from "./mermaid";
+import { livePreviewMath } from "./math";
 
 function createView(
   doc: string,
@@ -170,6 +175,37 @@ describe("live preview hide formatting", () => {
       if (value.spec.widget) widgetCount += 1;
     });
     expect(widgetCount).toBe(1);
+  });
+
+  it("allows block decorations via StateField extensions without crashing", () => {
+    const doc = [
+      "$$E=mc^2$$",
+      "",
+      "```mermaid",
+      "graph TD; A-->B",
+      "```",
+      "",
+      "> [!note] Title",
+      "> body",
+      "",
+      "![[Embedded Note]]",
+      "",
+      "| a | b |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "",
+      "away",
+    ].join("\n");
+
+    expect(() =>
+      mount(doc, doc.length - 1, [
+        livePreviewMath,
+        livePreviewMermaid,
+        livePreviewCallouts,
+        livePreviewWiki,
+        livePreviewTables,
+      ]),
+    ).not.toThrow();
   });
 
   it("replaces wiki links with widgets when inactive", () => {

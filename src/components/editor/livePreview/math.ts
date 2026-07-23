@@ -3,24 +3,21 @@
  * Math is not in the Lezer markdown tree — scan with a small state machine.
  */
 
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, type EditorState } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
-  ViewPlugin,
   WidgetType,
   type DecorationSet,
-  type ViewUpdate,
 } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
 import { renderKatexHtml } from "../../../utils/markdown-extensions";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   collectWikiLinkRanges,
+  defineLivePreviewBlockDecorationField,
   hasSkipAncestor,
   rangesOverlap,
   selectionTouchesRange,
-  livePreviewShouldRebuild,
 } from "./shared";
 
 export interface MathRange {
@@ -126,37 +123,15 @@ class MathWidget extends WidgetType {
   }
 }
 
-export function buildLivePreviewMathDecorations(
-  view: EditorView,
-): DecorationSet {
-  if (isLargeEditorState(view.state)) {
+export function buildMathDecorations(state: EditorState): DecorationSet {
+  if (isLargeEditorState(state)) {
     return Decoration.none;
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const { state } = view;
   const docText = state.doc.toString();
-  const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
-    collectWikiLinkRanges(
-      docText,
-      Math.max(0, from - 2),
-      Math.min(docText.length, to + 2),
-    ),
-  );
-
-  const candidates: MathRange[] = [];
-  for (const { from, to } of view.visibleRanges) {
-    const padFrom = Math.max(0, from - 200);
-    const padTo = Math.min(docText.length, to + 200);
-    const slice = docText.slice(padFrom, padTo);
-    for (const range of findMathRangesInText(slice)) {
-      candidates.push({
-        ...range,
-        from: range.from + padFrom,
-        to: range.to + padFrom,
-      });
-    }
-  }
+  const wikiRanges = collectWikiLinkRanges(docText, 0, docText.length);
+  const candidates = findMathRangesInText(docText);
 
   candidates.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;
@@ -193,21 +168,13 @@ export function buildLivePreviewMathDecorations(
   return builder.finish();
 }
 
-export const livePreviewMath = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+/** @deprecated Prefer buildMathDecorations(state). */
+export function buildLivePreviewMathDecorations(
+  view: EditorView,
+): DecorationSet {
+  return buildMathDecorations(view.state);
+}
 
-    constructor(view: EditorView) {
-      this.decorations = buildLivePreviewMathDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (livePreviewShouldRebuild(update, "widgets")) {
-        this.decorations = buildLivePreviewMathDecorations(update.view);
-      }
-    }
-  },
-  {
-    decorations: (plugin) => plugin.decorations,
-  },
-);
+export const livePreviewMath = defineLivePreviewBlockDecorationField({
+  create: buildMathDecorations,
+});
