@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useAppStore } from "../../store/appStore";
 import { useI18n } from "../../hooks/useI18n";
 import {
@@ -22,6 +28,7 @@ import type { AskVaultCitation } from "../../types/vaultIndex";
 import type { RetrieveHit } from "../../types/vaultIndex";
 import type { FileNode } from "../../types";
 import { AppSelect } from "../ui/AppSelect";
+import { LAYOUT, clamp, getStoredPanelWidth } from "../../config/layout";
 
 interface AskVaultPanelProps {
   open: boolean;
@@ -62,6 +69,16 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   const linkIndexProgress = useAppStore((s) => s.linkIndexProgress);
   const chunkIndex = useAppStore((s) => s.chunkIndex);
   const semanticReady = useAppStore((s) => s.semanticReady);
+
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [width, setWidth] = useState(() =>
+    getStoredPanelWidth(
+      LAYOUT.STORAGE_KEYS.ASK_VAULT_WIDTH,
+      LAYOUT.ASK_VAULT.DEFAULT_WIDTH,
+      LAYOUT.ASK_VAULT.MIN_WIDTH,
+      LAYOUT.ASK_VAULT.MAX_WIDTH,
+    ),
+  );
 
   const [question, setQuestion] = useState("");
   const [scope, setScope] = useState<AskScope>("vault");
@@ -119,6 +136,47 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LAYOUT.STORAGE_KEYS.ASK_VAULT_WIDTH,
+      String(width),
+    );
+  }, [width]);
+
+  const handleResizeStart = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (window.innerWidth < 768) return;
+      event.preventDefault();
+
+      const handlePointerMove = (moveEvent: MouseEvent) => {
+        const panelRect = panelRef.current?.getBoundingClientRect();
+        const nextWidth =
+          (panelRect?.right ?? window.innerWidth) - moveEvent.clientX;
+        setWidth(
+          clamp(
+            nextWidth,
+            LAYOUT.ASK_VAULT.MIN_WIDTH,
+            LAYOUT.ASK_VAULT.MAX_WIDTH,
+          ),
+        );
+      };
+
+      const handlePointerUp = () => {
+        document.removeEventListener("mousemove", handlePointerMove);
+        document.removeEventListener("mouseup", handlePointerUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", handlePointerMove);
+      document.addEventListener("mouseup", handlePointerUp);
+    },
+    [],
+  );
 
   const resolveHydratedSettings = useCallback(async () => {
     const hydrated = await hydrateSensitiveSettingsIntoStore();
@@ -321,22 +379,38 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   if (!open) return null;
 
   return (
-    <div
-      className="ask-vault-overlay"
-      role="dialog"
-      aria-modal="true"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <aside
+      ref={panelRef}
+      className="ask-vault-module ui-scaled"
+      style={{ width: `${width}px` }}
+      aria-label={t("askVault_title")}
     >
-      <div className="ask-vault-panel">
-        <div className="ask-vault-header">
-          <h2>{t("askVault_title")}</h2>
-          <button type="button" onClick={onClose} className="ask-vault-close">
-            ×
-          </button>
-        </div>
+      <div
+        className="ask-vault-resize-handle"
+        onMouseDown={handleResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t("askVault_resize")}
+      />
 
+      <div className="ask-vault-module-header">
+        <div>
+          <h2>{t("askVault_title")}</h2>
+          <p className="ask-vault-module-subtitle">
+            {t("askVault_moduleHint")}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ask-vault-close"
+          aria-label={t("common_done")}
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="ask-vault-module-body">
         <div className="ask-vault-readiness">
           {!rootFolderPath ? (
             <p>{t("askVault_needVault")}</p>
@@ -413,7 +487,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder={t("askVault_placeholder")}
-            rows={3}
+            rows={4}
             onKeyDown={(event) => {
               if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                 event.preventDefault();
@@ -526,6 +600,6 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
           </div>
         ) : null}
       </div>
-    </div>
+    </aside>
   );
 };

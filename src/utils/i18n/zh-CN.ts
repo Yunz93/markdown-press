@@ -116,6 +116,8 @@ export default {
 
   askVault_title: "问知识库",
   askVault_short: "问库",
+  askVault_moduleHint: "与编辑器并排使用：检索、回答、跳转引用",
+  askVault_resize: "调整问库面板宽度",
   askVault_scope: "检索范围",
   askVault_scopeVault: "全库",
   askVault_scopeFolder: "当前文件夹",

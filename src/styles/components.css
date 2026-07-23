@@ -418,13 +418,82 @@
   fill: #93c5fd;
 }
 
-/* Ask Vault */
+/* Ask Vault — docked workspace module */
+.ask-vault-module {
+  position: relative;
+  height: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.dark .ask-vault-module {
+  border-left-color: rgba(255, 255, 255, 0.08);
+  background: rgba(9, 13, 21, 0.92);
+}
+
+.ask-vault-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.ask-vault-resize-handle:hover,
+.ask-vault-resize-handle:active {
+  background: rgba(37, 99, 235, 0.35);
+}
+
+.ask-vault-module-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  flex-shrink: 0;
+}
+
+.dark .ask-vault-module-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.ask-vault-module-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ask-vault-module-subtitle {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+
+.ask-vault-module-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .ask-vault-readiness {
-  margin: 0 0 12px;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--color-border, #e5e7eb) 55%, transparent);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   line-height: 1.45;
 }
 
@@ -454,47 +523,6 @@
   opacity: 0.8;
 }
 
-.ask-vault-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(4px);
-  padding: 16px;
-}
-
-.ask-vault-panel {
-  width: min(640px, 100%);
-  max-height: min(84vh, 820px);
-  overflow: auto;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
-  padding: 18px;
-}
-
-.dark .ask-vault-panel {
-  background: rgba(15, 23, 42, 0.96);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.ask-vault-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.ask-vault-header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-}
-
 .ask-vault-close {
   border: none;
   background: transparent;
@@ -502,6 +530,12 @@
   line-height: 1;
   cursor: pointer;
   color: inherit;
+  opacity: 0.7;
+  padding: 0 2px;
+}
+
+.ask-vault-close:hover {
+  opacity: 1;
 }
 
 .ask-vault-controls {
@@ -526,10 +560,15 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.ask-vault-controls textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
 .ask-vault-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-end;
 }
 
 .ask-vault-primary {
@@ -548,14 +587,16 @@
 .ask-vault-history,
 .ask-vault-sources-preview,
 .ask-vault-citations {
-  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .ask-vault-answer h3,
 .ask-vault-history h3,
 .ask-vault-sources-preview h3,
 .ask-vault-citations h4 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -576,9 +617,9 @@
   background: rgba(15, 23, 42, 0.04);
   border-radius: 12px;
   padding: 8px 10px;
-  margin-bottom: 6px;
   cursor: pointer;
   color: inherit;
+  font: inherit;
 }
 
 .dark .ask-vault-citation,
@@ -593,6 +634,7 @@
   font-size: 12px;
   color: #64748b;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Writing Stats Styles */
