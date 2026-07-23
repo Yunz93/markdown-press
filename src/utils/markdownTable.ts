@@ -629,3 +629,33 @@ export function isCellEmpty(
   const cells = getLogicalRowCells(table, logicalRow);
   return (cells[col] ?? "").trim() === "";
 }
+
+/** Set a single cell's raw markdown text (logicalRow 0 = header). */
+export function setTableCell(
+  table: MarkdownTable,
+  logicalRow: number,
+  col: number,
+  value: string,
+): MarkdownTable {
+  const columnCount = table.columnCount;
+  const c = Math.max(0, Math.min(col, columnCount - 1));
+
+  if (logicalRow <= 0) {
+    const header = normalizeRowWidth(table.header, columnCount);
+    header[c] = value;
+    return { ...table, header };
+  }
+
+  const bodyIndex = logicalRow - 1;
+  const body = table.body.map((row) => normalizeRowWidth(row, columnCount));
+  while (body.length <= bodyIndex) {
+    body.push(Array.from({ length: columnCount }, () => ""));
+  }
+  body[bodyIndex] = [...body[bodyIndex]];
+  body[bodyIndex][c] = value;
+  return {
+    ...table,
+    body,
+    endLine: table.startLine + 1 + body.length,
+  };
+}

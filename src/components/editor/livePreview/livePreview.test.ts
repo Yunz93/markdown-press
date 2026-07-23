@@ -10,12 +10,12 @@ import { buildLivePreviewImageDecorations } from "./images";
 import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
 import { buildLivePreviewWikiDecorations } from "./wiki";
-import { buildLivePreviewTableDecorations } from "./tables";
+import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
 import { findCalloutRanges } from "./callouts";
 import { findHighlightRanges, findCommentRanges } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 
-function createView(doc: string, cursor = 0) {
+function createView(doc: string, cursor = 0, withTables = false) {
   const state = EditorState.create({
     doc,
     selection: { anchor: cursor },
@@ -27,6 +27,7 @@ function createView(doc: string, cursor = 0) {
         rootFolderPath: null,
         files: [],
       }),
+      ...(withTables ? [livePreviewTables] : []),
     ],
   });
   const parent = document.createElement("div");
@@ -46,8 +47,8 @@ describe("live preview hide formatting", () => {
     }
   });
 
-  function mount(doc: string, cursor = 0) {
-    const view = createView(doc, cursor);
+  function mount(doc: string, cursor = 0, withTables = false) {
+    const view = createView(doc, cursor, withTables);
     views.push(view);
     return view;
   }
@@ -156,6 +157,53 @@ describe("live preview hide formatting", () => {
       if (value.spec.widget) widgetCount += 1;
     });
     expect(widgetCount).toBe(1);
+  });
+
+  it("keeps the table widget when the selection is inside the table", () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, 2, true);
+    const deco = buildLivePreviewTableDecorations(view);
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(1);
+    expect(view.dom.querySelector(".cm-live-preview-table")).not.toBeNull();
+  });
+
+  it("edits a table cell in place without revealing pipe source", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1, true);
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement | null;
+    expect(cell).not.toBeNull();
+
+    cell!.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const editing = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement | null;
+    expect(editing).not.toBeNull();
+    expect(view.dom.querySelector(".cm-live-preview-table")).not.toBeNull();
+
+    editing!.textContent = "hello";
+    editing!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    expect(view.state.doc.toString()).toContain("| hello |");
+    expect(view.dom.querySelector(".cm-live-preview-table")).not.toBeNull();
+    const next = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement | null;
+    expect(next?.dataset.mpCol).toBe("1");
   });
 
   it("replaces inactive markdown links with widgets", () => {

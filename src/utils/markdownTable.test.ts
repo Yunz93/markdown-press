@@ -14,6 +14,7 @@ import {
   moveRow,
   moveColumn,
   setColumnAlignment,
+  setTableCell,
   getCellContentRanges,
   locateCellInLine,
   resolveTableCursor,
@@ -162,6 +163,14 @@ describe("mutations", () => {
 
     const aligned = setColumnAlignment(table, 1, "center");
     expect(serializeTable(aligned)[1]).toContain(":---:");
+  });
+
+  it("sets a single cell value", () => {
+    const table = findTableAt(SAMPLE, 0)!;
+    const header = setTableCell(table, 0, 1, "Years");
+    expect(header.header[1]).toBe("Years");
+    const body = setTableCell(table, 2, 2, "Berlin");
+    expect(body.body[1][2]).toBe("Berlin");
   });
 });
 

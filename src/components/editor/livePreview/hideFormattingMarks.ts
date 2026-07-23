@@ -302,11 +302,21 @@ export const livePreviewTheme = EditorView.baseTheme({
       "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent)",
     padding: "0.4em 0.65em",
     verticalAlign: "top",
+    cursor: "text",
+    minWidth: "2.5em",
   },
   ".cm-live-preview-table th": {
     background:
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 12%, transparent)",
     fontWeight: "650",
+  },
+  ".cm-live-preview-table-cell-editing": {
+    outline: "2px solid var(--mp-doc-accent, #2563eb)",
+    outlineOffset: "-2px",
+    background:
+      "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
+    whiteSpace: "pre-wrap",
+    caretColor: "var(--mp-doc-accent, #2563eb)",
   },
   ".cm-live-preview-callout": {
     display: "block",
