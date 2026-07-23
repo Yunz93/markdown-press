@@ -126,18 +126,23 @@ function diffConfigPaths(left: unknown, right: unknown, path = ""): string[] {
 }
 
 describe("Tauri window config", () => {
-  it("keeps the release main window discoverable by macOS window listing", () => {
+  it("hides the overlay title text while keeping the product name for the app bundle", () => {
     const config = readTauriConfig("src-tauri/tauri.conf.json");
 
-    expect(getMainWindowTitle(config)).toBe(config.productName);
+    expect(config.productName).toBeTruthy();
+    expect(getMainWindowTitle(config)).toBe("");
+    expect(getMainWindow(config)?.hiddenTitle).toBe(true);
+    expect(getMainWindow(config)?.titleBarStyle).toBe("Overlay");
   });
 
-  it("keeps the dev main window discoverable by macOS window listing", () => {
+  it("keeps the dev main window title hidden like release", () => {
     const releaseConfig = readTauriConfig("src-tauri/tauri.conf.json");
     const devOverlay = readTauriConfig("src-tauri/tauri.dev.conf.json");
     const mergedDevConfig = mergeTauriConfigs(releaseConfig, devOverlay);
 
-    expect(getMainWindowTitle(mergedDevConfig)).toBe(releaseConfig.productName);
+    expect(getMainWindowTitle(mergedDevConfig)).toBe("");
+    expect(getMainWindow(mergedDevConfig)?.hiddenTitle).toBe(true);
+    expect(getMainWindow(mergedDevConfig)?.titleBarStyle).toBe("Overlay");
   });
 
   it("keeps dev overlay window chrome aligned with release because arrays are replaced", () => {
