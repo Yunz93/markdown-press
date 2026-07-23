@@ -93,7 +93,9 @@
   max-width: 100%;
   min-height: calc(100vh - 12rem);
   box-sizing: border-box;
-  padding: var(--pane-content-top) var(--pane-content-px)
+  /* CodeMirror: vertical padding on cm-content, horizontal on cm-line.
+     Horizontal padding here breaks drawSelection leftSide/rightSide math. */
+  padding: var(--pane-content-top) 0
     var(--editor-content-bottom, var(--pane-content-bottom)) !important;
   outline: none;
   white-space: pre;
@@ -119,10 +121,12 @@
 .editor-pane-layout .cm-line {
   display: block;
   position: relative;
+  box-sizing: border-box;
   /* 勿对 padding-left 使用 !important，否则列表悬挂缩进（内联 padding-left）无法生效 */
   padding-top: 0 !important;
   padding-bottom: 0 !important;
-  padding-right: 0 !important;
+  padding-right: var(--pane-content-px) !important;
+  padding-left: var(--pane-content-px);
   color: inherit;
 }
 
@@ -151,7 +155,12 @@
 }
 
 .editor-pane-layout .cm-fenced-code-line {
-  background: var(--editor-code-block-bg);
+  /* Selection is drawn behind line backgrounds; keep fill translucent so it stays visible. */
+  background: color-mix(
+    in srgb,
+    var(--editor-code-block-bg) 55%,
+    transparent
+  );
   color: var(--editor-code-fg);
   box-shadow:
     inset 1px 0 0 var(--editor-code-block-border),
@@ -159,7 +168,9 @@
   font-family: var(--editor-code-font-family);
   font-size: var(--editor-code-font-size);
   line-height: 1.75;
-  padding: 0 1.1rem !important;
+  /* Keep editor gutter inset + code-block chrome padding on the line (CM measures this). */
+  padding-left: calc(var(--pane-content-px) + 1.1rem) !important;
+  padding-right: calc(var(--pane-content-px) + 1.1rem) !important;
 }
 
 .editor-pane-layout .cm-fenced-code-line-start {
