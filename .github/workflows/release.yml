@@ -90,6 +90,19 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node scripts/prepare-apple-notarization.mjs
 
+      - name: Compose release body
+        id: release_body
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          {
+            echo "body<<MARKDOWN_EOF"
+            sed "s/{{VERSION}}/${VERSION}/g" .github/release-body.md
+            echo "MARKDOWN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
         env:
@@ -98,43 +111,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}
-          releaseBody: |
-            See the assets to download this version and install.
-
-            ### 0.9.17
-
-            #### 新功能与改进
-
-            - 编辑器：新增 Obsidian 风格 **实时预览（Live Preview）**——同一编辑面内隐藏 Markdown 标记，并内嵌图片 / KaTeX / wiki 链接与任务勾选。
-            - 编辑器：Markdown 表格支持 Obsidian 风格结构化编辑（对齐、行列操作等）。
-            - 设置：设置窗口可拖拽调整尺寸；元数据列宽不再被截断。
-            - UI：下拉选择统一到共享 `AppSelect` 组件。
-            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.16 相同限制）。
-
-            ### macOS 安装说明
-
-            **推荐：一键安装**
-
-            ```bash
-            curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
-            ```
-
-            脚本会自动下载对应架构的 `.dmg`、移除隔离标记并安装到「应用程序」。
-
-            已配置 Apple 开发者证书与公证凭据的 Release 也可直接拖入 Applications 打开。若仍提示无法验证开发者，请执行：
-
-            ```
-            xattr -cr /Applications/M記.app
-            ```
-
-            > 若应用仍在 Downloads 文件夹，请改用：
-            > ```
-            > xattr -cr ~/Downloads/M記.app
-            > ```
-
-            ### Windows 安装说明
-
-            下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
+          releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: false
           assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]
@@ -200,6 +177,19 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
+      - name: Compose release body
+        id: release_body
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          {
+            echo "body<<MARKDOWN_EOF"
+            sed "s/{{VERSION}}/${VERSION}/g" .github/release-body.md
+            echo "MARKDOWN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
         env:
@@ -207,43 +197,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Release ${{ github.ref_name }}
-          releaseBody: |
-            See the assets to download this version and install.
-
-            ### 0.9.17
-
-            #### 新功能与改进
-
-            - 编辑器：新增 Obsidian 风格 **实时预览（Live Preview）**——同一编辑面内隐藏 Markdown 标记，并内嵌图片 / KaTeX / wiki 链接与任务勾选。
-            - 编辑器：Markdown 表格支持 Obsidian 风格结构化编辑（对齐、行列操作等）。
-            - 设置：设置窗口可拖拽调整尺寸；元数据列宽不再被截断。
-            - UI：下拉选择统一到共享 `AppSelect` 组件。
-            - Windows 应用内更新：本版本仍暂不生成 `latest.json`（与 0.9.16 相同限制）。
-
-            ### macOS 安装说明
-
-            **推荐：一键安装**
-
-            ```bash
-            curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
-            ```
-
-            脚本会自动下载对应架构的 `.dmg`、移除隔离标记并安装到「应用程序」。
-
-            已配置 Apple 开发者证书与公证凭据的 Release 也可直接拖入 Applications 打开。若仍提示无法验证开发者，请执行：
-
-            ```
-            xattr -cr /Applications/M記.app
-            ```
-
-            > 若应用仍在 Downloads 文件夹，请改用：
-            > ```
-            > xattr -cr ~/Downloads/M記.app
-            > ```
-
-            ### Windows 安装说明
-
-            下载 `.exe` 安装程序，双击运行即可。如果 Windows SmartScreen 拦截，点击"更多信息" → "仍要运行"。
+          releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: false
           assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]

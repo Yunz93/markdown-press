@@ -1,4 +1,4 @@
-import type { AppSettings, FileNode } from "../../types";
+import type { AppSettings } from "../../types";
 import type { ChunkIndexSnapshot, TextChunk } from "../../types/vaultIndex";
 import { BUILTIN_EMBEDDING_MODEL } from "./builtinEmbedding";
 import { createEmbeddingProvider } from "./embeddingProvider";
@@ -13,6 +13,46 @@ import type { VectorStore, VectorStoreSnapshot } from "./vectorStore";
 const EMBED_BATCH = 16;
 const BUILTIN_EMBED_BATCH = 4;
 
+/** Stable model id stored on VectorStore / disk snapshots. */
+export function resolveEmbeddingModelId(settings: {
+  embeddingProvider?: AppSettings["embeddingProvider"];
+  embeddingModel?: string;
+}): string {
+  const provider = settings.embeddingProvider ?? "builtin";
+  if (provider === "none") return "";
+  if (provider === "builtin") return `builtin:${BUILTIN_EMBEDDING_MODEL}`;
+  return `${provider}:${settings.embeddingModel?.trim() || "nomic-embed-text"}`;
+}
+
+/**
+ * True when a persisted vector snapshot matches the current embedding
+ * provider/model (and has a positive dims when it contains records).
+ */
+export function isCompatibleVectorSnapshot(
+  snapshot: VectorStoreSnapshot | null | undefined,
+  settings: {
+    embeddingProvider?: AppSettings["embeddingProvider"];
+    embeddingModel?: string;
+  },
+): boolean {
+  if (!snapshot) return false;
+  const expected = resolveEmbeddingModelId(settings);
+  if (!expected) return snapshot.records.length === 0;
+  if (snapshot.model !== expected) return false;
+  if (snapshot.records.length === 0) return true;
+  if (snapshot.dims <= 0) return false;
+  // Reject corrupt snapshots where declared dims disagree with vectors.
+  const sample = snapshot.records[0];
+  if (
+    sample &&
+    sample.values.length > 0 &&
+    sample.values.length !== snapshot.dims
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export async function embedChunkIndex(options: {
   chunkIndex: ChunkIndexSnapshot;
   vectorStore: VectorStore;
@@ -20,6 +60,8 @@ export async function embedChunkIndex(options: {
   previousByPath?: Record<string, TextChunk[]>;
   onProgress?: (done: number, total: number) => void;
   shouldCancel?: () => boolean;
+  /** Force full re-embed even if content hashes match. */
+  forceFullReembed?: boolean;
 }): Promise<void> {
   const provider = createEmbeddingProvider(options.settings);
   if (provider.id === "none") {
@@ -27,20 +69,38 @@ export async function embedChunkIndex(options: {
     return;
   }
 
-  const model =
-    provider.id === "builtin"
-      ? `builtin:${BUILTIN_EMBEDDING_MODEL}`
-      : options.settings.embeddingModel?.trim() || "nomic-embed-text";
+  const model = resolveEmbeddingModelId(options.settings);
+  const modelChanged =
+    Boolean(options.vectorStore.model) && options.vectorStore.model !== model;
+  const forceFull =
+    options.forceFullReembed === true ||
+    modelChanged ||
+    !isCompatibleVectorSnapshot(
+      options.vectorStore.toSnapshot(),
+      options.settings,
+    );
+
+  if (forceFull) {
+    // Drop stale vectors from a previous provider/model so contentHash hits
+    // cannot keep cross-model embeddings around.
+    options.vectorStore.load(null);
+  }
+
   options.vectorStore.model = model;
   const batchSize =
     provider.id === "builtin" ? BUILTIN_EMBED_BATCH : EMBED_BATCH;
   options.vectorStore.vaultRoot = options.chunkIndex.vaultRoot;
 
+  const previousByPath = forceFull ? undefined : options.previousByPath;
   const upsertChunks: TextChunk[] = [];
   const removeIds: string[] = [];
 
   for (const [path, chunks] of Object.entries(options.chunkIndex.byPath)) {
-    const previous = options.previousByPath?.[path] ?? [];
+    const previous = previousByPath?.[path] ?? [];
+    if (forceFull) {
+      upsertChunks.push(...chunks);
+      continue;
+    }
     const diff = diffChunks(previous, chunks);
     upsertChunks.push(...diff.upsert);
     removeIds.push(...diff.removeIds);
@@ -109,6 +169,3 @@ export async function loadVectorSnapshot(
 ): Promise<VectorStoreSnapshot | null> {
   return read<VectorStoreSnapshot>(vaultRoot, VECTOR_INDEX_FILE);
 }
-
-/** Helper kept for tree typing in callers. */
-export type MarkdownTree = FileNode[];
