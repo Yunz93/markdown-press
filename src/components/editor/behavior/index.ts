@@ -68,6 +68,29 @@ export {
   createToggleOrderedList,
 } from "./commands/list";
 
+// Re-export table commands
+export {
+  insertTable,
+  insertTableRowAbove,
+  insertTableRowBelow,
+  deleteTableRow,
+  insertTableColumnLeft,
+  insertTableColumnRight,
+  deleteTableColumn,
+  moveTableRowUp,
+  moveTableRowDown,
+  moveTableColumnLeft,
+  moveTableColumnRight,
+  alignTableColumnLeft,
+  alignTableColumnCenter,
+  alignTableColumnRight,
+  formatTable,
+  handleTableTab,
+  handleTableShiftTab,
+  handleTableEnter,
+  isInMarkdownTable,
+} from "./tables";
+
 // Re-export input handling
 export {
   handleSmartEnter,
@@ -98,6 +121,23 @@ import {
   createToggleOrderedList,
 } from "./commands/list";
 import {
+  insertTable,
+  insertTableRowAbove,
+  insertTableRowBelow,
+  deleteTableRow,
+  insertTableColumnLeft,
+  insertTableColumnRight,
+  deleteTableColumn,
+  moveTableRowUp,
+  moveTableRowDown,
+  moveTableColumnLeft,
+  moveTableColumnRight,
+  alignTableColumnLeft,
+  alignTableColumnCenter,
+  alignTableColumnRight,
+  formatTable,
+} from "./tables";
+import {
   handleSmartEnter,
   handleSmartBackspace,
   handleSmartTab,
@@ -124,6 +164,21 @@ export const markdownCommands = {
   toggleInlineCode,
   insertLink,
   insertCodeBlock,
+  insertTable,
+  insertTableRowAbove,
+  insertTableRowBelow,
+  deleteTableRow,
+  insertTableColumnLeft,
+  insertTableColumnRight,
+  deleteTableColumn,
+  moveTableRowUp,
+  moveTableRowDown,
+  moveTableColumnLeft,
+  moveTableColumnRight,
+  alignTableColumnLeft,
+  alignTableColumnCenter,
+  alignTableColumnRight,
+  formatTable,
   handleStructuredPaste,
 };
 
@@ -141,6 +196,11 @@ export function createMarkdownKeyBindings(
     { key: "Mod-i", run: toggleItalic },
     { key: "Mod-k", run: insertLink },
     { key: "Mod-Shift-k", run: insertCodeBlock },
+    { key: "Mod-Shift-t", run: insertTable },
+    { key: "Mod-Shift-Enter", run: insertTableRowBelow },
+    { key: "Alt-Shift-Enter", run: insertTableRowAbove },
+    { key: "Alt-Mod-ArrowLeft", run: insertTableColumnLeft },
+    { key: "Alt-Mod-ArrowRight", run: insertTableColumnRight },
     { key: "Mod-`", run: toggleInlineCode },
     { key: "Mod-Shift-l", run: toggleUnorderedList },
     { key: "Mod-Shift-o", run: createToggleOrderedList(orderedListMode) },
