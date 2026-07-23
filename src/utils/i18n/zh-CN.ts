@@ -188,9 +188,10 @@ export default {
   search_mode_keyword: "关键词",
   search_mode_semantic: "语义",
   search_mode_hybrid: "混合",
-  search_mode_keyword_short: "词",
-  search_mode_semantic_short: "义",
-  search_mode_hybrid_short: "混",
+  search_mode_keyword_short: "关键词",
+  search_mode_semantic_short: "语义",
+  search_mode_hybrid_short: "混合",
+  search_mode_cycleHint: "点击切换",
 
   related_tab: "相关",
   related_title: "相关笔记",
