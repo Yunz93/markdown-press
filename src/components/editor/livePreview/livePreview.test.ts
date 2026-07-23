@@ -310,6 +310,75 @@ describe("live preview hide formatting", () => {
     expect(next?.dataset.mpCol).toBe("1");
   });
 
+  it("adds and deletes rows/columns from the live table context menu", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1, [
+      livePreviewTheme,
+      livePreviewTables,
+    ]);
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement | null;
+    expect(cell).not.toBeNull();
+
+    cell!.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 40,
+        clientY: 40,
+      }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const menu = document.querySelector(
+      ".cm-live-preview-table-menu",
+    ) as HTMLElement | null;
+    expect(menu).not.toBeNull();
+
+    const insertCol = Array.from(
+      menu!.querySelectorAll(".cm-live-preview-table-menu-item"),
+    ).find(
+      (el) =>
+        el.textContent?.includes("插入列") ||
+        el.textContent?.includes("Insert column right"),
+    );
+    expect(insertCol).toBeTruthy();
+    (insertCol as HTMLButtonElement).click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    expect(view.state.doc.toString()).toMatch(/\|\s*a\s*\|\s*b\s*\|\s*\|/);
+
+    const cell2 = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement | null;
+    cell2!.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 40,
+        clientY: 40,
+      }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const menu2 = document.querySelector(".cm-live-preview-table-menu");
+    const insertRow = Array.from(
+      menu2!.querySelectorAll(".cm-live-preview-table-menu-item"),
+    ).find(
+      (el) =>
+        el.textContent?.includes("下方插入行") ||
+        el.textContent?.includes("Insert row below"),
+    );
+    (insertRow as HTMLButtonElement).click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const lines = view.state.doc.toString().split("\n");
+    const tableLines = lines.filter((line) => line.trim().startsWith("|"));
+    expect(tableLines.length).toBeGreaterThanOrEqual(4);
+  });
+
   it("replaces inactive markdown links with widgets", () => {
     const doc = "go [here](https://example.com)\n\naway";
     const view = mount(doc, doc.length - 1);

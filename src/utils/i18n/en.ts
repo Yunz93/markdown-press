@@ -960,6 +960,14 @@ export default {
     "Large-file optimization: tables, callouts, and Mermaid show placeholders.",
   editor_livePreviewLargeFileMode:
     "Very large file mode: math, images, and wiki Live widgets are off; source remains editable.",
+  table_cellHint:
+    "Right-click to add/delete rows or columns; Tab/Enter to navigate",
+  table_insertRowAbove: "Insert row above",
+  table_insertRowBelow: "Insert row below",
+  table_deleteRow: "Delete row",
+  table_insertColumnLeft: "Insert column left",
+  table_insertColumnRight: "Insert column right",
+  table_deleteColumn: "Delete column",
   editor_uploadToHosting: "Upload to hosting",
   preview_loading: "Loading...",
   preview_doubleClickReveal: "Double-click to reveal in Finder",

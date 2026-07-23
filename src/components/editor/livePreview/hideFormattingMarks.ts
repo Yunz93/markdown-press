@@ -387,6 +387,52 @@ export const livePreviewTheme = EditorView.baseTheme({
     overflowWrap: "anywhere",
     caretColor: "var(--mp-doc-accent, #2563eb)",
   },
+  ".cm-live-preview-table-menu": {
+    position: "fixed",
+    zIndex: "10050",
+    minWidth: "14rem",
+    padding: "0.3rem",
+    borderRadius: "0.5rem",
+    border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.35))",
+    background: "var(--mp-doc-surface, #fff)",
+    boxShadow: "0 10px 28px rgba(15, 23, 42, 0.16)",
+    color: "var(--mp-doc-text, #1f2937)",
+    fontSize: "0.85rem",
+    lineHeight: "1.35",
+  },
+  ".cm-live-preview-table-menu-item": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "1rem",
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    borderRadius: "0.35rem",
+    padding: "0.4rem 0.55rem",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  ".cm-live-preview-table-menu-item:hover:not(:disabled)": {
+    background:
+      "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 12%, transparent)",
+  },
+  ".cm-live-preview-table-menu-item:disabled": {
+    opacity: "0.45",
+    cursor: "not-allowed",
+  },
+  ".cm-live-preview-table-menu-kbd": {
+    color: "var(--mp-doc-muted, #94a3b8)",
+    fontSize: "0.75em",
+    whiteSpace: "nowrap",
+  },
+  ".cm-live-preview-table-menu-sep": {
+    height: "1px",
+    margin: "0.25rem 0.35rem",
+    background:
+      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent)",
+  },
   ".cm-live-preview-callout": {
     display: "block",
     marginBlock: "0.75em",

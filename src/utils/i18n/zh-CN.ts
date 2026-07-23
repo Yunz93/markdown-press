@@ -879,6 +879,13 @@ export default {
     "已进入大文件优化模式：表格 / Callout / Mermaid 显示占位，详情见组件提示。",
   editor_livePreviewLargeFileMode:
     "已进入超大文件优化模式：公式、图片、Wiki 等 Live 组件已关闭，源码仍可编辑。",
+  table_cellHint: "右键可增删行列；Tab / Enter 导航",
+  table_insertRowAbove: "在上方插入行",
+  table_insertRowBelow: "在下方插入行",
+  table_deleteRow: "删除行",
+  table_insertColumnLeft: "在左侧插入列",
+  table_insertColumnRight: "在右侧插入列",
+  table_deleteColumn: "删除列",
   editor_uploadToHosting: "上传到图床",
   preview_loading: "加载中...",
   preview_doubleClickReveal: "双击可在 Finder 中定位",
