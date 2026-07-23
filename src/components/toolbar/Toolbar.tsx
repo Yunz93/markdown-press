@@ -228,13 +228,30 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                 type="button"
                 onClick={onAskVault}
                 disabled={isPreviewOnlyFile}
-                className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] px-2 text-xs font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 dark:bg-white/[0.06] text-sky-600 dark:text-sky-300 hover:bg-white dark:hover:bg-white/10 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
                 title={t("askVault_title")}
+                aria-label={t("askVault_title")}
               >
-                {t("askVault_short")}
+                <svg
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  <path d="M12 7.5v.01" />
+                  <path d="M10.5 11a1.5 1.5 0 1 1 2.2 1.3c-.5.4-.7.7-.7 1.2" />
+                </svg>
               </button>
             ) : null}
+          </div>
 
+          <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
             <ViewModeToggle
               viewMode={viewMode}
               onViewModeChange={onViewModeChange}
