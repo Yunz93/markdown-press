@@ -1,0 +1,217 @@
+/**
+ * Live Preview KaTeX widgets for `$inline$` and `$$display$$` math.
+ * Math is not in the Lezer markdown tree — scan with a small state machine.
+ */
+
+import { RangeSetBuilder } from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
+import { renderKatexHtml } from "../../../utils/markdown-extensions";
+import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import {
+  collectWikiLinkRanges,
+  hasSkipAncestor,
+  rangesOverlap,
+  selectionTouchesRange,
+} from "./shared";
+
+export interface MathRange {
+  from: number;
+  to: number;
+  content: string;
+  displayMode: boolean;
+}
+
+/**
+ * Find math spans in `text`. Indices are relative to `text` (caller offsets).
+ * Skips escaped dollars and requires non-empty content.
+ */
+export function findMathRangesInText(text: string): MathRange[] {
+  const ranges: MathRange[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    if (text[i] === "\\" && i + 1 < text.length) {
+      i += 2;
+      continue;
+    }
+
+    if (text[i] === "$" && text[i + 1] === "$") {
+      const close = text.indexOf("$$", i + 2);
+      if (close < 0) break;
+      const content = text.slice(i + 2, close);
+      if (content.trim()) {
+        ranges.push({
+          from: i,
+          to: close + 2,
+          content,
+          displayMode: true,
+        });
+      }
+      i = close + 2;
+      continue;
+    }
+
+    if (text[i] === "$") {
+      let j = i + 1;
+      let found = -1;
+      while (j < text.length) {
+        if (text[j] === "\\" && j + 1 < text.length) {
+          j += 2;
+          continue;
+        }
+        if (text[j] === "\n") break;
+        if (text[j] === "$") {
+          found = j;
+          break;
+        }
+        j += 1;
+      }
+      if (found > i + 1) {
+        const content = text.slice(i + 1, found);
+        if (content.trim()) {
+          ranges.push({
+            from: i,
+            to: found + 1,
+            content,
+            displayMode: false,
+          });
+        }
+        i = found + 1;
+        continue;
+      }
+    }
+
+    i += 1;
+  }
+
+  return ranges;
+}
+
+class MathWidget extends WidgetType {
+  constructor(
+    readonly content: string,
+    readonly displayMode: boolean,
+    readonly html: string,
+  ) {
+    super();
+  }
+
+  eq(other: MathWidget) {
+    return (
+      this.content === other.content && this.displayMode === other.displayMode
+    );
+  }
+
+  toDOM() {
+    const el = document.createElement(this.displayMode ? "div" : "span");
+    el.className = this.displayMode
+      ? "cm-live-preview-math cm-live-preview-math-display katex-display"
+      : "cm-live-preview-math cm-live-preview-math-inline";
+    el.setAttribute("contenteditable", "false");
+    el.innerHTML = this.html;
+    return el;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+export function buildLivePreviewMathDecorations(
+  view: EditorView,
+): DecorationSet {
+  if (isLargeEditorState(view.state)) {
+    return Decoration.none;
+  }
+
+  const builder = new RangeSetBuilder<Decoration>();
+  const { state } = view;
+  const docText = state.doc.toString();
+  const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
+    collectWikiLinkRanges(
+      docText,
+      Math.max(0, from - 2),
+      Math.min(docText.length, to + 2),
+    ),
+  );
+
+  const candidates: MathRange[] = [];
+  for (const { from, to } of view.visibleRanges) {
+    const padFrom = Math.max(0, from - 200);
+    const padTo = Math.min(docText.length, to + 200);
+    const slice = docText.slice(padFrom, padTo);
+    for (const range of findMathRangesInText(slice)) {
+      candidates.push({
+        ...range,
+        from: range.from + padFrom,
+        to: range.to + padFrom,
+      });
+    }
+  }
+
+  candidates.sort((a, b) => a.from - b.from || a.to - b.to);
+  let lastTo = -1;
+
+  for (const range of candidates) {
+    if (range.from < lastTo) continue;
+    if (range.from >= range.to) continue;
+    if (selectionTouchesRange(state, range.from, range.to)) continue;
+    if (hasSkipAncestor(state, range.from)) continue;
+    if (
+      wikiRanges.some((w) => rangesOverlap(range.from, range.to, w.from, w.to))
+    ) {
+      continue;
+    }
+
+    let html: string;
+    try {
+      html = renderKatexHtml(range.content, range.displayMode);
+    } catch {
+      continue;
+    }
+
+    builder.add(
+      range.from,
+      range.to,
+      Decoration.replace({
+        widget: new MathWidget(range.content, range.displayMode, html),
+        block: range.displayMode,
+      }),
+    );
+    lastTo = range.to;
+  }
+
+  return builder.finish();
+}
+
+export const livePreviewMath = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = buildLivePreviewMathDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (
+        update.docChanged ||
+        update.selectionSet ||
+        update.viewportChanged ||
+        syntaxTree(update.startState) !== syntaxTree(update.state)
+      ) {
+        this.decorations = buildLivePreviewMathDecorations(update.view);
+      }
+    }
+  },
+  {
+    decorations: (plugin) => plugin.decorations,
+  },
+);

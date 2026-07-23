@@ -33,6 +33,7 @@ export interface MarkdownFile {
 
 export enum ViewMode {
   EDITOR = "EDITOR",
+  LIVE = "LIVE",
   PREVIEW = "PREVIEW",
   SPLIT = "SPLIT",
 }
