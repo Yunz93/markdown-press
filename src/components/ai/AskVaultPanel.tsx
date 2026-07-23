@@ -315,7 +315,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
     const files = useAppStore.getState().files;
     const freshHits = pendingHits.filter((hit) =>
-      hitPathStillExists(files, hit.path),
+      hitPathStillExists(files, hit.chunk.path),
     );
     if (freshHits.length === 0) {
       setPendingHits([]);
