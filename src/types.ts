@@ -236,6 +236,8 @@ export interface AppSettings {
   embeddingApiBaseUrl?: string;
   embeddingApiKey?: string;
   embeddingModel?: string;
+  /** Hub used to download builtin embedding weights */
+  embeddingHub?: "auto" | "huggingface" | "hf-mirror";
   privacyMode?: boolean;
   imageHosting: ImageHostingConfig;
   imageHostingGithubToken?: string;

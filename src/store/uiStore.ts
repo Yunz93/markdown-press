@@ -191,6 +191,7 @@ export const defaultSettings: AppSettings = {
   wikiPromptTemplateEn: DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
   searchModeDefault: "hybrid",
   embeddingProvider: "builtin",
+  embeddingHub: "auto",
   embeddingApiBaseUrl: "http://127.0.0.1:11434/v1",
   embeddingApiKey: "",
   embeddingModel: "nomic-embed-text",

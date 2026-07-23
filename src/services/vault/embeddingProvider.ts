@@ -79,6 +79,7 @@ export function createEmbeddingProvider(settings: {
   embeddingApiBaseUrl?: string;
   embeddingApiKey?: string;
   embeddingModel?: string;
+  embeddingHub?: "auto" | "huggingface" | "hf-mirror";
   privacyMode?: boolean;
 }): EmbeddingProvider {
   const provider = settings.embeddingProvider ?? "builtin";
@@ -86,7 +87,9 @@ export function createEmbeddingProvider(settings: {
     return new NoneEmbeddingProvider();
   }
   if (provider === "builtin") {
-    return new BuiltinEmbeddingProvider();
+    return new BuiltinEmbeddingProvider({
+      hub: settings.embeddingHub,
+    });
   }
 
   const baseUrl =
