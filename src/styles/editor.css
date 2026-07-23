@@ -1090,7 +1090,9 @@
   }
 }
 
-/* Live Preview: match Reading/Preview typography scale and tokens. */
+/* Live Preview: match Reading tokens, but keep CM line-box metrics stable.
+   Heading font-size is OK; do NOT set a tighter line-height than .cm-content
+   (that desyncs CodeMirror's height map → click/caret vertical offset). */
 .editor-pane-layout[data-live-preview="true"] .cm-content {
   font-family: var(--preview-font-family, var(--editor-font-family));
   font-size: var(--preview-font-size, var(--editor-font-size));
@@ -1105,8 +1107,7 @@
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-1 {
   font-size: 1.6em;
   font-weight: var(--mp-doc-heading-weight, 700);
-  letter-spacing: -0.02em;
-  line-height: 1.35;
+  line-height: inherit;
   color: var(--mp-doc-heading-1, var(--mp-doc-accent, #7c3aed));
 }
 
@@ -1114,8 +1115,7 @@
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-2 {
   font-size: 1.35em;
   font-weight: var(--mp-doc-heading-weight, 700);
-  letter-spacing: -0.015em;
-  line-height: 1.4;
+  line-height: inherit;
   color: var(--mp-doc-heading-2, var(--mp-doc-accent, #7c3aed));
 }
 
@@ -1123,7 +1123,7 @@
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-3 {
   font-size: 1.2em;
   font-weight: var(--mp-doc-heading-weight, 650);
-  line-height: 1.45;
+  line-height: inherit;
   color: var(--mp-doc-heading-3, var(--mp-doc-accent, #7c3aed));
 }
 
@@ -1131,6 +1131,7 @@
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-4 {
   font-size: 1.05em;
   font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
   color: var(--mp-doc-heading-4, var(--mp-doc-accent, #7c3aed));
 }
 
@@ -1138,6 +1139,7 @@
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-5 {
   font-size: 0.95em;
   font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
   color: var(--mp-doc-heading-5, var(--mp-doc-accent, #7c3aed));
 }
 
@@ -1145,6 +1147,7 @@
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-6 {
   font-size: 0.9em;
   font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
   color: var(--mp-doc-heading-6, var(--mp-doc-accent, #7c3aed));
 }
 

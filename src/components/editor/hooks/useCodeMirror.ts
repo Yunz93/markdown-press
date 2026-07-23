@@ -46,6 +46,7 @@ import {
 } from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
 import { EMPTY_LIVE_PREVIEW_CONTEXT } from "../livePreview";
+import { scheduleLivePreviewMeasure } from "../livePreview/shared";
 
 export { getEditorTooltipSpace };
 
@@ -238,6 +239,16 @@ export function useCodeMirror(
     });
     // Remounting widgets changes document height; keep the user's place.
     view.scrollDOM.scrollTop = scrollTop;
+    if (livePreviewEnabled) {
+      scheduleLivePreviewMeasure(view);
+      if (typeof document !== "undefined" && document.fonts?.ready) {
+        void document.fonts.ready.then(() => {
+          if (viewRef.current === view && view.dom.isConnected) {
+            scheduleLivePreviewMeasure(view);
+          }
+        });
+      }
+    }
   }, [compartments.livePreview, livePreviewEnabled]);
 
   useEffect(() => {

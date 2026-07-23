@@ -17,6 +17,7 @@ import {
   hasSkipAncestor,
   selectionTouchesRange,
   bindLivePreviewMediaMeasure,
+  bindLivePreviewWidgetCaret,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -93,6 +94,7 @@ class CalloutWidget extends WidgetType {
     readonly type: string,
     readonly title: string,
     readonly bodyHtml: string,
+    readonly from: number,
   ) {
     super();
   }
@@ -101,7 +103,8 @@ class CalloutWidget extends WidgetType {
     return (
       this.type === other.type &&
       this.title === other.title &&
-      this.bodyHtml === other.bodyHtml
+      this.bodyHtml === other.bodyHtml &&
+      this.from === other.from
     );
   }
 
@@ -124,6 +127,7 @@ class CalloutWidget extends WidgetType {
       bindLivePreviewMediaMeasure(view, body);
     }
 
+    bindLivePreviewWidgetCaret(view, wrap, this.from);
     return wrap;
   }
 
@@ -133,13 +137,18 @@ class CalloutWidget extends WidgetType {
 }
 
 class HorizontalRuleWidget extends WidgetType {
-  eq() {
-    return true;
+  constructor(readonly from: number) {
+    super();
   }
 
-  toDOM() {
+  eq(other: HorizontalRuleWidget) {
+    return this.from === other.from;
+  }
+
+  toDOM(view: EditorView) {
     const hr = document.createElement("hr");
     hr.className = "cm-live-preview-hr";
+    bindLivePreviewWidgetCaret(view, hr, this.from);
     return hr;
   }
 
@@ -173,6 +182,7 @@ export function buildCalloutDecorations(
             "callout",
             reason,
             callout.title,
+            callout.from,
           ),
           block: true,
         }),
@@ -203,7 +213,12 @@ export function buildCalloutDecorations(
       from: callout.from,
       to: callout.to,
       deco: Decoration.replace({
-        widget: new CalloutWidget(callout.type, callout.title, bodyHtml),
+        widget: new CalloutWidget(
+          callout.type,
+          callout.title,
+          bodyHtml,
+          callout.from,
+        ),
         block: true,
       }),
     });
@@ -223,7 +238,7 @@ export function buildCalloutDecorations(
         from: node.from,
         to: node.to,
         deco: Decoration.replace({
-          widget: new HorizontalRuleWidget(),
+          widget: new HorizontalRuleWidget(node.from),
           block: true,
         }),
       });

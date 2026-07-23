@@ -19,6 +19,7 @@ import {
   defineLivePreviewBlockDecorationField,
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
+  bindLivePreviewWidgetCaret,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -32,12 +33,17 @@ class MermaidWidget extends WidgetType {
   constructor(
     readonly source: string,
     readonly themeMode: "light" | "dark",
+    readonly from: number,
   ) {
     super();
   }
 
   eq(other: MermaidWidget) {
-    return this.source === other.source && this.themeMode === other.themeMode;
+    return (
+      this.source === other.source &&
+      this.themeMode === other.themeMode &&
+      this.from === other.from
+    );
   }
 
   get estimatedHeight() {
@@ -188,6 +194,7 @@ class MermaidWidget extends WidgetType {
       }
     });
 
+    bindLivePreviewWidgetCaret(view, wrap, this.from);
     return wrap;
   }
 
@@ -244,6 +251,7 @@ export function buildMermaidDecorations(
               "mermaid",
               reason,
               body.trim().slice(0, 48),
+              from,
             ),
             block: true,
           }),
@@ -255,7 +263,7 @@ export function buildMermaidDecorations(
         from,
         to,
         Decoration.replace({
-          widget: new MermaidWidget(body, themeMode),
+          widget: new MermaidWidget(body, themeMode, from),
           block: true,
         }),
       );

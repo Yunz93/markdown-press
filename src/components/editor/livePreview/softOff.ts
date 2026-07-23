@@ -3,12 +3,13 @@
  * Heavy/large docs keep source markdown visible and show why widgets are skipped.
  */
 
-import { WidgetType } from "@codemirror/view";
+import { EditorView, WidgetType } from "@codemirror/view";
 import type { EditorState } from "@codemirror/state";
 import {
   isHeavyLivePreviewState,
   isLargeEditorState,
 } from "../hooks/codeMirrorHelpers";
+import { bindLivePreviewWidgetCaret } from "./shared";
 
 export type LivePreviewOptimizationMode = "normal" | "heavy" | "large";
 
@@ -50,6 +51,7 @@ export class SoftOffPlaceholderWidget extends WidgetType {
     readonly kind: SoftOffKind,
     readonly reason: string,
     readonly summary = "",
+    readonly from: number | null = null,
   ) {
     super();
   }
@@ -58,11 +60,12 @@ export class SoftOffPlaceholderWidget extends WidgetType {
     return (
       this.kind === other.kind &&
       this.reason === other.reason &&
-      this.summary === other.summary
+      this.summary === other.summary &&
+      this.from === other.from
     );
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const wrap = document.createElement("div");
     wrap.className = "cm-live-preview-soft-off";
     wrap.setAttribute("contenteditable", "false");
@@ -85,6 +88,10 @@ export class SoftOffPlaceholderWidget extends WidgetType {
     hint.className = "cm-live-preview-soft-off-hint";
     hint.textContent = this.reason;
     wrap.appendChild(hint);
+
+    if (this.from != null) {
+      bindLivePreviewWidgetCaret(view, wrap, this.from);
+    }
 
     return wrap;
   }

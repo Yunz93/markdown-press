@@ -33,6 +33,9 @@ import {
   livePreviewShouldRebuild,
   bindLivePreviewImageMeasure,
   scheduleLivePreviewMeasure,
+  scheduleLivePreviewReveal,
+  isLivePreviewRevealCurrent,
+  cancelPendingLivePreviewReveals,
 } from "./shared";
 
 const imageResolvedEffect = StateEffect.define<{
@@ -117,26 +120,31 @@ class MarkdownImageWidget extends WidgetType {
       const urlTo = this.urlTo;
       const from = this.from;
       const to = this.to;
-      view.focus();
-      // Cover the whole image construct so replace widgets drop on rebuild.
-      // Selecting a sub-range inside an active replace decoration collapses.
-      view.dispatch({
-        selection: { anchor: from, head: to },
-        scrollIntoView: true,
-      });
-      if (urlFrom < urlTo) {
-        requestAnimationFrame(() => {
-          if (!view.dom.isConnected) return;
-          view.dispatch({
-            selection: { anchor: urlFrom, head: urlTo },
-            scrollIntoView: true,
-          });
+      scheduleLivePreviewReveal(view, (generation) => {
+        view.focus();
+        // Cover the whole image construct so replace widgets drop on rebuild.
+        // Selecting a sub-range inside an active replace decoration collapses.
+        view.dispatch({
+          selection: { anchor: from, head: to },
+          scrollIntoView: false,
         });
-      }
+        if (urlFrom < urlTo) {
+          requestAnimationFrame(() => {
+            if (!isLivePreviewRevealCurrent(generation)) return;
+            if (!view.dom.isConnected) return;
+            view.dispatch({
+              selection: { anchor: urlFrom, head: urlTo },
+              scrollIntoView: false,
+            });
+          });
+        }
+      });
     };
 
     wrap.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
+      // Drop any prior deferred reveal before this click's reveal runs.
+      cancelPendingLivePreviewReveals();
       // Prevent CM from applying a DOM selection inside the replaced range.
       event.preventDefault();
       event.stopPropagation();
@@ -145,7 +153,7 @@ class MarkdownImageWidget extends WidgetType {
       event.preventDefault();
       event.stopPropagation();
       // Defer past CM's DOM selection flush from this click.
-      window.setTimeout(revealSource, 0);
+      revealSource();
     });
 
     return wrap;

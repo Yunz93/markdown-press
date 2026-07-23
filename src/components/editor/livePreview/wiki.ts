@@ -47,7 +47,10 @@ import {
   selectionTouchesRange,
   bindLivePreviewImageMeasure,
   bindLivePreviewMediaMeasure,
+  bindLivePreviewWidgetCaret,
   scheduleLivePreviewMeasure,
+  scheduleLivePreviewReveal,
+  cancelPendingLivePreviewReveals,
   type BlockDecorationBuild,
   type CoverageRange,
   type WikiLinkRange,
@@ -161,6 +164,7 @@ class WikiImageWidget extends WidgetType {
 
     wrap.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
+      cancelPendingLivePreviewReveals();
       event.preventDefault();
       event.stopPropagation();
     });
@@ -169,13 +173,13 @@ class WikiImageWidget extends WidgetType {
       event.stopPropagation();
       const from = this.from;
       const to = this.to;
-      window.setTimeout(() => {
+      scheduleLivePreviewReveal(view, () => {
         view.focus();
         view.dispatch({
           selection: { anchor: from, head: to },
-          scrollIntoView: true,
+          scrollIntoView: false,
         });
-      }, 0);
+      });
     });
 
     return wrap;
@@ -191,6 +195,7 @@ class WikiNoteEmbedWidget extends WidgetType {
     readonly title: string,
     readonly target: string,
     readonly bodyHtml: string,
+    readonly from: number,
   ) {
     super();
   }
@@ -199,7 +204,8 @@ class WikiNoteEmbedWidget extends WidgetType {
     return (
       this.title === other.title &&
       this.target === other.target &&
-      this.bodyHtml === other.bodyHtml
+      this.bodyHtml === other.bodyHtml &&
+      this.from === other.from
     );
   }
 
@@ -233,11 +239,12 @@ class WikiNoteEmbedWidget extends WidgetType {
       queueMicrotask(() => scheduleLivePreviewMeasure(view));
     }
 
+    bindLivePreviewWidgetCaret(view, wrap, this.from);
     return wrap;
   }
 
-  ignoreEvent(event: Event) {
-    return event.type !== "click" && event.type !== "mousedown";
+  ignoreEvent() {
+    return true;
   }
 }
 
@@ -442,6 +449,7 @@ export function buildWikiDecorations(
             cached?.title ?? parsed.displayText,
             parsed.target,
             cached?.html ?? "",
+            range.from,
           ),
           block: true,
         }),

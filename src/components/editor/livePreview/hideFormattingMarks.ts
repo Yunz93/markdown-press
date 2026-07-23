@@ -261,7 +261,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     display: "inline-block",
     maxWidth: "100%",
     verticalAlign: "middle",
-    marginBlock: "0.35em",
+    // Prefer padding over margin — CM block height maps ignore vertical margins.
+    paddingBlock: "0.35em",
     cursor: "text",
   },
   ".cm-live-preview-image-wrap.is-loading": {
@@ -292,7 +293,6 @@ export const livePreviewTheme = EditorView.baseTheme({
     flexDirection: "column",
     gap: "0.2em",
     width: "100%",
-    marginBlock: "0.55em",
     padding: "0.55em 0.7em",
     borderRadius: "0.4rem",
     border:
@@ -321,7 +321,7 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-math-display": {
     display: "block",
     width: "100%",
-    marginBlock: "0.65em",
+    paddingBlock: "0.65em",
     overflowX: "auto",
     textAlign: "center",
   },
@@ -345,7 +345,7 @@ export const livePreviewTheme = EditorView.baseTheme({
     display: "block",
     width: "100%",
     overflowX: "auto",
-    marginBlock: "0.75em",
+    paddingBlock: "0.75em",
   },
   ".cm-live-preview-table": {
     borderCollapse: "collapse",
@@ -435,8 +435,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-callout": {
     display: "block",
-    marginBlock: "0.75em",
     padding: "0.65em 0.85em",
+    paddingBlock: "0.85em",
     borderRadius: "0.45rem",
     borderInlineStart: "4px solid var(--mp-doc-accent, #2563eb)",
     background:
@@ -468,7 +468,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     border: "none",
     borderTop:
       "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 45%, transparent)",
-    marginBlock: "1em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBlock: "1em",
   },
   ".cm-live-preview-list-marker": {
     display: "inline-block",
@@ -488,16 +489,16 @@ export const livePreviewTheme = EditorView.baseTheme({
     display: "block",
     width: "100%",
     overflowX: "auto",
-    marginBlock: "0.75em",
     padding: "0.5em",
+    paddingBlock: "0.75em",
     borderRadius: "0.45rem",
     background:
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 8%, transparent)",
   },
   ".cm-live-preview-note-embed": {
     display: "block",
-    marginBlock: "0.75em",
     padding: "0.65em 0.85em",
+    paddingBlock: "0.85em",
     borderRadius: "0.45rem",
     border:
       "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 30%, transparent)",

@@ -54,6 +54,7 @@ import {
 } from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
 import { clearPendingEditorRangeFocus } from "../../../utils/editorSelectionBridge";
+import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
@@ -217,8 +218,10 @@ export function createEditorExtensions(
     compartments.placeholder.of(cmPlaceholder(placeholder)),
     EditorView.domEventHandlers({
       mousedown: () => {
-        // User intent wins over stale outline/search focus requests.
+        // User intent wins over stale outline/search focus requests and
+        // deferred Live Preview image/wiki click-to-reveal selections.
         clearPendingEditorRangeFocus();
+        cancelPendingLivePreviewReveals();
         return false;
       },
       scroll: (() => {
