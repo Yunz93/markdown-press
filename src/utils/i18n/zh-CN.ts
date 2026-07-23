@@ -190,9 +190,16 @@ export default {
   index_embeddingBuiltinReady: "已就绪",
   index_embeddingBuiltinError: "加载失败",
   index_embeddingBuiltinHint:
-    "模型缓存在本机浏览器存储中，不上传笔记内容。首次需联网下载权重。",
+    "模型缓存在本机。首次需联网下载权重；若 Hugging Face 无法访问，请将模型源改为「国内镜像」。",
   index_embeddingBuiltinDownload: "下载并加载模型",
   index_embeddingBuiltinReload: "重新加载模型",
+  index_embeddingHub: "模型下载源",
+  index_embeddingHubActive: "当前源",
+  index_embeddingHubAuto: "自动（官方失败则切镜像）",
+  index_embeddingHubHuggingFace: "Hugging Face 官方",
+  index_embeddingHubMirror: "国内镜像（hf-mirror）",
+  index_embeddingHubHint:
+    "大陆网络建议选国内镜像。切换源后需重新点「下载并加载模型」。",
   index_embeddingBaseUrl: "API Base URL",
   index_embeddingModel: "Embedding 模型",
   index_embeddingApiKey: "API Key（可选）",

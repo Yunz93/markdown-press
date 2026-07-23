@@ -7,7 +7,9 @@ import {
   BUILTIN_EMBEDDING_MODEL,
   ensureBuiltinEmbeddingReady,
   getBuiltinEmbeddingStatus,
+  resetBuiltinEmbeddingPipeline,
   subscribeBuiltinEmbeddingStatus,
+  type BuiltinEmbeddingHub,
   type BuiltinEmbeddingStatus,
 } from "../../../services/vault/builtinEmbedding";
 import { useSecureSettings } from "../useSecureSettings";
@@ -188,6 +190,43 @@ export const IndexTab: React.FC<IndexTabProps> = ({
                       : t("index_embeddingBuiltinIdle")}
               </span>
             </div>
+            {builtinStatus.hub ? (
+              <div className="flex justify-between gap-3 text-gray-600 dark:text-gray-300">
+                <span>{t("index_embeddingHubActive")}</span>
+                <span className="font-medium text-gray-900 dark:text-white text-right break-all">
+                  {builtinStatus.hub}
+                </span>
+              </div>
+            ) : null}
+            <label className="block text-sm">
+              <span className="mb-1 block text-gray-600 dark:text-gray-300">
+                {t("index_embeddingHub")}
+              </span>
+              <AppSelect
+                aria-label={t("index_embeddingHub")}
+                value={settings.embeddingHub ?? "auto"}
+                options={[
+                  { value: "auto", label: t("index_embeddingHubAuto") },
+                  {
+                    value: "huggingface",
+                    label: t("index_embeddingHubHuggingFace"),
+                  },
+                  {
+                    value: "hf-mirror",
+                    label: t("index_embeddingHubMirror"),
+                  },
+                ]}
+                onChange={(embeddingHub) => {
+                  resetBuiltinEmbeddingPipeline();
+                  onUpdateSettings({
+                    embeddingHub: embeddingHub as BuiltinEmbeddingHub,
+                  });
+                }}
+              />
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("index_embeddingHubHint")}
+            </p>
             {builtinStatus.phase === "loading" ? (
               <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
                 <div
@@ -208,7 +247,15 @@ export const IndexTab: React.FC<IndexTabProps> = ({
               type="button"
               disabled={builtinStatus.phase === "loading"}
               onClick={() => {
-                void ensureBuiltinEmbeddingReady()
+                const hub = settings.embeddingHub ?? "auto";
+                // Reload / retry must drop the cached pipeline first.
+                if (
+                  builtinStatus.phase === "ready" ||
+                  builtinStatus.phase === "error"
+                ) {
+                  resetBuiltinEmbeddingPipeline();
+                }
+                void ensureBuiltinEmbeddingReady(hub)
                   .then(() => setMessage(t("index_embeddingBuiltinReady")))
                   .catch((error) =>
                     setMessage(

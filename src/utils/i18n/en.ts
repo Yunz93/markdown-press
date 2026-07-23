@@ -199,9 +199,16 @@ export default {
   index_embeddingBuiltinReady: "Ready",
   index_embeddingBuiltinError: "Failed to load",
   index_embeddingBuiltinHint:
-    "Weights are cached on this device. Note text is embedded locally; the first download needs network access.",
+    "Weights are cached on this device. The first download needs network access; if Hugging Face is blocked, switch the model hub to the China mirror.",
   index_embeddingBuiltinDownload: "Download and load model",
   index_embeddingBuiltinReload: "Reload model",
+  index_embeddingHub: "Model download source",
+  index_embeddingHubActive: "Active source",
+  index_embeddingHubAuto: "Auto (official, then mirror)",
+  index_embeddingHubHuggingFace: "Hugging Face",
+  index_embeddingHubMirror: "China mirror (hf-mirror)",
+  index_embeddingHubHint:
+    "Prefer the China mirror when huggingface.co is unreachable. After switching, click Download again.",
   index_embeddingBaseUrl: "API Base URL",
   index_embeddingModel: "Embedding model",
   index_embeddingApiKey: "API Key (optional)",
