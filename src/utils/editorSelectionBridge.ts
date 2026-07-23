@@ -201,10 +201,17 @@ export function requestEditorRangeFocus(
   const didFocus = tryFlushPendingEditorFocus();
   if (didFocus) return true;
 
-  pendingEditorFocusRetryTimers = EDITOR_FOCUS_RETRY_DELAYS_MS.map((delay) =>
-    window.setTimeout(() => {
-      tryFlushPendingEditorFocus();
-    }, delay),
+  const lastRetryIndex = EDITOR_FOCUS_RETRY_DELAYS_MS.length - 1;
+  pendingEditorFocusRetryTimers = EDITOR_FOCUS_RETRY_DELAYS_MS.map(
+    (delay, index) =>
+      window.setTimeout(() => {
+        const flushed = tryFlushPendingEditorFocus();
+        // Drop stale requests after the final retry so a later click/register
+        // cannot suddenly jump the caret to an old outline/search offset.
+        if (!flushed && index === lastRetryIndex) {
+          pendingEditorFocusRequest = null;
+        }
+      }, delay),
   );
   return false;
 }
