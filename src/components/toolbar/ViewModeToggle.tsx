@@ -1,10 +1,11 @@
 /**
- * Toolbar toggle between Live Preview (edit) and Reading (preview-only).
+ * Toolbar toggle: Source (edit) / Live Preview / Reading.
  */
 
 import React from "react";
 import { ViewMode } from "../../types";
 import { useI18n } from "../../hooks/useI18n";
+import { normalizeSessionViewMode } from "../../utils/viewMode";
 
 interface ViewModeToggleProps {
   viewMode: ViewMode;
@@ -18,6 +19,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
   previewOnly = false,
 }) => {
   const { t } = useI18n();
+  const mode = normalizeSessionViewMode(viewMode);
 
   const inactiveClass =
     "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-white/5";
@@ -30,14 +32,32 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
       active ? activeClass : disabled ? disabledClass : inactiveClass
     }`;
 
-  const isReading = viewMode === ViewMode.PREVIEW;
-
   return (
     <div className="flex items-center gap-0.5">
       <button
+        onClick={() => onViewModeChange(ViewMode.EDITOR)}
+        disabled={previewOnly}
+        className={buttonClass(mode === ViewMode.EDITOR, previewOnly)}
+        title={t("view_editorOnly")}
+      >
+        <svg
+          className="h-3.5 w-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="16 18 22 12 16 6" />
+          <polyline points="8 6 2 12 8 18" />
+        </svg>
+      </button>
+
+      <button
         onClick={() => onViewModeChange(ViewMode.LIVE)}
         disabled={previewOnly}
-        className={buttonClass(viewMode === ViewMode.LIVE, previewOnly)}
+        className={buttonClass(mode === ViewMode.LIVE, previewOnly)}
         title={t("view_livePreview")}
       >
         <svg
@@ -56,7 +76,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
 
       <button
         onClick={() => onViewModeChange(ViewMode.PREVIEW)}
-        className={buttonClass(isReading)}
+        className={buttonClass(mode === ViewMode.PREVIEW)}
         title={t("view_preview")}
       >
         <svg

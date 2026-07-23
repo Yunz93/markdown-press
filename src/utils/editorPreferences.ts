@@ -22,15 +22,14 @@ export function normalizeDefaultViewMode(value: unknown): ViewMode {
   if (value === ViewMode.PREVIEW || value === "PREVIEW") {
     return ViewMode.PREVIEW;
   }
-  // LIVE is the writing mode; legacy EDITOR / SPLIT map here.
-  if (
-    value === ViewMode.LIVE ||
-    value === "LIVE" ||
-    value === ViewMode.EDITOR ||
-    value === "EDITOR" ||
-    value === ViewMode.SPLIT ||
-    value === "SPLIT"
-  ) {
+  if (value === ViewMode.EDITOR || value === "EDITOR") {
+    return ViewMode.EDITOR;
+  }
+  if (value === ViewMode.LIVE || value === "LIVE") {
+    return ViewMode.LIVE;
+  }
+  // Legacy SPLIT maps to Live Preview (edit + render without dual panes).
+  if (value === ViewMode.SPLIT || value === "SPLIT") {
     return ViewMode.LIVE;
   }
   return ViewMode.LIVE;

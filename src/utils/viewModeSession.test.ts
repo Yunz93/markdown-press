@@ -17,7 +17,7 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
     });
   });
 
-  it("normalizes legacy modes when saving before preview-only", () => {
+  it("preserves source mode when saving before preview-only", () => {
     expect(
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: false,
@@ -27,7 +27,7 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
       }),
     ).toEqual({
       nextViewMode: ViewMode.PREVIEW,
-      nextViewModeBeforePreviewOnly: ViewMode.LIVE,
+      nextViewModeBeforePreviewOnly: ViewMode.EDITOR,
     });
   });
 

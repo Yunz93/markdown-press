@@ -23,8 +23,9 @@ describe("normalizeDefaultViewMode", () => {
     expect(normalizeDefaultViewMode("nope")).toBe(ViewMode.LIVE);
   });
 
-  it("keeps live/preview and maps legacy modes to live", () => {
-    expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.LIVE);
+  it("keeps editor/live/preview and maps legacy split to live", () => {
+    expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.EDITOR);
+    expect(normalizeDefaultViewMode(ViewMode.EDITOR)).toBe(ViewMode.EDITOR);
     expect(normalizeDefaultViewMode(ViewMode.PREVIEW)).toBe(ViewMode.PREVIEW);
     expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.LIVE);
     expect(normalizeDefaultViewMode("LIVE")).toBe(ViewMode.LIVE);
