@@ -1,7 +1,7 @@
 /**
  * Hook for view mode management
  *
- * Toggle cycle: Live Preview ↔ Reading
+ * Toggle cycle: Source → Live Preview → Reading → Source
  */
 
 import { useCallback } from "react";
@@ -15,6 +15,10 @@ export function useViewMode() {
   const toggleViewMode = useCallback(() => {
     setViewMode(getNextViewMode(viewMode), "toggle");
   }, [viewMode, setViewMode]);
+
+  const setEditorOnly = useCallback(() => {
+    setViewMode(ViewMode.EDITOR, "direct");
+  }, [setViewMode]);
 
   const setLivePreview = useCallback(() => {
     setViewMode(ViewMode.LIVE, "direct");
@@ -30,8 +34,10 @@ export function useViewMode() {
     viewMode: normalized,
     setViewMode,
     toggleViewMode,
+    setEditorOnly,
     setLivePreview,
     setPreviewOnly,
+    isEditorOnly: normalized === ViewMode.EDITOR,
     isLivePreview: normalized === ViewMode.LIVE,
     isPreviewOnly: normalized === ViewMode.PREVIEW,
   };
