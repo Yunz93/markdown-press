@@ -31,7 +31,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
 import { convertHtmlToMarkdown } from "../../../utils/htmlToMarkdown";
@@ -48,6 +48,7 @@ import {
   markdownListDecorations,
   markdownHighlightStyle,
 } from "../decorations";
+import { createLivePreviewExtensions } from "../livePreview";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
@@ -64,6 +65,7 @@ interface EditorCompartments {
   keymap: Compartment;
   darkTheme: Compartment;
   markdown: Compartment;
+  livePreview: Compartment;
 }
 
 export interface CreateEditorExtensionsContext {
@@ -72,6 +74,7 @@ export interface CreateEditorExtensionsContext {
   orderedListMode: OrderedListMode;
   wordWrap: boolean;
   placeholder: string;
+  livePreviewEnabled: boolean;
   preferences: EditorPreferenceOptions;
   compartments: EditorCompartments;
   preferenceCompartments: EditorPreferenceCompartments;
@@ -137,6 +140,7 @@ export function createEditorExtensions(
     orderedListMode,
     wordWrap,
     placeholder,
+    livePreviewEnabled,
     preferences,
     compartments,
     preferenceCompartments,
@@ -185,12 +189,18 @@ export function createEditorExtensions(
     }),
     ...wrapEditorPreferenceExtensions(preferenceCompartments, preferences),
     compartments.markdown.of(
-      markdown({ codeLanguages: resolveEditorCodeLanguage }),
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: resolveEditorCodeLanguage,
+      }),
     ),
     drawSelection(),
     frontmatterDecorations,
     fencedCodeDecorations,
     markdownListDecorations,
+    compartments.livePreview.of(
+      livePreviewEnabled ? createLivePreviewExtensions() : [],
+    ),
     compartments.wrap.of(wordWrap ? EditorView.lineWrapping : []),
     syntaxHighlighting(markdownHighlightStyle),
     compartments.placeholder.of(cmPlaceholder(placeholder)),

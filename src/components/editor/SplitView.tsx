@@ -8,6 +8,11 @@ import React, {
 } from "react";
 import { useAppStore } from "../../store/appStore";
 import { ViewMode } from "../../types";
+import {
+  isEditorSoloMode,
+  isEditorVisibleMode,
+  isPreviewVisibleMode,
+} from "../../utils/viewMode";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
 import { WritingStatsDisplay } from "../stats/WritingStatsDisplay";
@@ -167,7 +172,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
       return;
     }
     const mode = useAppStore.getState().viewMode;
-    if (mode !== ViewMode.PREVIEW) {
+    if (isEditorVisibleMode(mode)) {
       previewScrollPercentageRef.current = percentage;
     }
     if (mode === ViewMode.SPLIT) {
@@ -188,7 +193,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
       return;
     }
     const mode = useAppStore.getState().viewMode;
-    if (mode !== ViewMode.EDITOR) {
+    if (isPreviewVisibleMode(mode)) {
       editorScrollPercentageRef.current = percentage;
     }
     if (mode === ViewMode.SPLIT) {
@@ -212,13 +217,13 @@ export const SplitView: React.FC<SplitViewProps> = ({
     (anchorPercentage: number) => {
       cleanupTransition();
 
-      if (viewMode !== ViewMode.PREVIEW) {
+      if (isEditorVisibleMode(viewMode)) {
         editorPaneRef.current?.syncScrollTo(anchorPercentage, {
           immediate: true,
         });
       }
 
-      if (viewMode !== ViewMode.EDITOR) {
+      if (isPreviewVisibleMode(viewMode)) {
         previewPaneRef.current?.syncScrollTo(anchorPercentage, {
           immediate: true,
         });
@@ -226,12 +231,12 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
       const resyncAfterTransition = () => {
         transitionCleanupRef.current = null;
-        if (viewMode !== ViewMode.PREVIEW) {
+        if (isEditorVisibleMode(viewMode)) {
           editorPaneRef.current?.syncScrollTo(anchorPercentage, {
             immediate: true,
           });
         }
-        if (viewMode !== ViewMode.EDITOR) {
+        if (isPreviewVisibleMode(viewMode)) {
           previewPaneRef.current?.syncScrollTo(anchorPercentage, {
             immediate: true,
           });
@@ -329,12 +334,11 @@ export const SplitView: React.FC<SplitViewProps> = ({
   }, [syncVisiblePanesToAnchor, viewMode]);
 
   const isSplitView = visualMode === ViewMode.SPLIT;
-  const editorWidth =
-    visualMode === ViewMode.EDITOR
-      ? 100
-      : visualMode === ViewMode.SPLIT
-        ? splitRatio
-        : 0;
+  const editorWidth = isEditorSoloMode(visualMode)
+    ? 100
+    : visualMode === ViewMode.SPLIT
+      ? splitRatio
+      : 0;
   const previewWidth =
     visualMode === ViewMode.PREVIEW
       ? 100
@@ -343,7 +347,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
         : 0;
   const editorActive = editorWidth > 0;
   const previewActive = previewWidth > 0;
-  const previewRenderActive = viewMode !== ViewMode.EDITOR || previewActive;
+  const previewRenderActive = isPreviewVisibleMode(viewMode) || previewActive;
   const activePaneKey = activeTabId ?? "no-active-tab";
   const markdownStyleVariables = useMemo(
     () =>

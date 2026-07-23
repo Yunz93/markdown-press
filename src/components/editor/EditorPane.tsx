@@ -20,6 +20,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore, selectContent } from "../../store/appStore";
+import { ViewMode } from "../../types";
 import {
   getPaneLayoutMetrics,
   scalePaneLayoutMetrics,
@@ -391,6 +392,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       wordWrap: settings.wordWrap,
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
+      livePreviewEnabled: viewMode === ViewMode.LIVE,
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
       showLineNumbers: settings.showLineNumbers,
@@ -877,6 +879,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             ? " show-editor-gutters"
             : ""
         }`}
+        data-live-preview={viewMode === ViewMode.LIVE ? "true" : undefined}
         style={layoutStyle}
       >
         {isSaving && (

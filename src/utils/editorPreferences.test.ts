@@ -27,6 +27,8 @@ describe("normalizeDefaultViewMode", () => {
     expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.EDITOR);
     expect(normalizeDefaultViewMode(ViewMode.PREVIEW)).toBe(ViewMode.PREVIEW);
     expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.SPLIT);
+    expect(normalizeDefaultViewMode("LIVE")).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode(ViewMode.LIVE)).toBe(ViewMode.LIVE);
   });
 });
 

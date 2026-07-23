@@ -27,6 +27,7 @@ import {
   normalizeDefaultViewMode,
   normalizeTabSize,
 } from "../utils/editorPreferences";
+import { resolveLastNonSplitViewMode } from "../utils/viewMode";
 import { normalizeMetadataFields } from "../utils/metadataFields";
 import { normalizeTrashFolder } from "../utils/trashFolder";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
@@ -176,10 +177,9 @@ export const useAppStore = create<AppState>()(
           semanticVectorCount: currentState.semanticVectorCount,
           // Session starts from the configured default; file switches keep the live mode.
           viewMode: mergedSettings.defaultViewMode,
-          lastNonSplitViewMode:
-            mergedSettings.defaultViewMode === ViewMode.PREVIEW
-              ? ViewMode.PREVIEW
-              : ViewMode.EDITOR,
+          lastNonSplitViewMode: resolveLastNonSplitViewMode(
+            mergedSettings.defaultViewMode,
+          ),
           viewModeBeforePreviewOnly: null,
         };
       },

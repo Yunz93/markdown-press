@@ -24,7 +24,7 @@ import {
   keymap,
   placeholder as cmPlaceholder,
 } from "@codemirror/view";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
 import { extractMarkdownFenceLanguages } from "../../../utils/shikiLanguages";
 import { createMarkdownKeyBindings } from "../behavior";
@@ -40,6 +40,7 @@ import {
   createEditorPreferenceCompartments,
   type EditorPreferenceOptions,
 } from "./editorPreferenceExtensions";
+import { createLivePreviewExtensions } from "../livePreview";
 
 export { getEditorTooltipSpace };
 
@@ -55,6 +56,8 @@ export interface UseCodeMirrorOptions {
   orderedListMode?: OrderedListMode;
   /** 与 html.dark / 应用主题一致，供补全浮层等 CodeMirror 主题作用域使用 */
   themeMode?: ThemeMode;
+  /** Obsidian-style inline live preview (hide marks when inactive). */
+  livePreviewEnabled?: boolean;
   autoPairBrackets?: boolean;
   autoPairMarkdown?: boolean;
   showLineNumbers?: boolean;
@@ -104,6 +107,7 @@ export function useCodeMirror(
     wordWrap = true,
     orderedListMode = "strict",
     themeMode = "light",
+    livePreviewEnabled = false,
     autoPairBrackets = DEFAULT_PREFERENCES.autoPairBrackets,
     autoPairMarkdown = DEFAULT_PREFERENCES.autoPairMarkdown,
     showLineNumbers = DEFAULT_PREFERENCES.showLineNumbers,
@@ -172,6 +176,7 @@ export function useCodeMirror(
       keymap: new Compartment(),
       darkTheme: new Compartment(),
       markdown: new Compartment(),
+      livePreview: new Compartment(),
     }),
     [],
   );
@@ -213,6 +218,16 @@ export function useCodeMirror(
       ),
     });
   }, [compartments.wrap, wordWrap]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: compartments.livePreview.reconfigure(
+        livePreviewEnabled ? createLivePreviewExtensions() : [],
+      ),
+    });
+  }, [compartments.livePreview, livePreviewEnabled]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -367,7 +382,10 @@ export function useCodeMirror(
     if (!view) return;
     view.dispatch({
       effects: compartments.markdown.reconfigure(
-        markdown({ codeLanguages: resolveEditorCodeLanguage }),
+        markdown({
+          base: markdownLanguage,
+          codeLanguages: resolveEditorCodeLanguage,
+        }),
       ),
     });
   }, [compartments.markdown, markdownLanguageRevision]);
@@ -383,6 +401,7 @@ export function useCodeMirror(
         orderedListMode,
         wordWrap,
         placeholder,
+        livePreviewEnabled,
         preferences,
         compartments,
         preferenceCompartments,
@@ -504,6 +523,9 @@ export function useCodeMirror(
           compartments.wrap.reconfigure(
             wordWrap ? EditorView.lineWrapping : [],
           ),
+          compartments.livePreview.reconfigure(
+            livePreviewEnabled ? createLivePreviewExtensions() : [],
+          ),
           compartments.keymap.reconfigure(
             Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
           ),
@@ -570,12 +592,14 @@ export function useCodeMirror(
     documentKey,
     compartments.darkTheme,
     compartments.wrap,
+    compartments.livePreview,
     compartments.keymap,
     compartments.placeholder,
     preferenceCompartments,
     preferences,
     themeMode,
     wordWrap,
+    livePreviewEnabled,
     orderedListMode,
     placeholder,
   ]);

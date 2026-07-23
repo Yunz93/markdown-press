@@ -95,9 +95,10 @@ export default {
   ai_generateWiki: "Generate explainer wiki with AI",
   ai_generatingWiki: "Generating wiki...",
 
-  view_editorOnly: "Editor only",
+  view_editorOnly: "Source only",
+  view_livePreview: "Live preview",
   view_split: "Split view",
-  view_preview: "Preview",
+  view_preview: "Reading view",
 
   split_toggleOutline: "Toggle outline",
   split_hideOutline: "Hide side panel",
@@ -476,8 +477,9 @@ export default {
   settings_defaultViewMode: "Default view mode",
   settings_defaultViewModeDesc:
     "Initial view when the app starts. After you choose a mode, switching files keeps it.",
-  settings_defaultViewModeEditor: "Editor",
-  settings_defaultViewModePreview: "Preview",
+  settings_defaultViewModeEditor: "Source",
+  settings_defaultViewModeLive: "Live preview",
+  settings_defaultViewModePreview: "Reading",
   settings_defaultViewModeSplit: "Split",
   settings_attachmentLocation: "Default location for new attachments",
   settings_attachmentLocationDesc:
