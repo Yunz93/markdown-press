@@ -4,14 +4,26 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it, afterEach } from "vitest";
+import { livePreviewContextFacet } from "./context";
 import { buildLivePreviewHideDecorations } from "./hideFormattingMarks";
+import { buildLivePreviewImageDecorations } from "./images";
+import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
+import { buildLivePreviewWikiDecorations } from "./wiki";
 
 function createView(doc: string, cursor = 0) {
   const state = EditorState.create({
     doc,
     selection: { anchor: cursor },
-    extensions: [markdown({ base: markdownLanguage }), EditorView.lineWrapping],
+    extensions: [
+      markdown({ base: markdownLanguage }),
+      EditorView.lineWrapping,
+      livePreviewContextFacet.of({
+        sourceFilePath: null,
+        rootFolderPath: null,
+        files: [],
+      }),
+    ],
   });
   const parent = document.createElement("div");
   document.body.appendChild(parent);
@@ -43,7 +55,6 @@ describe("live preview hide formatting", () => {
     deco.between(0, view.state.doc.length, (from, to) => {
       hidden.push([from, to]);
     });
-    // Two `**` ranges around "world"
     expect(hidden.length).toBeGreaterThanOrEqual(2);
     expect(
       hidden.some(
@@ -90,5 +101,63 @@ describe("live preview hide formatting", () => {
       if (value.spec.widget) widgetCount += 1;
     });
     expect(widgetCount).toBe(0);
+  });
+
+  it("replaces remote markdown images when inactive", () => {
+    const doc = "see ![cat](https://example.com/cat.png)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewImageDecorations(
+      view,
+      new Map(),
+      () => undefined,
+    );
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(1);
+  });
+
+  it("replaces inactive math with widgets", () => {
+    const view = mount("area $E=mc^2$ done\n\naway", 22);
+    const deco = buildLivePreviewMathDecorations(view);
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(1);
+  });
+
+  it("replaces wiki links with widgets when inactive", () => {
+    const view = mount("see [[Note]] please\n\naway", 22);
+    const deco = buildLivePreviewWikiDecorations(
+      view,
+      new Map(),
+      () => undefined,
+    );
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(1);
+  });
+});
+
+describe("findMathRangesInText", () => {
+  it("finds inline and display math", () => {
+    const ranges = findMathRangesInText("a $x$ b\n$$\ny\n$$\n");
+    expect(ranges).toHaveLength(2);
+    expect(ranges[0]).toMatchObject({
+      content: "x",
+      displayMode: false,
+    });
+    expect(ranges[1]).toMatchObject({
+      content: "\ny\n",
+      displayMode: true,
+    });
+  });
+
+  it("skips empty math", () => {
+    expect(findMathRangesInText("$$  $$\n$ $")).toEqual([]);
   });
 });

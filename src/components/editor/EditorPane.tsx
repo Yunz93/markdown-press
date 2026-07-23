@@ -385,6 +385,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     );
 
     // CodeMirror hook
+    const livePreviewContext = useMemo(
+      () => ({
+        sourceFilePath: currentFilePath,
+        rootFolderPath,
+        files,
+      }),
+      [currentFilePath, rootFolderPath, files],
+    );
     const codeMirror = useCodeMirror({
       content,
       documentKey: activeTabId,
@@ -393,6 +401,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
       livePreviewEnabled: viewMode === ViewMode.LIVE,
+      livePreviewContext,
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
       showLineNumbers: settings.showLineNumbers,

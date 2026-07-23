@@ -1153,3 +1153,18 @@
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-image {
+  max-width: min(100%, 42rem);
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-math .katex {
+  font-size: 1.05em;
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-math
+  .katex {
+  color: inherit;
+}

@@ -49,6 +49,7 @@ import {
   markdownHighlightStyle,
 } from "../decorations";
 import { createLivePreviewExtensions } from "../livePreview";
+import type { LivePreviewContext } from "../livePreview";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
@@ -75,6 +76,7 @@ export interface CreateEditorExtensionsContext {
   wordWrap: boolean;
   placeholder: string;
   livePreviewEnabled: boolean;
+  livePreviewContext: LivePreviewContext;
   preferences: EditorPreferenceOptions;
   compartments: EditorCompartments;
   preferenceCompartments: EditorPreferenceCompartments;
@@ -141,6 +143,7 @@ export function createEditorExtensions(
     wordWrap,
     placeholder,
     livePreviewEnabled,
+    livePreviewContext,
     preferences,
     compartments,
     preferenceCompartments,
@@ -199,7 +202,7 @@ export function createEditorExtensions(
     fencedCodeDecorations,
     markdownListDecorations,
     compartments.livePreview.of(
-      livePreviewEnabled ? createLivePreviewExtensions() : [],
+      livePreviewEnabled ? createLivePreviewExtensions(livePreviewContext) : [],
     ),
     compartments.wrap.of(wordWrap ? EditorView.lineWrapping : []),
     syntaxHighlighting(markdownHighlightStyle),

@@ -14,6 +14,12 @@ import {
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
+import {
+  collectWikiLinkRanges,
+  hasSkipAncestor,
+  rangesOverlap,
+  selectionTouchesRange,
+} from "./shared";
 
 const HIDEABLE_MARK_NODES = new Set([
   "HeaderMark",
@@ -41,12 +47,6 @@ const INLINE_PARENT_NODES = new Set([
 
 const BLOCK_MARK_NODES = new Set(["HeaderMark", "QuoteMark"]);
 
-const SKIP_ANCESTOR_NODES = new Set([
-  "FencedCode",
-  "CodeBlock",
-  "CommentBlock",
-]);
-
 const hideMarkDecoration = Decoration.replace({
   inclusive: true,
 });
@@ -55,42 +55,16 @@ const hideUrlDecoration = Decoration.replace({
   inclusive: true,
 });
 
-function selectionTouchesRange(
-  state: EditorState,
-  from: number,
-  to: number,
-  pad = 0,
-): boolean {
-  const start = Math.max(0, from - pad);
-  const end = Math.min(state.doc.length, to + pad);
-  for (const range of state.selection.ranges) {
-    if (range.from <= end && range.to >= start) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function hasSkipAncestor(state: EditorState, pos: number): boolean {
-  let node = syntaxTree(state).resolveInner(pos, 1);
-  for (let depth = 0; depth < 12 && node; depth += 1) {
-    if (SKIP_ANCESTOR_NODES.has(node.name)) return true;
-    if (!node.parent) break;
-    node = node.parent;
-  }
-  return false;
-}
-
-function findInlineParentRange(
+function findInlineParent(
   state: EditorState,
   markFrom: number,
   markTo: number,
-): { from: number; to: number } | null {
+): { name: string; from: number; to: number } | null {
   const mid = Math.min(markFrom, Math.max(markFrom, markTo - 1));
   let node = syntaxTree(state).resolveInner(mid, 1);
   for (let depth = 0; depth < 10 && node; depth += 1) {
     if (INLINE_PARENT_NODES.has(node.name)) {
-      return { from: node.from, to: node.to };
+      return { name: node.name, from: node.from, to: node.to };
     }
     if (!node.parent) break;
     node = node.parent;
@@ -109,7 +83,7 @@ function shouldRevealMark(
     return selectionTouchesRange(state, line.from, line.to);
   }
 
-  const parent = findInlineParentRange(state, from, to);
+  const parent = findInlineParent(state, from, to);
   if (parent) {
     return selectionTouchesRange(state, parent.from, parent.to);
   }
@@ -126,7 +100,11 @@ function shouldHideUrl(state: EditorState, from: number, to: number): boolean {
     node = node.parent;
   }
 
-  const parent = findInlineParentRange(state, from, to);
+  const parent = findInlineParent(state, from, to);
+  // Inactive images are fully replaced by the image widget — skip partial hides.
+  if (parent?.name === "Image") {
+    return false;
+  }
   if (parent) {
     return !selectionTouchesRange(state, parent.from, parent.to);
   }
@@ -144,9 +122,15 @@ export function buildLivePreviewHideDecorations(
   const { state } = view;
   const tree =
     ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
+  const docText = state.doc.toString();
+  const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
+    collectWikiLinkRanges(
+      docText,
+      Math.max(0, from - 2),
+      Math.min(docText.length, to + 2),
+    ),
+  );
 
-  // Collect then sort — tree iteration is ordered, but we may emit URL hides
-  // interleaved with marks; RangeSetBuilder requires sorted non-overlapping adds.
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
@@ -156,15 +140,25 @@ export function buildLivePreviewHideDecorations(
       enter: (node) => {
         const { name, from, to } = node;
         if (from >= to) return;
+        if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
+          return;
+        }
 
         if (HIDEABLE_MARK_NODES.has(name)) {
           if (hasSkipAncestor(state, from)) return;
+          const parent = findInlineParent(state, from, to);
+          // Image widgets replace the whole construct when inactive.
+          if (
+            parent?.name === "Image" &&
+            !selectionTouchesRange(state, parent.from, parent.to)
+          ) {
+            return;
+          }
           if (shouldRevealMark(state, name, from, to)) return;
           ranges.push({ from, to, deco: hideMarkDecoration });
           return;
         }
 
-        // Hide link/image destinations when the construct is inactive.
         if (name === "URL") {
           if (hasSkipAncestor(state, from)) return;
           if (!shouldHideUrl(state, from, to)) return;
@@ -240,5 +234,45 @@ export const livePreviewTheme = EditorView.baseTheme({
     borderRight: "2px solid #fff",
     borderBottom: "2px solid #fff",
     transform: "rotate(40deg) translate(-0.05em, -0.08em)",
+  },
+  ".cm-live-preview-image-wrap": {
+    display: "inline-block",
+    maxWidth: "100%",
+    verticalAlign: "middle",
+    marginBlock: "0.35em",
+  },
+  ".cm-live-preview-image-wrap.is-loading": {
+    minWidth: "4rem",
+    minHeight: "2.5rem",
+    background:
+      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 18%, transparent)",
+    borderRadius: "0.4rem",
+  },
+  ".cm-live-preview-image": {
+    display: "block",
+    maxWidth: "100%",
+    height: "auto",
+    borderRadius: "0.35rem",
+  },
+  ".cm-live-preview-math": {
+    display: "inline-block",
+    verticalAlign: "middle",
+  },
+  ".cm-live-preview-math-display": {
+    display: "block",
+    width: "100%",
+    marginBlock: "0.65em",
+    overflowX: "auto",
+    textAlign: "center",
+  },
+  ".cm-live-preview-wiki": {
+    color: "var(--mp-doc-accent, #2563eb)",
+    textDecoration: "underline",
+    textUnderlineOffset: "0.15em",
+    cursor: "default",
+  },
+  ".cm-live-preview-wiki.is-unresolved": {
+    color: "var(--mp-doc-muted, #94a3b8)",
+    textDecorationStyle: "dashed",
   },
 });

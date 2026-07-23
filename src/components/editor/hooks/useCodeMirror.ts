@@ -41,6 +41,8 @@ import {
   type EditorPreferenceOptions,
 } from "./editorPreferenceExtensions";
 import { createLivePreviewExtensions } from "../livePreview";
+import type { LivePreviewContext } from "../livePreview";
+import { EMPTY_LIVE_PREVIEW_CONTEXT } from "../livePreview";
 
 export { getEditorTooltipSpace };
 
@@ -58,6 +60,7 @@ export interface UseCodeMirrorOptions {
   themeMode?: ThemeMode;
   /** Obsidian-style inline live preview (hide marks when inactive). */
   livePreviewEnabled?: boolean;
+  livePreviewContext?: LivePreviewContext;
   autoPairBrackets?: boolean;
   autoPairMarkdown?: boolean;
   showLineNumbers?: boolean;
@@ -108,6 +111,7 @@ export function useCodeMirror(
     orderedListMode = "strict",
     themeMode = "light",
     livePreviewEnabled = false,
+    livePreviewContext = EMPTY_LIVE_PREVIEW_CONTEXT,
     autoPairBrackets = DEFAULT_PREFERENCES.autoPairBrackets,
     autoPairMarkdown = DEFAULT_PREFERENCES.autoPairMarkdown,
     showLineNumbers = DEFAULT_PREFERENCES.showLineNumbers,
@@ -224,10 +228,12 @@ export function useCodeMirror(
     if (!view) return;
     view.dispatch({
       effects: compartments.livePreview.reconfigure(
-        livePreviewEnabled ? createLivePreviewExtensions() : [],
+        livePreviewEnabled
+          ? createLivePreviewExtensions(livePreviewContext)
+          : [],
       ),
     });
-  }, [compartments.livePreview, livePreviewEnabled]);
+  }, [compartments.livePreview, livePreviewEnabled, livePreviewContext]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -402,6 +408,7 @@ export function useCodeMirror(
         wordWrap,
         placeholder,
         livePreviewEnabled,
+        livePreviewContext,
         preferences,
         compartments,
         preferenceCompartments,
@@ -524,7 +531,9 @@ export function useCodeMirror(
             wordWrap ? EditorView.lineWrapping : [],
           ),
           compartments.livePreview.reconfigure(
-            livePreviewEnabled ? createLivePreviewExtensions() : [],
+            livePreviewEnabled
+              ? createLivePreviewExtensions(livePreviewContext)
+              : [],
           ),
           compartments.keymap.reconfigure(
             Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
@@ -600,6 +609,7 @@ export function useCodeMirror(
     themeMode,
     wordWrap,
     livePreviewEnabled,
+    livePreviewContext,
     orderedListMode,
     placeholder,
   ]);
